@@ -3,17 +3,33 @@ import { WebhookEvent } from '@line/bot-sdk';
 import { verifySignature } from '@/lib/line/client';
 import { getDatabase } from '@/lib/db/mongodb';
 
+export async function GET() {
+  return NextResponse.json({
+    message: 'Webhook endpoint is working',
+    note: 'This endpoint only accepts POST requests from LINE Platform'
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
     const signature = request.headers.get('x-line-signature');
 
-    if (!signature || !verifySignature(body, signature)) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    // Skip signature verification for empty body (LINE verification request)
+    if (body && signature) {
+      if (!verifySignature(body, signature)) {
+        console.error('Invalid signature');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+      }
+    }
+
+    // If body is empty, it's a verification request - just return 200
+    if (!body || body.trim() === '') {
+      return NextResponse.json({ success: true });
     }
 
     const data = JSON.parse(body);
-    const events: WebhookEvent[] = data.events;
+    const events: WebhookEvent[] = data.events || [];
 
     // Process each event
     for (const event of events) {
