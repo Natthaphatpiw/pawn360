@@ -7,7 +7,8 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "setup-richmenu": "tsx scripts/setup-richmenu.ts"
+    "setup-richmenu": "tsx scripts/setup-richmenu.ts",
+    "setup-richmenu-prod": "tsx scripts/create-richmenu-production.ts"
   },
   "dependencies": {
     "@line/bot-sdk": "^10.3.0",
