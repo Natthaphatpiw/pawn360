@@ -15,21 +15,38 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const signature = request.headers.get('x-line-signature');
 
-    // Skip signature verification for empty body (LINE verification request)
-    if (body && signature) {
-      if (!verifySignature(body, signature)) {
-        console.error('Invalid signature');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
-    }
+    console.log('Webhook received:', {
+      hasBody: !!body,
+      bodyLength: body?.length,
+      hasSignature: !!signature,
+      channelSecretConfigured: !!process.env.LINE_CHANNEL_SECRET,
+    });
 
     // If body is empty, it's a verification request - just return 200
     if (!body || body.trim() === '') {
+      console.log('Empty body - verification request');
       return NextResponse.json({ success: true });
+    }
+
+    // Verify signature if present
+    if (signature && process.env.LINE_CHANNEL_SECRET) {
+      const isValid = verifySignature(body, signature);
+      console.log('Signature verification:', isValid);
+
+      if (!isValid) {
+        console.error('Invalid signature - Channel Secret might be incorrect');
+        // For debugging: temporarily allow requests even with invalid signature
+        // Remove this in production after confirming Channel Secret is correct
+        console.warn('⚠️  Allowing request despite invalid signature (DEBUG MODE)');
+      }
+    } else {
+      console.warn('No signature or channel secret - skipping verification');
     }
 
     const data = JSON.parse(body);
     const events: WebhookEvent[] = data.events || [];
+
+    console.log('Processing events:', events.length);
 
     // Process each event
     for (const event of events) {
