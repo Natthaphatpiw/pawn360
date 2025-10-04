@@ -74,16 +74,15 @@ export async function POST(request: NextRequest) {
 
     const itemId = itemResult.insertedId;
 
-    // Generate QR Code
+    // Generate QR Code as data URL
     const qrData = generateQRCodeData(itemId.toString());
-    const qrFilename = `${itemId.toString()}.png`;
-    const qrCodePath = await generateQRCode(qrData, qrFilename);
+    const qrCodeDataURL = await generateQRCode(qrData);
 
     // Create pawn request object
     const pawnRequest: PawnRequest = {
       _id: new ObjectId(),
       itemId: itemId,
-      qrCode: qrCodePath,
+      qrCode: qrCodeDataURL, // เก็บ data URL แทน path
       status: 'pending',
       createdAt: new Date(),
     };
@@ -98,11 +97,9 @@ export async function POST(request: NextRequest) {
     );
 
     // Send QR Code to LINE chat
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const qrCodeUrl = `${baseUrl}${qrCodePath}`;
-
     try {
-      await sendQRCodeImage(lineId, qrCodeUrl, qrCodeUrl);
+      // qrData คือ LIFF URL สำหรับร้านค้า
+      await sendQRCodeImage(lineId, qrCodeDataURL, qrData);
     } catch (error) {
       console.error('Error sending QR code to LINE:', error);
       // Continue even if sending fails
@@ -111,7 +108,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       itemId: itemId,
-      qrCode: qrCodePath,
+      qrCode: qrCodeDataURL,
       message: 'Pawn request created successfully. QR Code has been sent to your LINE chat.',
     });
   } catch (error) {

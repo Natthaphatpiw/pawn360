@@ -1,10 +1,9 @@
 import QRCode from 'qrcode';
-import { writeFile } from 'fs/promises';
-import path from 'path';
 
-export async function generateQRCode(data: string, filename: string): Promise<string> {
+export async function generateQRCode(data: string, filename?: string): Promise<string> {
   try {
-    // Generate QR code as data URL
+    // Generate QR code as data URL (base64)
+    // ใน Vercel ไม่สามารถเขียนไฟล์ได้ เลยต้องใช้ data URL แทน
     const qrCodeDataURL = await QRCode.toDataURL(data, {
       errorCorrectionLevel: 'H',
       type: 'image/png',
@@ -12,16 +11,8 @@ export async function generateQRCode(data: string, filename: string): Promise<st
       margin: 1,
     });
 
-    // Convert data URL to buffer
-    const base64Data = qrCodeDataURL.replace(/^data:image\/png;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    // Save to public folder
-    const publicPath = path.join(process.cwd(), 'public', 'qrcodes', filename);
-    await writeFile(publicPath, buffer);
-
-    // Return public URL
-    return `/qrcodes/${filename}`;
+    // Return data URL directly (ใช้ส่งไปยัง LINE API ได้เลย)
+    return qrCodeDataURL;
   } catch (error) {
     console.error('Error generating QR code:', error);
     throw error;
