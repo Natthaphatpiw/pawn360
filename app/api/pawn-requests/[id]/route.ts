@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db/mongodb';
+import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 
 export async function GET(
@@ -16,7 +16,7 @@ export async function GET(
       );
     }
 
-    const db = await getDatabase();
+    const { db } = await connectToDatabase();
     const itemsCollection = db.collection('items');
     const customersCollection = db.collection('customers');
 

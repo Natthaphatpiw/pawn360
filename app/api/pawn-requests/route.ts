@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db/mongodb';
+import { connectToDatabase } from '@/lib/db/mongodb';
 import { Item, Customer, PawnRequest } from '@/lib/db/models';
 import { generateQRCode, generateQRCodeData } from '@/lib/utils/qrcode';
 import { sendQRCodeImage } from '@/lib/line/client';
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = await getDatabase();
+    const { db } = await connectToDatabase();
     const itemsCollection = db.collection<Item>('items');
     const customersCollection = db.collection<Customer>('customers');
 

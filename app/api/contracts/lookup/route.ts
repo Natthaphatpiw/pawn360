@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db/mongodb';
+import { connectToDatabase } from '@/lib/db/mongodb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = await getDatabase();
+    const { db } = await connectToDatabase();
     const customersCollection = db.collection('customers');
     const contractsCollection = db.collection('contracts');
 

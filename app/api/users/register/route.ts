@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db/mongodb';
+import { connectToDatabase } from '@/lib/db/mongodb';
 import { Customer } from '@/lib/db/models';
 import { linkRichMenuToUser } from '@/lib/line/client';
 
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = await getDatabase();
+    const { db } = await connectToDatabase();
     const customersCollection = db.collection<Customer>('customers');
 
     // Check if user already exists
