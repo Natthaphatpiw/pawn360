@@ -10,7 +10,10 @@ const client = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET || '',
 });
 
-const PRODUCTION_URL = 'https://pawn360.vercel.app';
+// LIFF IDs for each endpoint
+const LIFF_ID_REGISTER = process.env.LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
+const LIFF_ID_PAWN = process.env.LIFF_ID_PAWN || '2008216710-54P86MRY';
+const LIFF_ID_CONTRACTS = process.env.LIFF_ID_CONTRACTS || '2008216710-WJXR6xOM';
 
 async function deleteOldRichMenus() {
   try {
@@ -48,7 +51,7 @@ async function createRichMenuForNewUsers() {
           },
           action: {
             type: 'uri',
-            uri: `${PRODUCTION_URL}/register`,
+            uri: `https://liff.line.me/${LIFF_ID_REGISTER}/register`,
           },
         },
       ],
@@ -76,19 +79,19 @@ async function createRichMenuForMembers() {
       areas: [
         {
           bounds: { x: 0, y: 0, width: 833, height: 843 },
-          action: { type: 'uri', uri: `${PRODUCTION_URL}/pawn/new` },
+          action: { type: 'uri', uri: `https://liff.line.me/${LIFF_ID_PAWN}/pawn/new` },
         },
         {
           bounds: { x: 833, y: 0, width: 834, height: 843 },
-          action: { type: 'uri', uri: `${PRODUCTION_URL}/contracts` },
+          action: { type: 'uri', uri: `https://liff.line.me/${LIFF_ID_CONTRACTS}/contracts` },
         },
         {
           bounds: { x: 1667, y: 0, width: 833, height: 843 },
-          action: { type: 'uri', uri: `${PRODUCTION_URL}/contracts/history` },
+          action: { type: 'uri', uri: `https://liff.line.me/${LIFF_ID_CONTRACTS}/contracts/history` },
         },
         {
           bounds: { x: 0, y: 843, width: 1250, height: 843 },
-          action: { type: 'uri', uri: `${PRODUCTION_URL}/pawn/list` },
+          action: { type: 'uri', uri: `https://liff.line.me/${LIFF_ID_PAWN}/pawn/list` },
         },
         {
           bounds: { x: 1250, y: 843, width: 1250, height: 843 },

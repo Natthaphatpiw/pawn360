@@ -21,7 +21,13 @@ const LiffContext = createContext<LiffContextType>({
 
 export const useLiff = () => useContext(LiffContext);
 
-export function LiffProvider({ children }: { children: React.ReactNode }) {
+export function LiffProvider({
+  children,
+  liffId
+}: {
+  children: React.ReactNode;
+  liffId: string;
+}) {
   const [liffObject, setLiffObject] = useState<typeof liff | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -31,10 +37,8 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeLiff = async () => {
       try {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-
         if (!liffId) {
-          throw new Error('LIFF ID is not configured');
+          throw new Error('LIFF ID is not provided');
         }
 
         await liff.init({ liffId });
@@ -56,7 +60,7 @@ export function LiffProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeLiff();
-  }, []);
+  }, [liffId]);
 
   return (
     <LiffContext.Provider

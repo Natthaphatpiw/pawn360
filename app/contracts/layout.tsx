@@ -5,5 +5,6 @@ export default function ContractsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <LiffProvider>{children}</LiffProvider>;
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS || '2008216710-WJXR6xOM';
+  return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }

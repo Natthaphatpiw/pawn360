@@ -8,12 +8,15 @@
     "start": "next start",
     "lint": "eslint",
     "setup-richmenu": "tsx scripts/setup-richmenu.ts",
-    "setup-richmenu-prod": "tsx scripts/create-richmenu-production.ts"
+    "setup-richmenu-prod": "tsx scripts/create-richmenu-production.ts",
+    "setup-richmenu-6": "tsx scripts/create-richmenu-6-buttons.ts"
   },
   "dependencies": {
     "@line/bot-sdk": "^10.3.0",
     "@line/liff": "^2.27.2",
+    "@types/bcrypt": "^6.0.0",
     "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
     "dotenv": "^17.2.3",
     "mongodb": "^6.20.0",
     "next": "15.5.4",

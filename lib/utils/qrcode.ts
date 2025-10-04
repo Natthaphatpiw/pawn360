@@ -29,10 +29,7 @@ export async function generateQRCode(data: string, filename: string): Promise<st
 }
 
 export function generateQRCodeData(itemId: string): string {
-  // Create a JSON structure for the QR code
-  return JSON.stringify({
-    type: 'pawn_request',
-    itemId,
-    timestamp: Date.now(),
-  });
+  // สร้าง LIFF URL ที่เปิดหน้าร้านค้าตรวจสอบรายการจำนำ
+  const liffId = process.env.LIFF_ID_STORE || '2008216710-de1ovYZL';
+  return `https://liff.line.me/${liffId}/store/verify-pawn?itemId=${itemId}`;
 }

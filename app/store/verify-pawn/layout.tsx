@@ -1,10 +1,10 @@
 import { LiffProvider } from '@/lib/liff/liff-provider';
 
-export default function RegisterLayout({
+export default function StoreVerifyLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_STORE || '2008216710-de1ovYZL';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }

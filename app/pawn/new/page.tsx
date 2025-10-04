@@ -57,6 +57,14 @@ export default function NewPawnPage() {
         throw new Error('LINE profile not found');
       }
 
+      // ตรวจสอบว่า lineId นี้ลงทะเบียนแล้วหรือยัง
+      const checkResponse = await axios.get(`/api/users/check?lineId=${profile.userId}`);
+      if (!checkResponse.data.exists) {
+        // เด้งไปหน้าลงทะเบียน
+        window.location.href = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_REGISTER}/register`;
+        return;
+      }
+
       const response = await axios.post('/api/pawn-requests', {
         lineId: profile.userId,
         brand: formData.brand,
