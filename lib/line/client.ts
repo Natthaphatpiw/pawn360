@@ -19,17 +19,83 @@ export async function linkRichMenuToUser(userId: string, richMenuId: string) {
   }
 }
 
-// Send Push Message with Image (QR Code)
-export async function sendQRCodeImage(userId: string, imageUrl: string, previewUrl: string) {
+// Send Push Message with QR Code
+export async function sendQRCodeImage(userId: string, qrCodeDataURL: string, liffUrl: string) {
   try {
+    // ส่ง Flex Message พร้อม QR Code และ Link
     await lineClient.pushMessage(userId, {
-      type: 'image',
-      originalContentUrl: imageUrl,
-      previewImageUrl: previewUrl,
+      type: 'flex',
+      altText: 'QR Code สำหรับร้านค้ารับจำนำ',
+      contents: {
+        type: 'bubble',
+        hero: {
+          type: 'image',
+          url: qrCodeDataURL.startsWith('data:')
+            ? 'https://placehold.co/400x400/green/white?text=QR+Code'  // Placeholder เพราะ LINE ไม่รับ data URL
+            : qrCodeDataURL,
+          size: 'full',
+          aspectRatio: '1:1',
+          aspectMode: 'fit',
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '✅ สร้างรายการจำนำสำเร็จ',
+              weight: 'bold',
+              size: 'xl',
+              color: '#1DB446',
+            },
+            {
+              type: 'text',
+              text: 'นำ QR Code นี้ไปแสดงที่ร้านค้า',
+              size: 'sm',
+              color: '#666666',
+              margin: 'md',
+            },
+            {
+              type: 'separator',
+              margin: 'md',
+            },
+            {
+              type: 'text',
+              text: 'QR Code:',
+              size: 'sm',
+              color: '#555555',
+              margin: 'md',
+            },
+            {
+              type: 'text',
+              text: qrCodeDataURL.substring(0, 50) + '...',
+              size: 'xxs',
+              color: '#999999',
+              wrap: true,
+            },
+          ],
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'button',
+              action: {
+                type: 'uri',
+                label: 'ดู QR Code',
+                uri: liffUrl,
+              },
+              style: 'primary',
+              color: '#1DB446',
+            },
+          ],
+        },
+      },
     });
     return { success: true };
   } catch (error) {
-    console.error('Error sending QR code image:', error);
+    console.error('Error sending QR code:', error);
     throw error;
   }
 }
