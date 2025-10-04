@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
@@ -31,7 +31,7 @@ interface PawnRequest {
   };
 }
 
-export default function StoreVerifyPawnPage() {
+function StoreVerifyPawnContent() {
   const { isLoading: liffLoading, error: liffError } = useLiff();
   const searchParams = useSearchParams();
   const itemId = searchParams.get('itemId');
@@ -340,5 +340,20 @@ export default function StoreVerifyPawnPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function StoreVerifyPawnPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    }>
+      <StoreVerifyPawnContent />
+    </Suspense>
   );
 }
