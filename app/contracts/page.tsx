@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 
@@ -30,10 +30,16 @@ export default function ContractsPage() {
   const { profile, isLoading, error: liffError } = useLiff();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [idNumberLast4, setIdNumberLast4] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Auto-fetch contracts when profile is loaded
+  useEffect(() => {
+    if (profile?.userId && !hasSearched) {
+      handleSearch();
+    }
+  }, [profile]);
 
   const handleSearch = async () => {
     setIsSearching(true);
@@ -45,10 +51,8 @@ export default function ContractsPage() {
         throw new Error('LINE profile not found');
       }
 
-      const response = await axios.post('/api/contracts/lookup', {
-        lineId: profile.userId,
-        idNumberLast4: idNumberLast4 || undefined,
-      });
+      // เช็คจาก lineId เท่านั้น
+      const response = await axios.get(`/api/contracts/by-line-id?lineId=${profile.userId}`);
 
       if (response.data.success) {
         setContracts(response.data.contracts);
@@ -221,27 +225,10 @@ export default function ContractsPage() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">สถานะสัญญาจำนำ</h1>
 
-        {/* Search Form */}
-        {!hasSearched && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <p className="text-gray-600 mb-4">กรุณากรอกเลขบัตรประชาชน 4 ตัวท้ายเพื่อยืนยันตัวตน</p>
-            <div className="space-y-4">
-              <input
-                type="text"
-                value={idNumberLast4}
-                onChange={(e) => setIdNumberLast4(e.target.value)}
-                placeholder="เลข 4 ตัวท้าย (ถ้ามี)"
-                maxLength={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={handleSearch}
-                disabled={isSearching}
-                className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {isSearching ? 'กำลังค้นหา...' : 'ค้นหาสัญญา'}
-              </button>
-            </div>
+        {isSearching && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">กำลังโหลดสัญญา...</p>
           </div>
         )}
 
@@ -252,7 +239,7 @@ export default function ContractsPage() {
         )}
 
         {/* Contracts List */}
-        {hasSearched && (
+        {hasSearched && !isSearching && (
           <>
             {contracts.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-6 text-center">

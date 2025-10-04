@@ -20,22 +20,34 @@ export async function linkRichMenuToUser(userId: string, richMenuId: string) {
 }
 
 // Send Push Message with QR Code
-export async function sendQRCodeImage(userId: string, qrCodeDataURL: string, liffUrl: string) {
+export async function sendQRCodeImage(userId: string, itemId: string, qrPageUrl: string) {
   try {
-    // ส่ง Flex Message พร้อม QR Code และ Link
+    // ส่ง Flex Message พร้อมลิงก์ไปหน้า QR Code
     await lineClient.pushMessage(userId, {
       type: 'flex',
-      altText: 'QR Code สำหรับร้านค้ารับจำนำ',
+      altText: '✅ สร้างรายการจำนำสำเร็จ - กดดู QR Code',
       contents: {
         type: 'bubble',
         hero: {
-          type: 'image',
-          url: qrCodeDataURL.startsWith('data:')
-            ? 'https://placehold.co/400x400/green/white?text=QR+Code'  // Placeholder เพราะ LINE ไม่รับ data URL
-            : qrCodeDataURL,
-          size: 'full',
-          aspectRatio: '1:1',
-          aspectMode: 'fit',
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: '✅',
+                  size: '5xl',
+                  align: 'center',
+                  color: '#ffffff',
+                },
+              ],
+              backgroundColor: '#1DB446',
+              paddingAll: 'xl',
+            },
+          ],
         },
         body: {
           type: 'box',
@@ -43,51 +55,86 @@ export async function sendQRCodeImage(userId: string, qrCodeDataURL: string, lif
           contents: [
             {
               type: 'text',
-              text: '✅ สร้างรายการจำนำสำเร็จ',
+              text: 'สร้างรายการจำนำสำเร็จ',
               weight: 'bold',
               size: 'xl',
               color: '#1DB446',
+              wrap: true,
             },
             {
               type: 'text',
-              text: 'นำ QR Code นี้ไปแสดงที่ร้านค้า',
+              text: 'นำ QR Code ไปแสดงที่ร้านค้า',
               size: 'sm',
               color: '#666666',
               margin: 'md',
+              wrap: true,
             },
             {
               type: 'separator',
-              margin: 'md',
+              margin: 'xl',
             },
             {
-              type: 'text',
-              text: 'QR Code:',
-              size: 'sm',
-              color: '#555555',
-              margin: 'md',
-            },
-            {
-              type: 'text',
-              text: qrCodeDataURL.substring(0, 50) + '...',
-              size: 'xxs',
-              color: '#999999',
-              wrap: true,
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'text',
+                  text: '📱 วิธีใช้งาน',
+                  color: '#1DB446',
+                  size: 'sm',
+                  weight: 'bold',
+                },
+                {
+                  type: 'text',
+                  text: '1. กดปุ่ม "ดู QR Code" ด้านล่าง',
+                  size: 'xs',
+                  color: '#666666',
+                  wrap: true,
+                  margin: 'sm',
+                },
+                {
+                  type: 'text',
+                  text: '2. แสดง QR Code ให้พนักงานร้าน',
+                  size: 'xs',
+                  color: '#666666',
+                  wrap: true,
+                },
+                {
+                  type: 'text',
+                  text: '3. พนักงานจะแสกนเพื่อสร้างสัญญา',
+                  size: 'xs',
+                  color: '#666666',
+                  wrap: true,
+                },
+              ],
             },
           ],
         },
         footer: {
           type: 'box',
           layout: 'vertical',
+          spacing: 'sm',
           contents: [
             {
               type: 'button',
               action: {
                 type: 'uri',
                 label: 'ดู QR Code',
-                uri: liffUrl,
+                uri: qrPageUrl,
               },
               style: 'primary',
               color: '#1DB446',
+              height: 'sm',
+            },
+            {
+              type: 'text',
+              text: `รหัส: ${itemId.substring(0, 8)}...`,
+              size: 'xxs',
+              color: '#999999',
+              align: 'center',
+              margin: 'sm',
             },
           ],
         },

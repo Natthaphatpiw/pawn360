@@ -98,8 +98,11 @@ export async function POST(request: NextRequest) {
 
     // Send QR Code to LINE chat
     try {
-      // qrData คือ LIFF URL สำหรับร้านค้า
-      await sendQRCodeImage(lineId, qrCodeDataURL, qrData);
+      // สร้าง URL ไปหน้าแสดง QR Code
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+      const qrPageUrl = `${baseUrl}/qr/${itemId.toString()}`;
+
+      await sendQRCodeImage(lineId, itemId.toString(), qrPageUrl);
     } catch (error) {
       console.error('Error sending QR code to LINE:', error);
       // Continue even if sending fails
