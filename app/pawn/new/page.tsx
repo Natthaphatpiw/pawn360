@@ -61,7 +61,8 @@ export default function NewPawnPage() {
       const checkResponse = await axios.get(`/api/users/check?lineId=${profile.userId}`);
       if (!checkResponse.data.exists) {
         // เด้งไปหน้าลงทะเบียน
-        window.location.href = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_REGISTER}/register`;
+        const liffIdRegister = process.env.NEXT_PUBLIC_LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
+        window.location.href = `https://liff.line.me/${liffIdRegister}/register`;
         return;
       }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent } from '@line/bot-sdk';
 import { verifySignature } from '@/lib/line/client';
-import { getDatabase } from '@/lib/db/mongodb';
+import { connectToDatabase } from '@/lib/db/mongodb';
 
 export async function GET() {
   return NextResponse.json({
@@ -69,7 +69,7 @@ async function handleFollowEvent(event: WebhookEvent) {
   if (!userId) return;
 
   try {
-    const db = await getDatabase();
+    const { db } = await connectToDatabase();
     const customersCollection = db.collection('customers');
 
     // Check if user already exists
