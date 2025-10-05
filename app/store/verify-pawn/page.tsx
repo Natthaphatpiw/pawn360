@@ -77,8 +77,28 @@ function StoreVerifyPawnContent() {
     try {
       setIsLoading(true);
       const response = await axios.get(`/api/pawn-requests/${itemId}`);
-      if (response.data.success) {
-        setPawnRequest(response.data.pawnRequest);
+      if (response.data.success && response.data.item && response.data.customer) {
+        // รวม item และ customer เป็น pawnRequest object
+        setPawnRequest({
+          _id: response.data.item._id,
+          lineId: response.data.customer.lineId || '',
+          brand: response.data.item.brand,
+          model: response.data.item.model,
+          type: response.data.item.type,
+          serialNo: response.data.item.serialNo,
+          condition: response.data.item.condition,
+          defects: response.data.item.defects,
+          note: response.data.item.note,
+          accessories: response.data.item.accessories,
+          images: response.data.item.images,
+          customer: {
+            title: response.data.customer.title,
+            firstName: response.data.customer.firstName,
+            lastName: response.data.customer.lastName,
+            phone: response.data.customer.phone,
+            idNumber: response.data.customer.idNumber,
+          },
+        });
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'ไม่พบรายการจำนำ');
