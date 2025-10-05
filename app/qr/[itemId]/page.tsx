@@ -2,7 +2,6 @@
 
 import { useEffect, useState, use } from 'react';
 import axios from 'axios';
-import QRCode from 'qrcode';
 
 export default function QRCodePage({ params }: { params: Promise<{ itemId: string }> }) {
   const { itemId } = use(params);
@@ -11,27 +10,16 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchAndGenerateQR = async () => {
+    const fetchQRFromS3 = async () => {
       try {
-        // ดึงข้อมูล item
+        // ดึงข้อมูล pawn request ที่มี QR Code URL จาก S3
         const response = await axios.get(`/api/pawn-requests/${itemId}`);
 
-        if (response.data.success) {
-          // สร้าง LIFF URL สำหรับร้านค้า
-          const liffId = process.env.NEXT_PUBLIC_LIFF_ID_STORE || '2008216710-de1ovYZL';
-          const liffUrl = `https://liff.line.me/${liffId}/store/verify-pawn?itemId=${itemId}`;
-
-          // Generate QR Code
-          const qrDataUrl = await QRCode.toDataURL(liffUrl, {
-            errorCorrectionLevel: 'H',
-            type: 'image/png',
-            width: 400,
-            margin: 2,
-          });
-
-          setQrCodeUrl(qrDataUrl);
+        if (response.data.success && response.data.qrCode) {
+          // ใช้ QR Code URL จาก S3 โดยตรง
+          setQrCodeUrl(response.data.qrCode);
         } else {
-          setError('ไม่พบรายการจำนำ');
+          setError('ไม่พบรายการจำนำหรือ QR Code');
         }
       } catch (err) {
         console.error('Error:', err);
@@ -41,7 +29,7 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
       }
     };
 
-    fetchAndGenerateQR();
+    fetchQRFromS3();
   }, [itemId]);
 
   if (loading) {
