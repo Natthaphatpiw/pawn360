@@ -36,6 +36,7 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
           aspectMode: 'cover',
           action: {
             type: 'uri',
+            label: 'ดู QR Code',
             uri: s3Url,
           },
         },
