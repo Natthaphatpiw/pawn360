@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Item, Customer, PawnRequest } from '@/lib/db/models';
 import { generateQRCode, generateQRCodeData } from '@/lib/utils/qrcode';
-import { uploadQRCodeToS3 } from '@/lib/aws/s3';
+import { uploadQRCodeToS3, getQRCodePresignedUrl } from '@/lib/aws/s3';
 import { sendQRCodeImage } from '@/lib/line/client';
 import { ObjectId } from 'mongodb';
 
@@ -86,11 +86,14 @@ export async function POST(request: NextRequest) {
     // Upload to S3
     const s3Url = await uploadQRCodeToS3(itemId.toString(), qrBuffer);
 
+    // Generate presigned URL (valid for 7 days)
+    const presignedUrl = await getQRCodePresignedUrl(itemId.toString(), 7 * 24 * 3600);
+
     // Create pawn request object
     const pawnRequest: PawnRequest = {
       _id: new ObjectId(),
       itemId: itemId,
-      qrCode: s3Url, // เก็บ S3 URL แทน data URL
+      qrCode: s3Url, // เก็บ S3 URL ถาวร
       status: 'pending',
       createdAt: new Date(),
     };
@@ -104,9 +107,9 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Send QR Code to LINE chat
+    // Send QR Code to LINE chat (ใช้ presigned URL)
     try {
-      await sendQRCodeImage(lineId, itemId.toString(), s3Url);
+      await sendQRCodeImage(lineId, itemId.toString(), presignedUrl);
     } catch (error) {
       console.error('Error sending QR code to LINE:', error);
       // Continue even if sending fails
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       itemId: itemId,
-      qrCode: s3Url,
+      qrCode: presignedUrl,
       message: 'Pawn request created successfully. QR Code has been sent to your LINE chat.',
     });
   } catch (error) {

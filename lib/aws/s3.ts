@@ -65,9 +65,10 @@ export async function uploadQRCodeToS3(
 /**
  * สร้าง Presigned URL สำหรับดาวน์โหลด QR Code (ใช้เมื่อ ACL ไม่เป็น public)
  * @param itemId - ID ของรายการจำนำ
- * @returns Presigned URL (valid 1 ชั่วโมง)
+ * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
+ * @returns Presigned URL
  */
-export async function getQRCodePresignedUrl(itemId: string): Promise<string> {
+export async function getQRCodePresignedUrl(itemId: string, expiresIn: number = 7 * 24 * 3600): Promise<string> {
   try {
     const client = getS3Client();
     const fileName = `qr-${itemId}.png`;
@@ -78,8 +79,7 @@ export async function getQRCodePresignedUrl(itemId: string): Promise<string> {
       Key: key,
     });
 
-    // URL จะใช้งานได้ 1 ชั่วโมง
-    const signedUrl = await getSignedUrl(client, command, { expiresIn: 3600 });
+    const signedUrl = await getSignedUrl(client, command, { expiresIn });
     return signedUrl;
   } catch (error) {
     console.error('Error generating presigned URL:', error);
