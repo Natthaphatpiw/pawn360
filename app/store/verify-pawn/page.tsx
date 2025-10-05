@@ -22,6 +22,14 @@ interface PawnRequest {
   note: string;
   accessories: string;
   images: string[];
+  desiredAmount?: number;
+  estimatedValue?: number;
+  loanDays?: number;
+  interestRate?: number;
+  negotiatedAmount?: number;
+  negotiatedDays?: number;
+  negotiatedInterestRate?: number;
+  negotiationStatus?: string;
   customer: {
     title: string;
     firstName: string;
@@ -43,6 +51,12 @@ function StoreVerifyPawnContent() {
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // ข้อมูลการต่อรอง
+  const [isEditingTerms, setIsEditingTerms] = useState(false);
+  const [editedAmount, setEditedAmount] = useState<number>(0);
+  const [editedDays, setEditedDays] = useState<number>(0);
+  const [editedInterestRate, setEditedInterestRate] = useState<number>(0);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,18 +93,27 @@ function StoreVerifyPawnContent() {
       const response = await axios.get(`/api/pawn-requests/${itemId}`);
       if (response.data.success && response.data.item && response.data.customer) {
         // รวม item และ customer เป็น pawnRequest object
+        const item = response.data.item;
         setPawnRequest({
-          _id: response.data.item._id,
+          _id: item._id,
           lineId: response.data.customer.lineId || '',
-          brand: response.data.item.brand,
-          model: response.data.item.model,
-          type: response.data.item.type,
-          serialNo: response.data.item.serialNo,
-          condition: response.data.item.condition,
-          defects: response.data.item.defects,
-          note: response.data.item.note,
-          accessories: response.data.item.accessories,
-          images: response.data.item.images,
+          brand: item.brand,
+          model: item.model,
+          type: item.type,
+          serialNo: item.serialNo,
+          condition: item.condition,
+          defects: item.defects,
+          note: item.note,
+          accessories: item.accessories,
+          images: item.images,
+          desiredAmount: item.desiredAmount,
+          estimatedValue: item.estimatedValue,
+          loanDays: item.loanDays,
+          interestRate: item.interestRate,
+          negotiatedAmount: item.negotiatedAmount,
+          negotiatedDays: item.negotiatedDays,
+          negotiatedInterestRate: item.negotiatedInterestRate,
+          negotiationStatus: item.negotiationStatus,
           customer: {
             title: response.data.customer.title,
             firstName: response.data.customer.firstName,
@@ -99,6 +122,11 @@ function StoreVerifyPawnContent() {
             idNumber: response.data.customer.idNumber,
           },
         });
+
+        // ตั้งค่าเริ่มต้นสำหรับการแก้ไข (ใช้ค่าที่ต่อรองแล้วถ้ามี ไม่งั้นใช้ค่าเดิม)
+        setEditedAmount(item.negotiatedAmount || item.desiredAmount || 0);
+        setEditedDays(item.negotiatedDays || item.loanDays || 30);
+        setEditedInterestRate(item.negotiatedInterestRate || item.interestRate || 3);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'ไม่พบรายการจำนำ');
@@ -142,19 +170,51 @@ function StoreVerifyPawnContent() {
     setError(null);
 
     try {
-      const response = await axios.post('/api/stores/verify-and-create-contract', {
-        itemId,
-        storeId: selectedStore._id,
-        password,
-      });
+      // ตรวจสอบว่ามีการแก้ไขข้อมูลการจำนำหรือไม่
+      const originalAmount = pawnRequest?.negotiatedAmount || pawnRequest?.desiredAmount || 0;
+      const originalDays = pawnRequest?.negotiatedDays || pawnRequest?.loanDays || 30;
+      const originalRate = pawnRequest?.negotiatedInterestRate || pawnRequest?.interestRate || 3;
 
-      if (response.data.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          if (window.liff) {
-            window.liff.closeWindow();
-          }
-        }, 2000);
+      const hasChanges =
+        editedAmount !== originalAmount ||
+        editedDays !== originalDays ||
+        editedInterestRate !== originalRate;
+
+      if (hasChanges) {
+        // มีการแก้ไข - ส่งข้อเสนอไปให้ลูกค้ายืนยัน
+        const negotiateResponse = await axios.post('/api/pawn-requests/negotiate', {
+          itemId,
+          storeId: selectedStore._id,
+          password,
+          negotiatedAmount: editedAmount,
+          negotiatedDays: editedDays,
+          negotiatedInterestRate: editedInterestRate,
+        });
+
+        if (negotiateResponse.data.success) {
+          setSuccess(true);
+          setTimeout(() => {
+            if (window.liff) {
+              window.liff.closeWindow();
+            }
+          }, 3000);
+        }
+      } else {
+        // ไม่มีการแก้ไข - สร้างสัญญาได้เลย
+        const response = await axios.post('/api/stores/verify-and-create-contract', {
+          itemId,
+          storeId: selectedStore._id,
+          password,
+        });
+
+        if (response.data.success) {
+          setSuccess(true);
+          setTimeout(() => {
+            if (window.liff) {
+              window.liff.closeWindow();
+            }
+          }, 2000);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
@@ -286,6 +346,149 @@ function StoreVerifyPawnContent() {
                     className="w-full h-32 object-cover rounded-md"
                   />
                 ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ข้อมูลการจำนำ */}
+        <div className="mb-6 border-t pt-4">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold text-gray-700">ข้อมูลการจำนำ</h2>
+            {!isEditingTerms && (
+              <button
+                type="button"
+                onClick={() => setIsEditingTerms(true)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                แก้ไข
+              </button>
+            )}
+          </div>
+
+          {!isEditingTerms ? (
+            <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">ราคาประเมิน</p>
+                  <p className="font-medium text-gray-900">
+                    {pawnRequest.estimatedValue?.toLocaleString() || '-'} บาท
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">ราคาที่ต้องการจำนำ</p>
+                  <p className="font-medium text-green-600">
+                    {(pawnRequest.negotiatedAmount || pawnRequest.desiredAmount)?.toLocaleString() || '-'} บาท
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">จำนวนวัน</p>
+                  <p className="font-medium">
+                    {pawnRequest.negotiatedDays || pawnRequest.loanDays || '-'} วัน
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">อัตราดอกเบี้ย</p>
+                  <p className="font-medium">
+                    {pawnRequest.negotiatedInterestRate || pawnRequest.interestRate || '-'}% ต่อเดือน
+                  </p>
+                </div>
+              </div>
+              <div className="border-t pt-3 mt-2">
+                <p className="text-sm text-gray-600">ยอดไถ่ถอนโดยประมาณ</p>
+                <p className="text-xl font-bold text-blue-600">
+                  {(() => {
+                    const amount = pawnRequest.negotiatedAmount || pawnRequest.desiredAmount || 0;
+                    const days = pawnRequest.negotiatedDays || pawnRequest.loanDays || 30;
+                    const rate = pawnRequest.negotiatedInterestRate || pawnRequest.interestRate || 3;
+                    const interest = (amount * rate * (days / 30)) / 100;
+                    return (amount + interest).toLocaleString();
+                  })()} บาท
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  (รวมต้นเงิน + ดอกเบี้ย)
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ราคาประเมิน (อ่านอย่างเดียว)
+                </label>
+                <input
+                  type="number"
+                  value={pawnRequest.estimatedValue || 0}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ราคาที่จำนำ (บาท) *
+                </label>
+                <input
+                  type="number"
+                  value={editedAmount}
+                  onChange={(e) => setEditedAmount(parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                  required
+                  min="0"
+                  step="100"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    จำนวนวัน *
+                  </label>
+                  <input
+                    type="number"
+                    value={editedDays}
+                    onChange={(e) => setEditedDays(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    required
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    อัตราดอกเบี้ย (%) *
+                  </label>
+                  <input
+                    type="number"
+                    value={editedInterestRate}
+                    onChange={(e) => setEditedInterestRate(parseFloat(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    required
+                    min="0"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingTerms(false);
+                    // Reset to original values
+                    setEditedAmount(pawnRequest.negotiatedAmount || pawnRequest.desiredAmount || 0);
+                    setEditedDays(pawnRequest.negotiatedDays || pawnRequest.loanDays || 30);
+                    setEditedInterestRate(pawnRequest.negotiatedInterestRate || pawnRequest.interestRate || 3);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTerms(false)}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  บันทึก
+                </button>
               </div>
             </div>
           )}

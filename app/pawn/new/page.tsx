@@ -15,6 +15,10 @@ export default function NewPawnPage() {
     defects: '',
     note: '',
     accessories: '',
+    desiredAmount: '',
+    estimatedValue: '',
+    loanDays: '30',
+    interestRate: '3',
   });
   const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,6 +81,10 @@ export default function NewPawnPage() {
         note: formData.note,
         accessories: formData.accessories,
         images: images,
+        desiredAmount: parseFloat(formData.desiredAmount) || 0,
+        estimatedValue: parseFloat(formData.estimatedValue) || 0,
+        loanDays: parseInt(formData.loanDays) || 30,
+        interestRate: parseFloat(formData.interestRate) || 3,
       });
 
       if (response.data.success) {
@@ -260,6 +268,73 @@ export default function NewPawnPage() {
                   placeholder="ข้อมูลเพิ่มเติมที่ต้องการแจ้ง"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              {/* ข้อมูลการจำนำ */}
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">ข้อมูลการจำนำ</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ราคาที่ต้องการจำนำ (บาท) *</label>
+                    <input
+                      type="number"
+                      name="desiredAmount"
+                      value={formData.desiredAmount}
+                      onChange={handleChange}
+                      placeholder="เช่น 10000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ราคาประเมิน (บาท) *</label>
+                    <input
+                      type="number"
+                      name="estimatedValue"
+                      value={formData.estimatedValue}
+                      onChange={handleChange}
+                      placeholder="เช่น 15000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">จำนวนวันที่ต้องการจำนำ *</label>
+                    <input
+                      type="number"
+                      name="loanDays"
+                      value={formData.loanDays}
+                      onChange={handleChange}
+                      placeholder="เช่น 30"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      min="1"
+                      step="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">อัตราดอกเบี้ย (% ต่อเดือน) *</label>
+                    <input
+                      type="number"
+                      name="interestRate"
+                      value={formData.interestRate}
+                      onChange={handleChange}
+                      placeholder="เช่น 3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Image Upload */}

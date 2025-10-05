@@ -57,6 +57,16 @@ export interface Item {
   currentContractId?: ObjectId | null;
   contractHistory?: ObjectId[];
   storeId?: ObjectId;
+  // ข้อมูลการจำนำ
+  desiredAmount?: number;
+  estimatedValue?: number;
+  loanDays?: number;
+  interestRate?: number;
+  // ข้อมูลการต่อรอง (ถ้าร้านค้าแก้ไข)
+  negotiatedAmount?: number;
+  negotiatedDays?: number;
+  negotiatedInterestRate?: number;
+  negotiationStatus?: 'none' | 'pending' | 'accepted' | 'rejected';
   createdAt: Date;
   updatedAt: Date;
 }
