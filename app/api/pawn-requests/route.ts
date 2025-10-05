@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
       note,
       accessories,
       images,
+      desiredAmount,
+      estimatedValue,
+      loanDays,
+      interestRate,
     } = body;
 
     // Validation
@@ -59,6 +63,11 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       currentContractId: null,
       contractHistory: [],
+      desiredAmount: desiredAmount || 0,
+      estimatedValue: estimatedValue || 0,
+      loanDays: loanDays || 30,
+      interestRate: interestRate || 3,
+      negotiationStatus: 'none',
       createdAt: new Date(),
       updatedAt: new Date(),
     };

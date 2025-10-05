@@ -69,14 +69,17 @@ export async function POST(request: NextRequest) {
     // 4. สร้างสัญญา
     const contractNumber = `PW${Date.now()}`;
     const startDate = new Date();
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 30); // 30 วันนับจากวันนี้
 
-    // ตั้งค่าเบื้องต้น (ควรปรับตามความต้องการจริง)
-    const pawnedPrice = 10000; // ราคาประเมิน
-    const interestRate = 1.5; // อัตราดอกเบี้ย 1.5%
-    const periodDays = 30;
-    const interestAmount = pawnedPrice * (interestRate / 100);
+    // ใช้ค่าที่ต่อรองแล้ว (ถ้ามี) หรือค่าเริ่มต้น
+    const pawnedPrice = item.negotiatedAmount || item.desiredAmount || 0;
+    const interestRate = item.negotiatedInterestRate || item.interestRate || 3;
+    const periodDays = item.negotiatedDays || item.loanDays || 30;
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + periodDays);
+
+    // คำนวณดอกเบี้ยและยอดรวม
+    const interestAmount = (pawnedPrice * interestRate * (periodDays / 30)) / 100;
     const remainingAmount = pawnedPrice + interestAmount;
 
     const newContract = {
@@ -96,11 +99,15 @@ export async function POST(request: NextRequest) {
         images: item.images || [],
       },
       pawnDetails: {
+        aiEstimatedPrice: item.estimatedValue || 0,
         pawnedPrice,
         interestRate,
         periodDays,
-        interestAmount,
+        totalInterest: interestAmount,
         remainingAmount,
+        fineAmount: 0,
+        payInterest: 0,
+        soldAmount: 0,
       },
       dates: {
         startDate,
