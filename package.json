@@ -9,9 +9,12 @@
     "lint": "eslint",
     "setup-richmenu": "tsx scripts/setup-richmenu.ts",
     "setup-richmenu-prod": "tsx scripts/create-richmenu-production.ts",
-    "setup-richmenu-6": "tsx scripts/create-richmenu-6-buttons.ts"
+    "setup-richmenu-6": "tsx scripts/create-richmenu-6-buttons.ts",
+    "test-s3": "tsx scripts/test-s3.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.901.0",
+    "@aws-sdk/s3-request-presigner": "^3.901.0",
     "@line/bot-sdk": "^10.3.0",
     "@line/liff": "^2.27.2",
     "@types/bcrypt": "^6.0.0",

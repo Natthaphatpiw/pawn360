@@ -40,9 +40,15 @@ export async function GET(
       );
     }
 
+    // Find the pawn request in customer's pawnRequests array to get QR code
+    const pawnRequest = customer.pawnRequests?.find(
+      (pr: any) => pr.itemId.toString() === id
+    );
+
     // Return combined data for store to verify
     return NextResponse.json({
       success: true,
+      qrCode: pawnRequest?.qrCode || null,
       item: {
         _id: item._id,
         brand: item.brand,

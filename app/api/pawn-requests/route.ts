@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Item, Customer, PawnRequest } from '@/lib/db/models';
 import { generateQRCode, generateQRCodeData } from '@/lib/utils/qrcode';
+import { uploadQRCodeToS3 } from '@/lib/aws/s3';
 import { sendQRCodeImage } from '@/lib/line/client';
 import { ObjectId } from 'mongodb';
 
@@ -74,15 +75,22 @@ export async function POST(request: NextRequest) {
 
     const itemId = itemResult.insertedId;
 
-    // Generate QR Code as data URL
+    // Generate QR Code and upload to S3
     const qrData = generateQRCodeData(itemId.toString());
     const qrCodeDataURL = await generateQRCode(qrData);
+
+    // Convert data URL to buffer for S3 upload
+    const base64Data = qrCodeDataURL.replace(/^data:image\/png;base64,/, '');
+    const qrBuffer = Buffer.from(base64Data, 'base64');
+
+    // Upload to S3
+    const s3Url = await uploadQRCodeToS3(itemId.toString(), qrBuffer);
 
     // Create pawn request object
     const pawnRequest: PawnRequest = {
       _id: new ObjectId(),
       itemId: itemId,
-      qrCode: qrCodeDataURL, // เก็บ data URL แทน path
+      qrCode: s3Url, // เก็บ S3 URL แทน data URL
       status: 'pending',
       createdAt: new Date(),
     };
@@ -98,11 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Send QR Code to LINE chat
     try {
-      // สร้าง URL ไปหน้าแสดง QR Code
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
-      const qrPageUrl = `${baseUrl}/qr/${itemId.toString()}`;
-
-      await sendQRCodeImage(lineId, itemId.toString(), qrPageUrl);
+      await sendQRCodeImage(lineId, itemId.toString(), s3Url);
     } catch (error) {
       console.error('Error sending QR code to LINE:', error);
       // Continue even if sending fails
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       itemId: itemId,
-      qrCode: qrCodeDataURL,
+      qrCode: s3Url,
       message: 'Pawn request created successfully. QR Code has been sent to your LINE chat.',
     });
   } catch (error) {

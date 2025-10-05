@@ -20,34 +20,24 @@ export async function linkRichMenuToUser(userId: string, richMenuId: string) {
 }
 
 // Send Push Message with QR Code
-export async function sendQRCodeImage(userId: string, itemId: string, qrPageUrl: string) {
+export async function sendQRCodeImage(userId: string, itemId: string, s3Url: string) {
   try {
-    // ส่ง Flex Message พร้อมลิงก์ไปหน้า QR Code
+    // ส่ง Flex Message พร้อมรูป QR Code จาก S3
     await lineClient.pushMessage(userId, {
       type: 'flex',
-      altText: '✅ สร้างรายการจำนำสำเร็จ - กดดู QR Code',
+      altText: '✅ สร้างรายการจำนำสำเร็จ - ดู QR Code',
       contents: {
         type: 'bubble',
         hero: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'box',
-              layout: 'vertical',
-              contents: [
-                {
-                  type: 'text',
-                  text: '✅',
-                  size: '5xl',
-                  align: 'center',
-                  color: '#ffffff',
-                },
-              ],
-              backgroundColor: '#1DB446',
-              paddingAll: 'xl',
-            },
-          ],
+          type: 'image',
+          url: s3Url,
+          size: 'full',
+          aspectRatio: '1:1',
+          aspectMode: 'cover',
+          action: {
+            type: 'uri',
+            uri: s3Url,
+          },
         },
         body: {
           type: 'box',
@@ -121,8 +111,8 @@ export async function sendQRCodeImage(userId: string, itemId: string, qrPageUrl:
               type: 'button',
               action: {
                 type: 'uri',
-                label: 'ดู QR Code',
-                uri: qrPageUrl,
+                label: 'เปิดรูป QR Code ขนาดใหญ่',
+                uri: s3Url,
               },
               style: 'primary',
               color: '#1DB446',
