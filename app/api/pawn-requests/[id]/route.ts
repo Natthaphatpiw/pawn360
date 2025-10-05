@@ -64,6 +64,7 @@ export async function GET(
       },
       customer: {
         _id: customer._id,
+        lineId: customer.lineId,
         title: customer.title,
         firstName: customer.firstName,
         lastName: customer.lastName,
