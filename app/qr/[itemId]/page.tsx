@@ -10,14 +10,14 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchQRFromS3 = async () => {
+    const fetchQRPresignedUrl = async () => {
       try {
-        // ดึงข้อมูล pawn request ที่มี QR Code URL จาก S3
-        const response = await axios.get(`/api/pawn-requests/${itemId}`);
+        // ดึง presigned URL จาก API
+        const response = await axios.get(`/api/qr/${itemId}`);
 
-        if (response.data.success && response.data.qrCode) {
-          // ใช้ QR Code URL จาก S3 โดยตรง
-          setQrCodeUrl(response.data.qrCode);
+        if (response.data.success && response.data.url) {
+          // ใช้ presigned URL
+          setQrCodeUrl(response.data.url);
         } else {
           setError('ไม่พบรายการจำนำหรือ QR Code');
         }
@@ -29,7 +29,7 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
       }
     };
 
-    fetchQRFromS3();
+    fetchQRPresignedUrl();
   }, [itemId]);
 
   if (loading) {
