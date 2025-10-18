@@ -53,6 +53,7 @@ export default function ItemActionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (profile?.userId && itemId) {
@@ -126,10 +127,12 @@ export default function ItemActionsPage() {
   };
 
   const handleSaveTemporary = async () => {
+    setIsSubmitting(true);
     // Item is already saved, just show success message
     setSuccess('สินค้านี้บันทึกไว้แล้ว');
     setTimeout(() => {
       setSuccess(null);
+      setIsSubmitting(false);
     }, 2000);
   };
 
