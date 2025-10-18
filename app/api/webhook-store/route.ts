@@ -2,16 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent } from '@line/bot-sdk';
 import { Client, ClientConfig } from '@line/bot-sdk';
 
-const storeConfig: ClientConfig = {
-  channelAccessToken: process.env.LINE_STORE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_STORE_CHANNEL_SECRET || '',
-};
+// Lazy initialization of LINE client
+let storeClient: Client | null = null;
 
-const storeClient = new Client(storeConfig);
+function getStoreClient(): Client {
+  if (!storeClient) {
+    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const channelSecret = process.env.LINE_CHANNEL_SECRET;
+
+    if (!channelAccessToken || !channelSecret) {
+      throw new Error('LINE channel access token or secret not configured');
+    }
+
+    const storeConfig: ClientConfig = {
+      channelAccessToken,
+      channelSecret,
+    };
+
+    storeClient = new Client(storeConfig);
+  }
+  return storeClient;
+}
 
 function verifyStoreSignature(body: string, signature: string): boolean {
   const crypto = require('crypto');
-  const channelSecret = process.env.LINE_STORE_CHANNEL_SECRET || '';
+  const channelSecret = process.env.LINE_CHANNEL_SECRET || '';
 
   const hash = crypto
     .createHmac('SHA256', channelSecret)
@@ -67,7 +82,11 @@ export async function POST(request: NextRequest) {
     // Process each event
     for (const event of events) {
       if (event.type === 'follow') {
-        await handleStoreFollowEvent(event);
+        try {
+          await handleStoreFollowEvent(event);
+        } catch (error) {
+          console.error('Error handling store follow event:', error);
+        }
       }
     }
 
@@ -87,12 +106,14 @@ async function handleStoreFollowEvent(event: WebhookEvent) {
   try {
     console.log(`Store user followed: ${userId}`);
 
-    // Send welcome message
-    await storeClient.pushMessage(userId, {
+    // Get LINE client and send welcome message
+    const client = getStoreClient();
+    await client.pushMessage(userId, {
       type: 'text',
       text: 'ยินดีต้อนรับสู่ระบบจัดการร้านจำนำ\n\nกรุณาลงทะเบียนร้านค้าผ่านเมนูด้านล่าง'
     });
   } catch (error) {
     console.error('Error handling store follow event:', error);
+    // Continue without throwing - webhook should not fail
   }
 }

@@ -1,17 +1,33 @@
 import { Client, ClientConfig, WebhookEvent } from '@line/bot-sdk';
 import axios from 'axios';
 
-const config: ClientConfig = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || '',
-};
+// Lazy initialization of LINE client
+let lineClient: Client | null = null;
 
-export const lineClient = new Client(config);
+function getLineClient(): Client {
+  if (!lineClient) {
+    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const channelSecret = process.env.LINE_CHANNEL_SECRET;
+
+    if (!channelAccessToken || !channelSecret) {
+      throw new Error('LINE channel access token or secret not configured');
+    }
+
+    const config: ClientConfig = {
+      channelAccessToken,
+      channelSecret,
+    };
+
+    lineClient = new Client(config);
+  }
+  return lineClient;
+}
 
 // Link Rich Menu to User
 export async function linkRichMenuToUser(userId: string, richMenuId: string) {
   try {
-    await lineClient.linkRichMenuToUser(userId, richMenuId);
+    const client = getLineClient();
+    await client.linkRichMenuToUser(userId, richMenuId);
     return { success: true };
   } catch (error) {
     console.error('Error linking rich menu:', error);
@@ -34,7 +50,8 @@ export async function sendNegotiationMessage(
     const liffId = process.env.LIFF_ID_PAWN || '2008216710-54P86MRY';
     const acceptUrl = `https://liff.line.me/${liffId}/pawn/accept-negotiation?itemId=${itemId}`;
 
-    await lineClient.pushMessage(userId, {
+    const client = getLineClient();
+    await client.pushMessage(userId, {
       type: 'flex',
       altText: '🔄 ร้านค้าได้แก้ไขเงื่อนไขการจำนำ',
       contents: {
@@ -226,7 +243,8 @@ export async function sendNegotiationMessage(
 export async function sendQRCodeImage(userId: string, itemId: string, s3Url: string) {
   try {
     // ส่ง Flex Message พร้อมรูป QR Code จาก S3
-    await lineClient.pushMessage(userId, {
+    const client = getLineClient();
+    await client.pushMessage(userId, {
       type: 'flex',
       altText: '✅ สร้างรายการจำนำสำเร็จ - ดู QR Code',
       contents: {
@@ -344,7 +362,8 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
 // Send Text Message
 export async function sendTextMessage(userId: string, text: string) {
   try {
-    await lineClient.pushMessage(userId, {
+    const client = getLineClient();
+    await client.pushMessage(userId, {
       type: 'text',
       text,
     });
@@ -358,7 +377,8 @@ export async function sendTextMessage(userId: string, text: string) {
 // Get User Profile
 export async function getUserProfile(userId: string) {
   try {
-    const profile = await lineClient.getProfile(userId);
+    const client = getLineClient();
+    const profile = await client.getProfile(userId);
     return profile;
   } catch (error) {
     console.error('Error getting user profile:', error);
