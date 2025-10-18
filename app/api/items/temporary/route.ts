@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
       accessories,
       images,
       estimatedValue,
+      desiredPrice,
     } = body;
 
     // Validation
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       status: 'temporary',
       currentContractId: null,
       contractHistory: [],
-      desiredAmount: estimatedValue || 0,
+      desiredAmount: desiredPrice || estimatedValue || 0,
       estimatedValue: estimatedValue || 0,
       loanDays: 0,
       interestRate: 0,

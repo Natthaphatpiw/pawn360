@@ -3,34 +3,107 @@
 import { useEffect, useState, use } from 'react';
 import axios from 'axios';
 
+interface PawnRequest {
+  _id: string;
+  lineId: string;
+  brand: string;
+  model: string;
+  type: string;
+  pawnedPrice: number;
+  interestRate: number;
+  periodDays: number;
+  totalInterest: number;
+  storeId: string;
+  status: string;
+  createdAt: string;
+}
+
 export default function QRCodePage({ params }: { params: Promise<{ itemId: string }> }) {
   const { itemId } = use(params);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
+  const [editedPrice, setEditedPrice] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchQRPresignedUrl = async () => {
+    const fetchData = async () => {
       try {
-        // ดึง presigned URL จาก API
-        const response = await axios.get(`/api/qr/${itemId}`);
-
-        if (response.data.success && response.data.url) {
-          // ใช้ presigned URL
-          setQrCodeUrl(response.data.url);
-        } else {
-          setError('ไม่พบรายการจำนำหรือ QR Code');
+        // ดึงข้อมูล pawn request
+        const pawnResponse = await axios.get(`/api/pawn-requests/${itemId}`);
+        if (pawnResponse.data.success) {
+          setPawnRequest(pawnResponse.data.pawnRequest);
+          setEditedPrice(pawnResponse.data.pawnRequest.pawnedPrice.toString());
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error:', err);
-        setError('เกิดข้อผิดพลาด');
+        setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchQRPresignedUrl();
+    fetchData();
   }, [itemId]);
+
+  const handleSavePrice = async () => {
+    if (!pawnRequest || !editedPrice) return;
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await axios.put(`/api/pawn-requests/${itemId}`, {
+        pawnedPrice: parseInt(editedPrice),
+        totalInterest: calculateInterest(parseInt(editedPrice))
+      });
+
+      if (response.data.success) {
+        setSuccess('บันทึกการแก้ไขราคาเรียบร้อยแล้ว');
+        setPawnRequest(prev => prev ? {
+          ...prev,
+          pawnedPrice: parseInt(editedPrice),
+          totalInterest: calculateInterest(parseInt(editedPrice))
+        } : null);
+      }
+    } catch (err: any) {
+      console.error('Error saving price:', err);
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateContract = async () => {
+    if (!pawnRequest) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const response = await axios.post('/api/contracts/create', {
+        pawnRequestId: itemId
+      });
+
+      if (response.data.success) {
+        setSuccess('สร้างสัญญาจำนำเรียบร้อยแล้ว');
+        // Redirect or show success state
+      }
+    } catch (err: any) {
+      console.error('Error creating contract:', err);
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างสัญญา');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const calculateInterest = (price: number) => {
+    if (!pawnRequest) return 0;
+    const dailyRate = pawnRequest.interestRate / 100 / 30;
+    return Math.round(price * dailyRate * pawnRequest.periodDays);
+  };
 
   if (loading) {
     return (
@@ -55,39 +128,106 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white py-8 px-4">
-      <div className="max-w-md mx-auto">
-        <div className="bg-white rounded-2xl shadow-lg p-6 text-center">
-          <div className="mb-4">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+    <div className="min-h-screen" style={{ backgroundColor: '#FAFBFA' }}>
+      <div className="max-w-md mx-auto py-8 px-4">
+        <div className="rounded-xl shadow-sm p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E6E7E8' }}>
+
+          {/* Header */}
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold mb-2" style={{ color: '#1E293B' }}>ตรวจสอบและแก้ไขราคา</h1>
+            <p className="text-sm" style={{ color: '#6B7280' }}>สำหรับพนักงานร้านค้า</p>
+          </div>
+
+          {/* Item Info */}
+          {pawnRequest && (
+            <div className="mb-6">
+              <div className="rounded-lg p-3 mb-4" style={{ backgroundColor: '#EEECEB' }}>
+                <p className="text-sm mb-1" style={{ color: '#6B7280' }}>สินค้า</p>
+                <p className="text-base font-semibold" style={{ color: '#1E293B' }}>
+                  {pawnRequest.brand} {pawnRequest.model}
+                </p>
+                <p className="text-sm mt-1" style={{ color: '#6B7280' }}>
+                  ประเภท: {pawnRequest.type}
+                </p>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">QR Code จำนำ</h1>
-            <p className="text-gray-600 text-sm">นำ QR Code นี้ไปแสดงที่ร้านค้า</p>
-          </div>
+          )}
 
-          <div className="bg-white p-4 rounded-xl border-4 border-green-500 mb-4">
-            {qrCodeUrl && (
-              <img
-                src={qrCodeUrl}
-                alt="QR Code"
-                className="w-full h-auto"
+          {/* Price Edit Section */}
+          {pawnRequest && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
+                ราคาจำนำ (บาท)
+              </label>
+              <input
+                type="number"
+                value={editedPrice}
+                onChange={(e) => setEditedPrice(e.target.value)}
+                className="w-full px-3 py-2 focus:outline-none"
+                style={{
+                  border: '1px solid #E6E7E8',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '10px',
+                  color: '#1E293B',
+                  height: '44px'
+                }}
               />
-            )}
+
+              <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E6E7E8' }}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span style={{ color: '#6B7280' }}>ราคาจำนำ:</span>
+                  <span style={{ color: '#1E293B' }}>{parseInt(editedPrice).toLocaleString()} บาท</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span style={{ color: '#6B7280' }}>ดอกเบี้ย ({pawnRequest.interestRate}% x {pawnRequest.periodDays} วัน):</span>
+                  <span style={{ color: '#1E293B' }}>{calculateInterest(parseInt(editedPrice)).toLocaleString()} บาท</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#FEE', border: '1px solid #FCC', color: '#C33' }}>
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#EFE', border: '1px solid #CFC', color: '#363' }}>
+              {success}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={handleSavePrice}
+              disabled={saving}
+              className="w-full py-3 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: saving ? '#D1D5DB' : '#1F6F3B',
+                color: saving ? '#9CA3AF' : '#FFFFFF'
+              }}
+            >
+              {saving ? 'กำลังบันทึก...' : 'บันทึกการแก้ไขราคา'}
+            </button>
+
+            <button
+              onClick={handleCreateContract}
+              disabled={saving}
+              className="w-full py-3 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: saving ? '#D1D5DB' : '#1F6F3B',
+                color: saving ? '#9CA3AF' : '#FFFFFF'
+              }}
+            >
+              {saving ? 'กำลังสร้างสัญญา...' : 'ยืนยันและสร้างสัญญา'}
+            </button>
           </div>
 
-          <div className="bg-green-50 rounded-lg p-4 mb-4">
-            <p className="text-sm text-green-800 font-medium">📱 วิธีใช้งาน</p>
-            <ol className="text-xs text-green-700 text-left mt-2 space-y-1">
-              <li>1. แสดง QR Code นี้ให้พนักงานร้าน</li>
-              <li>2. พนักงานจะแสกนเพื่อตรวจสอบสินค้า</li>
-              <li>3. ร้านจะประเมินราคาและสร้างสัญญา</li>
-            </ol>
-          </div>
-
-          <p className="text-xs text-gray-500 mt-4">
+          {/* Item ID */}
+          <p className="text-xs text-center mt-4" style={{ color: '#9CA3AF' }}>
             Item ID: {itemId.substring(0, 8)}...
           </p>
         </div>
