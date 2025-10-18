@@ -88,12 +88,19 @@ export default function EstimatePage() {
 
   const checkCustomerExists = async () => {
     try {
+      console.log('Checking customer for lineId:', profile.userId);
       const response = await axios.get(`/api/users/check?lineId=${profile.userId}`);
+      console.log('Customer check response:', response.data);
       if (response.data.exists) {
         setCustomer(response.data.customer);
+        console.log('Customer found:', response.data.customer);
+      } else {
+        console.log('Customer not found');
+        setCustomer(null);
       }
     } catch (error) {
       console.error('Error checking customer:', error);
+      setCustomer(null);
     }
   };
 
@@ -102,7 +109,7 @@ export default function EstimatePage() {
     if (profile?.userId) {
       checkCustomerExists();
     }
-  }, [profile, checkCustomerExists]);
+  }, [profile?.userId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -790,14 +797,15 @@ export default function EstimatePage() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer */}
-              <button
-                onClick={handleContinue}
-                disabled={!selectedStore || !customer}
-                className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
-              >
-                ดำเนินการต่อ
-              </button>
+            {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer */}
+            <button
+              onClick={handleContinue}
+              disabled={!selectedStore || !customer}
+              className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
+              onMouseEnter={() => console.log('Button hover - selectedStore:', selectedStore, 'customer:', customer)}
+            >
+              ดำเนินการต่อ
+            </button>
 
               {/* 2. ลงทะเบียน */}
               <button
