@@ -487,7 +487,8 @@ export default function EstimatePage() {
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold text-center mb-6">ประเมินราคาสินค้า</h1>
+            <h1 className="text-2xl text-[#2C2A28] font-bold text-center mb-6">ประเมินราคาสินค้า</h1>
+            <p className="text-sm text-[#4A4644] mb-6 text-center">กรุณาอัปโหลดรูปภาพสินค้าเพื่อประเมินราคาสินค้า</p>
 
             {/* Image Upload Section */}
             <div className="mb-6">
@@ -549,7 +550,7 @@ export default function EstimatePage() {
                     disabled={isAnalyzing}
                     className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
                     style={{
-                      backgroundColor: isAnalyzing ? '#EAEAEA' : '#2D7A46',
+                      backgroundColor: isAnalyzing ? '#EAEAEA' : '#0A4215',
                       color: isAnalyzing ? '#AAAAAA' : 'white'
                     }}
                   >
@@ -563,34 +564,36 @@ export default function EstimatePage() {
             {showTutorial && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-                  <h3 className="text-lg font-semibold mb-4">คำแนะนำในการถ่ายรูป</h3>
-                  <div className="text-sm text-gray-600 mb-6 space-y-2">
-                    <p>• ถ่าย 4 ด้าน (หน้า หลัง ซ้าย ขวา)</p>
-                    <p>• ถ่ายในที่ที่มีแสงสว่างเพียงพอ</p>
-                    <p>• ไม่ถ่ายติดแสงสะท้อน</p>
-                    <p>• แตะโฟกัสไปที่ตัวสินค้าก่อนถ่ายทุกครั้ง</p>
-                    <p>• วางสินค้าเดี่ยวๆ พยายามไม่ให้มีวัตถุอื่นอยู่ในเฟรม</p>
+                  <div className="bg-[#F0EFEF] rounded-xl p-4 max-w-sm w-full">
+                    <h3 className="text-lg font-semibold mb-4 text-[#2C2A28]">คำแนะนำในการถ่ายรูป</h3>
+                    <div className="text-sm text-[#4A4644] mb-6 space-y-2">
+                      <p>• ถ่าย 4 ด้าน (หน้า หลัง ซ้าย ขวา)</p>
+                      <p>• ถ่ายในที่ที่มีแสงสว่างเพียงพอ</p>
+                      <p>• ไม่ถ่ายติดแสงสะท้อน</p>
+                      <p>• แตะโฟกัสไปที่ตัวสินค้าก่อนถ่ายทุกครั้ง</p>
+                      <p>• วางสินค้าเดี่ยวๆ พยายามไม่ให้มีวัตถุอื่นอยู่ในเฟรม</p>
+                    </div>
                   </div>
-                  <div className="flex space-x-3">
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={openCamera}
+                        className="flex-1 bg-[#0A4215] text-white py-2 px-4 rounded-lg hover:bg-gray-800"
+                      >
+                        ถ่ายรูป
+                      </button>
+                      <button
+                        onClick={openFilePicker}
+                        className="flex-1 bg-[#E7EFE9] text-[#0A4215] py-2 px-4 rounded-lg hover:bg-gray-700"
+                      >
+                        อัปโหลดรูปภาพ
+                      </button>
+                    </div>
                     <button
-                      onClick={openCamera}
-                      className="flex-1 bg-gray-700 text-white py-2 px-4 rounded-lg hover:bg-gray-800"
+                      onClick={() => setShowTutorial(false)}
+                      className="w-full mt-3 bg-[#E7EFE9] text-[#2C2A28] py-2 px-4 rounded-lg"
                     >
-                      ถ่ายรูป
+                      ยกเลิก
                     </button>
-                    <button
-                      onClick={openFilePicker}
-                      className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700"
-                    >
-                      อัปโหลดรูปภาพ
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => setShowTutorial(false)}
-                    className="w-full mt-3 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg"
-                  >
-                    ยกเลิก
-                  </button>
                 </div>
               </div>
             )}
@@ -618,7 +621,7 @@ export default function EstimatePage() {
             <div className="mt-6">
               <button
                 onClick={() => window.location.href = '/saved-items'}
-                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                className="w-full bg-[#2C2A28] text-white py-3 px-4 rounded-lg hover:bg-[#2C2A28]/80 transition-colors"
               >
                 ดูสินค้าที่บันทึกไว้
               </button>
@@ -658,12 +661,13 @@ export default function EstimatePage() {
               >
                 ←
               </button>
-              <h1 className="text-2xl font-bold">กรอกข้อมูลสินค้า</h1>
+              <h1 className="text-2xl text-[#2C2A28] font-bold">กรอกข้อมูลสินค้า</h1>
             </div>
 
             {/* Item Type */}
+            <div className="bg-[#F0EFEF] rounded-xl p-2 max-w-sm w-full">
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 ประเภทสินค้า*
               </label>
               <select
@@ -689,7 +693,7 @@ export default function EstimatePage() {
             {/* Brand */}
             {formData.itemType && (
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                   ยี่ห้อ*
                 </label>
                 <select
@@ -715,7 +719,7 @@ export default function EstimatePage() {
 
             {/* Model */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 รุ่น*
               </label>
               <input
@@ -738,7 +742,7 @@ export default function EstimatePage() {
 
             {/* Serial Number */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 หมายเลขซีเรียล*
               </label>
               <input
@@ -761,7 +765,7 @@ export default function EstimatePage() {
 
             {/* Accessories */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 อุปกรณ์เสริม*
               </label>
               <input
@@ -784,7 +788,7 @@ export default function EstimatePage() {
 
             {/* Condition Display (AI Analyzed) */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 สภาพสินค้า (วิเคราะห์โดย AI)
               </label>
               {conditionResult ? (
@@ -811,7 +815,7 @@ export default function EstimatePage() {
 
             {/* Defects */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 ตำหนิ
               </label>
               <textarea
@@ -833,7 +837,7 @@ export default function EstimatePage() {
 
             {/* Note */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 หมายเหตุ
               </label>
               <textarea
@@ -851,6 +855,7 @@ export default function EstimatePage() {
                 placeholder="เช่น สุขภาพแบต 90%"
                 rows={3}
               />
+            </div>
             </div>
 
             {/* Error Message */}
@@ -1148,8 +1153,8 @@ export default function EstimatePage() {
                   onClick={handleSaveTemporary}
                   className="w-full py-3 px-4 rounded-lg transition-colors text-base font-medium"
                   style={{
-                    backgroundColor: '#666666',
-                    color: 'white'
+                    backgroundColor: '#E7EFE9',
+                    color: '#0E5D1E'
                   }}
                 >
                   บันทึกชั่วคราว
