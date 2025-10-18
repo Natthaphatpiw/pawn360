@@ -290,7 +290,6 @@ export default function EstimatePage() {
       return;
     }
 
-    setIsSubmitting(true);
     setError(null);
 
     try {
@@ -338,8 +337,6 @@ export default function EstimatePage() {
     } catch (error: any) {
       console.error('Error saving temporary:', error);
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกชั่วคราว');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
