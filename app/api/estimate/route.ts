@@ -11,8 +11,7 @@ interface EstimateRequest {
   model: string;
   serialNo: string;
   accessories: string;
-  conditionScore: number; // AI-analyzed condition score (0-1)
-  conditionReason: string; // AI-analyzed condition reason
+  condition: number;
   defects: string;
   note: string;
   images: string[];
@@ -28,51 +27,45 @@ Brand: ${input.brand}
 Model: ${input.model}
 Serial Number: ${input.serialNo}
 Accessories: ${input.accessories}
-Condition: ${Math.round(input.conditionScore * 100)}% (${input.conditionReason})
+Condition: ${input.condition}%
 Defects: ${input.defects}
 Additional Notes: ${input.note}
 
 Please provide a clean, standardized description that would be suitable for searching second-hand market prices. Focus on key specifications and condition details.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await openai.responses.create({
     model: 'gpt-4.1-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 300,
-    temperature: 0.1,
+    input: prompt,
+    // max_tokens: 300,
+    // temperature: 0.1,
   });
 
-  return response.choices[0]?.message?.content || '';
+  return response.output_text || '';
 }
 
-// Agent 2: Market price estimation with web search simulation
+// Agent 2: Estimate pricing based on GPT knowledge
 async function getMarketPrice(normalizedInput: string): Promise<number> {
-  const prompt = `คุณเป็นผู้เชี่ยวชาญด้านราคาสินค้าอิเล็กทรอนิกส์มือสองในตลาดไทย คุณเพิ่งค้นหาข้อมูลล่าสุดจาก Kaidee.com และ Facebook Marketplace
-
-ให้ประเมินราคาจำหน่ายเฉลี่ยของสินค้านี้ในตลาดไทย (เป็นราคาที่ผู้ขายตั้งขาย ไม่ใช่ราคาจำนำ)
+  const prompt = `Based on current Thai market data and general knowledge of second-hand electronics prices in Thailand, estimate the market value of this item. Consider current market conditions, typical depreciation, and regional pricing.
 
 ${normalizedInput}
 
-พิจารณา:
-- ราคาจำหน่ายจริงใน Kaidee.com และ Facebook Marketplace
-- สภาวะตลาดปัจจุบันและความต้องการสินค้า
-- การปรับราคาตามสภาพสินค้า
-- ราคาท้องถิ่นในไทย (ไม่ใช่ราคานานาชาติ)
+Provide only a numerical estimate in Thai Baht (THB) without any additional text or formatting. Consider:
+- Current market demand for this type of product
+- Typical depreciation based on condition
+- Local Thai market pricing (not international prices)
+- Average selling prices on platforms like Kaidee, Facebook Marketplace, etc.
 
-ให้คำตอบเป็นตัวเลขจำนวนเต็มในหน่วยบาทไทย เท่านั้น ไม่มีคำอธิบายเพิ่มเติม
-
-ตัวอย่าง: 15000`;
+Return only the number, for example: 15000`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: 20,
-    temperature: 0.4,
+    max_tokens: 50,
+    temperature: 0.1,
   });
 
-  const priceText = response.choices[0]?.message?.content?.trim() || '0';
-  const price = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
+  const price = parseInt(response.choices[0]?.message?.content?.replace(/[^\d]/g, '') || '0') || 0;
 
-  console.log('✅ Estimated market price:', price);
   return price;
 }
 
@@ -89,7 +82,7 @@ export async function POST(request: NextRequest) {
     const body: EstimateRequest = await request.json();
 
     // Validate required fields
-    if (!body.itemType || !body.brand || !body.model || !body.lineId || body.conditionScore === undefined) {
+    if (!body.itemType || !body.brand || !body.model || !body.lineId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -101,14 +94,14 @@ export async function POST(request: NextRequest) {
     const normalizedInput = await normalizeInput(body);
     console.log('✅ Input normalized:', normalizedInput);
 
-    // Agent 2: Get market price using web search
+    // Agent 2: Get market price
     console.log('🔄 Getting market price...');
     const marketPrice = await getMarketPrice(normalizedInput);
     console.log('✅ Market price:', marketPrice);
 
-    // Use condition score from AI analysis (already provided)
-    const conditionScore = body.conditionScore;
-    console.log('✅ Using condition score:', conditionScore);
+    // Use condition score from AI analysis (already done in analyze-condition API)
+    const conditionScore = body.condition; // This comes from the analyze-condition API result
+    console.log('✅ Using condition score from AI analysis:', conditionScore);
 
     // Calculate final estimate: market price * condition score
     const estimatedPrice = Math.round(marketPrice * conditionScore);
@@ -120,7 +113,6 @@ export async function POST(request: NextRequest) {
       success: true,
       estimatedPrice: finalPrice,
       condition: conditionScore,
-      conditionReason: body.conditionReason,
       marketPrice: marketPrice,
       confidence: 0.85, // Placeholder confidence score
       normalizedInput: normalizedInput
