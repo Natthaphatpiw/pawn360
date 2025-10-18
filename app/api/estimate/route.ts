@@ -1,9 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { webSearchTool, RunContext, Agent, AgentInputItem, Runner, withTrace } from "@openai/agents";
+import { z } from "zod";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
 });
+
+// Tool definitions for web search
+const webSearchPreview = webSearchTool({
+  userLocation: {
+    type: "approximate",
+    country: "TH",
+    region: undefined,
+    city: undefined,
+    timezone: undefined
+  },
+  searchContextSize: "high",
+  filters: {
+    allowed_domains: [
+      "www.kaidee.com",
+      "www.facebook.com"
+    ]
+  }
+})
+
+const MyAgentSchema = z.object({ price: z.number() });
+
+interface MyAgentContext {
+  workflowInputAsText: string;
+}
+
+const myAgentInstructions = (runContext: RunContext<MyAgentContext>, _agent: Agent<MyAgentContext>) => {
+  const { workflowInputAsText } = runContext.context;
+  return `หาราคาสินค้ามือสองเฉลี่ยของรายการสินค้านี้ ${workflowInputAsText} `
+}
+
+const myAgent = new Agent({
+  name: "My agent",
+  instructions: myAgentInstructions,
+  model: "gpt-4o-mini",
+  tools: [
+    webSearchPreview
+  ],
+  outputType: MyAgentSchema,
+  modelSettings: {
+    temperature: 1,
+    topP: 1,
+    maxTokens: 2048,
+    store: true
+  }
+});
+
+type WorkflowInput = { input_as_text: string };
+
+// Main code entrypoint for web search workflow
+const runWorkflow = async (workflow: WorkflowInput) => {
+  return await withTrace("New workflow", async () => {
+    const conversationHistory: AgentInputItem[] = [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: workflow.input_as_text
+          }
+        ]
+      }
+    ];
+    const runner = new Runner({
+      traceMetadata: {
+        __trace_source__: "agent-builder",
+        workflow_id: "wf_68f3345611008190a5ee4046725f0ea5028b80ddfe686f46"
+      }
+    });
+    const myAgentResultTemp = await runner.run(
+      myAgent,
+      [
+        ...conversationHistory
+      ],
+      {
+        context: {
+          workflowInputAsText: workflow.input_as_text
+        }
+      }
+    );
+    conversationHistory.push(...myAgentResultTemp.newItems.map((item) => item.rawItem));
+
+    if (!myAgentResultTemp.finalOutput) {
+        throw new Error("Agent result is undefined");
+    }
+
+    const myAgentResult = {
+      output_text: JSON.stringify(myAgentResultTemp.finalOutput),
+      output_parsed: myAgentResultTemp.finalOutput
+    };
+
+    return myAgentResult;
+  });
+}
 
 interface EstimateRequest {
   itemType: string;
@@ -11,7 +106,8 @@ interface EstimateRequest {
   model: string;
   serialNo: string;
   accessories: string;
-  condition: number;
+  conditionScore: number; // AI-analyzed condition score (0-1)
+  conditionReason: string; // AI-analyzed condition reason
   defects: string;
   note: string;
   images: string[];
@@ -43,9 +139,25 @@ Please provide a clean, standardized description that would be suitable for sear
   return response.choices[0]?.message?.content || '';
 }
 
-// Agent 2: Web search for pricing (simulated with GPT knowledge)
+// Agent 2: Web search for pricing using webSearchTool
 async function getMarketPrice(normalizedInput: string): Promise<number> {
-  const prompt = `Based on current Thai market data and general knowledge of second-hand electronics prices in Thailand, estimate the market value of this item. Consider current market conditions, typical depreciation, and regional pricing.
+  try {
+    console.log('🔍 Searching for market prices...');
+    const workflowResult = await runWorkflow({ input_as_text: normalizedInput });
+
+    if (workflowResult.output_parsed && workflowResult.output_parsed.price) {
+      const price = workflowResult.output_parsed.price;
+      console.log('✅ Found market price:', price);
+      return price;
+    } else {
+      console.warn('⚠️ No price found in workflow result, using fallback');
+      throw new Error('No price found');
+    }
+  } catch (error) {
+    console.error('Error in web search workflow:', error);
+
+    // Fallback to basic GPT estimation
+    const prompt = `Based on current Thai market data and general knowledge of second-hand electronics prices in Thailand, estimate the market value of this item. Consider current market conditions, typical depreciation, and regional pricing.
 
 ${normalizedInput}
 
@@ -57,56 +169,21 @@ Provide only a numerical estimate in Thai Baht (THB) without any additional text
 
 Return only the number, for example: 15000`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 50,
-    temperature: 0.3,
-  });
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 50,
+      temperature: 0.3,
+    });
 
-  const priceText = response.choices[0]?.message?.content?.trim() || '0';
-  const price = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
+    const priceText = response.choices[0]?.message?.content?.trim() || '0';
+    const price = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
 
-  return price;
-}
-
-// Agent 3: Analyze condition from images
-async function analyzeConditionFromImages(images: string[], userCondition: number): Promise<number> {
-  if (images.length === 0) {
-    // If no images, use user-reported condition (convert to 0-1 scale)
-    return userCondition / 100;
+    console.log('✅ Fallback market price:', price);
+    return price;
   }
-
-  // For now, we'll use a combination of user input and basic analysis
-  // In a real implementation, you would use vision models to analyze the actual images
-  const prompt = `Analyze the condition of a ${images.length > 0 ? 'product with images provided' : 'product based on description'}.
-User reported condition: ${userCondition}%
-
-Based on typical second-hand item assessment, provide a condition score from 0.0 to 1.0 where:
-- 1.0 = Like new, no visible wear
-- 0.8 = Excellent condition, minimal wear
-- 0.6 = Good condition, some wear but functional
-- 0.4 = Fair condition, noticeable wear
-- 0.2 = Poor condition, significant wear
-- 0.0 = Very poor condition, barely functional
-
-Consider that users tend to over-rate their items. Provide a realistic assessment.
-
-Return only the numerical score (0.0 to 1.0) without any additional text.`;
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 20,
-    temperature: 0.2,
-  });
-
-  const conditionText = response.choices[0]?.message?.content?.trim() || '0.5';
-  const condition = parseFloat(conditionText) || 0.5;
-
-  // Ensure it's within bounds
-  return Math.max(0, Math.min(1, condition));
 }
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -120,7 +197,7 @@ export async function POST(request: NextRequest) {
     const body: EstimateRequest = await request.json();
 
     // Validate required fields
-    if (!body.itemType || !body.brand || !body.model || !body.lineId) {
+    if (!body.itemType || !body.brand || !body.model || !body.lineId || body.conditionScore === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -132,15 +209,14 @@ export async function POST(request: NextRequest) {
     const normalizedInput = await normalizeInput(body);
     console.log('✅ Input normalized:', normalizedInput);
 
-    // Agent 2: Get market price
+    // Agent 2: Get market price using web search
     console.log('🔄 Getting market price...');
     const marketPrice = await getMarketPrice(normalizedInput);
     console.log('✅ Market price:', marketPrice);
 
-    // Agent 3: Analyze condition
-    console.log('🔄 Analyzing condition...');
-    const conditionScore = await analyzeConditionFromImages(body.images, body.condition);
-    console.log('✅ Condition score:', conditionScore);
+    // Use condition score from AI analysis (already provided)
+    const conditionScore = body.conditionScore;
+    console.log('✅ Using condition score:', conditionScore);
 
     // Calculate final estimate: market price * condition score
     const estimatedPrice = Math.round(marketPrice * conditionScore);
@@ -152,6 +228,7 @@ export async function POST(request: NextRequest) {
       success: true,
       estimatedPrice: finalPrice,
       condition: conditionScore,
+      conditionReason: body.conditionReason,
       marketPrice: marketPrice,
       confidence: 0.85, // Placeholder confidence score
       normalizedInput: normalizedInput
