@@ -1,5 +1,29 @@
 import { ObjectId } from 'mongodb';
 
+// Store Model
+export interface Store {
+  _id?: ObjectId;
+  storeName: string;
+  ownerName: string;
+  ownerEmail: string;
+  phone: string;
+  taxId?: string;
+  address: {
+    houseNumber: string;
+    village?: string;
+    street?: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    country: string;
+    postcode: string;
+  };
+  interestRate?: number; // Default interest rate for the store
+  password: string; // Hashed password for employee login
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Customer Model
 export interface Customer {
   _id?: ObjectId;
@@ -23,12 +47,13 @@ export interface Customer {
   totalContracts?: number;
   totalValue?: number;
   lastContractDate?: Date;
-  storeId?: ObjectId;
+  storeId?: ObjectId[]; // Array of store IDs where customer has pawned items
   createdBy?: ObjectId;
   createdAt: Date;
   updatedAt: Date;
   contractsID?: ObjectId[];
   pawnRequests?: PawnRequest[];
+  itemIds?: ObjectId[]; // Array of item IDs owned by this customer
 }
 
 // Pawn Request (embedded in Customer for pre-registration)

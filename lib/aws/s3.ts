@@ -7,7 +7,7 @@ const FOLDER_PREFIX = 'cont360/';
 // Create S3 client lazily to ensure env vars are loaded
 let s3Client: S3Client | null = null;
 
-function getS3Client(): S3Client {
+export function getS3Client(): S3Client {
   if (!s3Client) {
     const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
