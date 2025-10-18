@@ -355,20 +355,42 @@ export default function EstimatePage() {
 
     setError(null);
     setIsSubmitting(true);
+
+    // Validate required fields
+    if (!formData.brand || !formData.model || !formData.itemType || formData.condition === undefined) {
+      setError('กรุณากรอกข้อมูลสินค้าให้ครบถ้วน');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!estimateResult?.estimatedPrice) {
+      setError('ไม่พบข้อมูลราคาประเมิน');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const pawnData = {
-        ...formData,
+        lineId: profile.userId,
+        brand: formData.brand,
+        model: formData.model,
+        type: formData.itemType,
+        serialNo: formData.serialNo,
+        condition: formData.condition,
+        defects: formData.defects,
+        note: formData.note,
+        accessories: formData.accessories,
         images: imageUrls,
         estimatedValue: estimateResult?.estimatedPrice,
         pawnedPrice: estimateResult?.estimatedPrice,
         interestRate,
         periodDays: parseInt(pawnDuration),
         storeId: selectedStore,
-        lineId: profile.userId,
         totalInterest: calculateInterest(),
         remainingAmount: estimateResult?.estimatedPrice
       };
 
+      console.log('Sending pawn request data:', pawnData);
       await axios.post('/api/pawn-requests', pawnData);
       setSuccess('สร้างคำขอจำนำเรียบร้อยแล้ว');
 
