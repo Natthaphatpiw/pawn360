@@ -27,7 +27,7 @@ export default function SavedItemsPage() {
     if (profile?.userId) {
       fetchSavedItems();
     }
-  }, [profile]);
+  }, [profile?.userId]);
 
   const fetchSavedItems = async () => {
     try {
