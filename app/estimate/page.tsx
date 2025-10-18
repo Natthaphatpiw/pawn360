@@ -87,6 +87,7 @@ export default function EstimatePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Check if customer exists on load
   useEffect(() => {
@@ -271,8 +272,77 @@ export default function EstimatePage() {
       return;
     }
 
+    if (!customer) {
+      setError('กรุณาลงทะเบียนก่อนดำเนินการต่อ');
+      return;
+    }
+
     setCurrentStep('pawn_setup');
     setError(null);
+  };
+
+  const handleRegister = () => {
+    // ไปหน้า register
+    window.location.href = '/register';
+  };
+
+  const handleSaveTemporary = async () => {
+    if (!profile?.userId) {
+      setError('กรุณาเข้าสู่ระบบก่อน');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const tempData = {
+        lineId: profile.userId,
+        brand: formData.brand,
+        model: formData.model,
+        type: formData.itemType,
+        serialNo: formData.serialNo,
+        condition: formData.condition,
+        defects: formData.defects,
+        note: formData.note,
+        accessories: formData.accessories,
+        images: imageUrls,
+        status: 'temporary',
+        estimatedValue: estimateResult?.estimatedPrice,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const response = await axios.post('/api/items/temporary', tempData);
+      setSuccess('บันทึกข้อมูลชั่วคราวเรียบร้อยแล้ว');
+
+      // Reset form after 2 seconds
+      setTimeout(() => {
+        setCurrentStep('input');
+        // Reset form
+        setFormData({
+          itemType: '',
+          brand: '',
+          model: '',
+          serialNo: '',
+          accessories: '',
+          condition: 50,
+          defects: '',
+          note: ''
+        });
+        setImages([]);
+        setImageUrls([]);
+        setEstimateResult(null);
+        setSelectedStore('');
+        setSuccess(null);
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Error saving temporary:', error);
+      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกชั่วคราว');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCreatePawnRequest = async () => {
@@ -682,7 +752,13 @@ export default function EstimatePage() {
               </div>
             </div>
 
-            {/* Error Message */}
+            {/* Success/Error Messages */}
+            {success && (
+              <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+                {success}
+              </div>
+            )}
+
             {error && (
               <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                 {error}
@@ -691,16 +767,54 @@ export default function EstimatePage() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
+              {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer */}
               <button
                 onClick={handleContinue}
-                disabled={!selectedStore}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+                disabled={!selectedStore || !customer}
+                className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
               >
-                {customer ? 'ดำเนินการต่อ' : 'ลงทะเบียน'}
+                ดำเนินการต่อ
               </button>
 
+              {/* 2. ลงทะเบียน */}
               <button
-                onClick={() => setCurrentStep('input')}
+                onClick={handleRegister}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                ลงทะเบียน
+              </button>
+
+              {/* 3. บันทึกชั่วคราว */}
+              <button
+                onClick={handleSaveTemporary}
+                disabled={isSubmitting}
+                className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกชั่วคราว'}
+              </button>
+
+              {/* 4. ประเมินสินค้าอื่นๆ */}
+              <button
+                onClick={() => {
+                  setCurrentStep('input');
+                  // Reset form
+                  setFormData({
+                    itemType: '',
+                    brand: '',
+                    model: '',
+                    serialNo: '',
+                    accessories: '',
+                    condition: 50,
+                    defects: '',
+                    note: ''
+                  });
+                  setImages([]);
+                  setImageUrls([]);
+                  setEstimateResult(null);
+                  setSelectedStore('');
+                  setError(null);
+                  setSuccess(null);
+                }}
                 className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
               >
                 ประเมินสินค้าอื่นๆ
