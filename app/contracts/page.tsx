@@ -33,6 +33,8 @@ export default function ContractsPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showActionModal, setShowActionModal] = useState<'renew' | 'redeem' | null>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   // Auto-fetch contracts when profile is loaded
   useEffect(() => {
@@ -97,6 +99,43 @@ export default function ContractsPage() {
         return 'ตกเป็นของร้าน';
       default:
         return status;
+    }
+  };
+
+  const calculateInterestPayment = () => {
+    if (!selectedContract) return 0;
+    const { pawnedPrice, interestRate } = selectedContract.pawnDetails;
+    return (pawnedPrice * interestRate) / 100;
+  };
+
+  const handleActionSubmit = async () => {
+    if (!selectedContract || !showActionModal) return;
+
+    setIsSubmittingAction(true);
+    setError(null);
+
+    try {
+      const actionType = showActionModal;
+      const amount = actionType === 'renew'
+        ? calculateInterestPayment()
+        : selectedContract.pawnDetails.remainingAmount;
+
+      const response = await axios.post('/api/contracts/request-action', {
+        contractId: selectedContract._id,
+        contractNumber: selectedContract.contractNumber,
+        actionType,
+        amount,
+        lineId: profile?.userId,
+      });
+
+      if (response.data.success) {
+        setShowActionModal(null);
+        alert('ส่งคำขอไปยังร้านค้าเรียบร้อยแล้ว');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ');
+    } finally {
+      setIsSubmittingAction(false);
     }
   };
 
@@ -206,15 +245,83 @@ export default function ContractsPage() {
             {/* Action Buttons */}
             {selectedContract.status === 'active' && (
               <div className="space-y-3">
-                <button className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700">
+                <button
+                  onClick={() => setShowActionModal('renew')}
+                  className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700"
+                >
                   ต่อดอกเบี้ย
                 </button>
-                <button className="w-full bg-green-600 text-white py-3 rounded-md font-semibold hover:bg-green-700">
+                <button
+                  onClick={() => setShowActionModal('redeem')}
+                  className="w-full bg-green-600 text-white py-3 rounded-md font-semibold hover:bg-green-700"
+                >
                   ไถ่ถอนสินค้า
                 </button>
               </div>
             )}
           </div>
+
+          {/* Action Modal */}
+          {showActionModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                <h2 className="text-xl font-bold text-gray-800 mb-4">
+                  {showActionModal === 'renew' ? 'ต่อดอกเบี้ย' : 'ไถ่ถอนสินค้า'}
+                </h2>
+
+                <div className="mb-6">
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-gray-600 mb-2">สัญญาเลขที่:</p>
+                    <p className="font-semibold text-gray-800">{selectedContract.contractNumber}</p>
+                  </div>
+
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-2">จำนวนเงินที่ต้องชำระ:</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {showActionModal === 'renew'
+                        ? calculateInterestPayment().toLocaleString()
+                        : selectedContract.pawnDetails.remainingAmount.toLocaleString()}{' '}
+                      บาท
+                    </p>
+                    {showActionModal === 'renew' && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        (ดอกเบี้ย {selectedContract.pawnDetails.interestRate}%)
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-4 text-sm text-gray-600">
+                    <p>• คำขอจะถูกส่งไปยังร้านค้า</p>
+                    <p>• พนักงานร้านจะติดต่อกลับภายใน 24 ชั่วโมง</p>
+                    <p>• กรุณาเตรียมเงินสดหรือช่องทางชำระเงิน</p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowActionModal(null)}
+                    disabled={isSubmittingAction}
+                    className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-md font-semibold hover:bg-gray-300 disabled:bg-gray-100"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    onClick={handleActionSubmit}
+                    disabled={isSubmittingAction}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+                  >
+                    {isSubmittingAction ? 'กำลังส่ง...' : 'ยืนยัน'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

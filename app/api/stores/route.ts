@@ -8,7 +8,7 @@ export async function GET() {
 
     const stores = await storesCollection
       .find({})
-      .project({ _id: 1, storeName: 1 })
+      .project({ _id: 1, storeName: 1, interestRate: 1 })
       .sort({ storeName: 1 })
       .toArray();
 

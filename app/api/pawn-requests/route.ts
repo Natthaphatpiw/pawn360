@@ -21,10 +21,11 @@ export async function POST(request: NextRequest) {
       note,
       accessories,
       images,
-      desiredAmount,
       estimatedValue,
-      loanDays,
+      pawnedPrice,
       interestRate,
+      periodDays,
+      storeId,
     } = body;
 
     // Validation
@@ -63,10 +64,11 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       currentContractId: null,
       contractHistory: [],
-      desiredAmount: desiredAmount || 0,
+      desiredAmount: pawnedPrice || estimatedValue || 0,
       estimatedValue: estimatedValue || 0,
-      loanDays: loanDays || 30,
-      interestRate: interestRate || 3,
+      loanDays: periodDays || 30,
+      interestRate: interestRate || 10,
+      storeId: storeId ? new ObjectId(storeId) : undefined,
       negotiationStatus: 'none',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -107,13 +109,23 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
     };
 
-    // Add pawn request to customer's pawnRequests array
+    // Update customer with pawn request, item ID, and store ID
+    const updateData: any = {
+      $push: {
+        pawnRequests: pawnRequest as any,
+        itemIds: itemId
+      },
+      $set: { updatedAt: new Date() },
+    };
+
+    // Add storeId to storeId array if provided and not already present
+    if (storeId) {
+      updateData.$addToSet = { storeId: new ObjectId(storeId) };
+    }
+
     await customersCollection.updateOne(
       { lineId },
-      {
-        $push: { pawnRequests: pawnRequest as any },
-        $set: { updatedAt: new Date() },
-      }
+      updateData
     );
 
     // Send QR Code to LINE chat (ใช้ presigned URL)
