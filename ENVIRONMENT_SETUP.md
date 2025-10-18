@@ -15,14 +15,21 @@ AWS_REGION=ap-southeast-2
 MONGODB_URI=mongodb+srv://natthapiw_db_user:afOJe2MrgMDsmm6k@cluster0.skadipr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
 MONGODB_DB=pawn
 
-# LINE LIFF Configuration
-NEXT_PUBLIC_LIFF_ID_PAWN=2008216710-54P86MRY
+# LINE Channel Configuration (ตามที่ตั้งค่าใน Vercel)
+LINE_CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
+LINE_CHANNEL_SECRET=75202717b1787be1869ecb8ed12abef7
 
-# Channel Configuration (Main Channel)
-CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
-CHANNEL_SECRET=75202717b1787be1869ecb8ed12abef7
+# LINE LIFF Configuration (ตามที่ตั้งค่าใน Vercel)
+LINE_LIFF_ID=2008216710-54P86MRY
+NEXT_PUBLIC_LIFF_ID=2008216710-54P86MRY
 
-# Store Channel (ถ้ามี channel แยกสำหรับร้านค้า)
-LINE_STORE_CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
-LINE_STORE_CHANNEL_SECRET=75202717b1787be1869ecb8ed12abef7
+# Rich Menu IDs (ตามที่ตั้งค่าใน Vercel)
+RICH_MENU_ID_NEW_USER=your_new_user_rich_menu_id
+RICH_MENU_ID_MEMBER=your_member_rich_menu_id
+
+# Base URL (ตามที่ตั้งค่าใน Vercel)
+NEXT_PUBLIC_BASE_URL=https://pawn360.vercel.app
+
+# QR Code Storage (ตามที่ตั้งค่าใน Vercel)
+QR_CODE_STORAGE_PATH=your_qr_storage_path
 ```
