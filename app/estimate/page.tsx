@@ -814,10 +814,9 @@ export default function EstimatePage() {
               {/* 3. บันทึกชั่วคราว */}
               <button
                 onClick={handleSaveTemporary}
-                disabled={isSubmitting}
-                className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
+                className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors"
               >
-                {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกชั่วคราว'}
+                บันทึกชั่วคราว
               </button>
 
               {/* 4. ประเมินสินค้าอื่นๆ */}
