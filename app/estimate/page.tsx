@@ -83,7 +83,6 @@ export default function EstimatePage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
 
   // UI states
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);

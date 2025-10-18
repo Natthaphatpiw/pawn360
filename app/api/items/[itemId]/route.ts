@@ -5,14 +5,15 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { itemId: string } }
+  { params }: { params: Promise<{ itemId: string }> }
 ) {
   try {
+    const { itemId } = await params;
     const { db } = await connectToDatabase();
     const itemsCollection = db.collection<Item>('items');
 
     const item = await itemsCollection.findOne({
-      _id: new ObjectId(params.itemId)
+      _id: new ObjectId(itemId)
     });
 
     if (!item) {

@@ -61,7 +61,7 @@ export default function ItemActionsPage() {
       fetchStores();
       checkCustomerExists();
     }
-  }, [profile, itemId]);
+  }, [profile?.userId, itemId]);
 
   const fetchItemDetails = async () => {
     try {
@@ -129,7 +129,9 @@ export default function ItemActionsPage() {
   const handleSaveTemporary = async () => {
     // Item is already saved, just show success message
     setSuccess('สินค้านี้บันทึกไว้แล้ว');
-    setTimeout(() => setSuccess(null), 2000);
+    setTimeout(() => {
+      setSuccess(null);
+    }, 2000);
   };
 
   if (isLoading || loading) {
