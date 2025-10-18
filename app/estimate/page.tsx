@@ -25,6 +25,7 @@ const BRANDS_BY_TYPE: Record<string, string[]> = {
 interface EstimateResult {
   estimatedPrice: number;
   condition: number;
+  conditionReason?: string;
   confidence: number;
 }
 
