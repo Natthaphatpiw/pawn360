@@ -227,6 +227,9 @@ export default function EstimatePage() {
       const response = await axios.post('/api/estimate', estimateData);
       setEstimateResult(response.data);
 
+      // Fetch stores for result step
+      await fetchStores();
+
       // Move to result step
       setCurrentStep('result');
 
@@ -243,10 +246,13 @@ export default function EstimatePage() {
 
   const fetchStores = async () => {
     try {
+      console.log('Fetching stores...');
       const response = await axios.get('/api/stores');
-      setStores(response.data.stores);
+      console.log('Stores fetched:', response.data.stores?.length || 0, 'stores');
+      setStores(response.data.stores || []);
     } catch (error) {
       console.error('Error fetching stores:', error);
+      setStores([]);
     }
   };
 
@@ -797,15 +803,21 @@ export default function EstimatePage() {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-            {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer */}
-            <button
-              onClick={handleContinue}
-              disabled={!selectedStore || !customer}
-              className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
-              onMouseEnter={() => console.log('Button hover - selectedStore:', selectedStore, 'customer:', customer)}
-            >
-              ดำเนินการต่อ
-            </button>
+            {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer หรือไม่ได้เลือก store */}
+            {selectedStore ? (
+              <button
+                onClick={handleContinue}
+                disabled={!customer}
+                className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
+                onMouseEnter={() => console.log('Button hover - customer:', !!customer)}
+              >
+                ดำเนินการต่อ
+              </button>
+            ) : (
+              <div className="w-full py-3 px-4 rounded-lg bg-gray-300 text-gray-500 text-center">
+                กรุณาเลือกร้านจำนำก่อน
+              </div>
+            )}
 
               {/* 2. ลงทะเบียน */}
               <button
