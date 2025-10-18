@@ -57,14 +57,15 @@ Provide only a numerical estimate in Thai Baht (THB) without any additional text
 
 Return only the number, for example: 15000`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: 50,
-    temperature: 0.1,
+  const response = await openai.responses.create({
+    model: 'gpt-4.1-mini',
+    tools: [{ type: "web_search_preview" }],
+    input: prompt,
+    // max_tokens: 300,
+    // temperature: 0.1,
   });
 
-  const price = parseInt(response.choices[0]?.message?.content?.replace(/[^\d]/g, '') || '0') || 0;
+  const price = parseInt(response.output_text?.replace(/[^\d]/g, '') || '0') || 0;
 
   return price;
 }
