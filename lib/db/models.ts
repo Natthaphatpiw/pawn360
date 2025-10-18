@@ -78,7 +78,7 @@ export interface Item {
   note?: string;
   accessories?: string;
   images: string[];
-  status: 'pending' | 'active' | 'redeemed' | 'lost' | 'sold';
+  status: 'pending' | 'active' | 'redeemed' | 'lost' | 'sold' | 'temporary';
   currentContractId?: ObjectId | null;
   contractHistory?: ObjectId[];
   storeId?: ObjectId;
