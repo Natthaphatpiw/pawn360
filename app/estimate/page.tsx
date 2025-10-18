@@ -25,7 +25,6 @@ const BRANDS_BY_TYPE: Record<string, string[]> = {
 interface EstimateResult {
   estimatedPrice: number;
   condition: number;
-  conditionReason?: string;
   confidence: number;
 }
 
@@ -243,8 +242,7 @@ export default function EstimatePage() {
       // Prepare data for AI estimation
       const estimateData = {
         ...formData,
-        conditionScore: conditionResult.score, // Use AI analyzed condition score
-        conditionReason: conditionResult.reason, // Use AI analyzed condition reason
+        condition: conditionResult.score, // Use AI analyzed condition score
         images: uploadedImageUrls,
         lineId: profile.userId
       };
@@ -450,7 +448,7 @@ export default function EstimatePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F9F9F9' }}>
+    <div className="min-h-screen bg-white">
       <div className="max-w-md mx-auto bg-white min-h-screen shadow-sm">
         {currentStep === 'input' && (
           <div className="p-4">
@@ -458,20 +456,20 @@ export default function EstimatePage() {
             <div className="mb-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">1</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#DADADA' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DADADA' }}>
-                    <span className="text-sm" style={{ color: '#999999' }}>2</span>
+                  <div className="w-12 h-1 bg-gray-300"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">2</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#DADADA' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DADADA' }}>
-                    <span className="text-sm" style={{ color: '#999999' }}>3</span>
+                  <div className="w-12 h-1 bg-gray-300"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">3</span>
                   </div>
                 </div>
               </div>
-              <div className="text-center text-sm" style={{ color: '#666666' }}>
+              <div className="text-center text-sm text-gray-600">
                 <p><strong className="text-blue-600">อัพโหลดรูปภาพ</strong> → กรอกข้อมูล → เลือกตัวเลือก</p>
               </div>
             </div>
@@ -480,26 +478,19 @@ export default function EstimatePage() {
 
             {/* Image Upload Section */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 รูปภาพสินค้า* ({images.length}/6)
               </label>
 
               {images.length === 0 ? (
-                <div className="border-2 border-dashed rounded-lg p-6 text-center" style={{ backgroundColor: '#F3F3F3', borderColor: '#DADADA' }}>
-                  <div className="mb-4">
-                    {/* Camera icon placeholder */}
-                    <div className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DADADA' }}>
-                      📷
-                    </div>
-                  </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <button
                     onClick={() => setShowTutorial(true)}
-                    className="w-full py-3 px-4 rounded-lg transition-colors text-white font-medium"
-                    style={{ backgroundColor: '#2D7A46' }}
+                    className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors"
                   >
-                    เพิ่มรูปถ่าย
+                    ถ่ายรูป
                   </button>
-                  <p className="text-xs mt-2" style={{ color: '#999999' }}>
+                  <p className="text-xs text-gray-500 mt-2">
                     กรุณาอัพโหลดรูปภาพอย่างน้อย 1 รูป
                   </p>
                 </div>
@@ -537,8 +528,7 @@ export default function EstimatePage() {
                   <button
                     onClick={handleAnalyzeCondition}
                     disabled={isAnalyzing}
-                    className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium"
-                    style={{ backgroundColor: isAnalyzing ? '#C0C0C0' : '#2D7A46' }}
+                    className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
                   >
                     {isAnalyzing ? 'กำลังวิเคราะห์สภาพ...' : 'วิเคราะห์สภาพสินค้า'}
                   </button>
@@ -619,20 +609,20 @@ export default function EstimatePage() {
             <div className="mb-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#2D7A46' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-12 h-1 bg-gray-700"></div>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">2</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#DADADA' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DADADA' }}>
-                    <span className="text-sm" style={{ color: '#999999' }}>3</span>
+                  <div className="w-12 h-1 bg-gray-300"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">3</span>
                   </div>
                 </div>
               </div>
-              <div className="text-center text-sm" style={{ color: '#666666' }}>
+              <div className="text-center text-sm text-gray-600">
                 <p>อัพโหลดรูป ✓ → <strong className="text-gray-700">กรอกข้อมูล</strong> → เลือกตัวเลือก</p>
               </div>
             </div>
@@ -649,15 +639,14 @@ export default function EstimatePage() {
 
             {/* Item Type */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 ประเภทสินค้า*
               </label>
               <select
                 name="itemType"
                 value={formData.itemType}
                 onChange={handleInputChange}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                 required
               >
                 <option value="">เลือกประเภทสินค้า</option>
@@ -670,15 +659,14 @@ export default function EstimatePage() {
             {/* Brand */}
             {formData.itemType && (
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   ยี่ห้อ*
                 </label>
                 <select
                   name="brand"
                   value={formData.brand}
                   onChange={handleInputChange}
-                  className="w-full border rounded-lg px-3 py-3 focus:outline-none focus:ring-2 text-base"
-                  style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                   required
                 >
                   <option value="">เลือกยี่ห้อ</option>
@@ -691,7 +679,7 @@ export default function EstimatePage() {
 
             {/* Model */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 รุ่น*
               </label>
               <input
@@ -699,8 +687,7 @@ export default function EstimatePage() {
                 name="model"
                 value={formData.model}
                 onChange={handleInputChange}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                 placeholder="เช่น iPhone 15 Pro"
                 required
               />
@@ -708,7 +695,7 @@ export default function EstimatePage() {
 
             {/* Serial Number */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 หมายเลขซีเรียล*
               </label>
               <input
@@ -716,8 +703,7 @@ export default function EstimatePage() {
                 name="serialNo"
                 value={formData.serialNo}
                 onChange={handleInputChange}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                 placeholder="หมายเลขซีเรียล"
                 required
               />
@@ -725,7 +711,7 @@ export default function EstimatePage() {
 
             {/* Accessories */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 อุปกรณ์เสริม*
               </label>
               <input
@@ -733,8 +719,7 @@ export default function EstimatePage() {
                 name="accessories"
                 value={formData.accessories}
                 onChange={handleInputChange}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                 placeholder="เช่น กล่อง เคส หูฟัง"
                 required
               />
@@ -742,42 +727,41 @@ export default function EstimatePage() {
 
             {/* Condition Display (AI Analyzed) */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 สภาพสินค้า (วิเคราะห์โดย AI)
               </label>
               {conditionResult ? (
-                <div className="rounded-lg p-4" style={{ backgroundColor: '#F9F9F9', borderColor: '#DADADA', borderWidth: 1, borderStyle: 'solid' }}>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium">คะแนนสภาพ:</span>
-                    <span className="text-lg font-bold" style={{ color: '#333333' }}>{Math.round(conditionResult.score * 100)}%</span>
+                    <span className="text-lg font-bold text-gray-800">{Math.round(conditionResult.score * 100)}%</span>
                   </div>
-                  <div className="w-full rounded-full h-3 mb-2" style={{ backgroundColor: '#E0E0E0' }}>
+                  <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                     <div
-                      className="h-3 rounded-full"
-                      style={{ width: `${conditionResult.score * 100}%`, backgroundColor: '#2D7A46' }}
+                      className="bg-gray-700 h-3 rounded-full"
+                      style={{ width: `${conditionResult.score * 100}%` }}
                     ></div>
                   </div>
-                  <p className="text-xs leading-relaxed" style={{ color: '#666666' }}>{conditionResult.reason}</p>
-                  <p className="text-xs mt-2" style={{ color: '#999999' }}>* สภาพสินค้าจะไม่สามารถแก้ไขได้</p>
+                  <p className="text-xs text-gray-600 leading-relaxed">{conditionResult.reason}</p>
+                  <p className="text-xs text-gray-500 mt-2">* สภาพสินค้าจะไม่สามารถแก้ไขได้</p>
                 </div>
               ) : (
-                <div className="rounded-lg p-4 text-center" style={{ backgroundColor: '#F9F9F9', borderColor: '#DADADA', borderWidth: 1, borderStyle: 'solid' }}>
-                  <p style={{ color: '#999999' }}>กำลังโหลดข้อมูลสภาพสินค้า...</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                  <p className="text-gray-500">กำลังโหลดข้อมูลสภาพสินค้า...</p>
                 </div>
               )}
             </div>
 
             {/* Defects */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 ตำหนิ
               </label>
               <textarea
                 name="defects"
                 value={formData.defects}
                 onChange={handleInputChange}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                 placeholder="ระบุตำหนิของสินค้าถ้าหากว่ามี"
                 rows={3}
               />
@@ -785,15 +769,14 @@ export default function EstimatePage() {
 
             {/* Note */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 หมายเหตุ
               </label>
               <textarea
                 name="note"
                 value={formData.note}
                 onChange={handleInputChange}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
                 placeholder="เช่น สุขภาพแบต 90%"
                 rows={3}
               />
@@ -810,10 +793,9 @@ export default function EstimatePage() {
             <button
               onClick={handleEstimate}
               disabled={isEstimating}
-              className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-base"
-              style={{ backgroundColor: isEstimating ? '#C0C0C0' : '#2D7A46' }}
+              className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
-              {isEstimating ? 'กำลังประเมินราคา...' : 'ประเมินราคาด้วย AI'}
+              {isEstimating ? 'กำลังประเมินราคา...' : 'ประเมินราคา'}
             </button>
           </div>
         )}
@@ -824,21 +806,21 @@ export default function EstimatePage() {
             <div className="mb-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#2D7A46' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-12 h-1 bg-gray-700"></div>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#2D7A46' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-12 h-1 bg-gray-700"></div>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">3</span>
                   </div>
                 </div>
               </div>
-              <div className="text-center text-sm" style={{ color: '#666666' }}>
-                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong style={{ color: '#2D7A46' }}>เลือกตัวเลือก</strong></p>
+              <div className="text-center text-sm text-gray-600">
+                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong className="text-blue-600">เลือกตัวเลือก</strong></p>
               </div>
             </div>
 
@@ -858,42 +840,36 @@ export default function EstimatePage() {
             )}
 
             {/* Estimated Price */}
-            <div className="rounded-lg p-6 mb-6 text-center" style={{ backgroundColor: '#F0F8F0', borderColor: '#2D7A46', borderWidth: 1, borderStyle: 'solid' }}>
-              <p className="text-sm mb-2" style={{ color: '#2D7A46' }}>ราคาประเมิน</p>
-              <p className="text-3xl font-bold" style={{ color: '#2D7A46' }}>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6 text-center">
+              <p className="text-sm text-green-600 mb-2">ราคาประเมิน</p>
+              <p className="text-3xl font-bold text-green-700">
                 ฿{estimateResult.estimatedPrice.toLocaleString()}
               </p>
-              <p className="text-sm mt-2" style={{ color: '#2D7A46' }}>
-                สภาพสินค้า: {Math.round(estimateResult.condition * 100)}%
+              <p className="text-sm text-green-600 mt-2">
+                สภาพสินค้า: {estimateResult.condition}/1.0
               </p>
-              {estimateResult.conditionReason && (
-                <p className="text-xs mt-1 text-gray-600">
-                  {estimateResult.conditionReason}
-                </p>
-              )}
             </div>
 
             {/* Pawn Shop Selection */}
             <div className="mb-6">
-      <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: '#F9F9F9', borderColor: '#DADADA', borderWidth: 1, borderStyle: 'solid' }}>
-        <div className="mb-2">
-          <h3 className="text-sm font-semibold" style={{ color: '#333333' }}>คำนวณราคา Preview</h3>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+        <div className="flex items-center mb-2">
+          <h3 className="text-sm font-semibold text-gray-800">คำนวณราคา Preview</h3>
         </div>
-        <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
+        <p className="text-sm text-gray-700 leading-relaxed">
           เลือกร้านค้าเพื่อคำนวณดอกเบี้ยและแสดงราคาประเมินโดยประมาณ
           <br />
-          <strong style={{ color: '#333333' }}>ไม่ผูกมัด:</strong> คุณสามารถนำ QR ไปให้ร้านไหนก็ได้
+          <strong className="text-gray-800">ไม่ผูกมัด:</strong> คุณสามารถนำ QR ไปให้ร้านไหนก็ได้
         </p>
       </div>
 
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 เลือกร้านเพื่อคำนวณราคา
               </label>
               <select
                 value={selectedStore}
                 onChange={(e) => handleStoreSelect(e.target.value)}
-                className="w-full border rounded-lg px-3 py-3 focus:outline-none focus:ring-2 text-base"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
               >
                 <option value="">เลือกเพื่อดูราคาประเมิน</option>
                 {stores.map(store => (
@@ -906,14 +882,13 @@ export default function EstimatePage() {
 
             {/* Pawn Duration */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 ระยะเวลาที่ต้องการจำนำ*
               </label>
               <select
                 value={pawnDuration}
                 onChange={(e) => setPawnDuration(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2"
-                style={{ borderColor: '#E0E0E0', backgroundColor: '#FFFFFF' }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-700"
               >
                 <option value="7">7 วัน</option>
                 <option value="14">14 วัน</option>
@@ -958,10 +933,10 @@ export default function EstimatePage() {
             {/* Action Buttons */}
             <div className="space-y-4">
               {/* Info Card */}
-      <div className="rounded-lg p-4" style={{ backgroundColor: '#F9F9F9', borderColor: '#DADADA', borderWidth: 1, borderStyle: 'solid' }}>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div>
-          <h4 className="text-sm font-semibold mb-1" style={{ color: '#333333' }}>ขั้นตอนต่อไป</h4>
-          <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
+          <h4 className="text-sm font-semibold text-gray-800 mb-1">ขั้นตอนต่อไป</h4>
+          <p className="text-sm text-gray-700 leading-relaxed">
             เลือกตัวเลือกที่ต้องการ หากลงทะเบียนแล้วสามารถดำเนินการต่อเพื่อสร้าง QR Code
           </p>
         </div>
@@ -973,8 +948,7 @@ export default function EstimatePage() {
         <button
           onClick={handleContinue}
           disabled={!customer}
-          className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-semibold"
-          style={{ backgroundColor: customer ? '#2D7A46' : '#C0C0C0' }}
+          className="w-full py-4 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-gray-700 text-white hover:bg-gray-800 text-base font-semibold"
           onMouseEnter={() => console.log('Button hover - customer:', !!customer)}
         >
           ดำเนินการต่อ - สร้าง QR Code
@@ -996,16 +970,14 @@ export default function EstimatePage() {
               <div className="border-t border-gray-200 pt-4 space-y-3">
                 <button
                   onClick={handleRegister}
-                  className="w-full py-3 px-4 rounded-lg transition-colors text-white font-medium text-base border-2"
-                  style={{ backgroundColor: '#FFFFFF', color: '#2D7A46', borderColor: '#2D7A46' }}
+                  className="w-full bg-green-700 text-white py-3 px-4 rounded-lg hover:bg-green-800 transition-colors text-base font-medium"
                 >
                   ลงทะเบียนสมาชิก
                 </button>
 
                 <button
                   onClick={handleSaveTemporary}
-                  className="w-full py-3 px-4 rounded-lg transition-colors text-white font-medium text-base"
-                  style={{ backgroundColor: '#666666' }}
+                  className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors text-base font-medium"
                 >
                   บันทึกชั่วคราว
                 </button>
@@ -1031,8 +1003,7 @@ export default function EstimatePage() {
                     setError(null);
                     setSuccess(null);
                   }}
-                  className="w-full py-3 px-4 rounded-lg transition-colors text-white font-medium text-base"
-                  style={{ backgroundColor: '#666666' }}
+                  className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors text-base font-medium"
                 >
                   ประเมินสินค้าอื่นๆ
                 </button>
@@ -1047,20 +1018,20 @@ export default function EstimatePage() {
             <div className="mb-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#2D7A46' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-12 h-1 bg-gray-700"></div>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#2D7A46' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
+                  <div className="w-12 h-1 bg-gray-700"></div>
+                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm">✓</span>
                   </div>
                 </div>
               </div>
-              <div className="text-center text-sm" style={{ color: '#666666' }}>
+              <div className="text-center text-sm text-gray-600">
                 <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong className="text-blue-600">สร้าง QR Code</strong></p>
               </div>
             </div>
@@ -1068,10 +1039,10 @@ export default function EstimatePage() {
             <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการจำนำ</h1>
 
             {/* Info Card */}
-    <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#F9F9F9', borderColor: '#DADADA', borderWidth: 1, borderStyle: 'solid' }}>
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
       <div>
-        <h4 className="text-sm font-semibold mb-1" style={{ color: '#333333' }}>พร้อมสร้าง QR Code</h4>
-        <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
+        <h4 className="text-sm font-semibold text-gray-800 mb-1">พร้อมสร้าง QR Code</h4>
+        <p className="text-sm text-gray-700 leading-relaxed">
           ข้อมูลครบถ้วนแล้ว กดสร้าง QR Code เพื่อให้พนักงานร้านสแกนและดำเนินการจำนำ
         </p>
       </div>
@@ -1079,7 +1050,7 @@ export default function EstimatePage() {
 
             {/* Customer Info */}
             {customer && (
-              <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#F9F9F9', borderColor: '#DADADA', borderWidth: 1, borderStyle: 'solid' }}>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
                 <h3 className="font-semibold mb-2">ข้อมูลลูกค้า</h3>
                 <p className="text-sm text-gray-600">{customer.fullName}</p>
                 <p className="text-sm text-gray-600">{customer.phone}</p>
@@ -1111,8 +1082,7 @@ export default function EstimatePage() {
             <button
               onClick={handleCreatePawnRequest}
               disabled={isSubmitting}
-              className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-white text-base font-semibold"
-              style={{ backgroundColor: isSubmitting ? '#C0C0C0' : '#2D7A46' }}
+              className="w-full bg-gray-700 text-white py-4 px-4 rounded-lg hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-base font-semibold"
             >
               {isSubmitting ? 'กำลังสร้าง QR Code...' : 'สร้าง QR Code สำหรับจำนำ'}
             </button>
@@ -1139,8 +1109,7 @@ export default function EstimatePage() {
 
               <button
                 onClick={() => setCurrentStep('input')}
-                className="w-full py-3 px-4 rounded-lg transition-colors text-white font-medium text-base"
-                style={{ backgroundColor: '#666666' }}
+                className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
               >
                 ประเมินสินค้าอื่นๆ
               </button>
