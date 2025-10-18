@@ -69,11 +69,10 @@ export default function EstimatePage() {
   // Images and upload state
   const [images, setImages] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-
   // Estimation results
   const [estimateResult, setEstimateResult] = useState<EstimateResult | null>(null);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Pawn setup
   const [stores, setStores] = useState<Store[]>([]);
@@ -87,13 +86,6 @@ export default function EstimatePage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
 
-  // Check if customer exists on load
-  useEffect(() => {
-    if (profile?.userId) {
-      checkCustomerExists();
-    }
-  }, [profile]);
-
   const checkCustomerExists = async () => {
     try {
       const response = await axios.get(`/api/users/check?lineId=${profile.userId}`);
@@ -104,6 +96,13 @@ export default function EstimatePage() {
       console.error('Error checking customer:', error);
     }
   };
+
+  // Check if customer exists on load
+  useEffect(() => {
+    if (profile?.userId) {
+      checkCustomerExists();
+    }
+  }, [profile, checkCustomerExists]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -170,26 +169,21 @@ export default function EstimatePage() {
   const uploadImages = async (): Promise<string[]> => {
     if (images.length === 0) return [];
 
-    setIsUploading(true);
-    try {
-      const uploadPromises = images.map(async (file) => {
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', file);
+    const uploadPromises = images.map(async (file) => {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
 
-        const response = await axios.post('/api/upload/image', formDataUpload, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        return response.data.url;
+      const response = await axios.post('/api/upload/image', formDataUpload, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
-      const urls = await Promise.all(uploadPromises);
-      return urls;
-    } finally {
-      setIsUploading(false);
-    }
+      return response.data.url;
+    });
+
+    const urls = await Promise.all(uploadPromises);
+    return urls;
   };
 
   const handleEstimate = async () => {
@@ -347,7 +341,7 @@ export default function EstimatePage() {
     }
 
     setError(null);
-
+    setIsSubmitting(true);
     try {
       const pawnData = {
         ...formData,
@@ -371,6 +365,8 @@ export default function EstimatePage() {
     } catch (error: any) {
       console.error('Error creating pawn request:', error);
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างคำขอจำนำ');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
