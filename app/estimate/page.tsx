@@ -290,12 +290,6 @@ export default function EstimatePage() {
     }
   };
 
-  const handleConditionChange = (value: number) => {
-    setFormData(prev => ({
-      ...prev,
-      condition: value
-    }));
-  };
 
   const calculateInterest = () => {
     const pawnPrice = parseInt(desiredPrice) || 0;
@@ -633,26 +627,26 @@ export default function EstimatePage() {
         )}
 
         {currentStep === 'form' && (
-          <div className="p-4" style={{ backgroundColor: '#F5F5F5' }}>
+          <div className="p-4">
             {/* Progress Indicator */}
             <div className="mb-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4CAF50' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#4CAF50' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#4CAF50' }}>
+                  <div className="w-12 h-1" style={{ backgroundColor: '#2D7A46' }}></div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#2D7A46' }}>
                     <span className="text-white text-sm">2</span>
                   </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#BDBDBD' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#BDBDBD' }}>
-                    <span className="text-sm" style={{ color: '#9E9E9E' }}>3</span>
+                  <div className="w-12 h-1" style={{ backgroundColor: '#DADADA' }}></div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#DADADA' }}>
+                    <span className="text-sm" style={{ color: '#999999' }}>3</span>
                   </div>
                 </div>
               </div>
-              <div className="text-center text-sm" style={{ color: '#4A4A4A' }}>
-                <p>อัพโหลดรูป ✓ → <strong style={{ color: '#4CAF50' }}>กรอกข้อมูล</strong> → เลือกตัวเลือก</p>
+              <div className="text-center text-sm" style={{ color: '#666666' }}>
+                <p>อัพโหลดรูป ✓ → <strong style={{ color: '#2D7A46' }}>กรอกข้อมูล</strong> → เลือกตัวเลือก</p>
               </div>
             </div>
 
@@ -660,52 +654,17 @@ export default function EstimatePage() {
               <button
                 onClick={() => setCurrentStep('input')}
                 className="mr-2 p-2 hover:bg-gray-50 rounded-full"
-                style={{ color: '#4A4A4A' }}
+                style={{ color: '#2D7A46' }}
               >
                 ←
               </button>
-              <h1 className="text-2xl font-bold" style={{ color: '#1E293B' }}>กรอกข้อมูลสินค้า</h1>
+              <h1 className="text-2xl font-bold">กรอกข้อมูลสินค้า</h1>
             </div>
 
-            {/* Item images */}
+            {/* Item Type */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Item images*
-              </label>
-              <div style={{ backgroundColor: '#F5F5F5', padding: '20px', border: '1px solid #BDBDBD', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '24px', marginBottom: '8px', color: '#4A4A4A' }}>+</div>
-                <span style={{ color: '#4A4A4A', fontSize: '14px' }}>กรุณาแนบไฟล์</span>
-                <span style={{ marginLeft: '10px', color: '#9E9E9E', fontSize: '12px' }}>0/6</span>
-              </div>
-            </div>
-
-            {/* Serial number */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                *หมายเลข serial number 1 ตัว
-              </label>
-              <input
-                type="text"
-                name="serialNo"
-                value={formData.serialNo}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 focus:outline-none"
-                style={{
-                  border: '1px solid #BDBDBD',
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '8px',
-                  color: '#1E293B',
-                  height: '44px'
-                }}
-                placeholder="กรุณาแนบไฟล์"
-                required
-              />
-            </div>
-
-            {/* Item type */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Item type*
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                ประเภทสินค้า*
               </label>
               <select
                 name="itemType"
@@ -713,15 +672,14 @@ export default function EstimatePage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 focus:outline-none"
                 style={{
-                  border: '1px solid #BDBDBD',
+                  border: '1px solid #E0E0E0',
                   backgroundColor: '#FFFFFF',
                   borderRadius: '8px',
-                  color: '#1E293B',
-                  height: '44px'
+                  color: '#333333'
                 }}
                 required
               >
-                <option value="">อุปกรณ์</option>
+                <option value="">เลือกประเภทสินค้า</option>
                 {ITEM_TYPES.map(type => (
                   <option key={type} value={type}>{type}</option>
                 ))}
@@ -729,61 +687,59 @@ export default function EstimatePage() {
             </div>
 
             {/* Brand */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Brand*
-              </label>
-              <select
-                name="brand"
-                value={formData.brand}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 focus:outline-none"
-                style={{
-                  border: '1px solid #BDBDBD',
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '8px',
-                  color: '#1E293B',
-                  height: '44px'
-                }}
-                required
-              >
-                <option value="">เลือก</option>
-                {BRANDS_BY_TYPE[formData.itemType]?.map(brand => (
-                  <option key={brand} value={brand}>{brand}</option>
-                ))}
-              </select>
-            </div>
+            {formData.itemType && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                  ยี่ห้อ*
+                </label>
+                <select
+                  name="brand"
+                  value={formData.brand}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 focus:outline-none"
+                  style={{
+                    border: '1px solid #E0E0E0',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '8px',
+                    color: '#333333'
+                  }}
+                  required
+                >
+                  <option value="">เลือกยี่ห้อ</option>
+                  {BRANDS_BY_TYPE[formData.itemType]?.map(brand => (
+                    <option key={brand} value={brand}>{brand}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Model */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Model*
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                รุ่น*
               </label>
-              <select
+              <input
+                type="text"
                 name="model"
                 value={formData.model}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 focus:outline-none"
                 style={{
-                  border: '1px solid #BDBDBD',
+                  border: '1px solid #E0E0E0',
                   backgroundColor: '#FFFFFF',
                   borderRadius: '8px',
-                  color: '#1E293B',
+                  color: '#333333',
                   height: '44px'
                 }}
+                placeholder="เช่น iPhone 15 Pro"
                 required
-              >
-                <option value="">เลือก</option>
-                <option value="iPhone 15 Pro">iPhone 15 Pro</option>
-                <option value="iPhone 15">iPhone 15</option>
-                <option value="Galaxy S24">Galaxy S24</option>
-              </select>
+              />
             </div>
 
-            {/* Serial no. */}
+            {/* Serial Number */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Serial no.*
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                หมายเลขซีเรียล*
               </label>
               <input
                 type="text"
@@ -792,105 +748,108 @@ export default function EstimatePage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 focus:outline-none"
                 style={{
-                  border: '1px solid #BDBDBD',
+                  border: '1px solid #E0E0E0',
                   backgroundColor: '#FFFFFF',
                   borderRadius: '8px',
-                  color: '#1E293B',
+                  color: '#333333',
                   height: '44px'
                 }}
-                placeholder="กรุณาแนบไฟล์"
+                placeholder="หมายเลขซีเรียล"
                 required
               />
             </div>
 
             {/* Accessories */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Accessories*
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                อุปกรณ์เสริม*
               </label>
-              <span style={{ color: '#4A4A4A', fontSize: '12px' }}>กรุณาแนบไฟล์</span>
               <input
                 type="text"
                 name="accessories"
                 value={formData.accessories}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 focus:outline-none mt-1"
+                className="w-full px-3 py-2 focus:outline-none"
                 style={{
-                  border: '1px solid #BDBDBD',
+                  border: '1px solid #E0E0E0',
                   backgroundColor: '#FFFFFF',
                   borderRadius: '8px',
-                  color: '#1E293B',
+                  color: '#333333',
                   height: '44px'
                 }}
+                placeholder="เช่น กล่อง เคส หูฟัง"
                 required
               />
             </div>
 
-            {/* Condition */}
+            {/* Condition Display (AI Analyzed) */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Condition*
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                สภาพสินค้า (วิเคราะห์โดย AI)
               </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={formData.condition}
-                onChange={(e) => handleConditionChange(parseInt(e.target.value))}
-                className="w-full h-2 focus:outline-none"
-                style={{
-                  accentColor: '#4CAF50',
-                  backgroundColor: '#E0E0E0'
-                }}
-              />
-              <div className="flex justify-between text-xs mt-1" style={{ color: '#9E9E9E' }}>
-                <span>0%</span>
-                <span>100%</span>
-              </div>
+              {conditionResult ? (
+                <div className="rounded-lg p-4" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium" style={{ color: '#333333' }}>คะแนนสภาพ:</span>
+                    <span className="text-lg font-bold" style={{ color: '#333333' }}>{Math.round(conditionResult.score * 100)}%</span>
+                  </div>
+                  <div className="w-full rounded-full h-3 mb-2" style={{ backgroundColor: '#E0E0E0' }}>
+                    <div
+                      className="h-3 rounded-full"
+                      style={{ width: `${conditionResult.score * 100}%`, backgroundColor: '#2D7A46' }}
+                    ></div>
+                  </div>
+                  <p className="text-xs leading-relaxed" style={{ color: '#888888' }}>{conditionResult.reason}</p>
+                  <p className="text-xs mt-2" style={{ color: '#999999' }}>* สภาพสินค้าจะไม่สามารถแก้ไขได้</p>
+                </div>
+              ) : (
+                <div className="rounded-lg p-4 text-center" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
+                  <p style={{ color: '#999999' }}>กำลังโหลดข้อมูลสภาพสินค้า...</p>
+                </div>
+              )}
             </div>
 
             {/* Defects */}
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Defects*
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                ตำหนิ
               </label>
-              <input
-                type="text"
+              <textarea
                 name="defects"
                 value={formData.defects}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 focus:outline-none"
                 style={{
-                  border: '1px solid #BDBDBD',
+                  border: '1px solid #E0E0E0',
                   backgroundColor: '#FFFFFF',
                   borderRadius: '8px',
-                  color: '#1E293B',
-                  height: '44px'
+                  color: '#333333',
+                  resize: 'vertical'
                 }}
-                placeholder="ไม่มี"
-                required
+                placeholder="ระบุตำหนิของสินค้าถ้าหากว่ามี"
+                rows={3}
               />
             </div>
 
             {/* Note */}
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#4A4A4A' }}>
-                Note
+              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                หมายเหตุ
               </label>
-              <input
-                type="text"
+              <textarea
                 name="note"
                 value={formData.note}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 focus:outline-none"
                 style={{
-                  border: '1px solid #BDBDBD',
+                  border: '1px solid #E0E0E0',
                   backgroundColor: '#FFFFFF',
                   borderRadius: '8px',
-                  color: '#1E293B',
-                  height: '44px'
+                  color: '#333333',
+                  resize: 'vertical'
                 }}
-                placeholder="กรุณากรอก"
+                placeholder="เช่น สุขภาพแบต 90%"
+                rows={3}
               />
             </div>
 
@@ -907,15 +866,12 @@ export default function EstimatePage() {
               disabled={isEstimating}
               className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
               style={{
-                backgroundColor: isEstimating ? '#E0E0E0' : '#66BB6A',
-                color: '#FFFFFF',
-                border: '1px solid #BDBDBD',
-                borderRadius: '8px'
+                backgroundColor: isEstimating ? '#EAEAEA' : '#2D7A46',
+                color: isEstimating ? '#AAAAAA' : 'white'
               }}
             >
-              ประเมินราคาด้วย AI (Evaluate the price with AI)
+              {isEstimating ? 'กำลังประเมินราคา...' : 'ประเมินราคา'}
             </button>
-            <div style={{ color: '#66BB6A', fontSize: '14px', textAlign: 'center', marginTop: '10px' }}>Drafts</div>
           </div>
         )}
 
