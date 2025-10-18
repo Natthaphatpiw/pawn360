@@ -5,6 +5,6 @@ export default function RegisterLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID || '2008216710-54P86MRY';
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }
