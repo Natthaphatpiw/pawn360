@@ -346,7 +346,6 @@ export default function EstimatePage() {
       return;
     }
 
-    setIsSubmitting(true);
     setError(null);
 
     try {
@@ -372,8 +371,6 @@ export default function EstimatePage() {
     } catch (error: any) {
       console.error('Error creating pawn request:', error);
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างคำขอจำนำ');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
