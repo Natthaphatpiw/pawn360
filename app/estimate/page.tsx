@@ -44,7 +44,7 @@ interface Customer {
   pawnRequests: any[];
 }
 
-type Step = 'input' | 'result' | 'pawn_setup' | 'qr_display';
+type Step = 'input' | 'form' | 'result' | 'pawn_setup' | 'qr_display';
 
 export default function EstimatePage() {
   const { profile, isLoading, error: liffError } = useLiff();
@@ -415,7 +415,7 @@ export default function EstimatePage() {
                 รูปภาพสินค้า* ({images.length}/6)
               </label>
 
-              {images.length === 0 && (
+              {images.length === 0 ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                   <button
                     onClick={() => setShowTutorial(true)}
@@ -423,36 +423,47 @@ export default function EstimatePage() {
                   >
                     ถ่ายรูป
                   </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    กรุณาอัพโหลดรูปภาพอย่างน้อย 1 รูป
+                  </p>
                 </div>
-              )}
-
-              {images.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {imageUrls.map((url, index) => (
-                    <div key={index} className="relative">
-                      <Image
-                        src={url}
-                        alt={`สินค้า ${index + 1}`}
-                        width={100}
-                        height={100}
-                        className="w-full h-24 object-cover rounded-lg"
-                      />
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {imageUrls.map((url, index) => (
+                      <div key={index} className="relative">
+                        <Image
+                          src={url}
+                          alt={`สินค้า ${index + 1}`}
+                          width={100}
+                          height={100}
+                          className="w-full h-24 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {images.length < 6 && (
                       <button
-                        onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                        onClick={() => setShowTutorial(true)}
+                        className="border-2 border-dashed border-gray-300 rounded-lg h-24 flex items-center justify-center text-gray-400"
                       >
-                        ×
+                        +
                       </button>
-                    </div>
-                  ))}
-                  {images.length < 6 && (
-                    <button
-                      onClick={() => setShowTutorial(true)}
-                      className="border-2 border-dashed border-gray-300 rounded-lg h-24 flex items-center justify-center text-gray-400"
-                    >
-                      +
-                    </button>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Next Step Button */}
+                  <button
+                    onClick={() => setCurrentStep('form')}
+                    className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    ถัดไป - กรอกข้อมูลสินค้า
+                  </button>
                 </div>
               )}
             </div>
@@ -511,6 +522,30 @@ export default function EstimatePage() {
               className="hidden"
               multiple
             />
+
+            {/* View Saved Items Button */}
+            <div className="mt-6">
+              <button
+                onClick={() => window.location.href = '/saved-items'}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                ดูสินค้าที่บันทึกไว้
+              </button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 'form' && (
+          <div className="p-4">
+            <div className="flex items-center mb-6">
+              <button
+                onClick={() => setCurrentStep('input')}
+                className="text-blue-600 mr-2"
+              >
+                ←
+              </button>
+              <h1 className="text-2xl font-bold">กรอกข้อมูลสินค้า</h1>
+            </div>
 
             {/* Item Type */}
             <div className="mb-4">
@@ -659,10 +694,10 @@ export default function EstimatePage() {
             {/* Estimate Button */}
             <button
               onClick={handleEstimate}
-              disabled={isEstimating || isUploading}
+              disabled={isEstimating}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
             >
-              {isEstimating ? 'กำลังประเมินราคา...' : isUploading ? 'กำลังอัปโหลดรูป...' : 'ประเมินราคา'}
+              {isEstimating ? 'กำลังประเมินราคา...' : 'ประเมินราคา'}
             </button>
           </div>
         )}

@@ -1,6 +1,6 @@
 import { LiffProvider } from '@/lib/liff/liff-provider';
 
-export default function RegisterLayout({
+export default function SavedItemsLayout({
   children,
 }: {
   children: React.ReactNode;
