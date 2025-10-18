@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { getS3Client } from '@/lib/aws/s3';
+import { getS3Client, getImagePresignedUrl } from '@/lib/aws/s3';
 
 const BUCKET_NAME = 'piwp360';
 const FOLDER_PREFIX = 'pawn-items/';
@@ -50,18 +50,17 @@ export async function POST(request: NextRequest) {
       Key: key,
       Body: buffer,
       ContentType: file.type,
-      // Make the file publicly readable
-      ACL: 'public-read',
+      // ไม่ใช้ ACL เพราะ bucket ไม่รองรับ ACLs
     });
 
     await s3Client.send(command);
 
-    // Return the public URL
-    const publicUrl = `https://piwp360.s3.ap-southeast-2.amazonaws.com/${key}`;
+    // สร้าง Presigned URL สำหรับเข้าถึงรูปภาพ
+    const presignedUrl = await getImagePresignedUrl(key);
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: presignedUrl,
       key: key
     });
 

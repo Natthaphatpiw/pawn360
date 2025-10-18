@@ -32,7 +32,7 @@ export function getS3Client(): S3Client {
  * อัปโหลด QR Code ไปยัง AWS S3
  * @param itemId - ID ของรายการจำนำ
  * @param qrCodeBuffer - Buffer ของ QR Code (PNG)
- * @returns URL ของ QR Code ใน S3
+ * @returns Presigned URL ของ QR Code ใน S3
  */
 export async function uploadQRCodeToS3(
   itemId: string,
@@ -48,14 +48,14 @@ export async function uploadQRCodeToS3(
       Key: key,
       Body: qrCodeBuffer,
       ContentType: 'image/png',
-      // ไม่ใช้ ACL เพราะ bucket มี policy ตั้งค่า public access แล้ว
+      // ไม่ใช้ ACL เพราะ bucket ไม่รองรับ ACLs
     });
 
     await client.send(command);
 
-    // Return public URL
-    const publicUrl = `https://piwp360.s3.ap-southeast-2.amazonaws.com/${key}`;
-    return publicUrl;
+    // สร้าง Presigned URL แทน public URL
+    const presignedUrl = await getQRCodePresignedUrl(itemId);
+    return presignedUrl;
   } catch (error) {
     console.error('Error uploading to S3:', error);
     throw error;
@@ -83,6 +83,28 @@ export async function getQRCodePresignedUrl(itemId: string, expiresIn: number = 
     return signedUrl;
   } catch (error) {
     console.error('Error generating presigned URL:', error);
+    throw error;
+  }
+}
+
+/**
+ * สร้าง Presigned URL สำหรับดาวน์โหลดไฟล์รูปภาพ
+ * @param imageKey - Key ของไฟล์รูปภาพใน S3
+ * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
+ * @returns Presigned URL
+ */
+export async function getImagePresignedUrl(imageKey: string, expiresIn: number = 7 * 24 * 3600): Promise<string> {
+  try {
+    const client = getS3Client();
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: imageKey,
+    });
+
+    const signedUrl = await getSignedUrl(client, command, { expiresIn });
+    return signedUrl;
+  } catch (error) {
+    console.error('Error generating presigned URL for image:', error);
     throw error;
   }
 }
