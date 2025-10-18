@@ -19,9 +19,13 @@ MONGODB_DB=pawn
 LINE_CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
 LINE_CHANNEL_SECRET=75202717b1787be1869ecb8ed12abef7
 
-# LINE LIFF Configuration (ตามที่ตั้งค่าใน Vercel)
+# LINE LIFF Configuration
+# สำหรับ estimate page
 LINE_LIFF_ID=2008216710-54P86MRY
 NEXT_PUBLIC_LIFF_ID=2008216710-54P86MRY
+
+# สำหรับ register page (ตามที่ผู้ใช้ระบุ)
+NEXT_PUBLIC_LIFF_ID_REGISTER=2008216710-BEZ5XNyd
 
 # Rich Menu IDs (ตามที่ตั้งค่าใน Vercel)
 RICH_MENU_ID_NEW_USER=your_new_user_rich_menu_id
