@@ -57,7 +57,7 @@ async function analyzeConditionFromImages(images: string[]): Promise<{ score: nu
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Vision-capable model
+      model: 'gpt-4.1-mini', // Vision-capable model
       messages: messages,
       max_tokens: 300,
       temperature: 0.2,
