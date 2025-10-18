@@ -4,6 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
+import {Sarabun} from 'next/font/google';
+
+const sarabun = Sarabun({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+});
 
 // Item types and their brands
 const ITEM_TYPES = [
@@ -461,7 +467,7 @@ export default function EstimatePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#FAFBFA' }}>
+    <div className={`min-h-screen ${sarabun.className}`} style={{ backgroundColor: '#FAFBFA' }}>
       <div className="max-w-md mx-auto" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', boxShadow: '0 4px 10px rgba(14, 20, 20, 0.04)' }}>
         {currentStep === 'input' && (
           <div className="p-4">
@@ -564,9 +570,9 @@ export default function EstimatePage() {
             {showTutorial && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-                  <div className="bg-[#F0EFEF] rounded-xl p-4 max-w-sm w-full">
+                  <div className="bg-[#F0EFEF] rounded-xl p-2 max-w-sm w-full">
                     <h3 className="text-lg font-semibold mb-4 text-[#2C2A28]">คำแนะนำในการถ่ายรูป</h3>
-                    <div className="text-sm text-[#4A4644] mb-6 space-y-2">
+                    <div className="text-sm text-[#4A4644] space-y-2">
                       <p>• ถ่าย 4 ด้าน (หน้า หลัง ซ้าย ขวา)</p>
                       <p>• ถ่ายในที่ที่มีแสงสว่างเพียงพอ</p>
                       <p>• ไม่ถ่ายติดแสงสะท้อน</p>
@@ -574,16 +580,16 @@ export default function EstimatePage() {
                       <p>• วางสินค้าเดี่ยวๆ พยายามไม่ให้มีวัตถุอื่นอยู่ในเฟรม</p>
                     </div>
                   </div>
-                    <div className="flex space-x-3">
+                    <div className="flex space-x-3 mt-4">
                       <button
                         onClick={openCamera}
-                        className="flex-1 bg-[#0A4215] text-white py-2 px-4 rounded-lg hover:bg-gray-800"
+                        className="flex-1 bg-[#0A4215] text-white py-2 px-4 rounded-lg hover:bg-[#0A4215]/80"
                       >
                         ถ่ายรูป
                       </button>
                       <button
                         onClick={openFilePicker}
-                        className="flex-1 bg-[#E7EFE9] text-[#0A4215] py-2 px-4 rounded-lg hover:bg-gray-700"
+                        className="flex-1 bg-[#E7EFE9] text-[#0A4215] py-2 px-4 rounded-lg hover:bg-[#E7EFE9]/80"
                       >
                         อัปโหลดรูปภาพ
                       </button>
@@ -665,7 +671,7 @@ export default function EstimatePage() {
             </div>
 
             {/* Item Type */}
-            <div className="bg-[#F0EFEF] rounded-xl p-2 max-w-sm w-full">
+            <div className="bg-[#F0EFEF] rounded-xl p-2 w-full mb-4">
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2 text-[#2C2A28]" style={{ color: '#666666' }}>
                 ประเภทสินค้า*
