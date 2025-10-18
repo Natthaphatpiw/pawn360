@@ -15,7 +15,7 @@ async function analyzeConditionFromImages(images: string[]): Promise<{ score: nu
   }
 
   try {
-    // Use OpenAI Vision API to analyze condition from images
+    // Use OpenAI Vision API to analyze condition from base64 images
     const prompt = `วิเคราะห์สภาพของสินค้าจากรูปภาพที่ให้มา และให้คะแนนสภาพจาก 0.0 ถึง 1.0 พร้อมเหตุผลสั้นๆ
 
 คะแนนสภาพ:
@@ -34,7 +34,7 @@ async function analyzeConditionFromImages(images: string[]): Promise<{ score: nu
   "reason": "สินค้าอยู่ในสภาพดีมาก มีร่องรอยการใช้งานเล็กน้อยที่ปกติ แต่ไม่มีตำหนิที่สำคัญ หน้าจอและตัวเครื่องอยู่ในสภาพสมบูรณ์"
 }`;
 
-    // Prepare messages with images for Vision API
+    // Prepare messages with base64 images for Vision API
     const messages: any[] = [
       {
         role: 'user',
@@ -50,14 +50,14 @@ async function analyzeConditionFromImages(images: string[]): Promise<{ score: nu
       messages[0].content.push({
         type: 'image_url',
         image_url: {
-          url: images[i],
+          url: images[i], // This is now base64 data URL
           detail: 'low' // Use low detail for faster processing
         }
       });
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini', // Vision-capable model
+      model: 'gpt-4o-mini', // Vision-capable model (corrected model name)
       messages: messages,
       max_tokens: 300,
       temperature: 0.2,
