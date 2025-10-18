@@ -3,12 +3,27 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { Client, ClientConfig } from '@line/bot-sdk';
 import { ObjectId } from 'mongodb';
 
-const storeConfig: ClientConfig = {
-  channelAccessToken: process.env.LINE_STORE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_STORE_CHANNEL_SECRET || '',
-};
+// Lazy initialization of LINE client
+let storeClient: Client | null = null;
 
-const storeClient = new Client(storeConfig);
+function getStoreClient(): Client {
+  if (!storeClient) {
+    const channelAccessToken = process.env.LINE_STORE_CHANNEL_ACCESS_TOKEN || process.env.CHANNEL_ACCESS_TOKEN;
+    const channelSecret = process.env.LINE_STORE_CHANNEL_SECRET || process.env.CHANNEL_SECRET;
+
+    if (!channelAccessToken || !channelSecret) {
+      throw new Error('LINE channel access token or secret not configured');
+    }
+
+    const storeConfig: ClientConfig = {
+      channelAccessToken,
+      channelSecret,
+    };
+
+    storeClient = new Client(storeConfig);
+  }
+  return storeClient;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -309,13 +324,22 @@ export async function POST(request: NextRequest) {
     };
 
     // Send to all store LINE IDs
-    for (const storeLineId of storeLineIds) {
-      try {
-        await storeClient.pushMessage(storeLineId, flexMessage);
-        console.log(`Sent notification to store LINE ID: ${storeLineId}`);
-      } catch (error) {
-        console.error(`Failed to send to ${storeLineId}:`, error);
+    try {
+      const client = getStoreClient();
+      for (const storeLineId of storeLineIds) {
+        try {
+          await client.pushMessage(storeLineId, flexMessage);
+          console.log(`Sent notification to store LINE ID: ${storeLineId}`);
+        } catch (error) {
+          console.error(`Failed to send to ${storeLineId}:`, error);
+        }
       }
+    } catch (error) {
+      console.error('LINE client initialization failed:', error);
+      return NextResponse.json(
+        { error: 'LINE messaging service unavailable' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
