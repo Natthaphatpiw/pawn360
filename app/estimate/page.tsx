@@ -87,7 +87,6 @@ export default function EstimatePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
 
   // Check if customer exists on load
   useEffect(() => {
@@ -313,7 +312,7 @@ export default function EstimatePage() {
         updatedAt: new Date(),
       };
 
-      const response = await axios.post('/api/items/temporary', tempData);
+      await axios.post('/api/items/temporary', tempData);
       setSuccess('บันทึกข้อมูลชั่วคราวเรียบร้อยแล้ว');
 
       // Reset form after 2 seconds
@@ -368,7 +367,7 @@ export default function EstimatePage() {
         remainingAmount: estimateResult?.estimatedPrice
       };
 
-      const response = await axios.post('/api/pawn-requests', pawnData);
+      await axios.post('/api/pawn-requests', pawnData);
       setSuccess('สร้างคำขอจำนำเรียบร้อยแล้ว');
 
       // Move to QR display step
