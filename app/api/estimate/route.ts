@@ -34,7 +34,7 @@ Additional Notes: ${input.note}
 Please provide a clean, standardized description that would be suitable for searching second-hand market prices. Focus on key specifications and condition details.`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1-mini',
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 300,
     temperature: 0.1,
@@ -58,7 +58,7 @@ Provide only a numerical estimate in Thai Baht (THB) without any additional text
 Return only the number, for example: 15000`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1-mini',
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 50,
     temperature: 0.3,
@@ -95,7 +95,7 @@ Consider that users tend to over-rate their items. Provide a realistic assessmen
 Return only the numerical score (0.0 to 1.0) without any additional text.`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4.1-mini',
     messages: [{ role: 'user', content: prompt }],
     max_tokens: 20,
     temperature: 0.2,
