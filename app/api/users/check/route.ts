@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       exists: !!customer,
+      customer: customer || null,
     });
   } catch (error: any) {
     console.error('Error checking user:', error);
