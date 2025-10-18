@@ -8,84 +8,78 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const { db } = await connectToDatabase();
+    const pawnRequestsCollection = db.collection('pawnRequests');
 
-    if (!ObjectId.isValid(id)) {
+    const pawnRequest = await pawnRequestsCollection.findOne({
+      _id: new ObjectId(id)
+    });
+
+    if (!pawnRequest) {
       return NextResponse.json(
-        { error: 'Invalid item ID' },
+        { error: 'ไม่พบรายการจำนำ' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      pawnRequest
+    });
+  } catch (error) {
+    console.error('Error fetching pawn request:', error);
+    return NextResponse.json(
+      { error: 'เกิดข้อผิดพลาดในการดึงข้อมูล' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { pawnedPrice, totalInterest } = body;
+
+    if (!pawnedPrice || typeof pawnedPrice !== 'number') {
+      return NextResponse.json(
+        { error: 'กรุณาระบุราคาจำนำที่ถูกต้อง' },
         { status: 400 }
       );
     }
 
     const { db } = await connectToDatabase();
-    const itemsCollection = db.collection('items');
-    const customersCollection = db.collection('customers');
+    const pawnRequestsCollection = db.collection('pawnRequests');
 
-    // Find the item
-    const item = await itemsCollection.findOne({ _id: new ObjectId(id) });
-
-    if (!item) {
-      return NextResponse.json(
-        { error: 'Item not found' },
-        { status: 404 }
-      );
-    }
-
-    // Find the customer
-    const customer = await customersCollection.findOne({ lineId: item.lineId });
-
-    if (!customer) {
-      return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
-      );
-    }
-
-    // Find the pawn request in customer's pawnRequests array to get QR code
-    const pawnRequest = customer.pawnRequests?.find(
-      (pr: any) => pr.itemId.toString() === id
+    const result = await pawnRequestsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          pawnedPrice,
+          totalInterest,
+          updatedAt: new Date()
+        }
+      }
     );
 
-    // Return combined data for store to verify
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        { error: 'ไม่พบรายการจำนำ' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      qrCode: pawnRequest?.qrCode || null,
-      item: {
-        _id: item._id,
-        brand: item.brand,
-        model: item.model,
-        type: item.type,
-        serialNo: item.serialNo,
-        condition: item.condition,
-        defects: item.defects,
-        note: item.note,
-        accessories: item.accessories,
-        images: item.images,
-        status: item.status,
-        desiredAmount: item.desiredAmount,
-        estimatedValue: item.estimatedValue,
-        loanDays: item.loanDays,
-        interestRate: item.interestRate,
-        negotiatedAmount: item.negotiatedAmount,
-        negotiatedDays: item.negotiatedDays,
-        negotiatedInterestRate: item.negotiatedInterestRate,
-        negotiationStatus: item.negotiationStatus,
-      },
-      customer: {
-        _id: customer._id,
-        lineId: customer.lineId,
-        title: customer.title,
-        firstName: customer.firstName,
-        lastName: customer.lastName,
-        fullName: customer.fullName,
-        phone: customer.phone,
-        idNumber: customer.idNumber,
-        address: customer.address,
-      },
+      message: 'อัพเดทราคาเรียบร้อยแล้ว'
     });
   } catch (error) {
-    console.error('Error fetching pawn request:', error);
+    console.error('Error updating pawn request:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'เกิดข้อผิดพลาดในการอัพเดท' },
       { status: 500 }
     );
   }

@@ -82,6 +82,7 @@ export default function EstimatePage() {
   const [pawnDuration, setPawnDuration] = useState<string>('30');
   const [interestRate, setInterestRate] = useState<number>(10);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [desiredPrice, setDesiredPrice] = useState<string>('');
 
   // UI states
   const [error, setError] = useState<string | null>(null);
@@ -289,34 +290,33 @@ export default function EstimatePage() {
     }
   };
 
-  const handleStoreSelect = (storeId: string) => {
-    setSelectedStore(storeId);
-    const store = stores.find(s => s._id === storeId);
-    if (store?.interestRate) {
-      setInterestRate(store.interestRate);
-    }
-  };
 
   const calculateInterest = () => {
-    if (!estimateResult) return 0;
+    const pawnPrice = parseInt(desiredPrice) || 0;
+    if (!pawnPrice) return 0;
+    const store = stores.find(s => s._id === selectedStore);
+    const interestRateValue = store?.interestRate || 10; // Default to 10%
     const days = parseInt(pawnDuration);
-    const monthlyRate = interestRate / 100 / 30; // Daily rate
-    return Math.round(estimateResult.estimatedPrice * monthlyRate * days);
+    const monthlyRate = interestRateValue / 100 / 30; // Daily rate
+    return Math.round(pawnPrice * monthlyRate * days);
   };
 
   const handleContinue = () => {
+    if (!estimateResult || !desiredPrice || parseInt(desiredPrice) > estimateResult.estimatedPrice) {
+      setError('กรุณากรอกราคาที่ต้องการจำนำให้ถูกต้อง');
+      return;
+    }
     if (!selectedStore) {
       setError('กรุณาเลือกร้านจำนำ');
       return;
     }
-
     if (!customer) {
       setError('กรุณาลงทะเบียนก่อนดำเนินการต่อ');
       return;
     }
 
-    setCurrentStep('pawn_setup');
     setError(null);
+    setCurrentStep('pawn_setup');
   };
 
   const handleRegister = () => {
@@ -346,6 +346,7 @@ export default function EstimatePage() {
         images: imageUrls,
         status: 'temporary',
         estimatedValue: estimateResult?.estimatedPrice,
+        desiredPrice: desiredPrice ? parseInt(desiredPrice) : undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -415,7 +416,7 @@ export default function EstimatePage() {
         accessories: formData.accessories,
         images: imageUrls,
         estimatedValue: estimateResult?.estimatedPrice,
-        pawnedPrice: estimateResult?.estimatedPrice,
+        pawnedPrice: parseInt(desiredPrice),
         interestRate,
         periodDays: parseInt(pawnDuration),
         storeId: selectedStore,
@@ -460,8 +461,8 @@ export default function EstimatePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F9F9F9' }}>
-      <div className="max-w-md mx-auto" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#FAFBFA' }}>
+      <div className="max-w-md mx-auto" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', boxShadow: '0 4px 10px rgba(14, 20, 20, 0.04)' }}>
         {currentStep === 'input' && (
           <div className="p-4">
             {/* Progress Indicator */}
@@ -880,128 +881,200 @@ export default function EstimatePage() {
             <div className="mb-6">
               <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1F6F3B' }}>
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1 bg-gray-700"></div>
-                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-1" style={{ backgroundColor: '#1F6F3B' }}></div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1F6F3B' }}>
                     <span className="text-white text-sm">✓</span>
                   </div>
-                  <div className="w-12 h-1 bg-gray-700"></div>
-                  <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-1" style={{ backgroundColor: '#1F6F3B' }}></div>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1F6F3B' }}>
                     <span className="text-white text-sm">3</span>
                   </div>
                 </div>
               </div>
-              <div className="text-center text-sm text-gray-600">
-                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong className="text-blue-600">เลือกตัวเลือก</strong></p>
+              <div className="text-center text-sm" style={{ color: '#6B7280' }}>
+                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong style={{ color: '#1F6F3B' }}>เลือกตัวเลือก</strong></p>
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold text-center mb-6">ผลการประเมินราคา</h1>
+            {/* Header Summary Card */}
+            <div className="rounded-lg p-3 mb-6" style={{ backgroundColor: '#EEECEB' }}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-xs mb-1" style={{ color: '#6B7280' }}>สินค้า</p>
+                  <p className="text-base font-semibold" style={{ color: '#1E293B' }}>
+                    {formData.brand} {formData.model}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm" style={{ color: '#6B7280' }}>
+                    สภาพ {conditionResult ? Math.round(conditionResult.score * 100) : 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
 
-            {/* Item Image */}
+            {/* Image Preview Card */}
             {imageUrls.length > 0 && (
-              <div className="mb-6">
+              <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#F7F7F7' }}>
                 <Image
                   src={imageUrls[0]}
-                  alt="สินค้า"
-                  width={200}
-                  height={200}
-                  className="w-full max-w-xs mx-auto rounded-lg object-cover"
+                  alt="Product image"
+                  width={1200}
+                  height={800}
+                  className="w-full rounded-md object-cover"
+                  priority
                 />
               </div>
             )}
 
-            {/* Estimated Price */}
-            <div className="rounded-lg p-6 mb-6 text-center" style={{ backgroundColor: '#F0F8F0', border: `1px solid #2D7A46` }}>
-              <p className="text-sm mb-2" style={{ color: '#2D7A46' }}>ราคาประเมิน</p>
-              <p className="text-3xl font-bold" style={{ color: '#2D7A46' }}>
-                ฿{estimateResult.estimatedPrice.toLocaleString()}
+            {/* AI Estimated Price Card */}
+            <div className="rounded-xl p-6 mb-6 text-center" style={{ backgroundColor: '#DDEEE0' }}>
+              <p className="text-sm mb-2" style={{ color: '#1F6F3B' }}>ราคาประเมินจาก AI</p>
+              <p className="text-3xl font-extrabold mb-1" style={{ color: '#1F6F3B' }}>
+                {estimateResult.estimatedPrice.toLocaleString()}
               </p>
-              <p className="text-sm mt-2" style={{ color: '#2D7A46' }}>
-                สภาพสินค้า: {estimateResult.condition}/1.0
-              </p>
+              <p className="text-sm" style={{ color: '#6B7280' }}>บาท</p>
             </div>
 
-            {/* Pawn Shop Selection */}
-            <div className="mb-6">
-      <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
-        <div className="mb-2">
-          <h3 className="text-sm font-semibold" style={{ color: '#333333' }}>คำนวณราคา Preview</h3>
-        </div>
-        <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
-          เลือกร้านค้าเพื่อคำนวณดอกเบี้ยและแสดงราคาประเมินโดยประมาณ
-          <br />
-          <strong style={{ color: '#333333' }}>ไม่ผูกมัด:</strong> คุณสามารถนำ QR ไปให้ร้านไหนก็ได้
-        </p>
-      </div>
+            {/* Form Block */}
+            <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E6E7E8' }}>
 
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
-                เลือกร้านเพื่อคำนวณราคา
-              </label>
-              <select
-                value={selectedStore}
-                onChange={(e) => handleStoreSelect(e.target.value)}
-                className="w-full px-3 py-3 focus:outline-none text-base"
-                style={{
-                  border: '1px solid #E0E0E0',
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '8px',
-                  color: '#333333'
-                }}
-              >
-                <option value="">เลือกเพื่อดูราคาประเมิน</option>
-                {stores.map(store => (
-                  <option key={store._id} value={store._id}>
-                    {store.storeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Pawn Duration */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
-                ระยะเวลาที่ต้องการจำนำ*
-              </label>
-              <select
-                value={pawnDuration}
-                onChange={(e) => setPawnDuration(e.target.value)}
-                className="w-full px-3 py-2 focus:outline-none"
-                style={{
-                  border: '1px solid #E0E0E0',
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: '8px',
-                  color: '#333333'
-                }}
-              >
-                <option value="7">7 วัน</option>
-                <option value="14">14 วัน</option>
-                <option value="30">30 วัน</option>
-                <option value="60">60 วัน</option>
-                <option value="90">90 วัน</option>
-              </select>
-            </div>
-
-            {/* Interest Calculation */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-blue-600">ราคาประเมิน:</span>
-                <span className="font-semibold">฿{estimateResult.estimatedPrice.toLocaleString()}</span>
+              {/* Item Price Input */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
+                  ราคาที่ต้องการจำนำ*
+                </label>
+                <input
+                  type="number"
+                  value={desiredPrice}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const numValue = parseInt(value) || 0;
+                    if (numValue <= estimateResult.estimatedPrice) {
+                      setDesiredPrice(value);
+                    }
+                  }}
+                  className="w-full px-3 py-2 focus:outline-none"
+                  style={{
+                    border: '1px solid #E6E7E8',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    color: '#1E293B',
+                    height: '44px'
+                  }}
+                  placeholder="กรุณากรอกราคาที่ต้องการ"
+                  max={estimateResult.estimatedPrice}
+                />
+                <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
+                  สูงสุด {estimateResult.estimatedPrice.toLocaleString()} บาท (ราคาประเมิน)
+                </p>
+                {parseInt(desiredPrice) > estimateResult.estimatedPrice && (
+                  <p className="text-xs mt-1" style={{ color: '#DC2626' }}>
+                    ไม่สามารถกำหนดราคาที่ต้องการได้มากกว่าราคาประเมิน
+                  </p>
+                )}
               </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-blue-600">ดอกเบี้ย ({interestRate}%):</span>
-                <span className="font-semibold">฿{calculateInterest().toLocaleString()}</span>
+
+              {/* Use Estimated Price Button */}
+              <div className="mb-4">
+                <button
+                  onClick={() => setDesiredPrice(estimateResult.estimatedPrice.toString())}
+                  className="w-full py-2 px-3 rounded-lg text-sm font-medium"
+                  style={{
+                    backgroundColor: '#CFE3D2',
+                    color: '#1F6F3B',
+                    border: '1px solid #1F6F3B'
+                  }}
+                >
+                  ใช้ราคาประเมินเป็นราคาที่ต้องการ
+                </button>
               </div>
-              <hr className="my-2" />
-              <div className="flex justify-between">
-                <span className="text-sm font-semibold text-blue-700">รวม:</span>
-                <span className="font-bold text-blue-700">
-                  ฿{(estimateResult.estimatedPrice + calculateInterest()).toLocaleString()}
-                </span>
+
+              {/* Pawn Shop Select */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
+                  เลือกร้านจำนำ*
+                </label>
+                <select
+                  value={selectedStore}
+                  onChange={(e) => {
+                    setSelectedStore(e.target.value);
+                    const store = stores.find(s => s._id === e.target.value);
+                    if (store?.interestRate) {
+                      setInterestRate(store.interestRate);
+                    }
+                  }}
+                  className="w-full px-3 py-2 focus:outline-none"
+                  style={{
+                    border: '1px solid #E6E7E8',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    color: '#1E293B',
+                    height: '44px'
+                  }}
+                >
+                  <option value="">เลือกเพื่อดูราคาประเมิน</option>
+                  {stores.map(store => (
+                    <option key={store._id} value={store._id}>
+                      {store.storeName}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {/* Pawn Duration Select */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
+                  ระยะเวลาที่ต้องการจำนำ*
+                </label>
+                <select
+                  value={pawnDuration}
+                  onChange={(e) => setPawnDuration(e.target.value)}
+                  className="w-full px-3 py-2 focus:outline-none"
+                  style={{
+                    border: '1px solid #E6E7E8',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    color: '#1E293B',
+                    height: '44px'
+                  }}
+                >
+                  <option value="7">7 วัน</option>
+                  <option value="14">14 วัน</option>
+                  <option value="30">30 วัน</option>
+                  <option value="60">60 วัน</option>
+                  <option value="90">90 วัน</option>
+                </select>
+              </div>
+
+              {/* Interest Amount Display */}
+              {desiredPrice && pawnDuration && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
+                    จำนวนดอกเบี้ย
+                  </label>
+                  <div className="w-full px-3 py-2 rounded-lg border" style={{
+                    border: '1px solid #E6E7E8',
+                    backgroundColor: '#F9F9F9',
+                    borderRadius: '10px',
+                    color: '#1E293B',
+                    height: '44px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    {calculateInterest().toLocaleString()} บาท
+                  </div>
+                  <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
+                    จำนวนดอกเบี้ยขึ้นอยู่กับจำนวนระยะเวลาการจำนำ
+                  </p>
+                </div>
+              )}
+
             </div>
+
 
             {/* Success/Error Messages */}
             {success && (
