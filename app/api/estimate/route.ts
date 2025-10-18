@@ -55,6 +55,9 @@ Provide only a numerical estimate in Thai Baht (THB) without any additional text
 - Local Thai market pricing (not international prices)
 - Average selling prices on platforms like Kaidee, Facebook Marketplace, etc.
 
+Please use web search to get the latest market price.
+- important: include the source of the price in the response must be from Kaidee, Facebook Marketplace, etc in Thailand region only.
+
 Return only the number, for example: 15000`;
 
   const response = await openai.responses.create({
