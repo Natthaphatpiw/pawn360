@@ -431,6 +431,28 @@ export default function EstimatePage() {
       <div className="max-w-md mx-auto bg-white min-h-screen">
         {currentStep === 'input' && (
           <div className="p-4">
+            {/* Progress Indicator */}
+            <div className="mb-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">1</span>
+                  </div>
+                  <div className="w-12 h-1 bg-gray-300"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">2</span>
+                  </div>
+                  <div className="w-12 h-1 bg-gray-300"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">3</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center text-sm text-gray-600">
+                <p><strong className="text-blue-600">อัพโหลดรูปภาพ</strong> → กรอกข้อมูล → เลือกตัวเลือก</p>
+              </div>
+            </div>
+
             <h1 className="text-2xl font-bold text-center mb-6">ประเมินราคาสินค้า</h1>
 
             {/* Image Upload Section */}
@@ -561,10 +583,32 @@ export default function EstimatePage() {
 
         {currentStep === 'form' && (
           <div className="p-4">
+            {/* Progress Indicator */}
+            <div className="mb-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                  <div className="w-12 h-1 bg-blue-500"></div>
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">2</span>
+                  </div>
+                  <div className="w-12 h-1 bg-gray-300"></div>
+                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">3</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center text-sm text-gray-600">
+                <p>อัพโหลดรูป ✓ → <strong className="text-blue-600">กรอกข้อมูล</strong> → เลือกตัวเลือก</p>
+              </div>
+            </div>
+
             <div className="flex items-center mb-6">
               <button
                 onClick={() => setCurrentStep('input')}
-                className="text-blue-600 mr-2"
+                className="text-blue-600 mr-2 p-2 hover:bg-blue-50 rounded-full"
               >
                 ←
               </button>
@@ -728,6 +772,28 @@ export default function EstimatePage() {
 
         {currentStep === 'result' && estimateResult && (
           <div className="p-4">
+            {/* Progress Indicator */}
+            <div className="mb-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                  <div className="w-12 h-1 bg-green-500"></div>
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                  <div className="w-12 h-1 bg-green-500"></div>
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">3</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center text-sm text-gray-600">
+                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong className="text-blue-600">เลือกตัวเลือก</strong></p>
+              </div>
+            </div>
+
             <h1 className="text-2xl font-bold text-center mb-6">ผลการประเมินราคา</h1>
 
             {/* Item Image */}
@@ -756,15 +822,29 @@ export default function EstimatePage() {
 
             {/* Pawn Shop Selection */}
             <div className="mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center mb-2">
+                  <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mr-2">
+                    <span className="text-white text-xs">ℹ</span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-blue-800">คำนวณราคา Preview</h3>
+                </div>
+                <p className="text-sm text-blue-700 leading-relaxed">
+                  เลือกร้านค้าเพื่อคำนวณดอกเบี้ยและแสดงราคาประเมินโดยประมาณ
+                  <br />
+                  <strong className="text-blue-800">ไม่ผูกมัด:</strong> คุณสามารถนำ QR ไปให้ร้านไหนก็ได้
+                </p>
+              </div>
+
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                ร้านจำนำ*
+                เลือกร้านเพื่อคำนวณราคา
               </label>
               <select
                 value={selectedStore}
                 onChange={(e) => handleStoreSelect(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
               >
-                <option value="">เลือกร้านจำนำ</option>
+                <option value="">เลือกเพื่อดูราคาประเมิน</option>
                 {stores.map(store => (
                   <option key={store._id} value={store._id}>
                     {store.storeName}
@@ -824,72 +904,132 @@ export default function EstimatePage() {
             )}
 
             {/* Action Buttons */}
-            <div className="space-y-3">
-            {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer หรือไม่ได้เลือก store */}
-            {selectedStore ? (
-              <button
-                onClick={handleContinue}
-                disabled={!customer}
-                className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
-                onMouseEnter={() => console.log('Button hover - customer:', !!customer)}
-              >
-                ดำเนินการต่อ
-              </button>
-            ) : (
-              <div className="w-full py-3 px-4 rounded-lg bg-gray-300 text-gray-500 text-center">
-                กรุณาเลือกร้านจำนำก่อน
+            <div className="space-y-4">
+              {/* Info Card */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                    <span className="text-white text-xs">💡</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-yellow-800 mb-1">ขั้นตอนต่อไป</h4>
+                    <p className="text-sm text-yellow-700 leading-relaxed">
+                      เลือกตัวเลือกที่ต้องการ หากลงทะเบียนแล้วสามารถดำเนินการต่อเพื่อสร้าง QR Code
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
 
-              {/* 2. ลงทะเบียน */}
-              <button
-                onClick={handleRegister}
-                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
-              >
-                ลงทะเบียน
-              </button>
+              {/* Primary Actions */}
+              {selectedStore ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleContinue}
+                    disabled={!customer}
+                    className="w-full py-4 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700 text-base font-semibold"
+                    onMouseEnter={() => console.log('Button hover - customer:', !!customer)}
+                  >
+                    🚀 ดำเนินการต่อ - สร้าง QR Code
+                  </button>
 
-              {/* 3. บันทึกชั่วคราว */}
-              <button
-                onClick={handleSaveTemporary}
-                className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors"
-              >
-                บันทึกชั่วคราว
-              </button>
+                  {!customer && (
+                    <p className="text-xs text-center text-gray-600">
+                      ⚠️ ต้องลงทะเบียนก่อนจึงจะสร้าง QR Code ได้
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="w-full py-4 px-4 rounded-lg bg-gray-300 text-gray-500 text-center text-base">
+                  📋 เลือกร้านเพื่อดูราคาก่อน
+                </div>
+              )}
 
-              {/* 4. ประเมินสินค้าอื่นๆ */}
-              <button
-                onClick={() => {
-                  setCurrentStep('input');
-                  // Reset form
-                  setFormData({
-                    itemType: '',
-                    brand: '',
-                    model: '',
-                    serialNo: '',
-                    accessories: '',
-                    condition: 50,
-                    defects: '',
-                    note: ''
-                  });
-                  setImages([]);
-                  setImageUrls([]);
-                  setEstimateResult(null);
-                  setSelectedStore('');
-                  setError(null);
-                  setSuccess(null);
-                }}
-                className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                ประเมินสินค้าอื่นๆ
-              </button>
+              {/* Secondary Actions */}
+              <div className="border-t border-gray-200 pt-4 space-y-3">
+                <button
+                  onClick={handleRegister}
+                  className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-base font-medium"
+                >
+                  📝 ลงทะเบียนสมาชิก
+                </button>
+
+                <button
+                  onClick={handleSaveTemporary}
+                  className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors text-base font-medium"
+                >
+                  💾 บันทึกชั่วคราว
+                </button>
+
+                <button
+                  onClick={() => {
+                    setCurrentStep('input');
+                    // Reset form
+                    setFormData({
+                      itemType: '',
+                      brand: '',
+                      model: '',
+                      serialNo: '',
+                      accessories: '',
+                      condition: 50,
+                      defects: '',
+                      note: ''
+                    });
+                    setImages([]);
+                    setImageUrls([]);
+                    setEstimateResult(null);
+                    setSelectedStore('');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors text-base font-medium"
+                >
+                  🔄 ประเมินสินค้าอื่นๆ
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {currentStep === 'pawn_setup' && (
           <div className="p-4">
+            {/* Progress Indicator */}
+            <div className="mb-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                  <div className="w-12 h-1 bg-green-500"></div>
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                  <div className="w-12 h-1 bg-green-500"></div>
+                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-sm">✓</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center text-sm text-gray-600">
+                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong className="text-blue-600">สร้าง QR Code</strong></p>
+              </div>
+            </div>
+
             <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการจำนำ</h1>
+
+            {/* Info Card */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                  <span className="text-white text-xs">✅</span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-green-800 mb-1">พร้อมสร้าง QR Code</h4>
+                  <p className="text-sm text-green-700 leading-relaxed">
+                    ข้อมูลครบถ้วนแล้ว กดสร้าง QR Code เพื่อให้พนักงานร้านสแกนและดำเนินการจำนำ
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Customer Info */}
             {customer && (
@@ -925,10 +1065,14 @@ export default function EstimatePage() {
             <button
               onClick={handleCreatePawnRequest}
               disabled={isSubmitting}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-blue-600 text-white py-4 px-4 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors text-base font-semibold"
             >
-              {isSubmitting ? 'กำลังดำเนินการ...' : 'สร้างคำขอจำนำ'}
+              {isSubmitting ? '⏳ กำลังสร้าง QR Code...' : '🎯 สร้าง QR Code สำหรับจำนำ'}
             </button>
+
+            <p className="text-xs text-center text-gray-600 mt-2">
+              QR Code จะถูกส่งไปยัง LINE ของคุณ และคุณสามารถนำไปให้ร้านไหนก็ได้
+            </p>
           </div>
         )}
 
