@@ -9,22 +9,42 @@ export async function GET(
   try {
     const { id } = await params;
     const { db } = await connectToDatabase();
-    const pawnRequestsCollection = db.collection('pawnRequests');
+    const itemsCollection = db.collection('items');
+    const customersCollection = db.collection('customers');
 
-    const pawnRequest = await pawnRequestsCollection.findOne({
-      _id: new ObjectId(id)
-    });
+    // ค้นหา item จาก itemId
+    const item = await itemsCollection.findOne({ _id: new ObjectId(id) });
 
-    if (!pawnRequest) {
+    if (!item) {
       return NextResponse.json(
         { error: 'ไม่พบรายการจำนำ' },
         { status: 404 }
       );
     }
 
+    // ค้นหา customer จาก lineId
+    const customer = await customersCollection.findOne({ lineId: item.lineId });
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: 'ไม่พบข้อมูลลูกค้า' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      pawnRequest
+      item,
+      customer: {
+        lineId: customer.lineId,
+        title: customer.title,
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        fullName: customer.fullName,
+        phone: customer.phone,
+        idNumber: customer.idNumber,
+        address: customer.address
+      }
     });
   } catch (error) {
     console.error('Error fetching pawn request:', error);
