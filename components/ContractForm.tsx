@@ -336,6 +336,12 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     try {
       setLoading(true);
 
+      console.log('Starting contract creation...', {
+        itemId: item._id,
+        hasVerificationPhoto: !!verificationPhoto,
+        verificationPhotoLength: verificationPhoto?.length
+      });
+
       // Save verification photo to S3
       const saveResponse = await fetch('/api/contracts/save-contract-image', {
         method: 'POST',
@@ -349,11 +355,16 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
         })
       });
 
+      console.log('Save response status:', saveResponse.status);
+
       if (!saveResponse.ok) {
+        const errorText = await saveResponse.text();
+        console.error('Save response error:', errorText);
         throw new Error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
       }
 
       const saveResult = await saveResponse.json();
+      console.log('Save result:', saveResult);
 
       const contractData = {
         contractDate: new Date().toLocaleDateString('th-TH'),
