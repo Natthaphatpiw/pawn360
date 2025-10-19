@@ -4,6 +4,9 @@ import { getS3Client } from '@/lib/aws/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { ObjectId } from 'mongodb';
 
+const BUCKET_NAME = 'piwp360';
+const CONTRACTS_FOLDER = 'contracts/';
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Received save contract image request');
@@ -57,13 +60,17 @@ export async function POST(request: NextRequest) {
 
     console.log('Generated filenames:', { contractFilename, photoFilename });
 
-    // Check S3 configuration
-    if (!process.env.AWS_S3_BUCKET_NAME) {
-      throw new Error('AWS_S3_BUCKET_NAME environment variable is not set');
+    // Check AWS credentials
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+      console.error('AWS credentials not set');
+      return NextResponse.json(
+        { error: 'ระบบยังไม่ได้ตั้งค่า AWS credentials กรุณาติดต่อผู้ดูแลระบบ' },
+        { status: 500 }
+      );
     }
 
     const s3Client = getS3Client();
-    console.log('S3 client initialized, bucket:', process.env.AWS_S3_BUCKET_NAME);
+    console.log('S3 client initialized, bucket:', BUCKET_NAME);
 
     let contractUploadResult = null;
     let photoUploadResult = null;
@@ -75,8 +82,8 @@ export async function POST(request: NextRequest) {
         const contractBuffer = Buffer.from(contractImageData.replace(/^data:image\/png;base64,/, ''), 'base64');
 
         const contractUploadParams = {
-          Bucket: process.env.AWS_S3_BUCKET_NAME!,
-          Key: `contracts/${contractFilename}`,
+          Bucket: BUCKET_NAME,
+          Key: `${CONTRACTS_FOLDER}${contractFilename}`,
           Body: contractBuffer,
           ContentType: 'image/png'
         };
@@ -117,8 +124,8 @@ export async function POST(request: NextRequest) {
         }
 
         const photoUploadParams = {
-          Bucket: process.env.AWS_S3_BUCKET_NAME!,
-          Key: `contracts/${photoFilename}`,
+          Bucket: BUCKET_NAME,
+          Key: `${CONTRACTS_FOLDER}${photoFilename}`,
           Body: photoBuffer,
           ContentType: 'image/jpeg'
         };
