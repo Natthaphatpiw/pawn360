@@ -135,15 +135,29 @@ export default function ContractDetailsPage({ params }: { params: { itemId: stri
   }, [itemId]);
 
   useEffect(() => {
-    // Initialize LIFF
+    // Initialize LIFF (optional - for QR scan feature)
     const initLiff = async () => {
+      console.log('Initializing LIFF for contract details (optional)...');
       try {
         if (typeof window !== 'undefined' && window.liff) {
+          console.log('LIFF object found, initializing...');
           await window.liff.init({ liffId: '2008216710-gn6BwQjo' });
-          setLiffReady(true);
+          console.log('LIFF initialized successfully');
+
+          if (window.liff.isLoggedIn()) {
+            console.log('User is logged in to LIFF');
+            setLiffReady(true);
+          } else {
+            console.log('User is not logged in - QR scan will not be available');
+            setLiffReady(false);
+          }
+        } else {
+          console.error('LIFF object not found - QR scan will not be available');
+          setLiffReady(false);
         }
       } catch (error) {
-        console.error('LIFF initialization failed:', error);
+        console.error('LIFF initialization failed - QR scan will not be available:', error);
+        setLiffReady(false);
       }
     };
 
