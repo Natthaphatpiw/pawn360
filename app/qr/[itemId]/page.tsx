@@ -37,17 +37,25 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // ดึงข้อมูล pawn request
-        const pawnResponse = await axios.get(`/api/pawn-requests/${itemId}`);
-        if (pawnResponse.data.success) {
-          setPawnRequest(pawnResponse.data.pawnRequest);
-          setEditedPrice(pawnResponse.data.pawnRequest.pawnedPrice.toString());
+        // ค้นหา pawn request ที่มี itemId ตรงกับที่ส่งมา
+        const pawnRequestsResponse = await axios.get('/api/pawn-requests');
+        if (pawnRequestsResponse.data.success) {
+          const pawnRequest = pawnRequestsResponse.data.pawnRequests.find((pr: any) => pr.itemId === itemId);
 
-          // ดึงข้อมูล customer จาก lineId
-          const customerResponse = await axios.get(`/api/users/check?lineId=${pawnResponse.data.pawnRequest.lineId}`);
-          if (customerResponse.data.exists) {
-            setCustomerData(customerResponse.data.customer);
+          if (pawnRequest) {
+            setPawnRequest(pawnRequest);
+            setEditedPrice(pawnRequest.pawnedPrice.toString());
+
+            // ดึงข้อมูล customer จาก lineId
+            const customerResponse = await axios.get(`/api/users/check?lineId=${pawnRequest.lineId}`);
+            if (customerResponse.data.exists) {
+              setCustomerData(customerResponse.data.customer);
+            }
+          } else {
+            setError('ไม่พบรายการจำนำสำหรับสินค้านี้');
           }
+        } else {
+          setError('ไม่สามารถโหลดข้อมูลรายการจำนำได้');
         }
       } catch (err: any) {
         console.error('Error:', err);
