@@ -277,6 +277,9 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
   // Camera input ref
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // Contract content ref for PDF generation
+  const contractContentRef = useRef<HTMLDivElement>(null);
+
   // Contract data calculation
   const calculateInterest = () => {
     const pawnedPrice = item.desiredAmount || item.estimatedValue || 0;
@@ -284,6 +287,158 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     const periodDays = item.loanDays || 30;
     const dailyRate = interestRate / 100 / 30;
     return Math.round(pawnedPrice * dailyRate * periodDays);
+  };
+
+  // Generate full contract HTML
+  const generateContractHTML = () => {
+    const contractData = {
+      contractDate: new Date().toLocaleDateString('th-TH'),
+      sellerName: customer.fullName,
+      sellerId: customer.idNumber,
+      sellerAddress: `${customer.address.houseNumber} ${customer.address.street || ''} ${customer.address.subDistrict} ${customer.address.district} ${customer.address.province} ${customer.address.postcode}`,
+      buyerAddress: '1400/84 เขตสวนหลวง แขวงสวนหลวง กทม 10250',
+      itemType: item.type,
+      itemDetails: `${item.brand} ${item.model}${item.serialNo ? ` (S/N: ${item.serialNo})` : ''}${item.accessories ? ` ${item.accessories}` : ''}${item.defects ? ` ${item.defects}` : ''}${item.note ? ` ${item.note}` : ''}`,
+      price: item.desiredAmount || item.estimatedValue || 0,
+      periodDays: item.loanDays || 30,
+      principal: item.desiredAmount || item.estimatedValue || 0,
+      interest: calculateInterest(),
+      serviceFee: 0,
+      total: (item.desiredAmount || item.estimatedValue || 0) + calculateInterest()
+    };
+
+    return `
+    <!DOCTYPE html>
+    <html lang="th">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>สัญญาซื้อขายทรัพย์ (TH)</title>
+        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Sarabun', 'Arial', sans-serif;
+                line-height: 1.8;
+                background-color: #ffffff;
+                color: #333;
+                margin: 0;
+                padding: 0;
+            }
+            .page-container {
+                width: 21cm;
+                min-height: 29.7cm;
+                padding: 2cm;
+                margin: 0 auto;
+                background-color: #ffffff;
+                box-sizing: border-box;
+            }
+            h3 { text-align: center; font-weight: 700; }
+            p { margin: 8px 0; }
+            .clause { margin-bottom: 20px; }
+            .clause-title { font-weight: 700; margin-top: 15px; }
+            .preamble p { text-indent: 2em; }
+            input[type="text"] {
+                border: none;
+                border-bottom: 1px solid #000;
+                padding: 2px 4px;
+                font-family: 'Sarabun', 'Arial', sans-serif;
+                font-size: 0.95em;
+                background-color: transparent;
+            }
+            .date { width: 120px; }
+            .days { width: 50px; text-align: center; }
+            .id-num { width: 150px; }
+            .name { width: 280px; }
+            .price, .amount { width: 140px; text-align: right; }
+            .address { width: 95%; }
+            .office-address { width: 60%; }
+            .item-type { width: 400px; }
+            .item-details { width: 90%; }
+            .signature-section {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 40px;
+                padding-top: 20px;
+            }
+            .signature-block { width: 48%; }
+            .signature-block p { margin-bottom: 10px; }
+        </style>
+    </head>
+    <body>
+        <div class="page-container">
+            <h3>สัญญาซื้อขายทรัพย์พร้อมสิทธิไถ่คืนโดยสมัครใจ</h3>
+
+            <div class="preamble clause">
+                <p>
+                    ทำขึ้น ณ วันที่ <input type="text" class="date" value="${contractData.contractDate}" readonly>
+                    ระหว่าง <input type="text" class="name" value="${contractData.sellerName}" readonly>
+                    เลขบัตรประชาชน <input type="text" class="id-num" value="${contractData.sellerId}" readonly>
+                    อยู่ที่อยู่ <input type="text" class="address" value="${contractData.sellerAddress}" readonly>
+                    ซึ่งต่อไปในสัญญานี้เรียกว่า "ผู้ขาย" กับ Pawnly Technologies Co., Ltd.
+                    สำนักงานตั้งอยู่ที่ <input type="text" class="office-address" value="${contractData.buyerAddress}" readonly>
+                    ซึ่งต่อไปในสัญญานี้เรียกว่า "ผู้ซื้อ"
+                </p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 1: รายละเอียดของทรัพย์</p>
+                <p>ผู้ขายตกลงขายทรัพย์สินให้แก่ผู้ซื้อ รายการดังต่อไปนี้ :</p>
+                <p style="padding-left: 20px;">ประเภททรัพย์ : <input type="text" class="item-type" value="${contractData.itemType}" readonly></p>
+                <p style="padding-left: 20px;">ยี่ห้อ / รุ่น / รายละเอียดเพิ่มเติม : <input type="text" class="item-details" value="${contractData.itemDetails}" readonly></p>
+                <p style="padding-left: 20px;">ราคาซื้อขาย : <input type="text" class="price" value="${contractData.price.toLocaleString()}" readonly> บาท ( รวมภาษีแล้ว )</p>
+                <p>ผู้ขายรับรองว่าเป็นเจ้าของทรัพย์โดยชอบด้วยกฎหมาย และทรัพย์ไม่ได้อยู่ภายใต้ภาระผูกพันใด ๆ</p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 2: การโอนกรรมสิทธิ์</p>
+                <p>ผู้ขายตกลงโอนกรรมสิทธิ์ทรัพย์ดังกล่าวให้แก่ผู้ซื้อทันทีในวันที่ทำสัญญานี้ และผู้ซื้อได้ชำระเงินครบถ้วนแล้ว</p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 3: สิทธิในการไถ่คืน</p>
+                <p>ผู้ขายมีสิทธิไถ่คืนทรัพย์ดังกล่าวจากผู้ซื้อได้ ภายใน <input type="text" class="days" value="${contractData.periodDays}" readonly> วัน นับจากวันทำสัญญา โดยต้องชำระเงินคืนรวม :</p>
+                <p style="padding-left: 20px;">เงินต้นจำนวน <input type="text" class="amount" value="${contractData.principal.toLocaleString()}" readonly> บาท</p>
+                <p style="padding-left: 20px;">ดอกเบี้ยจำนวน <input type="text" class="amount" value="${contractData.interest.toLocaleString()}" readonly> บาท</p>
+                <p style="padding-left: 20px;">ค่าธรรมเนียมการดูแลรักษาทรัพย์และดำเนินการ : <input type="text" class="amount" value="${contractData.serviceFee.toLocaleString()}" readonly> บาท</p>
+                <p style="padding-left: 20px;">รวมทั้งสิ้น : <input type="text" class="amount" value="${contractData.total.toLocaleString()}" readonly> บาท</p>
+                <p>หากผู้ขายไม่ชำระเงินคืนภายในกำหนดดังกล่าว ถือว่าผู้ขายสละสิทธิในการไถ่คืนโดยไม่จำเป็นต้องมีหนังสือบอกกล่าวใด ๆ และกรรมสิทธิ์ในทรัพย์เป็นของผู้ซื้อโดยสมบูรณ์</p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 4: การยืนยันความสมัครใจ</p>
+                <p>ผู้ขายรับรองว่าการทำสัญญาครั้งนี้เป็นการ ขายขาดโดยสมัครใจ ไม่อยู่ภายใต้การขู่เข็ญ บังคับ หรือหลอกลวง และเข้าใจเงื่อนไขของสิทธิในการไถ่คืนเป็นอย่างดี</p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 5: การไม่เป็นสัญญาจำนำหรือขายฝาก</p>
+                <p>คู่สัญญาทั้งสองฝ่ายตกลงร่วมกันว่าสัญญาฉบับนี้ มิใช่สัญญาจำนำ หรือขายฝาก ตามประมวลกฎหมายแพ่งและพาณิชย์ และไม่มีข้อบทใดที่ตีความเป็นอย่างอื่นได้</p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 6: การจัดเก็บและรับผิดชอบทรัพย์</p>
+                <p>ผู้ซื้อจะทำการเก็บรักษาทรัพย์ไว้โดยปลอดภัยจนกว่าจะครบกำหนดไถ่คืนหรือจนกว่าจะตกเป็นกรรมสิทธิ์ของผู้ซื้อ</p>
+            </div>
+
+            <div class="clause">
+                <p class="clause-title">ข้อ 7: กฎหมายที่ใช้บังคับ</p>
+                <p>สัญญาฉบับนี้อยู่ภายใต้กฎหมายไทย หากมีข้อพิพาท ให้ใช้ศาลในเขตกรุงเทพมหานครเป็นที่พิจารณาคดี</p>
+            </div>
+
+            <div class="signature-section">
+                <div class="signature-block">
+                    <p>ลงชื่อ <input type="text" style="width: 70%;" value="${signatures.seller.signature ? '[ลายเซ็น]' : ''}" readonly> ผู้ขาย</p>
+                    <p>( <input type="text" style="width: 80%;" value="${signatures.seller.name}" readonly> )</p>
+                    <p>วันที่ : <input type="text" class="date" value="${signatures.seller.date}" readonly></p>
+                </div>
+                <div class="signature-block">
+                    <p>ลงชื่อ <input type="text" style="width: 70%;" value="${signatures.buyer.signature ? '[ลายเซ็น]' : ''}" readonly> ผู้ซื้อ</p>
+                    <p>( pawnly technologies co.,ltd )</p>
+                    <p>วันที่ : <input type="text" class="date" value="${signatures.buyer.date}" readonly></p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>`;
   };
 
   // Signature modal handlers
@@ -368,7 +523,10 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
         buyerSignatureLength: signatures.buyer.signature?.length
       });
 
-      // Save verification photo to S3
+      // Generate contract HTML and save
+      const contractHTML = generateContractHTML();
+      console.log('Generated contract HTML, length:', contractHTML.length);
+
       console.log('About to make fetch request...');
       let saveResponse;
       try {
@@ -379,7 +537,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
           },
           body: JSON.stringify({
             itemId: item._id,
-            contractImageData: null, // Contract image will be saved from full contract page
+            contractHTML: contractHTML, // Send HTML for PDF generation
             verificationPhoto: verificationPhoto
           })
         });
@@ -495,21 +653,13 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                  <button
-                    onClick={() => window.open(`/contract/${item._id}/full`, '_blank')}
-                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                  >
-                    ดูร่างสัญญาเต็ม
-                  </button>
-                  <button
-                    onClick={goToSignatures}
-                    className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
-                  >
-                    ดำเนินการต่อ - เซ็นชื่อในสัญญา
-                  </button>
-                </div>
+                {/* Next Button */}
+                <button
+                  onClick={goToSignatures}
+                  className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
+                >
+                  ดำเนินการต่อ - เซ็นชื่อในสัญญา
+                </button>
               </div>
             )}
 

@@ -3,6 +3,8 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { getS3Client } from '@/lib/aws/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { ObjectId } from 'mongodb';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
 const BUCKET_NAME = 'piwp360';
 const CONTRACTS_FOLDER = 'contracts/';
@@ -14,13 +16,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Request body keys:', Object.keys(body));
 
-    const { itemId, contractImageData, verificationPhoto } = body;
+    const { itemId, contractHTML, verificationPhoto } = body;
 
     console.log('Parsed data:', {
       itemId: itemId?.substring(0, 10) + '...',
-      hasContractImageData: !!contractImageData,
+      hasContractHTML: !!contractHTML,
       hasVerificationPhoto: !!verificationPhoto,
-      contractImageDataLength: contractImageData?.length,
+      contractHTMLLength: contractHTML?.length,
       verificationPhotoLength: verificationPhoto?.length
     });
 
@@ -62,10 +64,15 @@ export async function POST(request: NextRequest) {
     console.log('Generated filenames:', { contractFilename, photoFilename });
 
     // Check AWS credentials
+    console.log('Checking AWS credentials...');
+    console.log('AWS_ACCESS_KEY_ID:', process.env.AWS_ACCESS_KEY_ID ? '***' + process.env.AWS_ACCESS_KEY_ID.slice(-4) : 'NOT SET');
+    console.log('AWS_SECRET_ACCESS_KEY:', process.env.AWS_SECRET_ACCESS_KEY ? '***SET***' : 'NOT SET');
+    console.log('AWS_REGION:', process.env.AWS_REGION || 'ap-southeast-2 (default)');
+
     if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-      console.error('AWS credentials not set');
+      console.error('AWS credentials not set in environment variables');
       return NextResponse.json(
-        { error: 'ระบบยังไม่ได้ตั้งค่า AWS credentials กรุณาติดต่อผู้ดูแลระบบ' },
+        { error: 'ระบบยังไม่ได้ตั้งค่า AWS credentials ใน Vercel กรุณาติดต่อผู้ดูแลระบบเพื่อตั้งค่า AWS_ACCESS_KEY_ID และ AWS_SECRET_ACCESS_KEY' },
         { status: 500 }
       );
     }
@@ -76,31 +83,60 @@ export async function POST(request: NextRequest) {
     let contractUploadResult = null;
     let photoUploadResult = null;
 
-    // Upload contract image as PDF-like file if provided
-    if (contractImageData) {
-      console.log('Uploading contract image...');
+    // Generate PDF from HTML if provided
+    if (contractHTML) {
+      console.log('Generating PDF from HTML...');
       try {
-        const contractBuffer = Buffer.from(contractImageData.replace(/^data:image\/png;base64,/, ''), 'base64');
+        // Launch puppeteer with chromium for Vercel
+        const browser = await puppeteer.launch({
+          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+          executablePath: await chromium.executablePath(),
+          headless: true,
+        });
 
-        // Save as PDF file (even though it's PNG content) for document integrity
+        const page = await browser.newPage();
+        page.setDefaultTimeout(30000); // 30 seconds timeout
+        await page.setViewport({ width: 794, height: 1123 }); // A4 size at 96 DPI
+
+        // Set HTML content
+        await page.setContent(contractHTML, { waitUntil: 'domcontentloaded' });
+
+        // Wait for fonts to load (reduced time)
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Generate PDF
+        const pdfBuffer = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: {
+            top: '2cm',
+            right: '2cm',
+            bottom: '2cm',
+            left: '2cm'
+          },
+          preferCSSPageSize: true
+        });
+
+        await browser.close();
+
+        console.log('PDF generated, size:', pdfBuffer.length);
+
+        // Upload PDF to S3
         const pdfFilename = `contract-${itemId}-${timestamp}.pdf`;
-        const contractUploadParams = {
+        const pdfUploadParams = {
           Bucket: BUCKET_NAME,
           Key: `${CONTRACTS_FOLDER}${pdfFilename}`,
-          Body: contractBuffer,
-          ContentType: 'application/pdf', // Mark as PDF for document security
-          Metadata: {
-            'original-format': 'png',
-            'converted-to': 'pdf-like'
-          }
+          Body: pdfBuffer,
+          ContentType: 'application/pdf'
         };
 
-        await s3Client.send(new PutObjectCommand(contractUploadParams));
+        await s3Client.send(new PutObjectCommand(pdfUploadParams));
         contractUploadResult = pdfFilename;
-        console.log('Contract image uploaded successfully as PDF file');
+        console.log('Contract PDF uploaded successfully');
       } catch (error) {
-        console.error('Error uploading contract image:', error);
-        throw new Error(`Contract upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('Error generating/uploading contract PDF:', error);
+        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+        throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 

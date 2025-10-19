@@ -342,30 +342,48 @@ export default function FullContractPage({ params }: { params: { itemId: string 
   };
 
   const handleSaveContract = async () => {
+    console.log('handleSaveContract called in full contract page');
+    console.log('Signatures:', {
+      seller: !!signatures.seller.signature,
+      buyer: !!signatures.buyer.signature,
+      sellerName: signatures.seller.name,
+      buyerName: signatures.buyer.name
+    });
+
     if (!signatures.seller.signature || !signatures.buyer.signature) {
+      console.log('Validation failed - missing signatures');
       alert('กรุณาเซ็นชื่อให้ครบถ้วน');
       return;
     }
 
+    console.log('Validation passed, proceeding with save...');
+
     try {
       setSaving(true);
+      console.log('Set saving to true');
 
+      console.log('Looking for contract element...');
       // Get the contract element
       const contractElement = document.querySelector('.page-container') as HTMLElement;
       if (!contractElement) {
+        console.error('Contract element not found');
         throw new Error('ไม่พบองค์ประกอบสัญญา');
       }
+      console.log('Contract element found, proceeding with html2canvas...');
 
       // Convert to canvas for image generation
+      console.log('Starting html2canvas...');
       const canvas = await html2canvas(contractElement, {
         useCORS: true,
         allowTaint: true,
         background: '#ffffff'
       });
+      console.log('html2canvas completed, canvas size:', canvas.width, 'x', canvas.height);
 
       // Convert to base64
       const contractImageData = canvas.toDataURL('image/png');
-      console.log('Contract image data length:', contractImageData.length);
+      console.log('Contract image data generated, length:', contractImageData.length);
+      console.log('Image data preview:', contractImageData.substring(0, 100));
 
       // Prepare data to send
       const saveData = {
@@ -374,20 +392,27 @@ export default function FullContractPage({ params }: { params: { itemId: string 
         verificationPhoto: null // Verification photo is saved from ContractForm
       };
 
+      console.log('Sending data to API...');
+
       // Save to backend
       const response = await axios.post('/api/contracts/save-contract-image', saveData);
+      console.log('API response received:', response.status, response.data);
 
       if (response.data.success) {
+        console.log('Contract saved successfully');
         alert('บันทึกสัญญาเรียบร้อยแล้ว');
         router.back();
       } else {
+        console.error('API returned error:', response.data.error);
         throw new Error(response.data.error || 'เกิดข้อผิดพลาดในการบันทึก');
       }
 
     } catch (error: any) {
       console.error('Error saving contract:', error);
-      alert('เกิดข้อผิดพลาดในการบันทึกสัญญา: ' + error.message);
+      console.error('Error details:', error.response?.data || error.message);
+      alert('เกิดข้อผิดพลาดในการบันทึกสัญญา: ' + (error.response?.data?.error || error.message));
     } finally {
+      console.log('Setting saving to false');
       setSaving(false);
     }
   };
