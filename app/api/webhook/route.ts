@@ -122,9 +122,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
-        // สร้าง LIFF URL สำหรับเปิดหน้า contract details
-        const contractDetailsUrl = `https://liff.line.me/2008216710-gn6BwQjo/contract/${itemId}/details`;
-        console.log('Contract details LIFF URL:', contractDetailsUrl);
+        // สร้าง direct URL สำหรับเปิดหน้า contract details
+        const contractDetailsUrl = `https://pawn360.vercel.app/contract/${itemId}/details`;
+        console.log('Contract details direct URL:', contractDetailsUrl);
 
         // ส่ง reply message เพื่อเปิด LIFF
         const lineClient = new Client({
