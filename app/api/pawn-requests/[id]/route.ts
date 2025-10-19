@@ -8,12 +8,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    console.log('API called with id:', id);
+
     const { db } = await connectToDatabase();
     const itemsCollection = db.collection('items');
     const customersCollection = db.collection('customers');
 
+    console.log('Searching for item with id:', id);
     // ค้นหา item จาก itemId
     const item = await itemsCollection.findOne({ _id: new ObjectId(id) });
+    console.log('Item found:', item ? 'yes' : 'no');
 
     if (!item) {
       return NextResponse.json(

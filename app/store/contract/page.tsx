@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
 import ContractForm from '@/components/ContractForm';
@@ -53,11 +53,22 @@ interface Customer {
 function StoreContractContent() {
   const [itemId, setItemId] = useState<string | null>(null);
 
-  // Get itemId from URL on client side
+  // Get itemId from URL on client side (try both search and hash)
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      let id = null;
+
+      // Try search params first
       const urlParams = new URLSearchParams(window.location.search);
-      const id = urlParams.get('itemId');
+      id = urlParams.get('itemId');
+
+      // If not found, try hash
+      if (!id && window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        id = hashParams.get('itemId');
+      }
+
+      console.log('Parsed itemId:', id, 'from URL');
       setItemId(id);
     }
   }, []);
@@ -93,16 +104,17 @@ function StoreContractContent() {
     }
   };
 
-  const fetchItemData = useCallback(async () => {
-    if (!itemId) return;
-
+  const fetchItemData = async (id: string) => {
     try {
+      console.log('Fetching data for item:', id);
       setLoading(true);
       setError(null);
-      const response = await axios.get(`/api/pawn-requests/${itemId}`);
+      const response = await axios.get(`/api/pawn-requests/${id}`);
+      console.log('API Response:', response.data);
       if (response.data.success) {
         setItem(response.data.item);
         setCustomer(response.data.customer);
+        console.log('Data loaded successfully');
       } else {
         setError('ไม่พบข้อมูลรายการจำนำ');
       }
@@ -112,17 +124,23 @@ function StoreContractContent() {
     } finally {
       setLoading(false);
     }
-  }, [itemId]);
+  };
 
   // Load stores on mount
   useEffect(() => {
     fetchStores();
   }, []);
 
-  // Load item and customer data when itemId or fetchItemData changes
+  // Load item and customer data when itemId changes
   useEffect(() => {
-    fetchItemData();
-  }, [fetchItemData]);
+    if (itemId) {
+      console.log('Loading data for itemId:', itemId);
+      fetchItemData(itemId);
+    } else {
+      console.log('No itemId found, stopping loading');
+      setLoading(false);
+    }
+  }, [itemId]);
 
   const handleLogin = async () => {
     if (!selectedStore || !password) {
