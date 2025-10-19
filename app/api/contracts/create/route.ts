@@ -11,12 +11,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const {
-      pawnRequestId,
+      itemId,
+      storeId,
       contractData,
     } = body;
 
     // Validation
-    if (!pawnRequestId || !contractData) {
+    if (!itemId || !storeId || !contractData) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -25,21 +26,11 @@ export async function POST(request: NextRequest) {
 
     const { db } = await connectToDatabase();
     const contractsCollection = db.collection<Contract>('contracts');
-    const pawnRequestsCollection = db.collection('pawnRequests');
     const itemsCollection = db.collection('items');
     const customersCollection = db.collection('customers');
 
-    // Get pawn request details
-    const pawnRequest = await pawnRequestsCollection.findOne({ _id: new ObjectId(pawnRequestId) });
-    if (!pawnRequest) {
-      return NextResponse.json(
-        { error: 'Pawn request not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get item details using itemId from pawn request
-    const item = await itemsCollection.findOne({ _id: new ObjectId(pawnRequest.itemId) });
+    // Get item details
+    const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
     if (!item) {
       return NextResponse.json(
         { error: 'Item not found' },
@@ -47,8 +38,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get customer details using lineId from pawn request
-    const customer = await customersCollection.findOne({ lineId: pawnRequest.lineId });
+    // Get customer details using lineId from item
+    const customer = await customersCollection.findOne({ lineId: item.lineId });
     if (!customer) {
       return NextResponse.json(
         { error: 'Customer not found' },
@@ -58,11 +49,14 @@ export async function POST(request: NextRequest) {
 
     // Calculate dates and amounts
     const startDate = new Date();
+    const periodDays = item.loanDays || 30;
     const dueDate = new Date(startDate);
-    dueDate.setDate(dueDate.getDate() + pawnRequest.periodDays);
+    dueDate.setDate(dueDate.getDate() + periodDays);
 
-    const totalInterest = (pawnRequest.pawnedPrice * pawnRequest.interestRate * pawnRequest.periodDays) / (100 * 30);
-    const remainingAmount = pawnRequest.pawnedPrice + totalInterest;
+    const pawnedPrice = item.desiredAmount || item.estimatedValue || 0;
+    const interestRate = item.interestRate || 10;
+    const totalInterest = (pawnedPrice * interestRate * periodDays) / (100 * 30);
+    const remainingAmount = pawnedPrice + totalInterest;
 
     // Generate contract number
     const contractNumber = `STORE${Date.now()}`;
@@ -120,15 +114,16 @@ export async function POST(request: NextRequest) {
         images: item.images,
       },
       pawnDetails: {
-        aiEstimatedPrice: pawnRequest.estimatedValue || 0,
-        pawnedPrice: pawnRequest.pawnedPrice,
-        interestRate: pawnRequest.interestRate,
-        periodDays: pawnRequest.periodDays,
+        aiEstimatedPrice: item.estimatedValue || 0,
+        pawnedPrice: pawnedPrice,
+        interestRate: interestRate,
+        periodDays: periodDays,
         totalInterest,
         remainingAmount,
         fineAmount: 0,
         payInterest: 0,
         soldAmount: 0,
+        serviceFee: contractData.serviceFee || 0,
       },
       dates: {
         startDate,
@@ -137,13 +132,12 @@ export async function POST(request: NextRequest) {
         suspendedDate: null,
       },
       transactionHistory: [],
-      storeId: new ObjectId(pawnRequest.storeId),
-      createdBy: new ObjectId(pawnRequest.createdBy || pawnRequest.storeId),
-      userId: new ObjectId(pawnRequest.createdBy || pawnRequest.storeId),
+      storeId: new ObjectId(storeId),
+      createdBy: new ObjectId(storeId), // ใช้ storeId เป็น createdBy เพราะเป็นพนักงานร้าน
+      userId: new ObjectId(storeId),
       // New fields for signatures and images
       signatures: contractData.signatures,
       contractImages: contractImageUrls,
-      serviceFee: contractData.serviceFee || 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -160,12 +154,12 @@ export async function POST(request: NextRequest) {
 
     // Update item status and link to contract
     await itemsCollection.updateOne(
-      { _id: new ObjectId(pawnRequest.itemId) },
+      { _id: new ObjectId(itemId) },
       {
         $set: {
           status: 'active',
           currentContractId: result.insertedId,
-          storeId: new ObjectId(pawnRequest.storeId),
+          storeId: new ObjectId(storeId),
           updatedAt: new Date(),
         },
         $push: {
@@ -180,14 +174,14 @@ export async function POST(request: NextRequest) {
       {
         $inc: {
           totalContracts: 1,
-          totalValue: pawnRequest.pawnedPrice,
+          totalValue: pawnedPrice,
         },
         $set: {
           lastContractDate: new Date(),
           updatedAt: new Date(),
         },
         $addToSet: {
-          storeId: new ObjectId(pawnRequest.storeId),
+          storeId: new ObjectId(storeId),
         },
         $push: {
           contractsID: result.insertedId as any,
@@ -195,21 +189,9 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Update pawn request status
-    await pawnRequestsCollection.updateOne(
-      { _id: new ObjectId(pawnRequestId) },
-      {
-        $set: {
-          status: 'completed',
-          contractId: result.insertedId,
-          updatedAt: new Date(),
-        },
-      }
-    );
-
     // Send notification to LINE
     try {
-      const message = `สัญญาเลขที่ ${contractNumber} ของคุณได้ถูกสร้างเรียบร้อยแล้ว\n\nรายละเอียด:\n- สินค้า: ${item.brand} ${item.model}\n- จำนวนเงิน: ${pawnRequest.pawnedPrice.toLocaleString()} บาท\n- อัตราดอกเบี้ย: ${pawnRequest.interestRate}%\n- ระยะเวลา: ${pawnRequest.periodDays} วัน\n- วันครบกำหนด: ${dueDate.toLocaleDateString('th-TH')}`;
+      const message = `สัญญาเลขที่ ${contractNumber} ของคุณได้ถูกสร้างเรียบร้อยแล้ว\n\nรายละเอียด:\n- สินค้า: ${item.brand} ${item.model}\n- จำนวนเงิน: ${pawnedPrice.toLocaleString()} บาท\n- อัตราดอกเบี้ย: ${interestRate}%\n- ระยะเวลา: ${periodDays} วัน\n- วันครบกำหนด: ${dueDate.toLocaleDateString('th-TH')}`;
 
       await sendTextMessage(customer.lineId, message);
     } catch (error) {
