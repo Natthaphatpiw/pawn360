@@ -20,8 +20,8 @@ export async function generateQRCode(data: string, filename?: string): Promise<s
 }
 
 export function generateQRCodeData(itemId: string): string {
-  // สร้าง URL ที่เปิดหน้าร้านค้าตรวจสอบและแก้ไขรายการจำนำ
-  // ใช้ domain จาก environment หรือ default
-  const domain = process.env.NEXT_PUBLIC_DOMAIN || 'https://pawn360.vercel.app';
-  return `${domain}/qr/${itemId}`;
+  // สร้าง LIFF URL ที่เปิดหน้าร้านค้าตรวจสอบและแก้ไขรายการจำนำ
+  // ใช้ LIFF ID สำหรับร้านค้า
+  const liffId = process.env.LIFF_ID_STORE || '2008216710-de1ovYZL';
+  return `https://liff.line.me/${liffId}?itemId=${itemId}`;
 }
