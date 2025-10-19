@@ -37,10 +37,9 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-    setSignatureData('');
+    }
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -114,7 +113,6 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
     const canvas = canvasRef.current;
     if (canvas && name.trim()) {
       const dataURL = canvas.toDataURL('image/png');
-      setSignatureData(dataURL);
       onSave(dataURL, name.trim());
       onClose();
     }
@@ -261,7 +259,6 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
   // Photo verification
   const [verificationPhoto, setVerificationPhoto] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Camera input ref
@@ -588,10 +585,10 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   </button>
                   <button
                     onClick={completeContract}
-                    disabled={!verificationPhoto || loading}
+                    disabled={!verificationPhoto}
                     className="flex-1 bg-green-500 text-white py-3 px-4 rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? 'กำลังสร้างสัญญา...' : 'สร้างสัญญา'}
+                    สร้างสัญญา
                   </button>
                 </div>
               </div>
