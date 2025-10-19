@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
-import { useSearchParams } from 'next/navigation';
 import ContractForm from '@/components/ContractForm';
 
 const sarabun = Sarabun({
@@ -52,8 +51,16 @@ interface Customer {
 }
 
 function StoreContractContent() {
-  const searchParams = useSearchParams();
-  const itemId = searchParams.get('itemId');
+  const [itemId, setItemId] = useState<string | null>(null);
+
+  // Get itemId from URL on client side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const id = urlParams.get('itemId');
+      setItemId(id);
+    }
+  }, []);
 
   const [currentStep, setCurrentStep] = useState<'login' | 'contract'>('login');
   const [loading, setLoading] = useState(true);
@@ -75,18 +82,6 @@ function StoreContractContent() {
     photoTaken: false
   });
 
-  // Load stores on mount
-  useEffect(() => {
-    fetchStores();
-  }, []);
-
-  // Load item and customer data when itemId changes
-  useEffect(() => {
-    if (itemId) {
-      fetchItemData();
-    }
-  }, [itemId]);
-
   const fetchStores = async () => {
     try {
       const response = await axios.get('/api/stores');
@@ -98,9 +93,12 @@ function StoreContractContent() {
     }
   };
 
-  const fetchItemData = async () => {
+  const fetchItemData = useCallback(async () => {
+    if (!itemId) return;
+
     try {
       setLoading(true);
+      setError(null);
       const response = await axios.get(`/api/pawn-requests/${itemId}`);
       if (response.data.success) {
         setItem(response.data.item);
@@ -114,7 +112,17 @@ function StoreContractContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemId]);
+
+  // Load stores on mount
+  useEffect(() => {
+    fetchStores();
+  }, []);
+
+  // Load item and customer data when itemId or fetchItemData changes
+  useEffect(() => {
+    fetchItemData();
+  }, [fetchItemData]);
 
   const handleLogin = async () => {
     if (!selectedStore || !password) {
@@ -394,16 +402,5 @@ function StoreContractContent() {
 }
 
 export default function StoreContractPage() {
-  return (
-    <Suspense fallback={
-      <div className={`min-h-screen flex items-center justify-center ${sarabun.className}`} style={{ backgroundColor: '#FAFBFA' }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    }>
-      <StoreContractContent />
-    </Suspense>
-  );
+  return <StoreContractContent />;
 }

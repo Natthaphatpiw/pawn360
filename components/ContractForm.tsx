@@ -78,15 +78,19 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     .signature-input { width: 70%; }
   `;
 
-  // Add styles to document head
+  // Add styles to document head only on client side
   useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = inputStyles;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
+    if (typeof document !== 'undefined') {
+      const styleId = 'contract-form-styles';
+      let style = document.getElementById(styleId) as HTMLStyleElement;
+      if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        document.head.appendChild(style);
+      }
+      style.textContent = inputStyles;
+    }
+  }, [inputStyles]); // Add inputStyles dependency
   const [currentStep, setCurrentStep] = useState<'contract' | 'photo'>('contract');
   const [signatureData, setSignatureData] = useState<SignatureData>({
     seller: { name: customer.fullName, signedDate: new Date() },
