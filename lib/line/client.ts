@@ -566,9 +566,9 @@ export async function sendContractCompletionNotification(
               type: 'button',
               style: 'primary',
               action: {
-                type: 'postback',
+                type: 'uri',
                 label: 'รายละเอียดสัญญา',
-                data: `action=contract_details&itemId=${itemId}`
+                uri: `https://pawn360.vercel.app/contract-info/${itemId}`
               },
               color: '#0A4215',
               flex: 1
