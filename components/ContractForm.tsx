@@ -248,14 +248,26 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     placeholder: ''
   });
 
+  console.log('ContractForm rendered with:', { item: !!item, customer: !!customer });
+
   // Contract signatures
   const [signatures, setSignatures] = useState<{
     seller: { name: string; signature: string; date: string };
     buyer: { name: string; signature: string; date: string };
   }>({
-    seller: { name: customer.fullName, signature: '', date: new Date().toLocaleDateString('th-TH') },
+    seller: { name: customer?.fullName || '', signature: '', date: new Date().toLocaleDateString('th-TH') },
     buyer: { name: '', signature: '', date: new Date().toLocaleDateString('th-TH') }
   });
+
+  // Update signatures when customer changes
+  useEffect(() => {
+    if (customer?.fullName && signatures.seller.name !== customer.fullName) {
+      setSignatures(prev => ({
+        ...prev,
+        seller: { ...prev.seller, name: customer.fullName }
+      }));
+    }
+  }, [customer?.fullName]);
 
   // Photo verification
   const [verificationPhoto, setVerificationPhoto] = useState<string | null>(null);
@@ -328,10 +340,22 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
   };
 
   const completeContract = async () => {
+    console.log('completeContract called with:', {
+      sellerSignature: !!signatures.seller.signature,
+      buyerSignature: !!signatures.buyer.signature,
+      verificationPhoto: !!verificationPhoto,
+      itemId: item?._id,
+      item: !!item,
+      customer: !!customer
+    });
+
     if (!signatures.seller.signature || !signatures.buyer.signature || !verificationPhoto) {
+      console.log('Validation failed');
       setError('กรุณาเซ็นชื่อและถ่ายรูปให้ครบถ้วน');
       return;
     }
+
+    console.log('Validation passed, proceeding...');
 
     try {
       setLoading(true);
@@ -339,23 +363,31 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
       console.log('Starting contract creation...', {
         itemId: item._id,
         hasVerificationPhoto: !!verificationPhoto,
-        verificationPhotoLength: verificationPhoto?.length
+        verificationPhotoLength: verificationPhoto?.length,
+        sellerSignatureLength: signatures.seller.signature?.length,
+        buyerSignatureLength: signatures.buyer.signature?.length
       });
 
       // Save verification photo to S3
-      const saveResponse = await fetch('/api/contracts/save-contract-image', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          itemId: item._id,
-          contractImageData: null, // Contract image will be saved from full contract page
-          verificationPhoto: verificationPhoto
-        })
-      });
-
-      console.log('Save response status:', saveResponse.status);
+      console.log('About to make fetch request...');
+      let saveResponse;
+      try {
+        saveResponse = await fetch('/api/contracts/save-contract-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            itemId: item._id,
+            contractImageData: null, // Contract image will be saved from full contract page
+            verificationPhoto: verificationPhoto
+          })
+        });
+        console.log('Fetch completed, response status:', saveResponse.status);
+      } catch (fetchError: any) {
+        console.error('Fetch failed:', fetchError);
+        throw new Error('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์');
+      }
 
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
