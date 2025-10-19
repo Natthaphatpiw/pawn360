@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { Store } from '@/lib/db/models';
+import bcrypt from 'bcrypt';
 
 export async function GET() {
   try {
     const { db } = await connectToDatabase();
-    const storesCollection = db.collection('stores');
+    const storesCollection = db.collection<Store>('stores');
 
     const stores = await storesCollection
       .find({})
@@ -20,6 +22,56 @@ export async function GET() {
     console.error('Error fetching stores:', error);
     return NextResponse.json(
       { error: 'Failed to fetch stores' },
+      { status: 500 }
+    );
+  }
+}
+
+// Verify store password
+export async function POST(request: NextRequest) {
+  try {
+    const { storeId, password } = await request.json();
+
+    if (!storeId || !password) {
+      return NextResponse.json(
+        { error: 'กรุณาระบุรหัสร้านค้าและรหัสผ่าน' },
+        { status: 400 }
+      );
+    }
+
+    const { db } = await connectToDatabase();
+    const storesCollection = db.collection<Store>('stores');
+
+    const store = await storesCollection.findOne({ _id: new (await import('mongodb')).ObjectId(storeId) });
+
+    if (!store) {
+      return NextResponse.json(
+        { error: 'ไม่พบร้านค้า' },
+        { status: 404 }
+      );
+    }
+
+    const isValidPassword = await bcrypt.compare(password, store.password);
+
+    if (!isValidPassword) {
+      return NextResponse.json(
+        { error: 'รหัสผ่านไม่ถูกต้อง' },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      store: {
+        _id: store._id,
+        storeName: store.storeName,
+        interestRate: store.interestRate
+      }
+    });
+  } catch (error) {
+    console.error('Error verifying store password:', error);
+    return NextResponse.json(
+      { error: 'เกิดข้อผิดพลาดในการตรวจสอบรหัสผ่าน' },
       { status: 500 }
     );
   }
