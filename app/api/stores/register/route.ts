@@ -52,9 +52,14 @@ export async function POST(request: NextRequest) {
     // Create store document
     const storeDoc = {
       storeName,
+      ownerName: ownerData.fullName,
+      ownerEmail: ownerData.email,
       phone,
       taxId: taxId || null,
       address,
+      interestRate: 10, // Default interest rate
+      password: passwordHash, // Store hashed password
+      ownerId: userId,
       logoUrl: null,
       stampUrl: null,
       signatureUrl: null,
@@ -68,9 +73,8 @@ export async function POST(request: NextRequest) {
         footer: 'ขอบคุณที่ใช้บริการ',
         terms: 'เงื่อนไขการจำนำมาตรฐาน',
       },
-      ownerId: userId,
       lineIds: [lineId], // เพิ่ม lineIds เป็น array
-      passwordHash,
+      passwordHash, // Keep for backward compatibility
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),

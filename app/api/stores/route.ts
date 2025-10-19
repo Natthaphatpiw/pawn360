@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
   try {
     const { storeId, password } = await request.json();
 
-    if (!storeId || !password) {
+    if (!storeId) {
       return NextResponse.json(
-        { error: 'กรุณาระบุรหัสร้านค้าและรหัสผ่าน' },
+        { error: 'กรุณาระบุรหัสร้านค้า' },
         { status: 400 }
       );
     }
@@ -51,7 +51,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isValidPassword = await bcrypt.compare(password, store.password);
+    // Check if store has password field
+    const storedPassword = store.passwordHash || store.password;
+    if (!storedPassword) {
+      // Store has no password - return special response for setting password
+      return NextResponse.json({
+        success: false,
+        needsPassword: true,
+        store: {
+          _id: store._id,
+          storeName: store.storeName
+        }
+      });
+    }
+
+    // If no password provided but store has password, it's invalid
+    if (!password) {
+      return NextResponse.json(
+        { error: 'กรุณาระบุรหัสผ่าน' },
+        { status: 400 }
+      );
+    }
+
+    const isValidPassword = await bcrypt.compare(password, storedPassword);
 
     if (!isValidPassword) {
       return NextResponse.json(

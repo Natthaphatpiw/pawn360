@@ -4,8 +4,8 @@ import { ObjectId } from 'mongodb';
 export interface Store {
   _id?: ObjectId;
   storeName: string;
-  ownerName: string;
-  ownerEmail: string;
+  ownerName?: string;
+  ownerEmail?: string;
   phone: string;
   taxId?: string;
   address: {
@@ -19,7 +19,16 @@ export interface Store {
     postcode: string;
   };
   interestRate?: number; // Default interest rate for the store
-  password: string; // Hashed password for employee login
+  password?: string; // Hashed password for employee login (legacy)
+  passwordHash?: string; // Hashed password for employee login
+  ownerId?: ObjectId;
+  lineIds?: string[];
+  logoUrl?: string;
+  stampUrl?: string;
+  signatureUrl?: string;
+  interestPresets?: any[];
+  contractTemplate?: any;
+  isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

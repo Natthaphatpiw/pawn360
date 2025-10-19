@@ -82,7 +82,10 @@ function StoreContractContent() {
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [setPasswordMode, setSetPasswordMode] = useState(false);
+  const [storeToSetPassword, setStoreToSetPassword] = useState<any>(null);
 
   // Contract data
   const [item, setItem] = useState<Item | null>(null);
@@ -143,13 +146,20 @@ function StoreContractContent() {
   }, [itemId]);
 
   const handleLogin = async () => {
-    if (!selectedStore || !password) {
-      setError('กรุณาเลือกชื่อร้านค้าและใส่รหัสผ่าน');
+    if (!selectedStore) {
+      setError('กรุณาเลือกชื่อร้านค้า');
+      return;
+    }
+
+    // In set password mode, we don't need password for initial check
+    if (!setPasswordMode && !password) {
+      setError('กรุณาใส่รหัสผ่าน');
       return;
     }
 
     setLoginLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const response = await axios.post('/api/stores', {
@@ -160,12 +170,65 @@ function StoreContractContent() {
       if (response.data.success) {
         setCurrentStep('contract');
         setError(null);
+        setSetPasswordMode(false);
+        setStoreToSetPassword(null);
+      } else if (response.data.needsPassword) {
+        // Store needs password setup
+        setSetPasswordMode(true);
+        setStoreToSetPassword(response.data.store);
+        setError(null);
       } else {
         setError('รหัสผ่านไม่ถูกต้อง');
       }
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (!password || !confirmPassword) {
+      setError('กรุณากรอกและยืนยันรหัสผ่าน');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('รหัสผ่านไม่ตรงกัน');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+
+    setLoginLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await axios.post('/api/stores/set-password', {
+        storeId: selectedStore,
+        password: password,
+        confirmPassword: confirmPassword
+      });
+
+      if (response.data.success) {
+        setSuccess('ตั้งรหัสผ่านเรียบร้อยแล้ว');
+        setSetPasswordMode(false);
+        setStoreToSetPassword(null);
+        setPassword('');
+        setConfirmPassword('');
+        // Auto login after setting password
+        setTimeout(() => {
+          handleLogin();
+        }, 2000);
+      }
+    } catch (err: any) {
+      console.error('Set password error:', err);
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการตั้งรหัสผ่าน');
     } finally {
       setLoginLoading(false);
     }
@@ -239,6 +302,13 @@ function StoreContractContent() {
                 <p className="text-sm" style={{ color: '#6B7280' }}>กรุณาเลือกชื่อร้านค้าและใส่รหัสผ่าน</p>
               </div>
 
+              {/* Success Message */}
+              {success && (
+                <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#D4EDDA', border: '1px solid #C3E6CB', color: '#155724' }}>
+                  {success}
+                </div>
+              )}
+
               {/* Error Message */}
               {error && (
                 <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#FEE', border: '1px solid #FCC', color: '#C33' }}>
@@ -270,39 +340,131 @@ function StoreContractContent() {
                 </select>
               </div>
 
-              {/* Password Input */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
-                  รหัสผ่าน*
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-3 py-2 focus:outline-none"
-                  style={{
-                    border: '1px solid #E0E0E0',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '8px',
-                    color: '#333333',
-                    height: '44px'
-                  }}
-                  placeholder="ใส่รหัสผ่านร้านค้า"
-                />
-              </div>
+              {/* Password Input - Normal Login */}
+              {!setPasswordMode && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                    รหัสผ่าน*
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-3 py-2 focus:outline-none"
+                    style={{
+                      border: '1px solid #E0E0E0',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '8px',
+                      color: '#333333',
+                      height: '44px'
+                    }}
+                    placeholder="ใส่รหัสผ่านร้านค้า"
+                  />
+                </div>
+              )}
 
-              {/* Login Button */}
-              <button
-                onClick={handleLogin}
-                disabled={loginLoading || !selectedStore || !password}
-                className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
-                style={{
-                  backgroundColor: loginLoading ? '#D1D5DB' : '#2D7A46',
-                  color: loginLoading ? '#9CA3AF' : 'white'
-                }}
-              >
-                {loginLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-              </button>
+              {/* Set Password Form */}
+              {setPasswordMode && storeToSetPassword && (
+                <div className="mb-6">
+                  <div className="p-4 rounded-lg mb-4" style={{ backgroundColor: '#FFF3CD', border: '1px solid #FFEAA7' }}>
+                    <p className="text-sm text-center" style={{ color: '#856404' }}>
+                      ร้านค้า <strong>{storeToSetPassword.storeName}</strong> ยังไม่ได้ตั้งรหัสผ่าน<br/>
+                      กรุณาตั้งรหัสผ่านใหม่
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                        รหัสผ่านใหม่*
+                      </label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-3 py-2 focus:outline-none"
+                        style={{
+                          border: '1px solid #E0E0E0',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '8px',
+                          color: '#333333',
+                          height: '44px'
+                        }}
+                        placeholder="ตั้งรหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
+                        ยืนยันรหัสผ่าน*
+                      </label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full px-3 py-2 focus:outline-none"
+                        style={{
+                          border: '1px solid #E0E0E0',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '8px',
+                          color: '#333333',
+                          height: '44px'
+                        }}
+                        placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {setPasswordMode ? (
+                  <>
+                    <button
+                      onClick={handleSetPassword}
+                      disabled={loginLoading || !password || !confirmPassword}
+                      className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
+                      style={{
+                        backgroundColor: loginLoading ? '#D1D5DB' : '#2D7A46',
+                        color: loginLoading ? '#9CA3AF' : 'white'
+                      }}
+                    >
+                      {loginLoading ? 'กำลังตั้งรหัสผ่าน...' : 'ตั้งรหัสผ่าน'}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSetPasswordMode(false);
+                        setStoreToSetPassword(null);
+                        setPassword('');
+                        setConfirmPassword('');
+                        setError(null);
+                      }}
+                      className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base border"
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        color: '#6B7280',
+                        border: '1px solid #E0E0E0'
+                      }}
+                    >
+                      เลือกร้านค้าใหม่
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={handleLogin}
+                    disabled={loginLoading || !selectedStore || !password}
+                    className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
+                    style={{
+                      backgroundColor: loginLoading ? '#D1D5DB' : '#2D7A46',
+                      color: loginLoading ? '#9CA3AF' : 'white'
+                    }}
+                  >
+                    {loginLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+                  </button>
+                )}
+              </div>
 
               {/* Item Preview */}
               {item && customer && (
