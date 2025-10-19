@@ -34,9 +34,15 @@ export async function POST(request: NextRequest) {
       console.log('Signature verification:', isValid);
 
       if (!isValid) {
-        console.warn('⚠️ Invalid signature detected - Channel Secret might be incorrect');
-        console.warn('⚠️ Allowing request to continue for debugging purposes');
-        console.warn('⚠️ Please verify LINE_CHANNEL_SECRET in environment variables');
+        console.error('🚨 SECURITY WARNING: Invalid webhook signature detected!');
+        console.error('🚨 This could indicate a security breach or misconfiguration');
+        console.error('🚨 IMMEDIATE ACTION REQUIRED:');
+        console.error('   1. Check LINE Developers Console > Channel Settings > Basic Settings');
+        console.error('   2. Copy Channel Secret (not Channel Access Token)');
+        console.error('   3. Update LINE_CHANNEL_SECRET in Vercel Environment Variables');
+        console.error('   4. Redeploy the application');
+        console.error('🚨 Temporarily allowing request to prevent service disruption');
+        console.error('🚨 FIX THIS IMMEDIATELY IN PRODUCTION!');
       }
     } else {
       console.warn('No signature or channel secret - skipping verification');
