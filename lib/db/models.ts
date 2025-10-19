@@ -26,10 +26,10 @@ export interface Store {
   logoUrl?: string;
   stampUrl?: string;
   signatureUrl?: string;
+  googleMapUrl?: string; // URL to Google Maps for store location
   interestPresets?: any[];
   contractTemplate?: any;
   isActive?: boolean;
-  googleMap?: string; // Google Maps URL
   createdAt: Date;
   updatedAt: Date;
 }

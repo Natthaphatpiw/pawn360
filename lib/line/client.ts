@@ -1,4 +1,4 @@
-import { Client, ClientConfig, WebhookEvent } from '@line/bot-sdk';
+import { Client, ClientConfig, WebhookEvent, FlexMessage } from '@line/bot-sdk';
 import axios from 'axios';
 
 // Lazy initialization of LINE client
@@ -355,6 +355,313 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
     return { success: true };
   } catch (error) {
     console.error('Error sending QR code:', error);
+    throw error;
+  }
+}
+
+// Send Contract Completion Notification
+export async function sendContractCompletionNotification(
+  userId: string,
+  contractData: any,
+  itemData: any
+) {
+  try {
+    const client = getLineClient();
+
+    // คำนวณวันครบกำหนด
+    const startDate = new Date();
+    const dueDate = new Date(startDate);
+    dueDate.setDate(dueDate.getDate() + (contractData.periodDays || 30));
+
+    const dueDateString = dueDate.toLocaleDateString('th-TH', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    // สร้างเลขที่สัญญา
+    const contractNumber = `STORE${Date.now()}`;
+
+    const flexMessage = {
+      type: 'flex',
+      altText: `✅ สัญญาจำนำเลขที่ ${contractNumber} ได้ถูกสร้างเรียบร้อยแล้ว`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: itemData.brand ? `${itemData.brand} ${itemData.model || ''}` : 'สินค้าจำนำ',
+              weight: 'bold',
+              size: 'lg',
+              color: '#0A4215',
+              align: 'center'
+            }
+          ],
+          backgroundColor: '#E7EFE9',
+          paddingAll: 'lg'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '✅ สัญญาจำนำได้ถูกสร้างเรียบร้อยแล้ว',
+              size: 'md',
+              color: '#0A4215',
+              weight: 'bold',
+              wrap: true,
+              margin: 'md'
+            },
+            {
+              type: 'separator',
+              margin: 'lg'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'เลขที่สัญญา:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 0
+                    },
+                    {
+                      type: 'text',
+                      text: contractNumber,
+                      wrap: true,
+                      color: '#0A4215',
+                      size: 'sm',
+                      weight: 'bold',
+                      flex: 0,
+                      align: 'end'
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'จำนวนเงิน:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 0
+                    },
+                    {
+                      type: 'text',
+                      text: `${contractData.price?.toLocaleString() || '0'} บาท`,
+                      wrap: true,
+                      color: '#0A4215',
+                      size: 'sm',
+                      weight: 'bold',
+                      flex: 0,
+                      align: 'end'
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'อัตราดอกเบี้ย:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 0
+                    },
+                    {
+                      type: 'text',
+                      text: `${contractData.interestRate || 10}%`,
+                      wrap: true,
+                      color: '#666666',
+                      size: 'sm',
+                      weight: 'bold',
+                      flex: 0,
+                      align: 'end'
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'ระยะเวลา:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 0
+                    },
+                    {
+                      type: 'text',
+                      text: `${contractData.periodDays || 30} วัน`,
+                      wrap: true,
+                      color: '#666666',
+                      size: 'sm',
+                      weight: 'bold',
+                      flex: 0,
+                      align: 'end'
+                    }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    {
+                      type: 'text',
+                      text: 'วันครบกำหนด:',
+                      color: '#666666',
+                      size: 'sm',
+                      flex: 0
+                    },
+                    {
+                      type: 'text',
+                      text: dueDateString,
+                      wrap: true,
+                      color: '#0A4215',
+                      size: 'sm',
+                      weight: 'bold',
+                      flex: 0,
+                      align: 'end'
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'horizontal',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              action: {
+                type: 'uri',
+                label: 'รายละเอียดสัญญา',
+                uri: `https://liff.line.me/2008216710-gn6BwQjo/contract/${itemData._id}/details`
+              },
+              color: '#0A4215',
+              flex: 1
+            },
+            {
+              type: 'button',
+              style: 'secondary',
+              action: {
+                type: 'postback',
+                label: 'ที่ตั้งร้าน',
+                data: `action=store_location&itemId=${itemData._id}`
+              },
+              color: '#F0EFEF',
+              flex: 1
+            }
+          ]
+        }
+      }
+    };
+
+    await client.pushMessage(userId, flexMessage as FlexMessage);
+    return { success: true, contractNumber };
+  } catch (error) {
+    console.error('Error sending contract completion notification:', error);
+    throw error;
+  }
+}
+
+// Send Store Location Card
+export async function sendStoreLocationCard(userId: string, storeData: any) {
+  try {
+    const client = getLineClient();
+
+    const flexMessage = {
+      type: 'flex',
+      altText: `📍 ที่ตั้งร้าน: ${storeData.storeName}`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: `📍 ${storeData.storeName}`,
+              weight: 'bold',
+              size: 'lg',
+              color: '#0A4215',
+              align: 'center'
+            }
+          ],
+          backgroundColor: '#E7EFE9',
+          paddingAll: 'lg'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: 'ที่อยู่ร้านค้า',
+              size: 'md',
+              color: '#0A4215',
+              weight: 'bold',
+              margin: 'md'
+            },
+            {
+              type: 'text',
+              text: `${storeData.address.houseNumber || ''} ${storeData.address.street || ''} ${storeData.address.subDistrict || ''} ${storeData.address.district || ''} ${storeData.address.province || ''} ${storeData.address.postcode || ''}`.trim(),
+              size: 'sm',
+              color: '#666666',
+              wrap: true,
+              margin: 'sm'
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'button',
+              action: {
+                type: 'uri',
+                label: 'ดูแผนที่',
+                uri: storeData.googleMapUrl || `https://maps.google.com/?q=${encodeURIComponent(`${storeData.address.houseNumber || ''} ${storeData.address.subDistrict || ''} ${storeData.address.district || ''} ${storeData.address.province || ''}`.trim())}`
+              },
+              style: 'primary',
+              color: '#0A4215'
+            }
+          ]
+        }
+      }
+    };
+
+    await client.pushMessage(userId, flexMessage as FlexMessage);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending store location card:', error);
     throw error;
   }
 }
