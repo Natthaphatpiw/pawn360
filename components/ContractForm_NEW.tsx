@@ -22,10 +22,12 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [name, setName] = useState(initialName || '');
+  const [signatureData, setSignatureData] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
       setName(initialName || '');
+      setSignatureData('');
       clearCanvas();
     }
   }, [isOpen, initialName]);
