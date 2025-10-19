@@ -356,7 +356,7 @@ export default function FullContractPage({ params }: { params: { itemId: string 
         throw new Error('ไม่พบองค์ประกอบสัญญา');
       }
 
-      // Convert to canvas
+      // Convert to canvas for image generation
       const canvas = await html2canvas(contractElement, {
         useCORS: true,
         allowTaint: true,
@@ -365,11 +365,12 @@ export default function FullContractPage({ params }: { params: { itemId: string 
 
       // Convert to base64
       const contractImageData = canvas.toDataURL('image/png');
+      console.log('Contract image data length:', contractImageData.length);
 
       // Prepare data to send
       const saveData = {
         itemId: itemId,
-        contractImageData: contractImageData,
+        contractImageData: contractImageData, // Send image data (saved as PDF file)
         verificationPhoto: null // Verification photo is saved from ContractForm
       };
 
