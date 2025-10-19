@@ -83,60 +83,77 @@ export async function POST(request: NextRequest) {
     let contractUploadResult = null;
     let photoUploadResult = null;
 
-    // Generate PDF from HTML if provided
+    // Generate PDF from HTML if provided (with fallback to PNG)
     if (contractHTML) {
-      console.log('Generating PDF from HTML...');
+      console.log('Generating contract document...');
       try {
-        // Launch puppeteer with chromium for Vercel
-        const browser = await puppeteer.launch({
-          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
-          executablePath: await chromium.executablePath(),
-          headless: true,
-        });
+        let documentBuffer: Buffer | Uint8Array;
+        let filename: string;
+        let contentType: string;
 
-        const page = await browser.newPage();
-        page.setDefaultTimeout(30000); // 30 seconds timeout
-        await page.setViewport({ width: 794, height: 1123 }); // A4 size at 96 DPI
+        try {
+          // Try to generate PDF with puppeteer
+          console.log('Attempting PDF generation with puppeteer...');
+          const browser = await puppeteer.launch({
+            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+            executablePath: await chromium.executablePath(),
+            headless: true,
+          });
 
-        // Set HTML content
-        await page.setContent(contractHTML, { waitUntil: 'domcontentloaded' });
+          const page = await browser.newPage();
+          page.setDefaultTimeout(30000);
+          await page.setViewport({ width: 794, height: 1123 });
 
-        // Wait for fonts to load (reduced time)
-        await new Promise(resolve => setTimeout(resolve, 500));
+          await page.setContent(contractHTML, { waitUntil: 'domcontentloaded' });
+          await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Generate PDF
-        const pdfBuffer = await page.pdf({
-          format: 'A4',
-          printBackground: true,
-          margin: {
-            top: '2cm',
-            right: '2cm',
-            bottom: '2cm',
-            left: '2cm'
-          },
-          preferCSSPageSize: true
-        });
+          const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: {
+              top: '2cm',
+              right: '2cm',
+              bottom: '2cm',
+              left: '2cm'
+            },
+            preferCSSPageSize: true
+          });
 
-        await browser.close();
+          await browser.close();
 
-        console.log('PDF generated, size:', pdfBuffer.length);
+          documentBuffer = pdfBuffer;
+          filename = `contract-${itemId}-${timestamp}.pdf`;
+          contentType = 'application/pdf';
+          console.log('PDF generated successfully, size:', pdfBuffer.length);
 
-        // Upload PDF to S3
-        const pdfFilename = `contract-${itemId}-${timestamp}.pdf`;
-        const pdfUploadParams = {
+        } catch (pdfError) {
+          console.warn('PDF generation failed, falling back to PNG:', pdfError);
+
+          // Fallback: Save HTML as text file or generate PNG from client
+          // For now, save HTML as text file
+          const htmlBuffer = Buffer.from(contractHTML, 'utf-8');
+          documentBuffer = htmlBuffer;
+          filename = `contract-${itemId}-${timestamp}.html`;
+          contentType = 'text/html';
+          console.log('Falling back to HTML file, size:', htmlBuffer.length);
+        }
+
+        // Upload document to S3
+        const uploadParams = {
           Bucket: BUCKET_NAME,
-          Key: `${CONTRACTS_FOLDER}${pdfFilename}`,
-          Body: pdfBuffer,
-          ContentType: 'application/pdf'
+          Key: `${CONTRACTS_FOLDER}${filename}`,
+          Body: documentBuffer,
+          ContentType: contentType
         };
 
-        await s3Client.send(new PutObjectCommand(pdfUploadParams));
-        contractUploadResult = pdfFilename;
-        console.log('Contract PDF uploaded successfully');
+        await s3Client.send(new PutObjectCommand(uploadParams));
+        contractUploadResult = filename;
+        console.log('Contract document uploaded successfully as', contentType);
+
       } catch (error) {
-        console.error('Error generating/uploading contract PDF:', error);
+        console.error('Error generating/uploading contract document:', error);
         console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-        throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(`Document generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 

@@ -653,13 +653,21 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   </div>
                 </div>
 
-                {/* Next Button */}
-                <button
-                  onClick={goToSignatures}
-                  className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
-                >
-                  ดำเนินการต่อ - เซ็นชื่อในสัญญา
-                </button>
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => window.open(`/contract/${item._id}/full?mode=view`, '_blank')}
+                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                  >
+                    ดูร่างสัญญาเต็ม (ดูเฉยๆ)
+                  </button>
+                  <button
+                    onClick={goToSignatures}
+                    className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
+                  >
+                    ดำเนินการต่อ - เซ็นชื่อในสัญญา
+                  </button>
+                </div>
               </div>
             )}
 
@@ -729,21 +737,29 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   )}
                 </div>
 
-                {/* Navigation Buttons */}
-                <div className="flex gap-2">
+                {/* Action Buttons */}
+                <div className="space-y-3">
                   <button
-                    onClick={() => setCurrentStep('contract')}
-                    className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded hover:bg-gray-300"
+                    onClick={() => window.open(`/contract/${item._id}/full?mode=view`, '_blank')}
+                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
                   >
-                    ย้อนกลับ
+                    ดูร่างสัญญาเต็ม (ดูเฉยๆ)
                   </button>
-                  <button
-                    onClick={goToPhoto}
-                    disabled={!signatures.seller.signature || !signatures.buyer.signature}
-                    className="flex-1 bg-green-500 text-white py-3 px-4 rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ถัดไป - ถ่ายรูป
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentStep('contract')}
+                      className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded hover:bg-gray-300"
+                    >
+                      ย้อนกลับ
+                    </button>
+                    <button
+                      onClick={goToPhoto}
+                      disabled={!signatures.seller.signature || !signatures.buyer.signature}
+                      className="flex-1 bg-green-500 text-white py-3 px-4 rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ถัดไป - ถ่ายรูป
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

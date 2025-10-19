@@ -232,6 +232,10 @@ export default function FullContractPage({ params }: { params: { itemId: string 
   const { itemId } = params;
   const router = useRouter();
 
+  // Check if this is view mode
+  const isViewMode = typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('mode') === 'view';
+
   const [item, setItem] = useState<Item | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -448,16 +452,18 @@ export default function FullContractPage({ params }: { params: { itemId: string 
     <div className={`min-h-screen bg-gray-100 py-4 ${sarabun.className}`}>
       {/* Header */}
       <div className="max-w-4xl mx-auto px-4 mb-4">
-        <div className="flex justify-between items-center">
-          <button
-            onClick={handleBack}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center gap-2"
-          >
-            ← ย้อนกลับ
-          </button>
-          <h1 className="text-xl font-bold text-gray-800">สัญญาซื้อขายทรัพย์พร้อมสิทธิไถ่คืน</h1>
-          <div></div>
-        </div>
+          <div className="flex justify-between items-center">
+            <button
+              onClick={handleBack}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center gap-2"
+            >
+              ← ย้อนกลับ
+            </button>
+            <h1 className="text-xl font-bold text-gray-800">
+              {isViewMode ? 'ดูร่างสัญญาเต็ม' : 'เซ็นชื่อสัญญาเต็ม'}
+            </h1>
+            <div></div>
+          </div>
       </div>
 
       {/* Contract Document */}
@@ -714,23 +720,27 @@ export default function FullContractPage({ params }: { params: { itemId: string 
         >
           ย้อนกลับ
         </button>
-        <button
-          onClick={handleSaveContract}
-          disabled={!signatures.seller.signature || !signatures.buyer.signature || saving}
-          className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {saving ? 'กำลังบันทึก...' : 'บันทึกสัญญา'}
-        </button>
+        {!isViewMode && (
+          <button
+            onClick={handleSaveContract}
+            disabled={!signatures.seller.signature || !signatures.buyer.signature || saving}
+            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'กำลังบันทึก...' : 'บันทึกสัญญา'}
+          </button>
+        )}
       </div>
 
-      {/* Signature Modal */}
-      <SignatureModal
-        isOpen={signatureModal.isOpen}
-        onClose={closeSignatureModal}
-        onSave={saveSignature}
-        title={signatureModal.title}
-        placeholder={signatureModal.placeholder}
-      />
+      {/* Signature Modal - Only show if not view mode */}
+      {!isViewMode && (
+        <SignatureModal
+          isOpen={signatureModal.isOpen}
+          onClose={closeSignatureModal}
+          onSave={saveSignature}
+          title={signatureModal.title}
+          placeholder={signatureModal.placeholder}
+        />
+      )}
     </div>
   );
 }
