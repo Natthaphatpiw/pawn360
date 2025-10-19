@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { WebhookEvent } from '@line/bot-sdk';
+import { WebhookEvent, Client } from '@line/bot-sdk';
 import { verifySignature, sendStoreLocationCard } from '@/lib/line/client';
 import { connectToDatabase } from '@/lib/db/mongodb';
 
@@ -34,10 +34,9 @@ export async function POST(request: NextRequest) {
       console.log('Signature verification:', isValid);
 
       if (!isValid) {
-        console.error('Invalid signature - Channel Secret might be incorrect');
-        // For debugging: temporarily allow requests even with invalid signature
-        // Remove this in production after confirming Channel Secret is correct
-        console.warn('⚠️  Allowing request despite invalid signature (DEBUG MODE)');
+        console.warn('⚠️ Invalid signature detected - Channel Secret might be incorrect');
+        console.warn('⚠️ Allowing request to continue for debugging purposes');
+        console.warn('⚠️ Please verify LINE_CHANNEL_SECRET in environment variables');
       }
     } else {
       console.warn('No signature or channel secret - skipping verification');
@@ -107,7 +106,87 @@ async function handlePostbackEvent(event: WebhookEvent) {
     const action = params.get('action');
     const itemId = params.get('itemId');
 
-    if (action === 'store_location' && itemId) {
+    if (action === 'contract_details' && itemId) {
+      try {
+        console.log(`Processing contract_details for itemId: ${itemId}`);
+
+        // Validate itemId format
+        if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
+          console.error('Invalid itemId format:', itemId);
+          return;
+        }
+
+        // สร้าง LIFF URL สำหรับเปิดหน้า contract details
+        const contractDetailsUrl = `https://liff.line.me/2008216710-gn6BwQjo/contract/${itemId}/details`;
+        console.log('Contract details LIFF URL:', contractDetailsUrl);
+
+        // ส่ง reply message เพื่อเปิด LIFF
+        const lineClient = new Client({
+          channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN!,
+          channelSecret: process.env.LINE_CHANNEL_SECRET!,
+        });
+
+        await lineClient.replyMessage(event.replyToken, {
+          type: 'flex',
+          altText: '📄 รายละเอียดสัญญา',
+          contents: {
+            type: 'bubble',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: '📄 รายละเอียดสัญญา',
+                  weight: 'bold',
+                  size: 'lg',
+                  color: '#0A4215',
+                  align: 'center'
+                }
+              ],
+              backgroundColor: '#E7EFE9',
+              paddingAll: 'lg'
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'กดปุ่มด้านล่างเพื่อดูรายละเอียดสัญญาเต็ม',
+                  size: 'sm',
+                  color: '#666666',
+                  wrap: true,
+                  margin: 'md'
+                }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'button',
+                  action: {
+                    type: 'uri',
+                    label: 'เปิดรายละเอียดสัญญา',
+                    uri: contractDetailsUrl
+                  },
+                  style: 'primary',
+                  color: '#0A4215'
+                }
+              ]
+            }
+          }
+        });
+
+        console.log(`Contract details message sent for itemId: ${itemId}`);
+      } catch (error) {
+        console.error('Error processing contract_details:', error);
+        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+      }
+    } else if (action === 'store_location' && itemId) {
       try {
         console.log(`Processing store_location for itemId: ${itemId}`);
 
