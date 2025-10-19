@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import axios from 'axios';
+import ContractModal from '@/components/ContractModal';
 
 interface PawnRequest {
   _id: string;
@@ -21,11 +22,17 @@ interface PawnRequest {
 export default function QRCodePage({ params }: { params: Promise<{ itemId: string }> }) {
   const { itemId } = use(params);
   const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
+  const [customerData, setCustomerData] = useState<any>(null);
   const [editedPrice, setEditedPrice] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [contractSteps, setContractSteps] = useState({
+    contractSigned: false,
+    photoTaken: false
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -35,6 +42,12 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
         if (pawnResponse.data.success) {
           setPawnRequest(pawnResponse.data.pawnRequest);
           setEditedPrice(pawnResponse.data.pawnRequest.pawnedPrice.toString());
+
+          // ดึงข้อมูล customer จาก lineId
+          const customerResponse = await axios.get(`/api/users/check?lineId=${pawnResponse.data.pawnRequest.lineId}`);
+          if (customerResponse.data.exists) {
+            setCustomerData(customerResponse.data.customer);
+          }
         }
       } catch (err: any) {
         console.error('Error:', err);
@@ -76,20 +89,34 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
     }
   };
 
-  const handleCreateContract = async () => {
-    if (!pawnRequest) return;
+  const handleCreateContract = () => {
+    if (!pawnRequest || !customerData) {
+      setError('ข้อมูลไม่ครบถ้วน ไม่สามารถสร้างสัญญาได้');
+      return;
+    }
+
+    setShowContractModal(true);
+  };
+
+  const handleContractComplete = async (contractData: any) => {
+    if (!pawnRequest) {
+      setError('ข้อมูล pawn request ไม่พบ');
+      return;
+    }
 
     setSaving(true);
     setError(null);
 
     try {
       const response = await axios.post('/api/contracts/create', {
-        pawnRequestId: itemId
+        pawnRequestId: pawnRequest._id,
+        contractData: contractData
       });
 
       if (response.data.success) {
         setSuccess('สร้างสัญญาจำนำเรียบร้อยแล้ว');
-        // Redirect or show success state
+        setContractSteps({ contractSigned: true, photoTaken: true });
+        setShowContractModal(false);
       }
     } catch (err: any) {
       console.error('Error creating contract:', err);
@@ -215,16 +242,51 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
 
             <button
               onClick={handleCreateContract}
-              disabled={saving}
+              disabled={saving || !customerData}
               className="w-full py-3 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: saving ? '#D1D5DB' : '#1F6F3B',
-                color: saving ? '#9CA3AF' : '#FFFFFF'
+                backgroundColor: saving || !customerData ? '#D1D5DB' : '#1F6F3B',
+                color: saving || !customerData ? '#9CA3AF' : '#FFFFFF'
               }}
             >
               {saving ? 'กำลังสร้างสัญญา...' : 'ยืนยันและสร้างสัญญา'}
             </button>
           </div>
+
+          {/* Contract Steps Status */}
+          {(contractSteps.contractSigned || contractSteps.photoTaken) && (
+            <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: '#F0F9F0', border: '1px solid #C6F6D5' }}>
+              <h3 className="text-sm font-semibold mb-3" style={{ color: '#2F855A' }}>ขั้นตอนการสร้างสัญญา</h3>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <div className={`w-5 h-5 rounded-full mr-3 flex items-center justify-center ${contractSteps.contractSigned ? 'bg-green-600' : 'bg-gray-300'}`}>
+                    {contractSteps.contractSigned && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <span className={`text-sm ${contractSteps.contractSigned ? 'text-green-700' : 'text-gray-600'}`}>
+                    เซ็นสัญญาแล้ว
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <div className={`w-5 h-5 rounded-full mr-3 flex items-center justify-center ${contractSteps.photoTaken ? 'bg-green-600' : 'bg-gray-300'}`}>
+                    {contractSteps.photoTaken && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <span className={`text-sm ${contractSteps.photoTaken ? 'text-green-700' : 'text-gray-600'}`}>
+                    ถ่ายรูปยืนยันตัวตนแล้ว
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Contract Modal */}
+          {showContractModal && pawnRequest && customerData && (
+            <ContractModal
+              pawnRequest={pawnRequest}
+              customerData={customerData}
+              onComplete={handleContractComplete}
+              onClose={() => setShowContractModal(false)}
+            />
+          )}
 
           {/* Item ID */}
           <p className="text-xs text-center mt-4" style={{ color: '#9CA3AF' }}>

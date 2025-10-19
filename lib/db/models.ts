@@ -135,6 +135,26 @@ export interface Contract {
   storeId: ObjectId;
   createdBy: ObjectId;
   userId: ObjectId;
+  // ข้อมูลการเซ็นสัญญา
+  signatures?: {
+    seller: {
+      name: string;
+      signatureData?: string; // Base64 encoded signature image
+      signedDate: Date;
+    };
+    buyer: {
+      name: string;
+      signatureData?: string; // Base64 encoded signature image
+      signedDate: Date;
+    };
+  };
+  // รูปภาพสัญญาและการยืนยันตัวตน
+  contractImages?: {
+    signedContract?: string; // URL to signed contract PDF/image in S3
+    verificationPhoto?: string; // URL to verification photo in S3
+  };
+  // ข้อมูลเพิ่มเติม
+  serviceFee?: number; // ค่าธรรมเนียมการดูแลรักษา
   createdAt: Date;
   updatedAt: Date;
 }
