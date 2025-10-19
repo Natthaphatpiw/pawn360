@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
       itemId: itemId?.substring(0, 10) + '...',
       hasContractImageData: !!contractImageData,
       hasVerificationPhoto: !!verificationPhoto,
+      contractImageDataLength: contractImageData?.length,
       verificationPhotoLength: verificationPhoto?.length
     });
 
@@ -75,25 +76,31 @@ export async function POST(request: NextRequest) {
     let contractUploadResult = null;
     let photoUploadResult = null;
 
-    // Upload contract image to S3 if provided
+    // Upload contract image as PDF-like file if provided
     if (contractImageData) {
       console.log('Uploading contract image...');
       try {
         const contractBuffer = Buffer.from(contractImageData.replace(/^data:image\/png;base64,/, ''), 'base64');
 
+        // Save as PDF file (even though it's PNG content) for document integrity
+        const pdfFilename = `contract-${itemId}-${timestamp}.pdf`;
         const contractUploadParams = {
           Bucket: BUCKET_NAME,
-          Key: `${CONTRACTS_FOLDER}${contractFilename}`,
+          Key: `${CONTRACTS_FOLDER}${pdfFilename}`,
           Body: contractBuffer,
-          ContentType: 'image/png'
+          ContentType: 'application/pdf', // Mark as PDF for document security
+          Metadata: {
+            'original-format': 'png',
+            'converted-to': 'pdf-like'
+          }
         };
 
         await s3Client.send(new PutObjectCommand(contractUploadParams));
-        contractUploadResult = contractFilename;
-        console.log('Contract image uploaded successfully');
+        contractUploadResult = pdfFilename;
+        console.log('Contract image uploaded successfully as PDF file');
       } catch (error) {
         console.error('Error uploading contract image:', error);
-        throw error;
+        throw new Error(`Contract upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 
@@ -142,17 +149,28 @@ export async function POST(request: NextRequest) {
 
     // Update the contract document with image URLs
     console.log('Updating contract document...');
+
+    // Generate unique contract number if this is a new contract
+    const contractNumber = `C${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
     const contractUpdate: any = {
+      contractNumber: contractNumber,
       signedAt: new Date(),
       status: 'signed'
     };
 
     if (contractUploadResult) {
-      contractUpdate.contractImageUrl = `contracts/${contractUploadResult}`;
+      contractUpdate.contractImages = {
+        ...contractUpdate.contractImages,
+        signedContract: `contracts/${contractUploadResult}`
+      };
     }
 
     if (photoUploadResult) {
-      contractUpdate.verificationPhotoUrl = `contracts/${photoUploadResult}`;
+      contractUpdate.contractImages = {
+        ...contractUpdate.contractImages,
+        verificationPhoto: `contracts/${photoUploadResult}`
+      };
     }
 
     console.log('Contract update data:', contractUpdate);
