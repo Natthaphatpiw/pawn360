@@ -1,89 +1,204 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent } from '@line/bot-sdk';
-import { verifySignature } from '@/lib/line/client';
+import axios from 'axios';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { ObjectId } from 'mongodb';
 
-export async function GET() {
-  return NextResponse.json({
-    message: 'Webhook endpoint is working',
-    note: 'This endpoint only accepts POST requests from LINE Platform'
-  });
-}
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+const LIFF_CONTRACT_DETAIL_URL = 'https://liff.line.me/2008216710-gn6BwQjo';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text();
-    const signature = request.headers.get('x-line-signature');
+    const body = await request.json();
+    const events: WebhookEvent[] = body.events;
 
-    console.log('Webhook received:', {
-      hasBody: !!body,
-      bodyLength: body?.length,
-      hasSignature: !!signature,
-      channelSecretConfigured: !!process.env.LINE_CHANNEL_SECRET,
-    });
-
-    // If body is empty, it's a verification request - just return 200
-    if (!body || body.trim() === '') {
-      console.log('Empty body - verification request');
-      return NextResponse.json({ success: true });
-    }
-
-    // Verify signature if present
-    if (signature && process.env.LINE_CHANNEL_SECRET) {
-      const isValid = verifySignature(body, signature);
-      console.log('Signature verification:', isValid);
-
-      if (!isValid) {
-        console.error('Invalid signature - Channel Secret might be incorrect');
-        // For debugging: temporarily allow requests even with invalid signature
-        // Remove this in production after confirming Channel Secret is correct
-        console.warn('⚠️  Allowing request despite invalid signature (DEBUG MODE)');
-      }
-    } else {
-      console.warn('No signature or channel secret - skipping verification');
-    }
-
-    const data = JSON.parse(body);
-    const events: WebhookEvent[] = data.events || [];
-
-    console.log('Processing events:', events.length);
-
-    // Process each event
     for (const event of events) {
-      if (event.type === 'follow') {
-        await handleFollowEvent(event);
+      // Handle postback events (for "ที่ตั้งร้าน" button)
+      if (event.type === 'postback') {
+        const data = event.postback.data;
+        const params = new URLSearchParams(data);
+        const action = params.get('action');
+
+        if (action === 'store_location') {
+          const storeId = params.get('storeId');
+          const contractId = params.get('contractId');
+
+          if (storeId && contractId) {
+            await sendStoreLocation(event.source.userId!, storeId, contractId);
+          }
+        }
       }
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Webhook error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 }
 
-async function handleFollowEvent(event: WebhookEvent) {
-  if (event.type !== 'follow') return;
-
-  const userId = event.source.userId;
-  if (!userId) return;
-
+async function sendStoreLocation(userId: string, storeId: string, contractId: string) {
   try {
     const { db } = await connectToDatabase();
-    const customersCollection = db.collection('customers');
+    const storesCollection = db.collection('stores');
 
-    // Check if user already exists
-    const existingCustomer = await customersCollection.findOne({ lineId: userId });
+    const store = await storesCollection.findOne({ _id: new ObjectId(storeId) });
 
-    if (!existingCustomer) {
-      // User doesn't exist - do nothing
-      // They will see the default Rich Menu for new users
-      console.log(`New user followed: ${userId}`);
-    } else {
-      // User already exists - Rich Menu will be set when they register
-      console.log(`Existing user followed: ${userId}`);
+    if (!store) {
+      console.error('Store not found:', storeId);
+      return;
     }
+
+    // Build address text
+    const addressText = `${store.address.houseNumber || ''} ${store.address.street || ''} ${store.address.subDistrict || ''} ${store.address.district || ''} ${store.address.province || ''} ${store.address.postcode || ''}`.trim();
+
+    // Create Location Flex Message
+    const locationMessage = {
+      type: 'flex',
+      altText: `ที่ตั้งร้าน ${store.storeName}`,
+      contents: {
+        type: 'bubble',
+        styles: {
+          header: {
+            backgroundColor: '#0A4215'
+          },
+          body: {
+            backgroundColor: '#F0EFEF'
+          },
+          footer: {
+            backgroundColor: '#FFFFFF'
+          }
+        },
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '📍 ที่ตั้งร้าน',
+              weight: 'bold',
+              size: 'lg',
+              color: '#FFFFFF',
+              align: 'center'
+            }
+          ],
+          paddingAll: '16px'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: store.storeName,
+              weight: 'bold',
+              size: 'md',
+              color: '#0A4215',
+              wrap: true
+            },
+            {
+              type: 'separator',
+              margin: 'md'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'ที่อยู่:',
+                  size: 'sm',
+                  color: '#333333',
+                  weight: 'bold',
+                  margin: 'md'
+                },
+                {
+                  type: 'text',
+                  text: addressText,
+                  size: 'sm',
+                  color: '#666666',
+                  wrap: true,
+                  margin: 'xs'
+                }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: 'เบอร์โทร:',
+                  size: 'sm',
+                  color: '#333333',
+                  weight: 'bold',
+                  margin: 'md'
+                },
+                {
+                  type: 'text',
+                  text: store.phone || 'ไม่ระบุ',
+                  size: 'sm',
+                  color: '#0A4215',
+                  margin: 'xs'
+                }
+              ]
+            }
+          ],
+          paddingAll: '16px',
+          spacing: 'sm'
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'button',
+              style: 'primary',
+              action: {
+                type: 'uri',
+                label: 'เปิด Google Maps',
+                uri: store.googleMap || 'https://maps.google.com'
+              },
+              color: '#0A4215',
+              height: 'sm'
+            },
+            {
+              type: 'button',
+              style: 'secondary',
+              action: {
+                type: 'uri',
+                label: 'กลับไปดูสัญญา',
+                uri: `${LIFF_CONTRACT_DETAIL_URL}?contractId=${contractId}`
+              },
+              color: '#666666',
+              height: 'sm',
+              margin: 'sm'
+            }
+          ],
+          paddingAll: '16px',
+          spacing: 'sm'
+        }
+      }
+    };
+
+    // Send message
+    await axios.post(
+      'https://api.line.me/v2/bot/message/push',
+      {
+        to: userId,
+        messages: [locationMessage]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+        }
+      }
+    );
+
+    console.log('Store location sent successfully');
+
   } catch (error) {
-    console.error('Error handling follow event:', error);
+    console.error('Error sending store location:', error);
   }
 }

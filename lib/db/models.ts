@@ -29,6 +29,7 @@ export interface Store {
   interestPresets?: any[];
   contractTemplate?: any;
   isActive?: boolean;
+  googleMap?: string; // Google Maps URL
   createdAt: Date;
   updatedAt: Date;
 }

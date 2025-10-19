@@ -586,6 +586,23 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
         verificationPhotoUrl: saveResult.verificationPhotoUrl
       };
 
+      // Send notification to customer
+      try {
+        await fetch('/api/contracts/notify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contractId: item._id // Using itemId as temporary reference
+          })
+        });
+        console.log('Notification sent successfully');
+      } catch (notifyError) {
+        console.error('Failed to send notification:', notifyError);
+        // Don't fail the whole process if notification fails
+      }
+
       onComplete(contractData);
     } catch (error: any) {
       console.error('Error completing contract:', error);
