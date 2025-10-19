@@ -6,6 +6,34 @@ import { uploadQRCodeToS3, getQRCodePresignedUrl } from '@/lib/aws/s3';
 import { sendQRCodeImage } from '@/lib/line/client';
 import { ObjectId } from 'mongodb';
 
+export async function GET(request: NextRequest) {
+  try {
+    const { db } = await connectToDatabase();
+    const customersCollection = db.collection<Customer>('customers');
+
+    // Get all pawn requests from all customers
+    const customers = await customersCollection.find({}).toArray();
+
+    const allPawnRequests: PawnRequest[] = [];
+    customers.forEach(customer => {
+      if (customer.pawnRequests) {
+        allPawnRequests.push(...customer.pawnRequests);
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      pawnRequests: allPawnRequests
+    });
+  } catch (error) {
+    console.error('Error fetching pawn requests:', error);
+    return NextResponse.json(
+      { error: 'เกิดข้อผิดพลาดในการดึงข้อมูล' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
