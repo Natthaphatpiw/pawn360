@@ -368,6 +368,8 @@ export async function sendContractCompletionNotification(
   try {
     const client = getLineClient();
 
+    console.log('Sending contract notification for item:', itemData._id, 'user:', userId);
+
     // คำนวณวันครบกำหนด
     const startDate = new Date();
     const dueDate = new Date(startDate);
@@ -381,6 +383,11 @@ export async function sendContractCompletionNotification(
 
     // สร้างเลขที่สัญญา
     const contractNumber = `STORE${Date.now()}`;
+
+    // สร้าง LIFF URL สำหรับรายละเอียดสัญญา
+    const itemId = itemData._id.toString();
+    const contractDetailsUrl = `https://liff.line.me/2008216710-gn6BwQjo/contract/${itemId}/details`;
+    console.log('Contract details URL:', contractDetailsUrl);
 
     const flexMessage = {
       type: 'flex',
@@ -561,7 +568,7 @@ export async function sendContractCompletionNotification(
               action: {
                 type: 'uri',
                 label: 'รายละเอียดสัญญา',
-                uri: `https://liff.line.me/2008216710-gn6BwQjo/contract/${itemData._id}/details`
+                uri: contractDetailsUrl
               },
               color: '#0A4215',
               flex: 1
@@ -594,6 +601,29 @@ export async function sendContractCompletionNotification(
 export async function sendStoreLocationCard(userId: string, storeData: any) {
   try {
     const client = getLineClient();
+
+    console.log('Sending store location card for:', storeData.storeName);
+    console.log('Store address data:', storeData.address);
+
+    // Build address string
+    const addressParts = [
+      storeData.address?.houseNumber,
+      storeData.address?.street,
+      storeData.address?.subDistrict,
+      storeData.address?.district,
+      storeData.address?.province,
+      storeData.address?.postcode
+    ].filter(part => part && part.trim());
+
+    const fullAddress = addressParts.join(' ').trim();
+
+    console.log('Built address:', fullAddress);
+
+    // Build Google Maps URL
+    const googleMapsQuery = encodeURIComponent(fullAddress);
+    const googleMapsUrl = storeData.googleMapUrl || `https://maps.google.com/?q=${googleMapsQuery}`;
+
+    console.log('Google Maps URL:', googleMapsUrl);
 
     const flexMessage = {
       type: 'flex',
@@ -630,7 +660,7 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
             },
             {
               type: 'text',
-              text: `${storeData.address.houseNumber || ''} ${storeData.address.street || ''} ${storeData.address.subDistrict || ''} ${storeData.address.district || ''} ${storeData.address.province || ''} ${storeData.address.postcode || ''}`.trim(),
+              text: fullAddress || 'ที่อยู่ไม่ระบุ',
               size: 'sm',
               color: '#666666',
               wrap: true,
@@ -648,7 +678,7 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
               action: {
                 type: 'uri',
                 label: 'ดูแผนที่',
-                uri: storeData.googleMapUrl || `https://maps.google.com/?q=${encodeURIComponent(`${storeData.address.houseNumber || ''} ${storeData.address.subDistrict || ''} ${storeData.address.district || ''} ${storeData.address.province || ''}`.trim())}`
+                uri: googleMapsUrl
               },
               style: 'primary',
               color: '#0A4215'
@@ -659,9 +689,11 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
     };
 
     await client.pushMessage(userId, flexMessage as FlexMessage);
+    console.log('Store location card sent successfully');
     return { success: true };
   } catch (error) {
     console.error('Error sending store location card:', error);
+    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
     throw error;
   }
 }

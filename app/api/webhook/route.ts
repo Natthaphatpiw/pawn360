@@ -108,33 +108,60 @@ async function handlePostbackEvent(event: WebhookEvent) {
     const itemId = params.get('itemId');
 
     if (action === 'store_location' && itemId) {
-      // Find store associated with this item
-      const { db } = await connectToDatabase();
-      const itemsCollection = db.collection('items');
-      const storesCollection = db.collection('stores');
+      try {
+        console.log(`Processing store_location for itemId: ${itemId}`);
 
-      const item = await itemsCollection.findOne({
-        _id: require('mongodb').ObjectId.createFromHexString(itemId)
-      });
+        // Validate itemId format
+        if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
+          console.error('Invalid itemId format:', itemId);
+          return;
+        }
 
-      if (!item || !item.storeId) {
-        console.error('Item not found or no storeId:', itemId);
-        return;
+        // Find store associated with this item
+        const { db } = await connectToDatabase();
+        const itemsCollection = db.collection('items');
+        const storesCollection = db.collection('stores');
+
+        const item = await itemsCollection.findOne({
+          _id: require('mongodb').ObjectId.createFromHexString(itemId)
+        });
+
+        if (!item) {
+          console.error('Item not found:', itemId);
+          return;
+        }
+
+        if (!item.storeId) {
+          console.error('Item has no storeId:', itemId);
+          return;
+        }
+
+        // Validate storeId format
+        const storeIdStr = item.storeId.toString();
+        if (!storeIdStr.match(/^[0-9a-fA-F]{24}$/)) {
+          console.error('Invalid storeId format:', storeIdStr);
+          return;
+        }
+
+        // Find store data
+        const store = await storesCollection.findOne({
+          _id: require('mongodb').ObjectId.createFromHexString(storeIdStr)
+        });
+
+        if (!store) {
+          console.error('Store not found:', storeIdStr);
+          return;
+        }
+
+        console.log(`Found store: ${store.storeName}, sending location card`);
+
+        // Send store location card
+        await sendStoreLocationCard(userId, store);
+        console.log(`Store location card sent successfully for store: ${store.storeName}`);
+      } catch (error) {
+        console.error('Error processing store_location:', error);
+        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
       }
-
-      // Find store data
-      const store = await storesCollection.findOne({
-        _id: require('mongodb').ObjectId.createFromHexString(item.storeId)
-      });
-
-      if (!store) {
-        console.error('Store not found:', item.storeId);
-        return;
-      }
-
-      // Send store location card
-      await sendStoreLocationCard(userId, store);
-      console.log(`Store location card sent for store: ${store.storeName}`);
     }
 
   } catch (error) {
