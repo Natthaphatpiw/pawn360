@@ -146,15 +146,42 @@ export async function POST(request: NextRequest) {
       $set: { updatedAt: new Date() },
     };
 
-    // Add storeId to storeId array if provided and not already present
-    if (storeId) {
-      updateData.$addToSet = { storeId: new ObjectId(storeId) };
-    }
-
+    // Update customer document
     await customersCollection.updateOne(
       { lineId },
       updateData
     );
+
+    // Add storeId to storeId field if provided
+    if (storeId) {
+      const customer = await customersCollection.findOne({ lineId });
+
+      if (customer) {
+        const storeIdObj = new ObjectId(storeId);
+
+        if (Array.isArray(customer.storeId)) {
+          // If storeId is already an array, add to set
+          if (!customer.storeId.some(id => id.toString() === storeIdObj.toString())) {
+            await customersCollection.updateOne(
+              { lineId },
+              { $push: { storeId: storeIdObj } }
+            );
+          }
+        } else if (customer.storeId) {
+          // If storeId is single value, convert to array
+          await customersCollection.updateOne(
+            { lineId },
+            { $set: { storeId: [customer.storeId, storeIdObj] } }
+          );
+        } else {
+          // If storeId doesn't exist, set as array with single value
+          await customersCollection.updateOne(
+            { lineId },
+            { $set: { storeId: [storeIdObj] } }
+          );
+        }
+      }
+    }
 
     // Send QR Code to LINE chat (ใช้ presigned URL)
     try {
