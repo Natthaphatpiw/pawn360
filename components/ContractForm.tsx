@@ -259,6 +259,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
   // Photo verification
   const [verificationPhoto, setVerificationPhoto] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Camera input ref
@@ -326,42 +327,71 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     setCurrentStep('photo');
   };
 
-  const completeContract = () => {
+  const completeContract = async () => {
     if (!signatures.seller.signature || !signatures.buyer.signature || !verificationPhoto) {
       setError('กรุณาเซ็นชื่อและถ่ายรูปให้ครบถ้วน');
       return;
     }
 
-    const contractData = {
-      contractDate: new Date().toLocaleDateString('th-TH'),
-      sellerName: customer.fullName,
-      sellerId: customer.idNumber,
-      sellerAddress: `${customer.address.houseNumber} ${customer.address.street || ''} ${customer.address.subDistrict} ${customer.address.district} ${customer.address.province} ${customer.address.postcode}`,
-      buyerAddress: '1400/84 เขตสวนหลวง แขวงสวนหลวง กทม 10250',
-      itemType: item.type,
-      itemDetails: `${item.brand} ${item.model}${item.serialNo ? ` (S/N: ${item.serialNo})` : ''}${item.accessories ? ` ${item.accessories}` : ''}${item.defects ? ` ${item.defects}` : ''}${item.note ? ` ${item.note}` : ''}`,
-      price: item.desiredAmount || item.estimatedValue || 0,
-      periodDays: item.loanDays || 30,
-      principal: item.desiredAmount || item.estimatedValue || 0,
-      interest: calculateInterest(),
-      serviceFee: 0,
-      total: (item.desiredAmount || item.estimatedValue || 0) + calculateInterest(),
-      signatures: {
-        seller: {
-          name: signatures.seller.name,
-          signatureData: signatures.seller.signature,
-          signedDate: new Date()
-        },
-        buyer: {
-          name: signatures.buyer.name,
-          signatureData: signatures.buyer.signature,
-          signedDate: new Date()
-        }
-      },
-      verificationPhoto
-    };
+    try {
+      setLoading(true);
 
-    onComplete(contractData);
+      // Save verification photo to S3
+      const saveResponse = await fetch('/api/contracts/save-contract-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          itemId: item._id,
+          contractImageData: null, // Contract image will be saved from full contract page
+          verificationPhoto: verificationPhoto
+        })
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      }
+
+      const saveResult = await saveResponse.json();
+
+      const contractData = {
+        contractDate: new Date().toLocaleDateString('th-TH'),
+        sellerName: customer.fullName,
+        sellerId: customer.idNumber,
+        sellerAddress: `${customer.address.houseNumber} ${customer.address.street || ''} ${customer.address.subDistrict} ${customer.address.district} ${customer.address.province} ${customer.address.postcode}`,
+        buyerAddress: '1400/84 เขตสวนหลวง แขวงสวนหลวง กทม 10250',
+        itemType: item.type,
+        itemDetails: `${item.brand} ${item.model}${item.serialNo ? ` (S/N: ${item.serialNo})` : ''}${item.accessories ? ` ${item.accessories}` : ''}${item.defects ? ` ${item.defects}` : ''}${item.note ? ` ${item.note}` : ''}`,
+        price: item.desiredAmount || item.estimatedValue || 0,
+        periodDays: item.loanDays || 30,
+        principal: item.desiredAmount || item.estimatedValue || 0,
+        interest: calculateInterest(),
+        serviceFee: 0,
+        total: (item.desiredAmount || item.estimatedValue || 0) + calculateInterest(),
+        signatures: {
+          seller: {
+            name: signatures.seller.name,
+            signatureData: signatures.seller.signature,
+            signedDate: new Date()
+          },
+          buyer: {
+            name: signatures.buyer.name,
+            signatureData: signatures.buyer.signature,
+            signedDate: new Date()
+          }
+        },
+        verificationPhoto,
+        verificationPhotoUrl: saveResult.verificationPhotoUrl
+      };
+
+      onComplete(contractData);
+    } catch (error: any) {
+      console.error('Error completing contract:', error);
+      setError(error.message || 'เกิดข้อผิดพลาดในการสร้างสัญญา');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -422,13 +452,21 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   </div>
                 </div>
 
-                {/* Next Button */}
-                <button
-                  onClick={goToSignatures}
-                  className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
-                >
-                  ดำเนินการต่อ - เซ็นชื่อในสัญญา
-                </button>
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => window.open(`/contract/${item._id}/full`, '_blank')}
+                    className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                  >
+                    ดูร่างสัญญาเต็ม
+                  </button>
+                  <button
+                    onClick={goToSignatures}
+                    className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
+                  >
+                    ดำเนินการต่อ - เซ็นชื่อในสัญญา
+                  </button>
+                </div>
               </div>
             )}
 
@@ -585,10 +623,10 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   </button>
                   <button
                     onClick={completeContract}
-                    disabled={!verificationPhoto}
+                    disabled={!verificationPhoto || loading}
                     className="flex-1 bg-green-500 text-white py-3 px-4 rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    สร้างสัญญา
+                    {loading ? 'กำลังสร้างสัญญา...' : 'สร้างสัญญา'}
                   </button>
                 </div>
               </div>
