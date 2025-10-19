@@ -566,9 +566,9 @@ export async function sendContractCompletionNotification(
               type: 'button',
               style: 'primary',
               action: {
-                type: 'uri',
+                type: 'postback',
                 label: 'รายละเอียดสัญญา',
-                uri: contractDetailsUrl
+                data: `action=contract_details&itemId=${itemId}`
               },
               color: '#0A4215',
               flex: 1
