@@ -145,9 +145,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('redeem')}
           className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#E7EFE9',
-            color: '#0A4215',
-            borderColor: '#B4CDB9'
+            backgroundColor: '#E78E0B',
+            color: '#FFF8EE',
+            borderColor: '#E78E0B'
           }}
         >
           <div className="flex justify-between items-center">
@@ -169,9 +169,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('renew')}
           className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#E6EBF2',
-            color: '#042657',
-            borderColor: '#B2C1D6'
+            backgroundColor: '#5E9268',
+            color: '#E7EFE9',
+            borderColor: '#5E9268'
           }}
         >
           <div className="flex justify-between items-center">
@@ -214,9 +214,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('reduce')}
           className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#F19DA2',
+            backgroundColor: '#DA676E',
             color: '#FFF3F3',
-            borderColor: '#F19DA2'
+            borderColor: '#DA676E'
           }}
         >
           <div className="flex justify-between items-center">
