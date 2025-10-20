@@ -22,7 +22,7 @@ interface Contract {
   };
   dates: {
     startDate: string;
-    dueDate?: string;
+    dueDate: string;
   };
 }
 
@@ -96,29 +96,41 @@ export default function ContractsPage() {
 
 
   // Function to get status style and text
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { text: 'หน่วย', bg: 'bg-green-500', textColor: 'text-white' };
-      case 'overdue':
-        return { text: 'รับจำนำ', bg: 'bg-red-500', textColor: 'text-white' };
-      case 'suspended':
-        return { text: 'หลุดจำนำ', bg: 'bg-orange-500', textColor: 'text-white' };
-      case 'sold':
-        return { text: 'ขายถอดตลาด', bg: 'bg-red-600', textColor: 'text-white' };
-      case 'redeemed':
-        return { text: 'ไถ่ถอนไปแล้ว', bg: 'bg-green-100', textColor: 'text-green-800' };
-      default:
-        return { text: status, bg: 'bg-gray-500', textColor: 'text-white' };
+  const getStatusInfo = (status: string, dueDate: string) => {
+    const currentDate = new Date();
+    const due = new Date(dueDate);
+    const daysLeft = Math.ceil((due.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (status === 'overdue' || daysLeft < 0) {
+      return { text: 'ครบกำหนด', bg: '#FFEBEE', textColor: '#C62828' };
+    } else if (daysLeft <= 7) {
+      return { text: 'ใกล้ครบกำหนด', bg: '#FFF3E0', textColor: '#EF6C00' };
+    } else {
+      return { text: 'ปกติ', bg: '#E8F5E9', textColor: '#1B5E20' };
     }
   };
 
+  // Function to calculate days left
+  const getDaysLeft = (dueDate: string) => {
+    const currentDate = new Date();
+    const due = new Date(dueDate);
+    const daysLeft = Math.ceil((due.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysLeft;
+  };
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white p-4">
       {/* Header */}
-      <div className="bg-gray-200 p-3 flex justify-between items-center">
-        <h1 className="text-lg font-bold text-gray-800">รายการจำนำ</h1>
-        <span className="text-sm text-gray-600">หน่วย {contracts.length} สินค้า</span>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h1 className="text-xl font-bold text-black">รายการสัญญาจำนำ</h1>
+          <p className="text-sm" style={{ color: '#4A4644' }}>
+            {profile?.displayName || 'ผู้ใช้'}
+          </p>
+        </div>
+        <span className="text-sm" style={{ color: '#9E9E9E' }}>
+          ทั้งหมด {contracts.length} รายการ
+        </span>
       </div>
 
       {/* Loading State */}
@@ -142,39 +154,51 @@ export default function ContractsPage() {
 
       {/* Contracts List */}
       {!isSearching && (
-        <div className="p-4 space-y-3">
+        <div className="space-y-3">
           {contracts.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600">ไม่พบรายการจำนำ</p>
+              <p style={{ color: '#4A4644' }}>ไม่พบรายการจำนำ</p>
             </div>
           ) : (
             contracts.map((contract) => {
-              const statusInfo = getStatusInfo(contract.status);
+              const statusInfo = getStatusInfo(contract.status, contract.dates.dueDate);
+              const daysLeft = getDaysLeft(contract.dates.dueDate);
               return (
                 <div
                   key={contract._id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
+                  className="rounded-xl shadow-sm p-4"
+                  style={{ backgroundColor: '#F0EFEF' }}
                 >
-                  <div className="flex flex-col space-y-2">
-                    <span className="text-md font-bold text-gray-800">
-                      {contract.item.brand} {contract.item.model}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      ราคา: {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      วันที่จำนำ: {formatDate(contract.dates.startDate)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center mt-3">
-                    <button
-                      className={`rounded-full px-4 py-1 ${statusInfo.bg} ${statusInfo.textColor} text-sm font-medium`}
-                    >
-                      {statusInfo.text}
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      รหัสสินค้า {contract.contractNumber}
-                    </span>
+                  <div className="bg-white rounded-lg p-4">
+                    <div className="flex justify-between">
+                      <div className="flex-1">
+                        <h2 className="font-bold text-black text-lg">
+                          {contract.item.brand} {contract.item.model}
+                        </h2>
+                        <p className="text-sm mt-1" style={{ color: '#4A4644' }}>
+                          มูลค่า: {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท
+                        </p>
+                        <p className="text-sm mt-1" style={{ color: '#4A4644' }}>
+                          วันครบกำหนด: {formatDate(contract.dates.dueDate)}
+                        </p>
+                        <p className="text-sm mt-1" style={{ color: '#4A4644' }}>
+                          เหลือเวลา: {daysLeft > 0 ? `${daysLeft} วัน` : 'หมดอายุแล้ว'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm" style={{ color: '#4A4644' }}>รหัสสัญญา</p>
+                        <p className="text-sm font-medium text-black">{contract.contractNumber}</p>
+                        <span
+                          className="inline-block mt-2 px-3 py-1 text-sm rounded-full font-medium"
+                          style={{
+                            backgroundColor: statusInfo.bg,
+                            color: statusInfo.textColor
+                          }}
+                        >
+                          {statusInfo.text}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -184,9 +208,13 @@ export default function ContractsPage() {
       )}
 
       {/* Footer Button */}
-      <div className="p-4">
-        <button className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg font-bold text-md">
-          Pawn entry
+      <div className="mt-6">
+        <button
+          className="w-full py-4 rounded-xl font-bold text-center"
+          style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}
+        >
+          จำนำสินค้า
+          <div className="text-sm font-normal">Pawn entry</div>
         </button>
       </div>
     </div>
