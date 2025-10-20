@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { ObjectId } from 'mongodb';
 
 export async function GET(
   request: NextRequest,
@@ -18,7 +19,7 @@ export async function GET(
     const { db } = await connectToDatabase();
     const contractsCollection = db.collection('contracts');
 
-    const contract = await contractsCollection.findOne({ _id: require('mongodb').ObjectId(contractId) });
+    const contract = await contractsCollection.findOne({ _id: new ObjectId(contractId) });
 
     if (!contract) {
       return NextResponse.json(

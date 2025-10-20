@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent, Client } from '@line/bot-sdk';
 import { verifySignature, sendStoreLocationCard } from '@/lib/line/client';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { ObjectId } from 'mongodb';
 
 export async function GET() {
   return NextResponse.json({
@@ -128,7 +129,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
         const storesCollection = db.collection('stores');
 
         const item = await itemsCollection.findOne({
-          _id: require('mongodb').ObjectId.createFromHexString(itemId)
+          _id: new ObjectId(itemId)
         });
 
         if (!item) {
@@ -150,7 +151,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
         // Find store data
         const store = await storesCollection.findOne({
-          _id: require('mongodb').ObjectId.createFromHexString(storeIdStr)
+          _id: new ObjectId(storeIdStr)
         });
 
         if (!store) {
