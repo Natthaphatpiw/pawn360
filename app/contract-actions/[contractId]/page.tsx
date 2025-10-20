@@ -126,11 +126,11 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
       </div>
 
       {/* Contract Info */}
-      <div className="bg-gray-50 rounded-xl p-4 mb-6">
-        <h2 className="font-bold text-black text-lg mb-2">
+      <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: '#F0EFEF' }}>
+        <h2 className="font-bold text-lg mb-2" style={{ color: '#2C2A28' }}>
           {contract.item.brand} {contract.item.model}
         </h2>
-        <div className="space-y-1 text-sm" style={{ color: '#4A4644' }}>
+        <div className="space-y-1 text-sm" style={{ color: '#2C2A28' }}>
           <p>รหัสสัญญา: {contract.contractNumber}</p>
           <p>มูลค่า: {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท</p>
           <p>ดอกเบี้ย: {calculateInterest().toLocaleString()} บาท</p>
@@ -143,12 +143,17 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ไถ่ถอน */}
         <button
           onClick={() => handleAction('redeem')}
-          className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-left px-4 hover:bg-green-700 transition-colors"
+          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          style={{
+            backgroundColor: '#E7EFE9',
+            color: '#0A4215',
+            borderColor: '#B4CDB9'
+          }}
         >
           <div className="flex justify-between items-center">
             <div>
               <div className="font-bold">ไถ่ถอนสินค้า</div>
-              <div className="text-sm font-normal opacity-90">
+              <div className="text-sm font-normal opacity-75">
                 จ่ายเงินต้นและดอกเบี้ยเพื่อรับสินค้าคืน
               </div>
             </div>
@@ -162,12 +167,17 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ต่อดอกเบี้ย */}
         <button
           onClick={() => handleAction('renew')}
-          className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-left px-4 hover:bg-blue-700 transition-colors"
+          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          style={{
+            backgroundColor: '#E6EBF2',
+            color: '#042657',
+            borderColor: '#B2C1D6'
+          }}
         >
           <div className="flex justify-between items-center">
             <div>
               <div className="font-bold">ต่อดอกเบี้ย</div>
-              <div className="text-sm font-normal opacity-90">
+              <div className="text-sm font-normal opacity-75">
                 จ่ายดอกเบี้ยเพื่อต่อสัญญา
               </div>
             </div>
@@ -181,12 +191,17 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* เพิ่มต้น */}
         <button
           onClick={() => handleAction('increase')}
-          className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-left px-4 hover:bg-purple-700 transition-colors"
+          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          style={{
+            backgroundColor: '#FFF4E5',
+            color: '#EEA842',
+            borderColor: '#FFECD1'
+          }}
         >
           <div className="flex justify-between items-center">
             <div>
               <div className="font-bold">เพิ่มเงินต้น</div>
-              <div className="text-sm font-normal opacity-90">
+              <div className="text-sm font-normal opacity-75">
                 เพิ่มจำนวนเงินกู้
               </div>
             </div>
@@ -197,12 +212,17 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ลดต้น */}
         <button
           onClick={() => handleAction('reduce')}
-          className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold text-left px-4 hover:bg-orange-700 transition-colors"
+          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          style={{
+            backgroundColor: '#FEEDEE',
+            color: '#CB5960',
+            borderColor: '#FFDBDD'
+          }}
         >
           <div className="flex justify-between items-center">
             <div>
               <div className="font-bold">ลดเงินต้น</div>
-              <div className="text-sm font-normal opacity-90">
+              <div className="text-sm font-normal opacity-75">
                 จ่ายเงินต้นบางส่วน
               </div>
             </div>
