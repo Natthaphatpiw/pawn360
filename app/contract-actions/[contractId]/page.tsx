@@ -169,9 +169,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('renew')}
           className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#5E9268',
+            backgroundColor: '#69AB3D',
             color: '#E7EFE9',
-            borderColor: '#5E9268'
+            borderColor: '#69AB3D'
           }}
         >
           <div className="flex justify-between items-center">
@@ -194,7 +194,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#5878A7',
-            color: '#F0EFEF',
+            color: '#B2C1D6',
             borderColor: '#5878A7'
           }}
         >
