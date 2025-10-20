@@ -145,9 +145,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('redeem')}
           className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#E78E0B',
+            backgroundColor: '#EEA842',
             color: '#FFF8EE',
-            borderColor: '#E78E0B'
+            borderColor: '#EEA842'
           }}
         >
           <div className="flex justify-between items-center">
@@ -193,9 +193,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('increase')}
           className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#B2C1D6',
+            backgroundColor: '#5878A7',
             color: '#F0EFEF',
-            borderColor: '#B2C1D6'
+            borderColor: '#5878A7'
           }}
         >
           <div className="flex justify-between items-center">
