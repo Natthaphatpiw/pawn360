@@ -166,8 +166,9 @@ export default function ContractsPage() {
               return (
                 <div
                   key={contract._id}
-                  className="rounded-xl shadow-sm p-4"
+                  className="rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow"
                   style={{ backgroundColor: '#F0EFEF' }}
+                  onClick={() => window.location.href = `/contract-actions/${contract._id}`}
                 >
                   <div className="bg-white rounded-lg p-4">
                     <div className="flex justify-between">
