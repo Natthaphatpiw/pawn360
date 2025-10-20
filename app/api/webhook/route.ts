@@ -163,11 +163,67 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
         // Send store location card
         await sendStoreLocationCard(userId, store);
-        console.log(`Store location card sent successfully for store: ${store.storeName}`);
-      } catch (error) {
-        console.error('Error processing store_location:', error);
-        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-      }
+                console.log(`Store location card sent successfully for store: ${store.storeName}`);
+              } catch (error) {
+                console.error('Error processing store_location:', error);
+                console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+              }
+            } else if (action === 'confirm_contract_modification' && itemId) {
+              try {
+                console.log(`Processing contract modification confirmation for itemId: ${itemId}`);
+
+                if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
+                  console.error('Invalid itemId format:', itemId);
+                  return;
+                }
+
+                const { db } = await connectToDatabase();
+                const itemsCollection = db.collection('items');
+
+                // Update item confirmation status to confirmed
+                await itemsCollection.updateOne(
+                  { _id: new ObjectId(itemId) },
+                  {
+                    $set: {
+                      confirmationStatus: 'confirmed',
+                      updatedAt: new Date()
+                    }
+                  }
+                );
+
+                console.log(`Contract modification confirmed for itemId: ${itemId}`);
+              } catch (error) {
+                console.error('Error processing contract modification confirmation:', error);
+                console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+              }
+            } else if (action === 'cancel_contract_modification' && itemId) {
+              try {
+                console.log(`Processing contract modification cancellation for itemId: ${itemId}`);
+
+                if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
+                  console.error('Invalid itemId format:', itemId);
+                  return;
+                }
+
+                const { db } = await connectToDatabase();
+                const itemsCollection = db.collection('items');
+
+                // Update item confirmation status to canceled
+                await itemsCollection.updateOne(
+                  { _id: new ObjectId(itemId) },
+                  {
+                    $set: {
+                      confirmationStatus: 'canceled',
+                      updatedAt: new Date()
+                    }
+                  }
+                );
+
+                console.log(`Contract modification canceled for itemId: ${itemId}`);
+              } catch (error) {
+                console.error('Error processing contract modification cancellation:', error);
+                console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+              }
     }
 
   } catch (error) {

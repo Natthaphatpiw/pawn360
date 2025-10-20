@@ -232,8 +232,8 @@ interface ContractFormProps {
 }
 
 export default function ContractForm({ item, customer, onComplete, onClose }: ContractFormProps) {
-  // Contract steps: 'contract' -> 'signatures' -> 'photo' -> 'complete'
-  const [currentStep, setCurrentStep] = useState<'contract' | 'signatures' | 'photo' | 'complete'>('contract');
+  // Contract steps: 'contract' -> 'signatures' -> 'photo' -> 'complete' -> 'waiting'
+  const [currentStep, setCurrentStep] = useState<'contract' | 'signatures' | 'photo' | 'complete' | 'waiting'>('contract');
 
   // Signature modal state
   const [signatureModal, setSignatureModal] = useState<{
@@ -269,6 +269,23 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     }
   }, [customer?.fullName]);
 
+  // Editable contract details
+  const [contractDetails, setContractDetails] = useState({
+    pawnPrice: item.desiredAmount || item.estimatedValue || 0,
+    interestRate: item.interestRate || 10,
+    loanDays: item.loanDays || 30,
+  });
+
+  // Original values for comparison
+  const originalDetails = {
+    pawnPrice: item.desiredAmount || item.estimatedValue || 0,
+    interestRate: item.interestRate || 10,
+    loanDays: item.loanDays || 30,
+  };
+
+  // Confirmation status
+  const [confirmationStatus, setConfirmationStatus] = useState<'pending' | 'confirmed' | 'canceled' | null>(null);
+
   // Photo verification
   const [verificationPhoto, setVerificationPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -282,11 +299,35 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
   // Contract data calculation
   const calculateInterest = () => {
-    const pawnedPrice = item.desiredAmount || item.estimatedValue || 0;
-    const interestRate = item.interestRate || 10;
-    const periodDays = item.loanDays || 30;
+    const pawnedPrice = contractDetails.pawnPrice;
+    const interestRate = contractDetails.interestRate;
+    const periodDays = contractDetails.loanDays;
     const dailyRate = interestRate / 100 / 30;
     return Math.round(pawnedPrice * dailyRate * periodDays);
+  };
+
+  // Check if details have been modified
+  const hasModifications = () => {
+    return (
+      contractDetails.pawnPrice !== originalDetails.pawnPrice ||
+      contractDetails.interestRate !== originalDetails.interestRate ||
+      contractDetails.loanDays !== originalDetails.loanDays
+    );
+  };
+
+  // Get modification details for LINE message
+  const getModificationDetails = () => {
+    const changes = [];
+    if (contractDetails.pawnPrice !== originalDetails.pawnPrice) {
+      changes.push(`ราคา จาก ${originalDetails.pawnPrice.toLocaleString()} เป็น ${contractDetails.pawnPrice.toLocaleString()}`);
+    }
+    if (contractDetails.interestRate !== originalDetails.interestRate) {
+      changes.push(`ดอกเบี้ย จาก ${originalDetails.interestRate}% เป็น ${contractDetails.interestRate}%`);
+    }
+    if (contractDetails.loanDays !== originalDetails.loanDays) {
+      changes.push(`จำนวนวัน จาก ${originalDetails.loanDays} เป็น ${contractDetails.loanDays}`);
+    }
+    return changes;
   };
 
   // Generate full contract HTML
@@ -299,12 +340,12 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
       buyerAddress: '1400/84 เขตสวนหลวง แขวงสวนหลวง กทม 10250',
       itemType: item.type,
       itemDetails: `${item.brand} ${item.model}${item.serialNo ? ` (S/N: ${item.serialNo})` : ''}${item.accessories ? ` ${item.accessories}` : ''}${item.defects ? ` ${item.defects}` : ''}${item.note ? ` ${item.note}` : ''}`,
-      price: item.desiredAmount || item.estimatedValue || 0,
-      periodDays: item.loanDays || 30,
-      principal: item.desiredAmount || item.estimatedValue || 0,
+      price: contractDetails.pawnPrice,
+      periodDays: contractDetails.loanDays,
+      principal: contractDetails.pawnPrice,
       interest: calculateInterest(),
       serviceFee: 0,
-      total: (item.desiredAmount || item.estimatedValue || 0) + calculateInterest()
+      total: contractDetails.pawnPrice + calculateInterest()
     };
 
     return `
@@ -485,9 +526,83 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     }
   };
 
+  // Send confirmation message to user
+  const sendConfirmationMessage = async () => {
+    try {
+      const modifications = getModificationDetails();
+
+      const response = await fetch('/api/contracts/send-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          lineId: customer.lineId,
+          itemId: item._id,
+          modifications,
+          newContract: {
+            itemId: item._id,
+            pawnPrice: contractDetails.pawnPrice,
+            interestRate: contractDetails.interestRate,
+            loanDays: contractDetails.loanDays,
+            interest: calculateInterest(),
+            total: contractDetails.pawnPrice + calculateInterest(),
+            item: `${item.brand} ${item.model}`,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        setCurrentStep('waiting');
+        pollConfirmationStatus();
+      } else {
+        throw new Error('Failed to send confirmation message');
+      }
+    } catch (error) {
+      console.error('Error sending confirmation message:', error);
+      setError('เกิดข้อผิดพลาดในการส่งข้อความยืนยัน');
+    }
+  };
+
+  // Poll for confirmation status
+  const pollConfirmationStatus = async () => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/contracts/confirmation-status?itemId=${item._id}`);
+        const data = await response.json();
+
+        if (data.status === 'confirmed') {
+          clearInterval(pollInterval);
+          setConfirmationStatus('confirmed');
+          setCurrentStep('signatures');
+        } else if (data.status === 'canceled') {
+          clearInterval(pollInterval);
+          setConfirmationStatus('canceled');
+          setError('ผู้ใช้ได้ยกเลิกการแก้ไขสัญญา กรุณาแก้ไขข้อมูลใหม่');
+          setCurrentStep('contract');
+        }
+      } catch (error) {
+        console.error('Error polling confirmation status:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    // Stop polling after 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (confirmationStatus !== 'confirmed') {
+        setError('หมดเวลายืนยัน กรุณาทำรายการใหม่');
+        setCurrentStep('contract');
+      }
+    }, 300000); // 5 minutes
+  };
+
   // Navigation handlers
-  const goToSignatures = () => {
-    setCurrentStep('signatures');
+  const goToSignatures = async () => {
+    if (hasModifications()) {
+      await sendConfirmationMessage();
+    } else {
+      setCurrentStep('signatures');
+    }
   };
 
   const goToPhoto = () => {
@@ -632,7 +747,8 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
           {/* Header */}
           <div className="flex justify-between items-center p-3 border-b bg-gray-50">
             <h2 className="text-lg font-bold text-gray-800">
-              {currentStep === 'contract' && 'สัญญาซื้อขาย'}
+              {currentStep === 'contract' && 'ตรวจสอบและแก้ไขสัญญา'}
+              {currentStep === 'waiting' && 'กำลังรอผู้ใช้อยืนยัน'}
               {currentStep === 'signatures' && 'เซ็นชื่อในสัญญา'}
               {currentStep === 'photo' && 'ถ่ายรูปยืนยัน'}
               {currentStep === 'complete' && 'เสร็จสิ้น'}
@@ -647,6 +763,37 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
           {/* Content */}
           <div className="p-4 overflow-y-auto max-h-[calc(95vh-120px)]">
+            {currentStep === 'waiting' && (
+              <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <h3 className="text-lg font-semibold text-blue-800 mb-2">
+                      กำลังรอผู้ใช้ยืนยัน
+                    </h3>
+                    <p className="text-blue-700 text-sm">
+                      ได้ส่งข้อความไปยัง LINE ของผู้ใช้แล้ว
+                      <br />
+                      กรุณารอให้ผู้ใช้กดยืนยันหรือยกเลิกการแก้ไข
+                    </p>
+                    <div className="mt-4 text-xs text-gray-600">
+                      จะหมดเวลาใน 5 นาที
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="font-semibold mb-2">รายละเอียดการแก้ไขที่ส่งไป:</h4>
+                  <div className="space-y-1 text-sm">
+                    {getModificationDetails().map((change, index) => (
+                      <div key={index} className="text-gray-700">
+                        • {change}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             {error && (
               <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
                 {error}
@@ -655,20 +802,88 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
             {currentStep === 'contract' && (
               <div className="space-y-4">
-                {/* Contract Preview - Mobile Optimized */}
-                <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 text-xs leading-relaxed max-h-96 overflow-y-auto">
-                  <h3 className="text-center font-bold text-base mb-3">สัญญาซื้อขายทรัพย์พร้อมสิทธิไถ่คืน</h3>
-                  <div className="space-y-3">
-                    <p>วันที่: {new Date().toLocaleDateString('th-TH')}</p>
-                    <p>ผู้ขาย: {customer.fullName}</p>
-                    <p>ผู้ซื้อ: Pawnly Technologies Co., Ltd.</p>
-                    <p>สินค้า: {item.type} - {item.brand} {item.model}</p>
-                    <p>ราคา: {(item.desiredAmount || item.estimatedValue || 0).toLocaleString()} บาท</p>
-                    <p>ระยะเวลา: {item.loanDays || 30} วัน</p>
-                    <p>ดอกเบี้ย: {calculateInterest().toLocaleString()} บาท</p>
-                    <p className="text-xs text-gray-600 mt-2">
-                      * ขยายเพื่อดูรายละเอียดเต็ม (เนื้อหาสัญญาถูกต้องตามกฎหมาย)
-                    </p>
+                {/* Contract Details - Editable */}
+                <div className="border border-gray-300 rounded-lg p-4 bg-white">
+                  <h3 className="text-center font-bold text-base mb-4">รายละเอียดสัญญา</h3>
+
+                  <div className="space-y-4">
+                    {/* Pawn Price */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1">ราคาจำนำ (บาท)</label>
+                      <input
+                        type="number"
+                        value={contractDetails.pawnPrice}
+                        onChange={(e) => setContractDetails(prev => ({
+                          ...prev,
+                          pawnPrice: parseFloat(e.target.value) || 0
+                        }))}
+                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="1"
+                      />
+                    </div>
+
+                    {/* Interest Rate */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1">อัตราดอกเบี้ย (%)</label>
+                      <input
+                        type="number"
+                        value={contractDetails.interestRate}
+                        onChange={(e) => setContractDetails(prev => ({
+                          ...prev,
+                          interestRate: parseFloat(e.target.value) || 0
+                        }))}
+                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+
+                    {/* Loan Days */}
+                    <div>
+                      <label className="block text-sm font-medium mb-1">จำนวนวันจำนำ</label>
+                      <input
+                        type="number"
+                        value={contractDetails.loanDays}
+                        onChange={(e) => setContractDetails(prev => ({
+                          ...prev,
+                          loanDays: parseInt(e.target.value) || 0
+                        }))}
+                        className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        min="1"
+                      />
+                    </div>
+
+                    {/* Summary */}
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span>ราคาจำนำ:</span>
+                          <span className="font-semibold">{contractDetails.pawnPrice.toLocaleString()} บาท</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>ดอกเบี้ย ({contractDetails.interestRate}%):</span>
+                          <span className="font-semibold">{calculateInterest().toLocaleString()} บาท</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>ระยะเวลา:</span>
+                          <span className="font-semibold">{contractDetails.loanDays} วัน</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1">
+                          <span className="font-semibold">รวม:</span>
+                          <span className="font-bold text-green-600">
+                            {(contractDetails.pawnPrice + calculateInterest()).toLocaleString()} บาท
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {hasModifications() && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p className="text-yellow-800 text-sm font-medium">
+                          ⚠️ ข้อมูลสัญญาได้ถูกแก้ไข จะต้องส่งให้ผู้ใช้ยืนยันก่อนดำเนินการต่อ
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -684,7 +899,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                     onClick={goToSignatures}
                     className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors font-medium"
                   >
-                    ดำเนินการต่อ - เซ็นชื่อในสัญญา
+                    {hasModifications() ? 'ส่งยืนยันและดำเนินการต่อ' : 'ดำเนินการต่อ - เซ็นชื่อในสัญญา'}
                   </button>
                 </div>
               </div>
