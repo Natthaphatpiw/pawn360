@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { sendContractCompletionNotification } from '@/lib/line/client';
+import { ObjectId } from 'mongodb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     // Fetch item data from database
     const { db } = await connectToDatabase();
     const itemsCollection = db.collection('items');
-    const item = await itemsCollection.findOne({ _id: require('mongodb').ObjectId.createFromHexString(itemId) });
+    const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
 
     if (!item) {
       return NextResponse.json(
