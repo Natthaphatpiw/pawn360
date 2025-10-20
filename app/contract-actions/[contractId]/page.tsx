@@ -200,9 +200,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('increase')}
           className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#4682B4',
+            backgroundColor: '#4169E1',
             color: '#F0EFEF',
-            borderColor: '#4682B4'
+            borderColor: '#4169E1'
           }}
         >
           <div className="flex justify-between items-center">
@@ -212,7 +212,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
                 เพิ่มจำนวนเงินกู้
               </div>
             </div>
-            <div className="text-2xl font-sarabun">➕</div>
+            <div className="text-2xl font-sarabun text-white">➕</div>
           </div>
         </button>
 
@@ -233,7 +233,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
                 จ่ายเงินต้นบางส่วน
               </div>
             </div>
-            <div className="text-2xl font-sarabun">➖</div>
+            <div className="text-2xl font-sarabun text-[#FFE4E1]">➖</div>
           </div>
         </button>
       </div>
