@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate dates and amounts
-    const startDate = new Date();
+    // Calculate dates and amounts - Always use current date for contract creation
+    const startDate = new Date(); // Current date when contract is created
     const periodDays = item.loanDays || 30;
     const dueDate = new Date(startDate);
     dueDate.setDate(dueDate.getDate() + periodDays);

@@ -11,30 +11,27 @@ interface Contract {
   item: {
     brand: string;
     model: string;
-    type: string;
-    images: string[];
+    type?: string;
+    images?: string[];
   };
   pawnDetails: {
     pawnedPrice: number;
-    interestRate: number;
-    periodDays: number;
-    remainingAmount: number;
+    interestRate?: number;
+    periodDays?: number;
+    remainingAmount?: number;
   };
   dates: {
     startDate: string;
-    dueDate: string;
+    dueDate?: string;
   };
 }
 
 export default function ContractsPage() {
   const { profile, isLoading, error: liffError } = useLiff();
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [showActionModal, setShowActionModal] = useState<'renew' | 'redeem' | null>(null);
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   // Auto-fetch contracts when profile is loaded
   useEffect(() => {
@@ -74,70 +71,6 @@ export default function ContractsPage() {
     });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'overdue':
-        return 'bg-red-100 text-red-800';
-      case 'redeemed':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'ใช้งานอยู่';
-      case 'overdue':
-        return 'เกินกำหนด';
-      case 'redeemed':
-        return 'ไถ่ถอนแล้ว';
-      case 'lost':
-        return 'ตกเป็นของร้าน';
-      default:
-        return status;
-    }
-  };
-
-  const calculateInterestPayment = () => {
-    if (!selectedContract) return 0;
-    const { pawnedPrice, interestRate } = selectedContract.pawnDetails;
-    return (pawnedPrice * interestRate) / 100;
-  };
-
-  const handleActionSubmit = async () => {
-    if (!selectedContract || !showActionModal) return;
-
-    setIsSubmittingAction(true);
-    setError(null);
-
-    try {
-      const actionType = showActionModal;
-      const amount = actionType === 'renew'
-        ? calculateInterestPayment()
-        : selectedContract.pawnDetails.remainingAmount;
-
-      const response = await axios.post('/api/contracts/request-action', {
-        contractId: selectedContract._id,
-        contractNumber: selectedContract.contractNumber,
-        actionType,
-        amount,
-        lineId: profile?.userId,
-      });
-
-      if (response.data.success) {
-        setShowActionModal(null);
-        alert('ส่งคำขอไปยังร้านค้าเรียบร้อยแล้ว');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ');
-    } finally {
-      setIsSubmittingAction(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -161,236 +94,100 @@ export default function ContractsPage() {
     );
   }
 
-  if (selectedContract) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={() => setSelectedContract(null)}
-            className="mb-4 text-blue-600 hover:text-blue-800 flex items-center"
-          >
-            ← กลับ
-          </button>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">สัญญาเลขที่</h1>
-                <p className="text-gray-600">{selectedContract.contractNumber}</p>
-              </div>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(
-                  selectedContract.status
-                )}`}
-              >
-                {getStatusText(selectedContract.status)}
-              </span>
-            </div>
-
-            {/* Item Info */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-700 mb-3">ข้อมูลสินค้า</h2>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-gray-800 font-medium">
-                  {selectedContract.item.brand} {selectedContract.item.model}
-                </p>
-                <p className="text-gray-600 text-sm">{selectedContract.item.type}</p>
-              </div>
-            </div>
-
-            {/* Financial Details */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-700 mb-3">ข้อมูลการเงิน</h2>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">จำนวนเงินจำนำ:</span>
-                  <span className="font-semibold">
-                    {selectedContract.pawnDetails.pawnedPrice.toLocaleString()} บาท
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">อัตราดอกเบี้ย:</span>
-                  <span className="font-semibold">{selectedContract.pawnDetails.interestRate}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">ระยะเวลา:</span>
-                  <span className="font-semibold">{selectedContract.pawnDetails.periodDays} วัน</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t">
-                  <span className="text-gray-600">ยอดที่ต้องชำระ:</span>
-                  <span className="font-bold text-lg text-blue-600">
-                    {selectedContract.pawnDetails.remainingAmount.toLocaleString()} บาท
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dates */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-700 mb-3">วันที่</h2>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">วันที่เริ่มสัญญา:</span>
-                  <span>{formatDate(selectedContract.dates.startDate)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">วันครบกำหนด:</span>
-                  <span className="font-semibold text-red-600">
-                    {formatDate(selectedContract.dates.dueDate)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            {selectedContract.status === 'active' && (
-              <div className="space-y-3">
-                <button
-                  onClick={() => setShowActionModal('renew')}
-                  className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700"
-                >
-                  ต่อดอกเบี้ย
-                </button>
-                <button
-                  onClick={() => setShowActionModal('redeem')}
-                  className="w-full bg-green-600 text-white py-3 rounded-md font-semibold hover:bg-green-700"
-                >
-                  ไถ่ถอนสินค้า
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Action Modal */}
-          {showActionModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">
-                  {showActionModal === 'renew' ? 'ต่อดอกเบี้ย' : 'ไถ่ถอนสินค้า'}
-                </h2>
-
-                <div className="mb-6">
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-gray-600 mb-2">สัญญาเลขที่:</p>
-                    <p className="font-semibold text-gray-800">{selectedContract.contractNumber}</p>
-                  </div>
-
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-2">จำนวนเงินที่ต้องชำระ:</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {showActionModal === 'renew'
-                        ? calculateInterestPayment().toLocaleString()
-                        : selectedContract.pawnDetails.remainingAmount.toLocaleString()}{' '}
-                      บาท
-                    </p>
-                    {showActionModal === 'renew' && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        (ดอกเบี้ย {selectedContract.pawnDetails.interestRate}%)
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 text-sm text-gray-600">
-                    <p>• คำขอจะถูกส่งไปยังร้านค้า</p>
-                    <p>• พนักงานร้านจะติดต่อกลับภายใน 24 ชั่วโมง</p>
-                    <p>• กรุณาเตรียมเงินสดหรือช่องทางชำระเงิน</p>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                    <p className="text-red-600 text-sm">{error}</p>
-                  </div>
-                )}
-
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setShowActionModal(null)}
-                    disabled={isSubmittingAction}
-                    className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-md font-semibold hover:bg-gray-300 disabled:bg-gray-100"
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    onClick={handleActionSubmit}
-                    disabled={isSubmittingAction}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-                  >
-                    {isSubmittingAction ? 'กำลังส่ง...' : 'ยืนยัน'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // Function to get status style and text
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'active':
+        return { text: 'หน่วย', bg: 'bg-green-500', textColor: 'text-white' };
+      case 'overdue':
+        return { text: 'รับจำนำ', bg: 'bg-red-500', textColor: 'text-white' };
+      case 'suspended':
+        return { text: 'หลุดจำนำ', bg: 'bg-orange-500', textColor: 'text-white' };
+      case 'sold':
+        return { text: 'ขายถอดตลาด', bg: 'bg-red-600', textColor: 'text-white' };
+      case 'redeemed':
+        return { text: 'ไถ่ถอนไปแล้ว', bg: 'bg-green-100', textColor: 'text-green-800' };
+      default:
+        return { text: status, bg: 'bg-gray-500', textColor: 'text-white' };
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">สถานะสัญญาจำนำ</h1>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-gray-200 p-3 flex justify-between items-center">
+        <h1 className="text-lg font-bold text-gray-800">รายการจำนำ</h1>
+        <span className="text-sm text-gray-600">หน่วย {contracts.length} สินค้า</span>
+      </div>
 
-        {isSearching && (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">กำลังโหลดสัญญา...</p>
+      {/* Loading State */}
+      {isSearching && (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">กำลังโหลด...</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600">{error}</p>
+      {/* Error State */}
+      {error && (
+        <div className="p-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-600 text-sm">{error}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Contracts List */}
-        {hasSearched && !isSearching && (
-          <>
-            {contracts.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-6 text-center">
-                <p className="text-gray-600">ไม่พบสัญญาที่ใช้งานอยู่</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {contracts.map((contract) => (
-                  <div
-                    key={contract._id}
-                    onClick={() => setSelectedContract(contract)}
-                    className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow"
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-800">
-                          {contract.item.brand} {contract.item.model}
-                        </h3>
-                        <p className="text-sm text-gray-600">สัญญา #{contract.contractNumber}</p>
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                          contract.status
-                        )}`}
-                      >
-                        {getStatusText(contract.status)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">จำนวนเงิน:</span>
-                      <span className="font-semibold">
-                        {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-gray-600">ครบกำหนด:</span>
-                      <span className="text-red-600">{formatDate(contract.dates.dueDate)}</span>
-                    </div>
+      {/* Contracts List */}
+      {!isSearching && (
+        <div className="p-4 space-y-3">
+          {contracts.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">ไม่พบรายการจำนำ</p>
+            </div>
+          ) : (
+            contracts.map((contract) => {
+              const statusInfo = getStatusInfo(contract.status);
+              return (
+                <div
+                  key={contract._id}
+                  className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
+                >
+                  <div className="flex flex-col space-y-2">
+                    <span className="text-md font-bold text-gray-800">
+                      {contract.item.brand} {contract.item.model}
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      ราคา: {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      วันที่จำนำ: {formatDate(contract.dates.startDate)}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+                  <div className="flex justify-between items-center mt-3">
+                    <button
+                      className={`rounded-full px-4 py-1 ${statusInfo.bg} ${statusInfo.textColor} text-sm font-medium`}
+                    >
+                      {statusInfo.text}
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      รหัสสินค้า {contract.contractNumber}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Footer Button */}
+      <div className="p-4">
+        <button className="w-full bg-gray-200 text-gray-800 py-3 rounded-lg font-bold text-md">
+          Pawn entry
+        </button>
       </div>
     </div>
   );
