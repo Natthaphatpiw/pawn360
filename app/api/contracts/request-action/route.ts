@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Client, ClientConfig } from '@line/bot-sdk';
 import { ObjectId } from 'mongodb';
+import { getS3Client } from '@/lib/aws/s3';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 
 // Lazy initialization of LINE client
 let storeClient: Client | null = null;
@@ -25,12 +27,51 @@ function getStoreClient(): Client {
   return storeClient;
 }
 
+// Function to upload slip to S3
+async function uploadSlipToS3(slipBuffer: Buffer, contractId: string, actionType: string): Promise<string | null> {
+  try {
+    const timestamp = Date.now();
+    const filename = `slip-${contractId}-${actionType}-${timestamp}.jpg`;
+    const s3Client = getS3Client();
+
+    const uploadParams = {
+      Bucket: 'piwp360',
+      Key: `slips/${filename}`,
+      Body: slipBuffer,
+      ContentType: 'image/jpeg'
+    };
+
+    await s3Client.send(new PutObjectCommand(uploadParams));
+    return `https://piwp360.s3.ap-southeast-2.amazonaws.com/slips/${filename}`;
+  } catch (error) {
+    console.error('Failed to upload slip:', error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { contractId, contractNumber, actionType, amount, lineId } = body;
+    // Check if request is multipart/form-data (has slip file)
+    const contentType = request.headers.get('content-type') || '';
+    let body: any;
+    let slipFile: File | null = null;
 
-    if (!contractId || !actionType || !lineId) {
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      body = {
+        contractId: formData.get('contractId'),
+        actionType: formData.get('actionType'),
+        amount: formData.get('amount'),
+        lineId: null, // Will be set later from session/LIFF
+      };
+      slipFile = formData.get('slip') as File;
+    } else {
+      body = await request.json();
+    }
+
+    const { contractId, actionType, amount, lineId, contractNumber } = body;
+
+    if (!contractId || !actionType) {
       return NextResponse.json(
         { error: 'ข้อมูลไม่ครบถ้วน' },
         { status: 400 }
@@ -51,8 +92,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get customer details
-    const customer = await customersCollection.findOne({ lineId });
+    // Get customer details (use contract.lineId if not provided)
+    const customerLineId = lineId || contract.lineId;
+    const customer = await customersCollection.findOne({ lineId: customerLineId });
     if (!customer) {
       return NextResponse.json(
         { error: 'ไม่พบข้อมูลลูกค้า' },
@@ -79,8 +121,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const actionText = actionType === 'renew' ? 'ต่อดอกเบี้ย' : 'ไถ่ถอนสินค้า';
-    const actionColor = actionType === 'renew' ? '#2563EB' : '#16A34A';
+    let actionText = '';
+    let actionColor = '#16A34A';
+
+    switch (actionType) {
+      case 'redeem':
+        actionText = 'ไถ่ถอนสินค้า';
+        actionColor = '#16A34A';
+        break;
+      case 'renew':
+        actionText = 'ต่อดอกเบี้ย';
+        actionColor = '#2563EB';
+        break;
+      case 'reduce':
+        actionText = 'ลดเงินต้น';
+        actionColor = '#F59E0B';
+        break;
+      case 'increase_principal':
+        actionText = 'เพิ่มเงินต้น';
+        actionColor = '#8B5CF6';
+        break;
+      default:
+        actionText = actionType;
+        actionColor = '#6B7280';
+    }
 
     // Create Flex Message
     const flexMessage = {
@@ -220,7 +284,7 @@ export async function POST(request: NextRequest) {
                     },
                     {
                       type: 'text' as const,
-                      text: contractNumber,
+                      text: contract.contractNumber || contractNumber,
                       wrap: true,
                       color: '#333333',
                       size: 'sm' as const,
@@ -323,6 +387,47 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    // Upload slip to S3 if provided
+    let slipUrl = null;
+    if (slipFile) {
+      const slipBuffer = Buffer.from(await slipFile.arrayBuffer());
+      slipUrl = await uploadSlipToS3(slipBuffer, contractId, actionType);
+    }
+
+    // Create transaction record
+    const transactionRecord = {
+      id: `TXN${Date.now()}`,
+      type: actionType,
+      amount: parseFloat(amount),
+      timestamp: new Date(),
+      slipUrl: slipUrl,
+      status: 'pending', // pending, approved, rejected
+      customerInfo: {
+        lineId: customerLineId,
+        fullName: customer.fullName,
+        phone: customer.phone
+      },
+      contractInfo: {
+        contractNumber: contract.contractNumber || contractNumber,
+        item: `${contract.item.brand} ${contract.item.model}`
+      }
+    };
+
+    // Add transaction to contract's transactionHistory
+    const existingContract = await contractsCollection.findOne({ _id: new ObjectId(contractId) });
+    const currentHistory = existingContract?.transactionHistory || [];
+    const updatedHistory = [...currentHistory, transactionRecord];
+
+    await contractsCollection.updateOne(
+      { _id: new ObjectId(contractId) },
+      {
+        $set: {
+          transactionHistory: updatedHistory,
+          updatedAt: new Date()
+        }
+      }
+    );
+
     // Send to all store LINE IDs
     try {
       const client = getStoreClient();
@@ -345,6 +450,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'ส่งคำขอไปยังร้านค้าเรียบร้อยแล้ว',
+      transactionId: transactionRecord.id
     });
   } catch (error: any) {
     console.error('Request action error:', error);
