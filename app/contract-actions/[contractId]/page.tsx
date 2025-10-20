@@ -3,7 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { Sarabun } from 'next/font/google';
 
+const sarabun = Sarabun({
+  subsets: ['thai'],
+  weight: ['400', '700'],
+  display: 'swap',
+  variable: '--font-sarabun',
+});
 interface Contract {
   _id: string;
   contractNumber: string;
@@ -112,7 +119,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
   }
 
   return (
-    <div className="min-h-screen bg-white p-4">
+    <div className={`min-h-screen bg-white p-4 ${sarabun.className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <button
@@ -121,16 +128,16 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         >
           ←
         </button>
-        <h1 className="text-xl font-bold text-black">จัดการสัญญา</h1>
+        <h1 className="text-xl font-bold text-black font-sarabun">จัดการสัญญา</h1>
         <div></div> {/* Spacer */}
       </div>
 
       {/* Contract Info */}
       <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: '#F0EFEF' }}>
-        <h2 className="font-bold text-lg mb-2" style={{ color: '#2C2A28' }}>
+        <h2 className="font-bold text-lg mb-2 font-sarabun" style={{ color: '#2C2A28' }}>
           {contract.item.brand} {contract.item.model}
         </h2>
-        <div className="space-y-1 text-sm" style={{ color: '#2C2A28' }}>
+        <div className="space-y-1 text-sm font-sarabun" style={{ color: '#2C2A28' }}>
           <p>รหัสสัญญา: {contract.contractNumber}</p>
           <p>มูลค่า: {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท</p>
           <p>ดอกเบี้ย: {calculateInterest().toLocaleString()} บาท</p>
@@ -139,27 +146,27 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
       </div>
 
       {/* Action Buttons */}
-      <div className="space-y-3">
+      <div className="space-y-3 font-sarabun">
         {/* ไถ่ถอน */}
         <button
           onClick={() => handleAction('redeem')}
           className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#FFFACD',
-            color: '#D88000',
+            color: '#FFD700',
             borderColor: '#FFFACD'
           }}
         >
           <div className="flex justify-between items-center">
             <div>
-              <div className="font-bold">ไถ่ถอนสินค้า</div>
-              <div className="text-sm font-normal opacity-75">
+              <div className="font-bold font-sarabun">ไถ่ถอนสินค้า</div>
+              <div className="text-sm font-normal opacity-75 font-sarabun">
                 จ่ายเงินต้นและดอกเบี้ยเพื่อรับสินค้าคืน
               </div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold">{calculateTotalAmount().toLocaleString()}</div>
-              <div className="text-sm">บาท</div>
+              <div className="text-lg font-bold font-sarabun">{calculateTotalAmount().toLocaleString()}</div>
+              <div className="text-sm font-sarabun">บาท</div>
             </div>
           </div>
         </button>
@@ -169,21 +176,21 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('renew')}
           className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#2E8B57',
+            backgroundColor: '#32CD32',
             color: '#E7EFE9',
-            borderColor: '#2E8B57'
+            borderColor: '#32CD32'
           }}
         >
           <div className="flex justify-between items-center">
             <div>
-              <div className="font-bold">ต่อดอกเบี้ย</div>
-              <div className="text-sm font-normal opacity-75">
+              <div className="font-bold font-sarabun">ต่อดอกเบี้ย</div>
+              <div className="text-sm font-normal opacity-75 font-sarabun">
                 จ่ายดอกเบี้ยเพื่อต่อสัญญา
               </div>
             </div>
             <div className="text-right">
-              <div className="text-lg font-bold">{calculateInterest().toLocaleString()}</div>
-              <div className="text-sm">บาท</div>
+              <div className="text-lg font-bold font-sarabun">{calculateInterest().toLocaleString()}</div>
+              <div className="text-sm font-sarabun">บาท</div>
             </div>
           </div>
         </button>
@@ -200,12 +207,12 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         >
           <div className="flex justify-between items-center">
             <div>
-              <div className="font-bold">เพิ่มเงินต้น</div>
-              <div className="text-sm font-normal opacity-75">
+              <div className="font-bold font-sarabun">เพิ่มเงินต้น</div>
+              <div className="text-sm font-normal opacity-75 font-sarabun">
                 เพิ่มจำนวนเงินกู้
               </div>
             </div>
-            <div className="text-2xl">➕</div>
+            <div className="text-2xl font-sarabun">➕</div>
           </div>
         </button>
 
@@ -221,12 +228,12 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         >
           <div className="flex justify-between items-center">
             <div>
-              <div className="font-bold">ลดเงินต้น</div>
-              <div className="text-sm font-normal opacity-75">
+              <div className="font-bold font-sarabun">ลดเงินต้น</div>
+              <div className="text-sm font-normal opacity-75 font-sarabun">
                 จ่ายเงินต้นบางส่วน
               </div>
             </div>
-            <div className="text-2xl">➖</div>
+            <div className="text-2xl font-sarabun">➖</div>
           </div>
         </button>
       </div>
