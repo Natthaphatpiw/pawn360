@@ -143,7 +143,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ไถ่ถอน */}
         <button
           onClick={() => handleAction('redeem')}
-          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#EEA842',
             color: '#FFF8EE',
@@ -167,7 +167,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ต่อดอกเบี้ย */}
         <button
           onClick={() => handleAction('renew')}
-          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#5E9268',
             color: '#E7EFE9',
@@ -191,7 +191,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* เพิ่มต้น */}
         <button
           onClick={() => handleAction('increase')}
-          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#5878A7',
             color: '#F0EFEF',
@@ -212,7 +212,7 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ลดต้น */}
         <button
           onClick={() => handleAction('reduce')}
-          className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#DA676E',
             color: '#FFF3F3',
