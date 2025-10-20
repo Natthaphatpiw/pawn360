@@ -214,9 +214,9 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
           onClick={() => handleAction('reduce')}
           className="w-full py-4 rounded-xl font-bold text-left px-4 border-2 transition-colors"
           style={{
-            backgroundColor: '#FEEDEE',
-            color: '#CB5960',
-            borderColor: '#FFDBDD'
+            backgroundColor: '#F19DA2',
+            color: '#FFF3F3',
+            borderColor: '#F19DA2'
           }}
         >
           <div className="flex justify-between items-center">
