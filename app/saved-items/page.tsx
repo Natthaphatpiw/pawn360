@@ -30,12 +30,22 @@ export default function SavedItemsPage() {
   }, [profile?.userId]);
 
   const fetchSavedItems = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      const response = await axios.get(`/api/items?lineId=${profile.userId}`);
-      setItems(response.data.items || []);
+      if (!profile?.userId) {
+        throw new Error('LINE profile not found');
+      }
+
+      const response = await axios.get(`/api/items?lineId=${profile.userId}&status=temporary`);
+
+      if (response.data.success) {
+        setItems(response.data.items);
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการโหลดสินค้า');
+      console.error('Error fetching saved items:', err);
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
     } finally {
       setLoading(false);
     }
