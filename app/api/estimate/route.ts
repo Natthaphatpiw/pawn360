@@ -83,21 +83,21 @@ function calculateIQRMedian(prices: number[]): number {
   const cleanedPrices = prices.filter(price => price >= lowerBound && price <= upperBound);
 
   if (cleanedPrices.length === 0) {
-    return calculatePercentile(prices, 30); // Use 30th percentile for competitive pricing
+    return calculatePercentile(prices, 40); // Use 40th percentile for reasonable pricing
   }
 
-  return calculatePercentile(cleanedPrices, 25); // Use 25th percentile for competitive pricing
+  return calculatePercentile(cleanedPrices, 35); // Use 35th percentile for reasonable pricing
 }
 
 function calculateTrimmedMean(prices: number[]): number {
   const sortedPrices = [...prices].sort((a, b) => a - b);
   const n = sortedPrices.length;
-  const startIdx = Math.floor(0.03 * n); // Remove bottom 3%
-  const endIdx = Math.floor(0.75 * n); // Remove top 25%
+  const startIdx = Math.floor(0.05 * n); // Remove bottom 5%
+  const endIdx = Math.floor(0.85 * n); // Remove top 15% (reduced from 25%)
   const trimmedPrices = sortedPrices.slice(startIdx, endIdx);
 
   if (trimmedPrices.length === 0) {
-    return calculatePercentile(prices, 20);
+    return calculatePercentile(prices, 35);
   }
 
   const sum = trimmedPrices.reduce((acc, price) => acc + price, 0);
@@ -139,10 +139,10 @@ function calculateSimpleClusteringMedian(prices: number[]): number {
   });
 
   if (mainClusterPrices.length === 0) {
-    return calculatePercentile(prices, 20);
+    return calculatePercentile(prices, 40);
   }
 
-  return calculatePercentile(mainClusterPrices, 20); // Use 20th percentile for competitive pricing
+  return calculatePercentile(mainClusterPrices, 35); // Use 35th percentile for reasonable pricing
 }
 
 function calculateSimpleOutlierRemoval(prices: number[]): number {
@@ -160,20 +160,20 @@ function calculateSimpleOutlierRemoval(prices: number[]): number {
   const inlierPrices = prices.filter(price => price >= lowerBound && price <= upperBound);
 
   if (inlierPrices.length === 0) {
-    return calculatePercentile(prices, 25);
+    return calculatePercentile(prices, 40);
   }
 
-  return calculatePercentile(inlierPrices, 25); // Use 25th percentile for competitive pricing
+  return calculatePercentile(inlierPrices, 35); // Use 35th percentile for reasonable pricing
 }
 
 function calculateRobustEnsemble(prices: number[], estimates: number[]): number {
   if (estimates.length === 0) {
-    return calculatePercentile(prices, 20);
+    return calculatePercentile(prices, 40);
   }
 
   const validEstimates = estimates.filter(est => est > 0);
   if (validEstimates.length === 0) {
-    return calculatePercentile(prices, 20);
+    return calculatePercentile(prices, 40);
   }
 
   // Calculate median of prices for weighting
@@ -273,6 +273,62 @@ function applyCompetitivePricingFilters(price: number, prices: number[]): number
   return competitivePrice;
 }
 
+function applyLighterCompetitivePricingFilters(price: number, prices: number[]): number {
+  if (!prices || prices.length === 0 || price <= 0) {
+    return price;
+  }
+
+  const filteredPrices = prices.filter(p => p > 100 && p !== 999999);
+  if (filteredPrices.length === 0) {
+    return price;
+  }
+
+  // Calculate market position percentiles
+  const percentile15 = calculatePercentile(filteredPrices, 15);
+  const percentile25 = calculatePercentile(filteredPrices, 25);
+  const percentile40 = calculatePercentile(filteredPrices, 40);
+  const median = calculatePercentile(filteredPrices, 50);
+
+  let adjustedPrice = price;
+
+  // Lighter Rule 1: If price is above median, bring it down towards 25th percentile (less aggressive)
+  if (price > median) {
+    adjustedPrice = percentile25 + (price - percentile25) * 0.6; // Increased from 0.4 to 0.6
+  }
+
+  // Rule 2: If price is above 75th percentile, cap it at 40th percentile (less aggressive than 70th)
+  const percentile75 = calculatePercentile(filteredPrices, 75);
+  if (price > percentile75) {
+    adjustedPrice = Math.min(adjustedPrice, percentile40);
+  }
+
+  // Rule 3: Ensure price is not below 15th percentile (same as before)
+  adjustedPrice = Math.max(adjustedPrice, percentile15);
+
+  // Rule 4: Lighter final adjustment - reduce by 3-5% based on market density (reduced from 7-15%)
+  const mean = filteredPrices.reduce((acc, p) => acc + p, 0) / filteredPrices.length;
+  const variance = filteredPrices.reduce((acc, p) => acc + Math.pow(p - mean, 2), 0) / filteredPrices.length;
+  const std = Math.sqrt(variance);
+  const cv = std / mean;
+
+  // Lighter variation adjustment
+  let adjustmentFactor = 0.97; // 3% reduction default (reduced from 7%)
+  if (cv > 0.5) { // High variation market
+    adjustmentFactor = 0.95; // 5% reduction (reduced from 15%)
+  } else if (cv > 0.3) { // Medium variation market
+    adjustmentFactor = 0.96; // 4% reduction (reduced from 10%)
+  }
+
+  adjustedPrice = adjustedPrice * adjustmentFactor;
+
+  // Final sanity check - ensure we didn't go too low
+  if (adjustedPrice < percentile15) {
+    adjustedPrice = percentile15;
+  }
+
+  return adjustedPrice;
+}
+
 function calculateMarketPriceAdvanced(prices: number[]): { [key: string]: number } {
   if (!prices || prices.length === 0) {
     return {
@@ -343,15 +399,21 @@ function calculateMarketPriceAdvanced(prices: number[]): { [key: string]: number
 
 function calculateMarketPrice(prices: number[]): number {
   const results = calculateMarketPriceAdvanced(prices);
-  // Use the most competitive estimate with stronger reduction
-  const competitivePrice = Math.min(
-    results.robust_estimate,
-    results.trimmed_mean,
-    results.dbscan_median
-  ) * 0.90;
 
-  // Apply additional competitive filters
-  return applyCompetitivePricingFilters(competitivePrice, prices);
+  // Use median of estimates instead of min for more reasonable pricing
+  const estimates = [results.robust_estimate, results.trimmed_mean, results.dbscan_median]
+    .filter(est => est > 0);
+
+  if (estimates.length === 0) {
+    return calculatePercentile(prices, 40);
+  }
+
+  // Use median of estimates instead of min, with minimal reduction
+  const medianEstimate = calculatePercentile(estimates, 50);
+  const reasonablePrice = medianEstimate * 0.97; // Reduced from 0.90 to 0.97
+
+  // Apply lighter competitive filters
+  return applyLighterCompetitivePricingFilters(reasonablePrice, prices);
 }
 
 // Agent 2: Get comprehensive market pricing with 20+ prices
