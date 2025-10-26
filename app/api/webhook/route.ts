@@ -186,18 +186,26 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 // ดึงข้อมูล item ที่มีข้อมูลการยืนยัน
                 const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
 
-                if (!item || !item.confirmationProposedContract) {
-                  console.error('Item not found or no proposed contract data');
+                if (!item) {
+                  console.error('Item not found');
+                  return;
+                }
+
+                // เลือกใช้ข้อมูลการยืนยัน (confirmationNewContract มี priority สูงกว่า confirmationProposedContract)
+                const confirmedContract = item.confirmationNewContract || item.confirmationProposedContract;
+
+                if (!confirmedContract) {
+                  console.error('No confirmed contract data found');
                   return;
                 }
 
                 // สร้างสัญญาจริง
                 const contractNumber = `PW${Date.now()}`;
                 const startDate = new Date();
-                const proposedContract = item.confirmationProposedContract;
+                const proposedContract = confirmedContract;
 
                 const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + proposedContract.periodDays);
+                dueDate.setDate(dueDate.getDate() + (proposedContract.loanDays || proposedContract.periodDays || 30));
 
                 const newContract = {
                   contractNumber,
@@ -217,11 +225,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   },
                   pawnDetails: {
                     aiEstimatedPrice: item.estimatedValue || 0,
-                    pawnedPrice: proposedContract.pawnedPrice,
+                    pawnedPrice: proposedContract.pawnPrice || proposedContract.pawnedPrice,
                     interestRate: proposedContract.interestRate,
-                    periodDays: proposedContract.periodDays,
-                    totalInterest: proposedContract.interestAmount,
-                    remainingAmount: proposedContract.remainingAmount,
+                    periodDays: proposedContract.loanDays || proposedContract.periodDays,
+                    totalInterest: proposedContract.interest || proposedContract.interestAmount,
+                    remainingAmount: proposedContract.total || proposedContract.remainingAmount,
                     fineAmount: 0,
                     payInterest: 0,
                     soldAmount: 0,
@@ -279,7 +287,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
                     } as any,
                     $inc: {
                       totalContracts: 1,
-                      totalValue: proposedContract.pawnedPrice,
+                      totalValue: proposedContract.pawnPrice || proposedContract.pawnedPrice,
                     },
                   }
                 );
@@ -289,8 +297,8 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   await sendConfirmationSuccessMessage(item.lineId, {
                     contractNumber,
                     storeName: proposedContract.storeName,
-                    pawnedPrice: proposedContract.pawnedPrice,
-                    remainingAmount: proposedContract.remainingAmount,
+                    pawnedPrice: proposedContract.pawnPrice || proposedContract.pawnedPrice,
+                    remainingAmount: proposedContract.total || proposedContract.remainingAmount,
                     dueDate: dueDate.toISOString(),
                   });
                 } catch (messageError) {
