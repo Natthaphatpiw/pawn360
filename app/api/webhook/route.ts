@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent, Client } from '@line/bot-sdk';
-import { verifySignature, sendStoreLocationCard } from '@/lib/line/client';
+import { verifySignature, sendStoreLocationCard, sendConfirmationSuccessMessage } from '@/lib/line/client';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -179,19 +179,126 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
                 const { db } = await connectToDatabase();
                 const itemsCollection = db.collection('items');
+                const contractsCollection = db.collection('contracts');
+                const customersCollection = db.collection('customers');
+                const storesCollection = db.collection('stores');
 
-                // Update item confirmation status to confirmed
+                // ดึงข้อมูล item ที่มีข้อมูลการยืนยัน
+                const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
+
+                if (!item || !item.confirmationProposedContract) {
+                  console.error('Item not found or no proposed contract data');
+                  return;
+                }
+
+                // สร้างสัญญาจริง
+                const contractNumber = `PW${Date.now()}`;
+                const startDate = new Date();
+                const proposedContract = item.confirmationProposedContract;
+
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + proposedContract.periodDays);
+
+                const newContract = {
+                  contractNumber,
+                  status: 'active',
+                  customerId: item.customerId || item.lineId, // ใช้ customerId หรือ lineId เป็น fallback
+                  lineId: item.lineId,
+                  item: {
+                    itemId: item._id,
+                    brand: item.brand,
+                    model: item.model,
+                    type: item.type,
+                    serialNo: item.serialNo || '',
+                    condition: item.condition,
+                    defects: item.defects || '',
+                    accessories: item.accessories || '',
+                    images: item.images || [],
+                  },
+                  pawnDetails: {
+                    aiEstimatedPrice: item.estimatedValue || 0,
+                    pawnedPrice: proposedContract.pawnedPrice,
+                    interestRate: proposedContract.interestRate,
+                    periodDays: proposedContract.periodDays,
+                    totalInterest: proposedContract.interestAmount,
+                    remainingAmount: proposedContract.remainingAmount,
+                    fineAmount: 0,
+                    payInterest: 0,
+                    soldAmount: 0,
+                  },
+                  dates: {
+                    startDate,
+                    dueDate,
+                    extendedDate: null,
+                    redeemedDate: null,
+                  },
+                  storeId: new ObjectId(proposedContract.storeId),
+                  storeName: proposedContract.storeName,
+                  // เพิ่มฟิลด์สำหรับบันทึก URL
+                  documents: {
+                    contractHtmlUrl: null, // จะอัปเดตหลังจากสร้าง HTML
+                    verificationPhotoUrl: null, // จะอัปเดตหลังจากถ่ายรูป
+                  },
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                };
+
+                const result = await contractsCollection.insertOne(newContract);
+
+                // อัปเดต item status และเพิ่ม contract reference
                 await itemsCollection.updateOne(
                   { _id: new ObjectId(itemId) },
                   {
                     $set: {
+                      status: 'contracted',
                       confirmationStatus: 'confirmed',
+                      contractId: result.insertedId,
+                      storeId: new ObjectId(proposedContract.storeId),
                       updatedAt: new Date()
-                    }
+                    },
+                    $unset: {
+                      confirmationModifications: 1,
+                      confirmationProposedContract: 1,
+                      confirmationTimestamp: 1
+                    },
+                    $push: {
+                      contractHistory: result.insertedId as any,
+                    } as any,
                   }
                 );
 
-                console.log(`Contract modification confirmed for itemId: ${itemId}`);
+                // อัปเดตข้อมูลลูกค้า
+                await customersCollection.updateOne(
+                  { lineId: item.lineId },
+                  {
+                    $set: {
+                      storeId: new ObjectId(proposedContract.storeId),
+                    },
+                    $push: {
+                      contractsID: result.insertedId as any,
+                    } as any,
+                    $inc: {
+                      totalContracts: 1,
+                      totalValue: proposedContract.pawnedPrice,
+                    },
+                  }
+                );
+
+                // ส่งข้อความยืนยันสำเร็จให้ user
+                try {
+                  await sendConfirmationSuccessMessage(item.lineId, {
+                    contractNumber,
+                    storeName: proposedContract.storeName,
+                    pawnedPrice: proposedContract.pawnedPrice,
+                    remainingAmount: proposedContract.remainingAmount,
+                    dueDate: dueDate.toISOString(),
+                  });
+                } catch (messageError) {
+                  console.error('Error sending confirmation success message:', messageError);
+                  // ไม่ให้ error นี้หยุดการทำงานหลัก
+                }
+
+                console.log(`Contract created successfully for itemId: ${itemId}, contractId: ${result.insertedId}`);
               } catch (error) {
                 console.error('Error processing contract modification confirmation:', error);
                 console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');

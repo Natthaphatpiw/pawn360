@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const contractNumber = `STORE${Date.now()}`;
 
     // Upload contract images to S3 if provided
-    const contractImageUrls: { signedContract?: string; verificationPhoto?: string } = {};
+    const contractImageUrls: { contractHtmlUrl?: string; verificationPhotoUrl?: string } = {};
 
     if (contractData.signatures?.seller?.signatureData || contractData.signatures?.buyer?.signatureData) {
       try {
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         });
 
         await s3Client.send(uploadCommand);
-        contractImageUrls.verificationPhoto = `https://${process.env.AWS_S3_BUCKET_NAME || 'piwp360'}.s3.amazonaws.com/${photoKey}`;
+        contractImageUrls.verificationPhotoUrl = `https://${process.env.AWS_S3_BUCKET_NAME || 'piwp360'}.s3.amazonaws.com/${photoKey}`;
       } catch (error) {
         console.error('Error uploading verification photo:', error);
       }
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       userId: new ObjectId(storeId),
       // New fields for signatures and images
       signatures: contractData.signatures,
-      contractImages: contractImageUrls,
+      documents: contractImageUrls,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

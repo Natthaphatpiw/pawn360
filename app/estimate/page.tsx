@@ -37,7 +37,24 @@ interface EstimateResult {
 interface Store {
   _id: string;
   storeName: string;
-  interestRate?: number;
+  phone?: string;
+  address?: {
+    houseNumber: string;
+    street?: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    postcode: string;
+  };
+  interestPerday?: number; // ดอกเบี้ยต่อวัน (decimal เช่น 0.025 = 2.5%)
+  interestSet?: { [days: string]: number }; // ดอกเบี้ยแบบรายเดือน { "7": 0.07, "14": 0.08, "30": 0.10 }
+  logo?: string;
+  googlemap?: string;
+  bankUrl?: string;
+  delayed?: {
+    maxday: number;
+    feeperday: number;
+  };
 }
 
 interface Customer {
@@ -50,7 +67,7 @@ interface Customer {
   pawnRequests: any[];
 }
 
-type Step = 'input' | 'form' | 'result' | 'pawn_setup' | 'qr_display';
+type Step = 'input' | 'form' | 'pawn_setup' | 'qr_display';
 
 export default function EstimatePage() {
   const { profile, isLoading, error: liffError } = useLiff();
@@ -86,7 +103,9 @@ export default function EstimatePage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [pawnDuration, setPawnDuration] = useState<string>('30');
-  const [interestRate, setInterestRate] = useState<number>(10);
+  const [interestCalculationType, setInterestCalculationType] = useState<'daily' | 'monthly'>('monthly');
+  const [interestAmount, setInterestAmount] = useState<number>(0);
+  const [totalAmount, setTotalAmount] = useState<number>(0);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [desiredPrice, setDesiredPrice] = useState<string>('');
 
@@ -119,6 +138,115 @@ export default function EstimatePage() {
       checkCustomerExists();
     }
   }, [profile?.userId]);
+
+  // Fetch stores when entering pawn_setup step
+  useEffect(() => {
+    if (currentStep === 'pawn_setup') {
+      fetchStores();
+    }
+  }, [currentStep]);
+
+  // Calculate interest when store, duration, or type changes
+  useEffect(() => {
+    if (selectedStore && pawnDuration && estimateResult) {
+      calculateInterest();
+    }
+  }, [selectedStore, pawnDuration, interestCalculationType, estimateResult]);
+
+  // Functions for interest calculation
+  const calculateInterest = () => {
+    const store = stores.find(s => s._id === selectedStore);
+    if (!store || !estimateResult) return;
+
+    const principal = parseFloat(desiredPrice) || estimateResult.estimatedPrice;
+    const days = parseInt(pawnDuration);
+
+    let interest = 0;
+
+    if (interestCalculationType === 'daily' && store.interestPerday) {
+      // ดอกเบี้ยรายวัน: เงินต้น × อัตราดอกเบี้ยต่อวัน × จำนวนวัน
+      interest = principal * store.interestPerday * days;
+    } else if (interestCalculationType === 'monthly' && store.interestSet) {
+      // ดอกเบี้ยรายเดือน: เงินต้น × อัตราดอกเบี้ยต่อเดือน × (จำนวนเดือน)
+      // หากมีอัตราเฉพาะสำหรับจำนวนวันนี้ ให้ใช้ หากไม่มีให้คำนวณแบบสัดส่วน
+      if (store.interestSet[days.toString()]) {
+        // กรณีมีอัตราเฉพาะ เช่น 7 วัน = 7%
+        interest = principal * store.interestSet[days.toString()];
+      } else {
+        // กรณีไม่มีอัตราเฉพาะ คำนวณแบบสัดส่วนรายวัน
+        // สมมติฐาน: เดือน = 30 วัน
+        const monthlyRate = store.interestSet['30'] || 0.10; // default 10%
+        const dailyRate = monthlyRate / 30;
+        interest = principal * dailyRate * days;
+      }
+    }
+
+    setInterestAmount(Math.round(interest));
+    setTotalAmount(Math.round(principal + interest));
+  };
+
+  const fetchStores = async () => {
+    try {
+      const response = await axios.get('/api/stores');
+      if (response.data.success) {
+        setStores(response.data.stores);
+      }
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+    }
+  };
+
+  const handleCreatePawnRequest = async () => {
+    if (!selectedStore || !estimateResult || !customer) {
+      setError('กรุณาเลือกร้านและกรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Prepare pawn request data
+      const pawnRequestData = {
+        lineId: profile?.userId,
+        item: {
+          ...formData,
+          images: imageUrls,
+          estimatedValue: estimateResult.estimatedPrice,
+          conditionScore: conditionResult?.score || 0
+        },
+        pawnDetails: {
+          storeId: selectedStore,
+          desiredAmount: parseFloat(desiredPrice) || estimateResult.estimatedPrice,
+          loanDays: parseInt(pawnDuration),
+          interestCalculationType: interestCalculationType,
+          interestAmount: interestAmount,
+          totalAmount: totalAmount,
+          interestRate: interestCalculationType === 'daily'
+            ? stores.find(s => s._id === selectedStore)?.interestPerday || 0
+            : (stores.find(s => s._id === selectedStore)?.interestSet?.[pawnDuration.toString()] || 0) / parseInt(pawnDuration) / 30 // Convert to daily rate
+        },
+        customer: customer,
+        status: 'pending'
+      };
+
+      console.log('Creating pawn request:', pawnRequestData);
+
+      const response = await axios.post('/api/pawn-requests', pawnRequestData);
+
+      if (response.data.success) {
+        setSuccess('สร้าง QR Code สำเร็จ! กรุณาตรวจสอบใน LINE ของคุณ');
+        setCurrentStep('qr_display');
+      } else {
+        throw new Error(response.data.error || 'Failed to create pawn request');
+      }
+    } catch (error: any) {
+      console.error('Error creating pawn request:', error);
+      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้าง QR Code');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -270,11 +398,11 @@ export default function EstimatePage() {
       const response = await axios.post('/api/estimate', estimateData);
       setEstimateResult(response.data);
 
-      // Fetch stores for result step
+      // Fetch stores for pawn_setup step
       await fetchStores();
 
-      // Move to result step
-      setCurrentStep('result');
+      // Move to pawn_setup step
+      setCurrentStep('pawn_setup');
 
     } catch (error: any) {
       console.error('Estimation error:', error);
@@ -284,46 +412,6 @@ export default function EstimatePage() {
     }
   };
 
-  const fetchStores = async () => {
-    try {
-      console.log('Fetching stores...');
-      const response = await axios.get('/api/stores');
-      console.log('Stores fetched:', response.data.stores?.length || 0, 'stores');
-      setStores(response.data.stores || []);
-    } catch (error) {
-      console.error('Error fetching stores:', error);
-      setStores([]);
-    }
-  };
-
-
-  const calculateInterest = () => {
-    const pawnPrice = parseInt(desiredPrice) || 0;
-    if (!pawnPrice) return 0;
-    const store = stores.find(s => s._id === selectedStore);
-    const interestRateValue = store?.interestRate || 10; // Default to 10%
-    const days = parseInt(pawnDuration);
-    const monthlyRate = interestRateValue / 100 / 30; // Daily rate
-    return Math.round(pawnPrice * monthlyRate * days);
-  };
-
-  const handleContinue = () => {
-    if (!estimateResult || !desiredPrice || parseInt(desiredPrice) > estimateResult.estimatedPrice) {
-      setError('กรุณากรอกราคาที่ต้องการจำนำให้ถูกต้อง');
-      return;
-    }
-    if (!selectedStore) {
-      setError('กรุณาเลือกร้านจำนำ');
-      return;
-    }
-    if (!customer) {
-      setError('กรุณาลงทะเบียนก่อนดำเนินการต่อ');
-      return;
-    }
-
-    setError(null);
-    setCurrentStep('pawn_setup');
-  };
 
   const handleRegister = () => {
     // ไปหน้า register
@@ -387,63 +475,6 @@ export default function EstimatePage() {
     }
   };
 
-  const handleCreatePawnRequest = async () => {
-    if (!customer) {
-      setError('กรุณาลงทะเบียนก่อนดำเนินการต่อ');
-      return;
-    }
-
-    setError(null);
-    setIsSubmitting(true);
-
-    // Validate required fields
-    if (!formData.brand || !formData.model || !formData.itemType || formData.condition === undefined) {
-      setError('กรุณากรอกข้อมูลสินค้าให้ครบถ้วน');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!estimateResult?.estimatedPrice) {
-      setError('ไม่พบข้อมูลราคาประเมิน');
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const pawnData = {
-        lineId: profile.userId,
-        brand: formData.brand,
-        model: formData.model,
-        type: formData.itemType,
-        serialNo: formData.serialNo,
-        condition: formData.condition,
-        defects: formData.defects,
-        note: formData.note,
-        accessories: formData.accessories,
-        images: imageUrls,
-        estimatedValue: estimateResult?.estimatedPrice,
-        pawnedPrice: parseInt(desiredPrice),
-        interestRate,
-        periodDays: parseInt(pawnDuration),
-        storeId: selectedStore,
-        totalInterest: calculateInterest(),
-        remainingAmount: estimateResult?.estimatedPrice
-      };
-
-      console.log('Sending pawn request data:', pawnData);
-      await axios.post('/api/pawn-requests', pawnData);
-      setSuccess('สร้างคำขอจำนำเรียบร้อยแล้ว');
-
-      // Move to QR display step
-      setCurrentStep('qr_display');
-
-    } catch (error: any) {
-      console.error('Error creating pawn request:', error);
-      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างคำขอจำนำ');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -886,319 +917,6 @@ export default function EstimatePage() {
           </div>
         )}
 
-        {currentStep === 'result' && estimateResult && (
-          <div className="p-4">
-            {/* Progress Indicator */}
-            <div className="mb-6">
-              <div className="flex items-center justify-center mb-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1F6F3B' }}>
-                    <span className="text-white text-sm">✓</span>
-                  </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#1F6F3B' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1F6F3B' }}>
-                    <span className="text-white text-sm">✓</span>
-                  </div>
-                  <div className="w-12 h-1" style={{ backgroundColor: '#1F6F3B' }}></div>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#1F6F3B' }}>
-                    <span className="text-white text-sm">3</span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-center text-sm" style={{ color: '#6B7280' }}>
-                <p>อัพโหลดรูป ✓ → กรอกข้อมูล ✓ → <strong style={{ color: '#1F6F3B' }}>เลือกตัวเลือก</strong></p>
-              </div>
-            </div>
-
-            {/* Header Summary Card */}
-            <div className="rounded-lg p-3 mb-6" style={{ backgroundColor: '#EEECEB' }}>
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-xs mb-1" style={{ color: '#6B7280' }}>สินค้า</p>
-                  <p className="text-base font-semibold" style={{ color: '#1E293B' }}>
-                    {formData.brand} {formData.model}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm" style={{ color: '#6B7280' }}>
-                    สภาพ {conditionResult ? Math.round(conditionResult.score * 100) : 0}%
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Image Preview Card */}
-            {imageUrls.length > 0 && (
-              <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#F7F7F7' }}>
-                <Image
-                  src={imageUrls[0]}
-                  alt="Product image"
-                  width={1200}
-                  height={800}
-                  className="w-full rounded-md object-cover"
-                  priority
-                />
-              </div>
-            )}
-
-            {/* AI Estimated Price Card */}
-            <div className="rounded-xl p-6 mb-6 text-center" style={{ backgroundColor: '#DDEEE0' }}>
-              <p className="text-sm mb-2" style={{ color: '#1F6F3B' }}>ราคาประเมินจาก AI</p>
-              <p className="text-3xl font-extrabold mb-1" style={{ color: '#1F6F3B' }}>
-                {estimateResult.estimatedPrice.toLocaleString()}
-              </p>
-              <p className="text-sm" style={{ color: '#6B7280' }}>บาท</p>
-            </div>
-
-            {/* Form Block */}
-            <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E6E7E8' }}>
-
-              {/* Item Price Input */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
-                  ราคาที่ต้องการจำนำ*
-                </label>
-                <input
-                  type="number"
-                  value={desiredPrice}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const numValue = parseInt(value) || 0;
-                    if (numValue <= estimateResult.estimatedPrice) {
-                      setDesiredPrice(value);
-                    }
-                  }}
-                  className="w-full px-3 py-2 focus:outline-none"
-                  style={{
-                    border: '1px solid #E6E7E8',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '10px',
-                    color: '#1E293B',
-                    height: '44px'
-                  }}
-                  placeholder="กรุณากรอกราคาที่ต้องการ"
-                  max={estimateResult.estimatedPrice}
-                />
-                <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
-                  สูงสุด {estimateResult.estimatedPrice.toLocaleString()} บาท (ราคาประเมิน)
-                </p>
-                {parseInt(desiredPrice) > estimateResult.estimatedPrice && (
-                  <p className="text-xs mt-1" style={{ color: '#DC2626' }}>
-                    ไม่สามารถกำหนดราคาที่ต้องการได้มากกว่าราคาประเมิน
-                  </p>
-                )}
-              </div>
-
-              {/* Use Estimated Price Button */}
-              <div className="mb-4">
-                <button
-                  onClick={() => setDesiredPrice(estimateResult.estimatedPrice.toString())}
-                  className="w-full py-2 px-3 rounded-lg text-sm font-medium"
-                  style={{
-                    backgroundColor: '#CFE3D2',
-                    color: '#1F6F3B',
-                    border: '1px solid #1F6F3B'
-                  }}
-                >
-                  ใช้ราคาประเมินเป็นราคาที่ต้องการ
-                </button>
-              </div>
-
-              {/* Pawn Shop Select */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
-                  เลือกร้านจำนำ*
-                </label>
-                <select
-                  value={selectedStore}
-                  onChange={(e) => {
-                    setSelectedStore(e.target.value);
-                    const store = stores.find(s => s._id === e.target.value);
-                    if (store?.interestRate) {
-                      setInterestRate(store.interestRate);
-                    }
-                  }}
-                  className="w-full px-3 py-2 focus:outline-none"
-                  style={{
-                    border: '1px solid #E6E7E8',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '10px',
-                    color: '#1E293B',
-                    height: '44px'
-                  }}
-                >
-                  <option value="">เลือกเพื่อดูราคาประเมิน</option>
-                  {stores.map(store => (
-                    <option key={store._id} value={store._id}>
-                      {store.storeName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Pawn Duration Select */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
-                  ระยะเวลาที่ต้องการจำนำ*
-                </label>
-                <select
-                  value={pawnDuration}
-                  onChange={(e) => setPawnDuration(e.target.value)}
-                  className="w-full px-3 py-2 focus:outline-none"
-                  style={{
-                    border: '1px solid #E6E7E8',
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '10px',
-                    color: '#1E293B',
-                    height: '44px'
-                  }}
-                >
-                  <option value="7">7 วัน</option>
-                  <option value="14">14 วัน</option>
-                  <option value="30">30 วัน</option>
-                  <option value="60">60 วัน</option>
-                  <option value="90">90 วัน</option>
-                </select>
-              </div>
-
-              {/* Interest Amount Display */}
-              {desiredPrice && pawnDuration && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
-                    จำนวนดอกเบี้ย
-                  </label>
-                  <div className="w-full px-3 py-2 rounded-lg border" style={{
-                    border: '1px solid #E6E7E8',
-                    backgroundColor: '#F9F9F9',
-                    borderRadius: '10px',
-                    color: '#1E293B',
-                    height: '44px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    {calculateInterest().toLocaleString()} บาท
-                  </div>
-                  <p className="text-xs mt-1" style={{ color: '#9CA3AF' }}>
-                    จำนวนดอกเบี้ยขึ้นอยู่กับจำนวนระยะเวลาการจำนำ
-                  </p>
-                </div>
-              )}
-
-            </div>
-
-
-            {/* Success/Error Messages */}
-            {success && (
-              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#EFE', border: '1px solid #CFC', color: '#363' }}>
-                {success}
-              </div>
-            )}
-
-            {error && (
-              <div className="mb-4 p-3 rounded-lg" style={{ backgroundColor: '#FEE', border: '1px solid #FCC', color: '#C33' }}>
-                {error}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="space-y-4">
-              {/* Info Card */}
-      <div className="rounded-lg p-4" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
-        <div>
-          <h4 className="text-sm font-semibold mb-1" style={{ color: '#333333' }}>ขั้นตอนต่อไป</h4>
-          <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
-            เลือกตัวเลือกที่ต้องการ หากลงทะเบียนแล้วสามารถดำเนินการต่อเพื่อสร้าง QR Code
-          </p>
-        </div>
-      </div>
-
-              {/* Primary Actions */}
-              {selectedStore ? (
-                <div className="space-y-3">
-        <button
-          onClick={handleContinue}
-          disabled={!customer}
-          className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold"
-          style={{
-            backgroundColor: customer ? '#2D7A46' : '#EAEAEA',
-            color: customer ? 'white' : '#AAAAAA'
-          }}
-          onMouseEnter={() => console.log('Button hover - customer:', !!customer)}
-        >
-          ดำเนินการต่อ - สร้าง QR Code
-        </button>
-
-          {!customer && (
-            <p className="text-xs text-center text-gray-600">
-              ต้องลงทะเบียนก่อนจึงจะสร้าง QR Code ได้
-            </p>
-          )}
-                </div>
-              ) : (
-                <div className="w-full py-4 px-4 rounded-lg text-center text-base" style={{ backgroundColor: '#EAEAEA', color: '#AAAAAA' }}>
-                  เลือกร้านเพื่อดูราคาก่อน
-                </div>
-              )}
-
-              {/* Secondary Actions */}
-              <div className="border-t border-gray-200 pt-4 space-y-3">
-                <button
-                  onClick={handleRegister}
-                  className="w-full py-3 px-4 rounded-lg transition-colors text-base font-medium"
-                  style={{
-                    backgroundColor: 'white',
-                    color: '#2D7A46',
-                    border: '2px solid #2D7A46',
-                    borderRadius: '12px'
-                  }}
-                >
-                  ลงทะเบียนสมาชิก
-                </button>
-
-                <button
-                  onClick={handleSaveTemporary}
-                  className="w-full py-3 px-4 rounded-lg transition-colors text-base font-medium"
-                  style={{
-                    backgroundColor: '#E7EFE9',
-                    color: '#0E5D1E'
-                  }}
-                >
-                  บันทึกชั่วคราว
-                </button>
-
-                <button
-                  onClick={() => {
-                    setCurrentStep('input');
-                    // Reset form
-                    setFormData({
-                      itemType: '',
-                      brand: '',
-                      model: '',
-                      serialNo: '',
-                      accessories: '',
-                      condition: 50,
-                      defects: '',
-                      note: ''
-                    });
-                    setImages([]);
-                    setImageUrls([]);
-                    setEstimateResult(null);
-                    setSelectedStore('');
-                    setError(null);
-                    setSuccess(null);
-                  }}
-                  className="w-full py-3 px-4 rounded-lg transition-colors text-base font-medium"
-                  style={{
-                    backgroundColor: '#666666',
-                    color: 'white'
-                  }}
-                >
-                  ประเมินสินค้าอื่นๆ
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {currentStep === 'pawn_setup' && (
           <div className="p-4">
@@ -1226,15 +944,148 @@ export default function EstimatePage() {
 
             <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการจำนำ</h1>
 
+            {/* Store Selection */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold mb-3">เลือกร้านจำนำ</h3>
+              <select
+                value={selectedStore}
+                onChange={(e) => setSelectedStore(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">เลือกกรุณาเลือกร้าน</option>
+                {stores.map((store) => (
+                  <option key={store._id} value={store._id}>
+                    {store.storeName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Duration and Interest Calculation */}
+            {selectedStore && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold mb-3">ระยะเวลาและดอกเบี้ย</h3>
+
+                {/* Duration Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">จำนวนวันที่ต้องการจำนำ</label>
+                  <select
+                    value={pawnDuration}
+                    onChange={(e) => setPawnDuration(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="7">7 วัน</option>
+                    <option value="14">14 วัน</option>
+                    <option value="30">30 วัน</option>
+                    <option value="60">60 วัน</option>
+                    <option value="90">90 วัน</option>
+                  </select>
+                </div>
+
+                {/* Interest Calculation Type */}
+                {(() => {
+                  const store = stores.find(s => s._id === selectedStore);
+                  const hasDailyRate = store?.interestPerday;
+                  const hasMonthlyRate = store?.interestSet;
+
+                  if (hasDailyRate && hasMonthlyRate) {
+                    return (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-2">ประเภทการคิดดอกเบี้ย</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setInterestCalculationType('monthly')}
+                            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                              interestCalculationType === 'monthly'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            รายเดือน
+                          </button>
+                          <button
+                            onClick={() => setInterestCalculationType('daily')}
+                            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                              interestCalculationType === 'daily'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            รายวัน
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  } else if (hasDailyRate) {
+                    // Force to daily
+                    setInterestCalculationType('daily');
+                  } else if (hasMonthlyRate) {
+                    // Force to monthly
+                    setInterestCalculationType('monthly');
+                  }
+
+                  return null;
+                })()}
+
+                {/* Interest Calculation Display */}
+                {estimateResult && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>ราคาประเมิน:</span>
+                        <span className="font-semibold">{estimateResult.estimatedPrice.toLocaleString()} บาท</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>ราคาที่ต้องการจำนำ:</span>
+                        <input
+                          type="number"
+                          value={desiredPrice}
+                          onChange={(e) => setDesiredPrice(e.target.value)}
+                          placeholder={estimateResult.estimatedPrice.toString()}
+                          className="w-24 p-1 border border-gray-300 rounded text-right text-sm"
+                          min="1"
+                          max={estimateResult.estimatedPrice}
+                        />
+                        <span className="ml-2">บาท</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>จำนวนวัน:</span>
+                        <span className="font-semibold">{pawnDuration} วัน</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>ดอกเบี้ย:</span>
+                        <span className="font-semibold text-red-600">{interestAmount.toLocaleString()} บาท</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between font-semibold">
+                        <span>รวมทั้งสิ้น:</span>
+                        <span className="text-green-600">{totalAmount.toLocaleString()} บาท</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Info Card */}
-    <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
-      <div>
-        <h4 className="text-sm font-semibold mb-1" style={{ color: '#333333' }}>พร้อมสร้าง QR Code</h4>
-        <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
-          ข้อมูลครบถ้วนแล้ว กดสร้าง QR Code เพื่อให้พนักงานร้านสแกนและดำเนินการจำนำ
-        </p>
-      </div>
-    </div>
+            {selectedStore && estimateResult ? (
+              <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
+                <div>
+                  <h4 className="text-sm font-semibold mb-1" style={{ color: '#333333' }}>พร้อมสร้าง QR Code</h4>
+                  <p className="text-sm leading-relaxed" style={{ color: '#666666' }}>
+                    ข้อมูลครบถ้วนแล้ว กดสร้าง QR Code เพื่อให้พนักงานร้านสแกนและดำเนินการจำนำ
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg p-4 mb-6" style={{ backgroundColor: '#FFF3CD', border: '1px solid #FFEAA7' }}>
+                <div>
+                  <h4 className="text-sm font-semibold mb-1" style={{ color: '#856404' }}>กรุณาเลือกร้านและระบุจำนวนวัน</h4>
+                  <p className="text-sm leading-relaxed" style={{ color: '#856404' }}>
+                    เลือกร้านจำนำและจำนวนวันที่ต้องการจำนำเพื่อคำนวณดอกเบี้ย
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Customer Info */}
             {customer && (
@@ -1267,17 +1118,23 @@ export default function EstimatePage() {
             )}
 
             {/* Create Pawn Request Button */}
-            <button
-              onClick={handleCreatePawnRequest}
-              disabled={isSubmitting}
-              className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold"
-              style={{
-                backgroundColor: isSubmitting ? '#EAEAEA' : '#2D7A46',
-                color: isSubmitting ? '#AAAAAA' : 'white'
-              }}
-            >
-              {isSubmitting ? 'กำลังสร้าง QR Code...' : 'สร้าง QR Code สำหรับจำนำ'}
-            </button>
+            {selectedStore && estimateResult ? (
+              <button
+                onClick={handleCreatePawnRequest}
+                disabled={isSubmitting}
+                className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold"
+                style={{
+                  backgroundColor: isSubmitting ? '#EAEAEA' : '#2D7A46',
+                  color: isSubmitting ? '#AAAAAA' : 'white'
+                }}
+              >
+                {isSubmitting ? 'กำลังสร้าง QR Code...' : 'สร้าง QR Code สำหรับจำนำ'}
+              </button>
+            ) : (
+              <div className="w-full py-4 px-4 rounded-lg text-center text-base font-semibold" style={{ backgroundColor: '#EAEAEA', color: '#AAAAAA' }}>
+                เลือกร้านเพื่อสร้าง QR Code
+              </div>
+            )}
 
             <p className="text-xs text-center text-gray-600 mt-2">
               QR Code จะถูกส่งไปยัง LINE ของคุณ และคุณสามารถนำไปให้ร้านไหนก็ได้

@@ -598,19 +598,23 @@ export async function sendContractCompletionNotification(
 }
 
 // Send Contract Modification Confirmation
-export async function sendConfirmationMessage(lineId: string, modifications: string[], newContract: any) {
+export async function sendConfirmationMessage(lineId: string, modifications: any, newContract: any) {
   try {
     const client = getLineClient();
 
-    console.log('Sending contract modification confirmation to:', lineId);
+    console.log('Sending contract confirmation to:', lineId);
     console.log('Modifications:', modifications);
     console.log('New contract:', newContract);
 
-    const modificationText = modifications.join('\n• ');
+    // ตรวจสอบประเภทการยืนยัน
+    const isContractCreation = modifications.type === 'contract_creation';
+    const headerText = isContractCreation ? 'ยืนยันการสร้างสัญญา' : 'มีการแก้ไขสัญญา';
+    const altText = isContractCreation ? `🔔 การสร้างสัญญาจำนำ` : `🔔 การแก้ไขสัญญา`;
+    const modificationText = isContractCreation ? 'การสร้างสัญญาจำนำใหม่' : modifications.changes.join('\n• ');
 
     const flexMessage = {
       type: 'flex',
-      altText: `🔔 การแก้ไขสัญญา - ${newContract.item}`,
+      altText: altText,
       contents: {
         type: 'bubble',
         header: {
@@ -619,7 +623,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
           contents: [
             {
               type: 'text',
-              text: 'มีการแก้ไขสัญญา',
+              text: headerText,
               weight: 'bold',
               size: 'lg',
               color: '#ffffff',
@@ -635,14 +639,14 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
           contents: [
             {
               type: 'text',
-              text: 'รายละเอียดการแก้ไข:',
+              text: isContractCreation ? 'รายละเอียดสัญญา:' : 'รายละเอียดการแก้ไข:',
               weight: 'bold',
               size: 'md',
               margin: 'md'
             },
             {
               type: 'text',
-              text: `• ${modificationText}`,
+              text: isContractCreation ? modificationText : `• ${modificationText}`,
               size: 'sm',
               color: '#555555',
               wrap: true,
@@ -654,7 +658,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
             },
             {
               type: 'text',
-              text: 'สัญญาใหม่ที่จะเกิดขึ้น:',
+              text: 'รายละเอียดสัญญา:',
               weight: 'bold',
               size: 'md',
               margin: 'lg'
@@ -670,8 +674,8 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
                   layout: 'baseline',
                   spacing: 'sm',
                   contents: [
-                    { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: newContract.item, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: 'ร้านค้า:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: newContract.storeName, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -680,7 +684,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${newContract.pawnPrice.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${newContract.pawnedPrice.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -689,7 +693,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${newContract.interest.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${newContract.interestAmount.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -698,7 +702,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ระยะเวลา:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${newContract.loanDays} วัน`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${newContract.periodDays} วัน`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -707,7 +711,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'รวมทั้งสิ้น:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${newContract.total.toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${newContract.remainingAmount.toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
                   ]
                 }
               ]
@@ -745,11 +749,148 @@ export async function sendConfirmationMessage(lineId: string, modifications: str
     };
 
     await client.pushMessage(lineId, flexMessage as FlexMessage);
-    console.log('Contract modification confirmation sent successfully');
+    console.log('Contract confirmation sent successfully');
     return { success: true };
   } catch (error) {
-    console.error('Error sending contract modification confirmation:', error);
+    console.error('Error sending contract confirmation:', error);
     console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+    throw error;
+  }
+}
+
+// Send Contract Creation Success Message
+export async function sendConfirmationSuccessMessage(lineId: string, contractData: any) {
+  try {
+    const client = getLineClient();
+
+    const dueDate = new Date(contractData.dueDate);
+    const dueDateString = dueDate.toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const flexMessage = {
+      type: 'flex',
+      altText: `✅ สัญญาจำนำสำเร็จ - ${contractData.contractNumber}`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '✅ สัญญาจำนำสำเร็จ',
+              weight: 'bold',
+              size: 'lg',
+              color: '#ffffff',
+              align: 'center'
+            },
+          ],
+          backgroundColor: '#0A4215',
+          paddingAll: 'lg'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: 'สัญญาจำนำของคุณได้สร้างเรียบร้อยแล้ว 🎉',
+              weight: 'bold',
+              size: 'md',
+              margin: 'lg',
+              color: '#0A4215'
+            },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'lg',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    { type: 'text', text: 'เลขที่สัญญา:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: contractData.contractNumber, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    { type: 'text', text: 'ร้านค้า:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: contractData.storeName, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: `${contractData.pawnedPrice.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    { type: 'text', text: 'รวมทั้งสิ้น:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: `${contractData.remainingAmount.toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    { type: 'text', text: 'วันครบกำหนด:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: dueDateString, wrap: true, color: '#0A4215', size: 'sm', flex: 5, weight: 'bold' }
+                  ]
+                }
+              ]
+            },
+            {
+              type: 'text',
+              text: 'ขอบคุณที่ใช้บริการ! คุณสามารถติดตามสถานะสัญญาและจัดการการจำนำได้ผ่านระบบของเรา',
+              size: 'sm',
+              color: '#666666',
+              wrap: true,
+              margin: 'lg'
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'button',
+              action: {
+                type: 'uri',
+                label: 'ดูสัญญาและจัดการ',
+                uri: `https://pawn360.vercel.app/contracts`
+              },
+              style: 'primary',
+              color: '#0A4215'
+            }
+          ]
+        }
+      }
+    };
+
+    await client.pushMessage(lineId, flexMessage as FlexMessage);
+    console.log('Contract creation success message sent successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending contract creation success message:', error);
     throw error;
   }
 }
