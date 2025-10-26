@@ -209,12 +209,16 @@ export default function EstimatePage() {
       // Prepare pawn request data
       const pawnRequestData = {
         lineId: profile?.userId,
-        item: {
-          ...formData,
-          images: imageUrls,
-          estimatedValue: estimateResult.estimatedPrice,
-          conditionScore: conditionResult?.score || 0
-        },
+        brand: formData.brand,
+        model: formData.model,
+        type: formData.itemType,
+        serialNo: formData.serialNo,
+        condition: conditionResult?.score || 50, // ใช้ค่า AI condition แทนค่าเริ่มต้น
+        defects: formData.defects,
+        note: formData.note,
+        accessories: formData.accessories,
+        images: imageUrls,
+        estimatedValue: estimateResult.estimatedPrice,
         pawnDetails: {
           storeId: selectedStore,
           desiredAmount: parseFloat(desiredPrice) || estimateResult.estimatedPrice,
