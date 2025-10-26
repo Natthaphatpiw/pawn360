@@ -102,6 +102,13 @@ export interface Item {
   negotiatedDays?: number;
   negotiatedInterestRate?: number;
   negotiationStatus?: 'none' | 'pending' | 'accepted' | 'rejected';
+  // ข้อมูลการยืนยันสัญญา
+  confirmationStatus?: 'none' | 'pending' | 'confirmed' | 'cancelled';
+  confirmationModifications?: any;
+  confirmationProposedContract?: any;
+  confirmationTimestamp?: Date;
+  customerId?: ObjectId;
+  contractId?: ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -159,10 +166,10 @@ export interface Contract {
       signedDate: Date;
     };
   };
-  // รูปภาพสัญญาและการยืนยันตัวตน
-  contractImages?: {
-    signedContract?: string; // URL to signed contract PDF/image in S3
-    verificationPhoto?: string; // URL to verification photo in S3
+  // เอกสารสัญญาและการยืนยันตัวตน
+  documents?: {
+    contractHtmlUrl?: string; // URL to contract HTML in S3
+    verificationPhotoUrl?: string; // URL to verification photo in S3
   };
   createdAt: Date;
   updatedAt: Date;

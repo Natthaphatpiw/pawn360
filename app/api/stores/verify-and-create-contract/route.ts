@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { sendConfirmationMessage } from '@/lib/line/client';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcrypt';
 
@@ -66,8 +67,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. สร้างสัญญา
-    const contractNumber = `PW${Date.now()}`;
+    // 4. เตรียมข้อมูลสัญญาและส่งการยืนยันเสมอ
     const startDate = new Date();
 
     // ใช้ค่าที่ต่อรองแล้ว (ถ้ามี) หรือค่าเริ่มต้น
@@ -82,82 +82,46 @@ export async function POST(request: NextRequest) {
     const interestAmount = (pawnedPrice * interestRate * (periodDays / 30)) / 100;
     const remainingAmount = pawnedPrice + interestAmount;
 
-    const newContract = {
-      contractNumber,
-      status: 'active',
-      customerId: customer._id,
-      lineId: item.lineId,
-      item: {
-        itemId: item._id,
-        brand: item.brand,
-        model: item.model,
-        type: item.type,
-        serialNo: item.serialNo || '',
-        condition: item.condition,
-        defects: item.defects || '',
-        accessories: item.accessories || '',
-        images: item.images || [],
-      },
-      pawnDetails: {
-        aiEstimatedPrice: item.estimatedValue || 0,
-        pawnedPrice,
-        interestRate,
-        periodDays,
-        totalInterest: interestAmount,
-        remainingAmount,
-        fineAmount: 0,
-        payInterest: 0,
-        soldAmount: 0,
-      },
-      dates: {
-        startDate,
-        dueDate,
-        extendedDate: null,
-        redeemedDate: null,
-      },
-      storeId: new ObjectId(storeId),
+    // เตรียมข้อมูลสัญญาสำหรับการยืนยัน
+    const proposedContract = {
+      pawnedPrice,
+      interestRate,
+      periodDays,
+      interestAmount,
+      remainingAmount,
       storeName: store.storeName,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      storeId: storeId,
     };
 
-    const result = await contractsCollection.insertOne(newContract);
+    // สร้างข้อมูลการแก้ไข (แม้จะไม่มีการแก้ไขจริง ก็ส่งเป็นการยืนยัน)
+    const modifications = {
+      type: 'contract_creation', // แสดงว่าเป็นการสร้างสัญญาใหม่ ไม่ใช่การแก้ไข
+      originalValues: null,
+      newValues: proposedContract,
+      changes: [] // ไม่มีการเปลี่ยนแปลง เพราะเป็นการสร้างใหม่
+    };
 
-    // 5. อัปเดตสถานะสินค้า
+    // บันทึกข้อมูลการยืนยันใน item
     await itemsCollection.updateOne(
       { _id: new ObjectId(itemId) },
       {
         $set: {
-          status: 'contracted',
-          storeId: new ObjectId(storeId),
-        },
-        $push: {
-          contractHistory: result.insertedId as any,
-        } as any,
+          confirmationStatus: 'pending',
+          confirmationModifications: modifications,
+          confirmationProposedContract: proposedContract,
+          confirmationTimestamp: new Date(),
+          updatedAt: new Date()
+        }
       }
     );
 
-    // 6. อัปเดตข้อมูลลูกค้า
-    await customersCollection.updateOne(
-      { _id: customer._id },
-      {
-        $set: {
-          storeId: new ObjectId(storeId),
-        },
-        $push: {
-          contractsID: result.insertedId as any,
-        } as any,
-        $inc: {
-          totalContracts: 1,
-          totalValue: pawnedPrice,
-        },
-      }
-    );
+    // ส่งการยืนยันให้ user เสมอ
+    await sendConfirmationMessage(item.lineId, modifications, proposedContract);
 
     return NextResponse.json({
       success: true,
-      contractId: result.insertedId,
-      contractNumber,
+      message: 'ส่งการยืนยันให้ลูกค้าเรียบร้อยแล้ว',
+      status: 'confirmation_sent'
     });
   } catch (error: any) {
     console.error('Error creating contract:', error);
