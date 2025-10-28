@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     try {
       // Convert Buffer to FormData for Shop System
       const formData = new FormData();
-      const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+      const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' });
       const file = new File([blob], 'slip.jpg', { type: 'image/jpeg' });
 
       formData.append('notificationId', notificationId);
