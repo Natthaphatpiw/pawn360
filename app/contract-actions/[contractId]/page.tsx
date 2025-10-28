@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
+import liff from '@line/liff';
 
 const sarabun = Sarabun({
   subsets: ['thai'],
@@ -36,8 +37,27 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [lineUserId, setLineUserId] = useState<string>('');
 
   useEffect(() => {
+    const initializeLiff = async () => {
+      try {
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS || '';
+        await liff.init({ liffId });
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        setLineUserId(profile.userId);
+      } catch (err) {
+        console.error('LIFF initialization error:', err);
+      }
+    };
+
     const fetchContract = async () => {
       try {
         setLoading(true);
@@ -53,28 +73,88 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
     };
 
     if (contractId) {
+      initializeLiff();
       fetchContract();
     }
   }, [contractId]);
 
-  const handleAction = (actionType: string) => {
+  const handleAction = async (actionType: string) => {
+    if (!lineUserId) {
+      alert('กรุณาเข้าสู่ระบบผ่าน LINE');
+      return;
+    }
+
     switch (actionType) {
       case 'redeem':
-        // ไถ่ถอน - จ่ายเงินต้น + ดอก
-        router.push(`/contract-actions/${contractId}/payment?action=${actionType}&amount=${calculateTotalAmount()}`);
+        // NEW FLOW: Send request to shop system first
+        await handleRedemptionRequest();
         break;
       case 'renew':
-        // ต่อดอกเบี้ย - จ่ายเฉพาะดอก
-        router.push(`/contract-actions/${contractId}/payment?action=${actionType}&amount=${calculateInterest()}`);
+        // NEW FLOW: Send request to shop system first
+        await handleExtensionRequest();
         break;
       case 'increase':
-        // เพิ่มต้น - ไปหน้าเพิ่มจำนวน
+        // เพิ่มต้น - ยังใช้ flow เดิม
         router.push(`/contract-actions/${contractId}/increase`);
         break;
       case 'reduce':
-        // ลดต้น - จ่ายเงินต้นบางส่วน (ไปหน้า payment แต่ให้ user ระบุจำนวน)
+        // ลดต้น - ยังใช้ flow เดิม (ไปหน้า payment แต่ให้ user ระบุจำนวน)
         router.push(`/contract-actions/${contractId}/payment?action=${actionType}&amount=0`);
         break;
+    }
+  };
+
+  const handleRedemptionRequest = async () => {
+    try {
+      setSubmitting(true);
+
+      const response = await axios.post('/api/customer/request-redemption', {
+        contractId,
+        lineUserId,
+        message: 'ลูกค้าต้องการไถ่ถอนสัญญา'
+      });
+
+      if (response.data.success) {
+        alert('✅ ส่งคำขอไถ่ถอนเรียบร้อยแล้ว\n\nพนักงานจะดำเนินการภายใน 24 ชั่วโมง คุณจะได้รับ QR Code สำหรับชำระเงินผ่าน LINE Chat');
+
+        // Close LIFF window and return to LINE chat
+        if (liff.isInClient()) {
+          liff.closeWindow();
+        } else {
+          router.push('/contracts');
+        }
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleExtensionRequest = async () => {
+    try {
+      setSubmitting(true);
+
+      const response = await axios.post('/api/customer/request-extension', {
+        contractId,
+        lineUserId,
+        message: 'ลูกค้าต้องการต่อดอกเบี้ย'
+      });
+
+      if (response.data.success) {
+        alert('✅ ส่งคำขอต่อดอกเบี้ยเรียบร้อยแล้ว\n\nพนักงานจะดำเนินการภายใน 24 ชั่วโมง คุณจะได้รับ QR Code สำหรับชำระเงินผ่าน LINE Chat');
+
+        // Close LIFF window and return to LINE chat
+        if (liff.isInClient()) {
+          liff.closeWindow();
+        } else {
+          router.push('/contracts');
+        }
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -150,7 +230,8 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ไถ่ถอน */}
         <button
           onClick={() => handleAction('redeem')}
-          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
+          disabled={submitting}
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors disabled:opacity-50"
           style={{
             backgroundColor: '#fff9c4',
             color: '#f9a825',
@@ -174,7 +255,8 @@ export default function ContractActionsPage({ params }: { params: { contractId: 
         {/* ต่อดอกเบี้ย */}
         <button
           onClick={() => handleAction('renew')}
-          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
+          disabled={submitting}
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors disabled:opacity-50"
           style={{
             backgroundColor: '#259b24',
             color: '#E7EFE9',
