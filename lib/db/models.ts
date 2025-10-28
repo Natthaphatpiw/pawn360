@@ -183,3 +183,34 @@ export interface Transaction {
   date: Date;
   note?: string;
 }
+
+// Notification Model (for async workflow between Customer and Shop System)
+export interface Notification {
+  _id?: ObjectId;
+  shopNotificationId: string; // Notification ID from Shop System
+  contractId: ObjectId;
+  customerId: ObjectId;
+  lineUserId: string;
+  type: 'redemption' | 'extension' | 'increase_principal' | 'reduce_principal';
+  status: 'pending' | 'confirmed' | 'rejected' | 'payment_pending' | 'payment_uploaded' | 'completed' | 'failed';
+  qrCodeUrl?: string;
+  paymentProofUrl?: string;
+  callbackUrl: string;
+  amount?: number;
+  message?: string;
+  shopResponse?: {
+    action: 'confirm' | 'reject';
+    confirmed: boolean;
+    message: string;
+    qrCodeUrl?: string;
+    timestamp: Date;
+  };
+  paymentVerification?: {
+    verified: boolean;
+    message: string;
+    timestamp: Date;
+  };
+  lastWebhookAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}

@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
         await handleFollowEvent(event);
       } else if (event.type === 'postback') {
         await handlePostbackEvent(event);
+      } else if (event.type === 'message') {
+        await handleMessageEvent(event);
       }
     }
 
@@ -339,9 +341,136 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 console.error('Error processing contract modification cancellation:', error);
                 console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
               }
+    } else if (action === 'upload_slip') {
+              // Handle slip upload postback (customer wants to upload payment slip)
+              const notificationId = params.get('notificationId');
+
+              if (!notificationId) {
+                console.error('No notificationId in upload_slip postback');
+                return;
+              }
+
+              try {
+                console.log(`Processing upload_slip for notificationId: ${notificationId}`);
+
+                const { db } = await connectToDatabase();
+                const notificationsCollection = db.collection('notifications');
+
+                // Find notification
+                const notification = await notificationsCollection.findOne({
+                  shopNotificationId: notificationId
+                });
+
+                if (!notification) {
+                  console.error('Notification not found:', notificationId);
+                  return;
+                }
+
+                // Store the notificationId in a temporary context for this user
+                // When they send an image, we'll use this to know which notification it's for
+                await notificationsCollection.updateOne(
+                  { _id: notification._id },
+                  {
+                    $set: {
+                      awaitingSlipUpload: true,
+                      updatedAt: new Date()
+                    }
+                  }
+                );
+
+                // Send instructions to customer
+                const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+                if (channelAccessToken) {
+                  const client = new Client({ channelAccessToken });
+                  await client.pushMessage(userId, {
+                    type: 'text',
+                    text: '📸 กรุณาส่งรูปภาพสลิปการโอนเงิน\n\nหลังจากโอนเงินเรียบร้อยแล้ว กรุณาถ่ายรูปหรือ screenshot สลิปการโอนเงินแล้วส่งมาที่แชทนี้'
+                  });
+                }
+
+                console.log(`Upload slip flow initiated for notification: ${notificationId}`);
+              } catch (error) {
+                console.error('Error processing upload_slip:', error);
+              }
     }
 
   } catch (error) {
     console.error('Error handling postback event:', error);
+  }
+}
+
+async function handleMessageEvent(event: WebhookEvent) {
+  if (event.type !== 'message') return;
+
+  const userId = event.source.userId;
+  if (!userId) return;
+
+  // Check if it's an image message
+  if (event.message.type !== 'image') return;
+
+  const messageId = event.message.id;
+  console.log(`Image message received from ${userId}, messageId: ${messageId}`);
+
+  try {
+    const { db } = await connectToDatabase();
+    const notificationsCollection = db.collection('notifications');
+
+    // Find notification that's awaiting slip upload for this user
+    const notification = await notificationsCollection.findOne({
+      lineUserId: userId,
+      status: 'confirmed',
+      awaitingSlipUpload: true
+    });
+
+    if (!notification) {
+      console.log('No pending slip upload found for this user');
+      return;
+    }
+
+    console.log(`Found pending notification: ${notification.shopNotificationId}, uploading slip`);
+
+    // Call upload-payment-proof API
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    const response = await fetch(`${baseUrl}/api/customer/upload-payment-proof`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        notificationId: notification.shopNotificationId,
+        lineUserId: userId,
+        imageId: messageId
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Failed to upload slip:', error);
+
+      // Send error message to user
+      const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      if (channelAccessToken) {
+        const client = new Client({ channelAccessToken });
+        await client.pushMessage(userId, {
+          type: 'text',
+          text: '❌ เกิดข้อผิดพลาดในการอัพโหลดสลิป กรุณาลองใหม่อีกครั้งหรือติดต่อร้านค้า'
+        });
+      }
+      return;
+    }
+
+    // Clear awaiting flag
+    await notificationsCollection.updateOne(
+      { _id: notification._id },
+      {
+        $unset: { awaitingSlipUpload: 1 },
+        $set: { updatedAt: new Date() }
+      }
+    );
+
+    console.log(`Slip uploaded successfully for notification: ${notification.shopNotificationId}`);
+
+  } catch (error) {
+    console.error('Error handling image message:', error);
   }
 }
