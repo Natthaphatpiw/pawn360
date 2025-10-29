@@ -606,11 +606,26 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
     console.log('Modifications:', modifications);
     console.log('New contract:', newContract);
 
-    // ตรวจสอบประเภทการยืนยัน
-    const isContractCreation = modifications.type === 'contract_creation';
+    // ตรวจสอบประเภทการยืนยัน และรูปแบบของ modifications
+    const isContractCreation = modifications?.type === 'contract_creation';
+
+    // Handle both array format and object format for modifications
+    let changesList: string[] = [];
+    if (Array.isArray(modifications)) {
+      // Direct array format from ContractForm
+      changesList = modifications;
+    } else if (modifications?.changes && Array.isArray(modifications.changes)) {
+      // Object format with changes property
+      changesList = modifications.changes;
+    }
+
     const headerText = isContractCreation ? 'ยืนยันการสร้างสัญญา' : 'มีการแก้ไขสัญญา';
     const altText = isContractCreation ? `🔔 การสร้างสัญญาจำนำ` : `🔔 การแก้ไขสัญญา`;
-    const modificationText = isContractCreation ? 'การสร้างสัญญาจำนำใหม่' : modifications.changes.join('\n• ');
+    const modificationText = isContractCreation
+      ? 'การสร้างสัญญาจำนำใหม่'
+      : (changesList.length > 0)
+        ? changesList.join('\n• ')
+        : 'ไม่มีการเปลี่ยนแปลง';
 
     const flexMessage = {
       type: 'flex',
