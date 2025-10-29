@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { Client } from '@line/bot-sdk';
-import { createPendingApprovalMessage } from '@/lib/line/flex-templates';
-import { calculateRedemptionAmount } from '@/lib/utils/calculations';
 
 // Lazy initialization of LINE client
 let lineClient: Client | null = null;
@@ -28,11 +26,19 @@ function getLineClient(): Client {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, lineUserId, message } = body;
+    const { contractId, lineUserId, increaseAmount } = body;
 
-    if (!contractId || !lineUserId) {
+    if (!contractId || !lineUserId || !increaseAmount) {
       return NextResponse.json(
         { error: 'ข้อมูลไม่ครบถ้วน' },
+        { status: 400 }
+      );
+    }
+
+    // Validate increaseAmount
+    if (increaseAmount <= 0) {
+      return NextResponse.json(
+        { error: 'จำนวนเงินเพิ่มต้องมากกว่า 0' },
         { status: 400 }
       );
     }
@@ -45,7 +51,7 @@ export async function POST(request: NextRequest) {
     // 1. Get item details
     const item = await itemsCollection.findOne({
       _id: new ObjectId(contractId),
-      lineId: lineUserId // ⚠️ ใช้ lineId ไม่ใช่ lineUserId
+      lineId: lineUserId
     });
 
     if (!item) {
@@ -72,30 +78,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Calculate redemption amount using proper calculation logic
-    const redemptionDetails = calculateRedemptionAmount(item);
-    const redemptionAmount = redemptionDetails.total;
-
     // 5. Create callback URL
     const callbackUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/webhooks/shop-notification`;
 
     // 6. Send request to Shop System
     const shopSystemUrl = process.env.SHOP_SYSTEM_URL || 'https://pawn360-ver.vercel.app';
-    const shopNotificationId = `REDEMPTION-${Date.now()}-${contractId}`;
 
     try {
-      const response = await fetch(`${shopSystemUrl}/api/notifications/redemption`, {
+      const response = await fetch(`${shopSystemUrl}/api/notifications/increase-principal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           storeId: item.storeId.toString(),
-          customerId: lineUserId, // ใช้ lineUserId เป็น customerId ชั่วคราว
+          customerId: lineUserId,
           contractId: item._id.toString(),
+          increaseAmount,
           customerName: 'ลูกค้า', // TODO: ดึงจาก collection อื่นถ้ามี
           phone: '', // TODO: ดึงจาก collection อื่นถ้ามี
-          message: `ต้องการไถ่ถอนสัญญา ${item._id.toString()}`,
           callbackUrl: callbackUrl
         })
       });
@@ -108,13 +109,17 @@ export async function POST(request: NextRequest) {
       const notificationData = await response.json();
       console.log('Shop System response:', notificationData);
 
+      // 7. Save notification to database
       await notificationsCollection.insertOne({
         shopNotificationId: notificationData.notificationId,
         contractId: item._id,
         customerId: new ObjectId(lineUserId), // TODO: ใช้ customerId จริง
         lineUserId,
-        type: 'redemption',
+        type: 'increase_principal',
         status: 'pending',
+        increaseAmount,
+        currentPrincipal: notificationData.currentPrincipal,
+        newPrincipal: notificationData.newPrincipal,
         callbackUrl: callbackUrl,
         createdAt: new Date()
       });
@@ -122,8 +127,10 @@ export async function POST(request: NextRequest) {
       // 8. Send LINE message to customer
       try {
         const client = getLineClient();
-        const flexMessage = createPendingApprovalMessage('redemption', item._id.toString());
-        await client.pushMessage(lineUserId, flexMessage);
+        await client.pushMessage(lineUserId, {
+          type: 'text',
+          text: `✅ ส่งคำขอเพิ่มเงินต้น ${increaseAmount.toLocaleString()} บาทแล้ว\nรอพนักงานดำเนินการ`
+        });
       } catch (lineError) {
         console.error('Failed to send LINE message:', lineError);
         // Don't fail the request if LINE message fails
@@ -131,10 +138,8 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: 'ส่งคำขอไถ่ถอนเรียบร้อยแล้ว รอพนักงานดำเนินการ',
-        notificationId: notificationData.notificationId,
-        amount: redemptionAmount,
-        details: redemptionDetails
+        message: `ส่งคำขอเพิ่มเงินต้น ${increaseAmount.toLocaleString()} บาทเรียบร้อยแล้ว รอพนักงานดำเนินการ`,
+        notificationId: notificationData.notificationId
       });
 
     } catch (shopError: any) {
@@ -146,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('Request redemption error:', error);
+    console.error('Request increase principal error:', error);
     return NextResponse.json(
       { error: 'เกิดข้อผิดพลาดในการส่งคำขอ' },
       { status: 500 }

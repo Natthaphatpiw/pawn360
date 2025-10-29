@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       accessories,
       images: images || [],
       status: 'temporary',
-      currentContractId: null,
+      currentContractId: undefined,
       contractHistory: [],
       desiredAmount: desiredPrice || estimatedValue || 0,
       estimatedValue: estimatedValue || 0,

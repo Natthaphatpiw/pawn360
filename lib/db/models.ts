@@ -78,38 +78,75 @@ export interface PawnRequest {
 // Item Model
 export interface Item {
   _id?: ObjectId;
-  lineId: string;
+  lineId: string; // LINE User ID ของลูกค้า
+
+  // ข้อมูลสินค้าที่จำนำ
   brand: string;
   model: string;
   type: string;
-  serialNo?: string;
+  serialNo: string;
   condition: number;
-  defects?: string;
-  note?: string;
-  accessories?: string;
-  images: string[];
+  defects: string;
+  note: string;
+  accessories: string;
+  images: Array<string>;
+
+  // ข้อมูลสัญญาจำนำ
   status: 'pending' | 'active' | 'redeemed' | 'lost' | 'sold' | 'temporary';
-  currentContractId?: ObjectId | null;
-  contractHistory?: ObjectId[];
-  storeId?: ObjectId;
-  // ข้อมูลการจำนำ
-  desiredAmount?: number;
-  estimatedValue?: number;
-  loanDays?: number;
-  interestRate?: number;
-  // ข้อมูลการต่อรอง (ถ้าร้านค้าแก้ไข)
-  negotiatedAmount?: number;
-  negotiatedDays?: number;
-  negotiatedInterestRate?: number;
-  negotiationStatus?: 'none' | 'pending' | 'accepted' | 'rejected';
-  // ข้อมูลการยืนยันสัญญา
-  confirmationStatus?: 'none' | 'pending' | 'confirmed' | 'cancelled';
-  confirmationModifications?: any;
-  confirmationProposedContract?: any;
+  currentContractId?: ObjectId;
+  contractHistory?: Array<ObjectId>;
+
+  // ข้อมูลการเงิน - ราคาเริ่มต้น (ก่อนต่อรอง)
+  desiredAmount: number; // เงินต้นที่ลูกค้าขอ (ก่อนต่อรอง)
+  estimatedValue: number;
+  loanDays: number; // จำนวนวันสัญญา (ไม่ใช่ contractDays!)
+  interestRate: number; // อัตราดอกเบี้ย % ต่อเดือน (เริ่มต้น)
+
+  // 🔥 ข้อมูลสัญญาจริง (หลังต่อรอง) - สำคัญมาก!
+  confirmationNewContract?: {
+    itemId: string;
+    pawnPrice: number; // 🔥 เงินต้นจริงหลังต่อรอง (ใช้ตัวนี้ในการคำนวณ!)
+    interestRate: number; // 🔥 อัตราดอกเบี้ยจริงหลังต่อรอง
+    loanDays: number;
+    interest: number; // ดอกเบี้ยรวมทั้งหมด
+    total: number; // ยอดรวมที่ต้องชำระ
+    item: string;
+  };
+  confirmationStatus?: string; // 'confirmed', 'rejected', etc.
   confirmationTimestamp?: Date;
-  customerId?: ObjectId;
-  contractId?: ObjectId;
-  createdAt: Date;
+  confirmationModifications?: Array<string>; // รายการเปลี่ยนแปลงจากการต่อรอง
+
+  // สำหรับคำนวณดอกเบี้ย (optional fields)
+  lastInterestCutoffDate?: Date; // วันที่ตัดดอกครั้งล่าสุด
+  accruedInterest?: number; // ดอกเบี้ยค้างสะสม
+
+  // ประวัติ (optional fields)
+  principalHistory?: Array<{
+    type: 'reduce' | 'increase';
+    changedAt: Date;
+    previousPrincipal: number;
+    newPrincipal: number;
+    reduceAmount?: number;
+    increaseAmount?: number;
+    interestPaid?: number;
+    interestCutoff?: number;
+    totalPaid?: number;
+    daysSinceLastCutoff?: number;
+    notificationId: ObjectId;
+  }>;
+
+  extensionHistory?: Array<{
+    extendedAt: Date;
+    extensionDays: number; // จำนวนวันที่ต่อ
+    notificationId: ObjectId;
+  }>;
+
+  redeemedAt?: Date;
+
+  // อื่นๆ
+  storeId?: ObjectId;
+  negotiationStatus?: string;
+  createdAt: Date; // ⭐ วันเริ่มสัญญา (ไม่ใช่ startDate!)
   updatedAt: Date;
 }
 

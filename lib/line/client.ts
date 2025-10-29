@@ -1038,6 +1038,33 @@ export async function getUserProfile(userId: string) {
   }
 }
 
+// Download LINE Image
+export async function downloadLineImage(messageId: string): Promise<Buffer> {
+  const client = getLineClient();
+
+  try {
+    const stream = await client.getMessageContent(messageId);
+    const chunks: Buffer[] = [];
+
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+
+      stream.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+
+      stream.on('error', (error: Error) => {
+        reject(error);
+      });
+    });
+  } catch (error) {
+    console.error('Error downloading LINE image:', error);
+    throw error;
+  }
+}
+
 // Verify LINE Signature
 export function verifySignature(body: string, signature: string): boolean {
   const crypto = require('crypto');

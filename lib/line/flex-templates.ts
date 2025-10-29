@@ -513,3 +513,266 @@ export function createPendingApprovalMessage(
     contents: bubble
   };
 }
+
+/**
+ * Creates a QR Code Card (ไถ่ถอน/ต่อดอก)
+ */
+export function createQRCodeCard(params: {
+  message: string;
+  qrCodeUrl: string;
+  notificationId: string;
+  contractNumber: string;
+}): FlexMessage {
+  return {
+    type: 'flex',
+    altText: 'คำขอของคุณได้รับการยืนยัน',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '✅ คำขอได้รับการยืนยัน', weight: 'bold', color: '#1DB446', size: 'lg' }
+        ]
+      },
+      hero: {
+        type: 'image',
+        url: params.qrCodeUrl,
+        size: 'full',
+        aspectRatio: '1:1'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: params.message, wrap: true },
+          { type: 'separator', margin: 'md' },
+          { type: 'text', text: `สัญญา: ${params.contractNumber}`, size: 'sm', color: '#999999', margin: 'md' },
+          { type: 'text', text: 'กรุณาสแกน QR Code เพื่อชำระเงิน', size: 'sm', color: '#999999' }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: 'อัพโหลดสลิปการโอน',
+              data: `action=upload_slip&notificationId=${params.notificationId}`
+            },
+            style: 'primary',
+            color: '#1DB446'
+          }
+        ]
+      }
+    }
+  };
+}
+
+/**
+ * Creates a Reduce Principal Card (ลดเงินต้น พร้อมยอดที่ต้องชำระ)
+ */
+export function createReducePrincipalCard(params: {
+  message: string;
+  qrCodeUrl: string;
+  notificationId: string;
+  reduceAmount: number;
+  interestAmount?: number;
+  totalAmount?: number;
+}): FlexMessage {
+  const interest = params.interestAmount || 0;
+  const total = params.totalAmount || (params.reduceAmount + interest);
+
+  return {
+    type: 'flex',
+    altText: 'คำขอลดเงินต้นได้รับการยืนยัน',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '✅ ยืนยันการลดเงินต้น', weight: 'bold', color: '#1DB446', size: 'lg' }
+        ]
+      },
+      hero: {
+        type: 'image',
+        url: params.qrCodeUrl,
+        size: 'full',
+        aspectRatio: '1:1'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: params.message, wrap: true, margin: 'md' },
+          { type: 'separator', margin: 'lg' },
+          { type: 'text', text: 'รายละเอียด', weight: 'bold', margin: 'lg' },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              { type: 'text', text: 'เงินต้นที่ลด', size: 'sm', color: '#555555', flex: 0 },
+              { type: 'text', text: `${params.reduceAmount.toLocaleString()} บาท`, size: 'sm', align: 'end' }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              { type: 'text', text: 'ดอกเบี้ยค้าง', size: 'sm', color: '#555555', flex: 0 },
+              { type: 'text', text: `${interest.toLocaleString()} บาท`, size: 'sm', align: 'end' }
+            ]
+          },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              { type: 'text', text: 'ยอดรวม', weight: 'bold', flex: 0 },
+              { type: 'text', text: `${total.toLocaleString()} บาท`, weight: 'bold', align: 'end', color: '#1DB446' }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: 'อัพโหลดสลิปการโอน',
+              data: `action=upload_slip&notificationId=${params.notificationId}`
+            },
+            style: 'primary',
+            color: '#1DB446'
+          }
+        ]
+      }
+    }
+  };
+}
+
+/**
+ * Creates an Increase Principal Card (เพิ่มเงินต้น - ไม่มี QR)
+ */
+export function createIncreasePrincipalCard(params: {
+  message: string;
+  increaseAmount: number;
+  storeName: string;
+}): FlexMessage {
+  return {
+    type: 'flex',
+    altText: 'คำขอเพิ่มวงเงินได้รับการยืนยัน',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '✅ ยืนยันการเพิ่มวงเงิน', weight: 'bold', color: '#1DB446', size: 'lg' }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: params.message, wrap: true },
+          { type: 'separator', margin: 'lg' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              { type: 'text', text: `เงินที่จะได้รับ: ${params.increaseAmount.toLocaleString()} บาท`, size: 'xl', weight: 'bold', color: '#1DB446', align: 'center' },
+              { type: 'text', text: `กรุณามารับเงินที่ ${params.storeName}`, size: 'sm', color: '#999999', align: 'center', margin: 'md' }
+            ],
+            margin: 'lg'
+          }
+        ]
+      }
+    }
+  };
+}
+
+/**
+ * Creates a Success Card
+ */
+export function createSuccessCard(params: {
+  title: string;
+  message: string;
+  contractNumber: string;
+}): FlexMessage {
+  return {
+    type: 'flex',
+    altText: params.title,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: params.title, weight: 'bold', color: '#1DB446', size: 'xl' }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: params.message, wrap: true },
+          { type: 'separator', margin: 'lg' },
+          { type: 'text', text: `สัญญา: ${params.contractNumber}`, size: 'sm', color: '#999999', margin: 'md' }
+        ]
+      }
+    }
+  };
+}
+
+/**
+ * Creates a rejection message
+ */
+export function createRejectionCard(params: {
+  message: string;
+  type: string;
+}): FlexMessage {
+  const actionText = getActionText(params.type);
+
+  return {
+    type: 'flex',
+    altText: `❌ คำขอ${actionText}ไม่ได้รับการยืนยัน`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: '❌ คำขอไม่ได้รับการยืนยัน', weight: 'bold', color: '#ffffff', size: 'lg' }
+        ],
+        backgroundColor: '#EF4444',
+        paddingAll: 'lg'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          { type: 'text', text: params.message, wrap: true, size: 'md', color: '#333333' },
+          { type: 'separator', margin: 'lg' },
+          { type: 'text', text: '💡 กรุณาติดต่อร้านค้าเพื่อสอบถามข้อมูลเพิ่มเติม', size: 'sm', color: '#999999', margin: 'lg', wrap: true }
+        ]
+      }
+    }
+  };
+}
+
+function getActionText(type: string): string {
+  switch (type) {
+    case 'redemption': return 'ไถ่ถอนสัญญา';
+    case 'extension': return 'ต่อดอกเบี้ย';
+    case 'reduce_principal': return 'ลดเงินต้น';
+    case 'increase_principal': return 'เพิ่มเงินต้น';
+    default: return '';
+  }
+}

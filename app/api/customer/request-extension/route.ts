@@ -37,39 +37,33 @@ export async function POST(request: NextRequest) {
     }
 
     const { db } = await connectToDatabase();
-    const contractsCollection = db.collection('contracts');
-    const customersCollection = db.collection('customers');
+    const itemsCollection = db.collection('items');
     const storesCollection = db.collection('stores');
     const notificationsCollection = db.collection('notifications');
 
-    // 1. Get contract details
-    const contract = await contractsCollection.findOne({ _id: new ObjectId(contractId) });
-    if (!contract) {
+    // 1. Get item details
+    const item = await itemsCollection.findOne({
+      _id: new ObjectId(contractId),
+      lineId: lineUserId
+    });
+
+    if (!item) {
       return NextResponse.json(
-        { error: 'ไม่พบสัญญา' },
+        { error: 'ไม่พบรายการจำนำ' },
         { status: 404 }
       );
     }
 
-    // Check if contract is active
-    if (contract.status !== 'active' && contract.status !== 'overdue') {
+    // Check if item is active
+    if (item.status !== 'active') {
       return NextResponse.json(
-        { error: 'สัญญานี้ไม่สามารถดำเนินการได้' },
+        { error: 'รายการนี้ไม่สามารถดำเนินการได้' },
         { status: 400 }
       );
     }
 
-    // 2. Get customer details
-    const customer = await customersCollection.findOne({ lineId: lineUserId });
-    if (!customer) {
-      return NextResponse.json(
-        { error: 'ไม่พบข้อมูลลูกค้า' },
-        { status: 404 }
-      );
-    }
-
-    // 3. Get store details
-    const store = await storesCollection.findOne({ _id: contract.storeId });
+    // 2. Get store details
+    const store = await storesCollection.findOne({ _id: item.storeId });
     if (!store) {
       return NextResponse.json(
         { error: 'ไม่พบข้อมูลร้านค้า' },
@@ -77,16 +71,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Calculate interest extension amount
-    const totalInterest = contract.pawnDetails.totalInterest;
-    const extensionAmount = totalInterest;
-
     // 5. Create callback URL
     const callbackUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/webhooks/shop-notification`;
 
     // 6. Send request to Shop System
     const shopSystemUrl = process.env.SHOP_SYSTEM_URL || 'https://pawn360-ver.vercel.app';
-    const shopNotificationId = `EXTENSION-${Date.now()}-${contractId}`;
 
     try {
       const response = await fetch(`${shopSystemUrl}/api/notifications/extension`, {
@@ -95,19 +84,13 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          notificationId: shopNotificationId,
-          storeId: store._id.toString(),
-          customerId: customer._id.toString(),
-          contractId: contract._id.toString(),
-          customerName: customer.fullName,
-          phone: customer.phone,
-          lineUserId: lineUserId,
-          contractNumber: contract.contractNumber,
-          itemDescription: `${contract.item.brand} ${contract.item.model}`,
-          amount: extensionAmount,
-          message: message || 'ลูกค้าต้องการต่อดอกเบี้ย',
-          callbackUrl: callbackUrl,
-          timestamp: new Date().toISOString()
+          storeId: item.storeId.toString(),
+          customerId: lineUserId,
+          contractId: item._id.toString(),
+          customerName: 'ลูกค้า', // TODO: ดึงจาก collection อื่นถ้ามี
+          phone: '', // TODO: ดึงจาก collection อื่นถ้ามี
+          message: `ต้องการต่อดอกเบี้ยสัญญา ${item._id.toString()}`,
+          callbackUrl: callbackUrl
         })
       });
 
@@ -116,28 +99,25 @@ export async function POST(request: NextRequest) {
         throw new Error('ไม่สามารถส่งคำขอไปยังระบบร้านได้');
       }
 
-      const shopData = await response.json();
-      console.log('Shop System response:', shopData);
+      const notificationData = await response.json();
+      console.log('Shop System response:', notificationData);
 
       // 7. Save notification to database
       await notificationsCollection.insertOne({
-        shopNotificationId: shopNotificationId,
-        contractId: new ObjectId(contractId),
-        customerId: customer._id,
-        lineUserId: lineUserId,
+        shopNotificationId: notificationData.notificationId,
+        contractId: item._id,
+        customerId: new ObjectId(lineUserId), // TODO: ใช้ customerId จริง
+        lineUserId,
         type: 'extension',
         status: 'pending',
-        amount: extensionAmount,
-        message: message || 'ลูกค้าต้องการต่อดอกเบี้ย',
         callbackUrl: callbackUrl,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: new Date()
       });
 
       // 8. Send LINE message to customer
       try {
         const client = getLineClient();
-        const flexMessage = createPendingApprovalMessage('extension', contract.contractNumber);
+        const flexMessage = createPendingApprovalMessage('extension', item._id.toString());
         await client.pushMessage(lineUserId, flexMessage);
       } catch (lineError) {
         console.error('Failed to send LINE message:', lineError);
@@ -147,8 +127,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'ส่งคำขอต่อดอกเบี้ยเรียบร้อยแล้ว รอพนักงานดำเนินการ',
-        notificationId: shopNotificationId,
-        amount: extensionAmount
+        notificationId: notificationData.notificationId
       });
 
     } catch (shopError: any) {
