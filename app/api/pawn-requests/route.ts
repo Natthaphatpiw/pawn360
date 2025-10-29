@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       accessories,
       images: images || [],
       status: 'pending',
-      currentContractId: null,
+      currentContractId: undefined,
       contractHistory: [],
       desiredAmount: pawnedPrice || estimatedValue || 0,
       estimatedValue: estimatedValue || 0,
