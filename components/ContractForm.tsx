@@ -269,11 +269,11 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
     }
   }, [customer?.fullName]);
 
-  // Editable contract details
+  // Editable contract details - use strings to handle empty inputs properly
   const [contractDetails, setContractDetails] = useState({
-    pawnPrice: item.desiredAmount || item.estimatedValue || 0,
-    interestRate: item.interestRate || 10,
-    loanDays: item.loanDays || 30,
+    pawnPrice: (item.desiredAmount || item.estimatedValue || 0).toString(),
+    interestRate: (item.interestRate || 10).toString(),
+    loanDays: (item.loanDays || 30).toString(),
   });
 
   // Original values for comparison
@@ -299,9 +299,9 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
   // Contract data calculation
   const calculateInterest = () => {
-    const pawnedPrice = contractDetails.pawnPrice;
-    const interestRate = contractDetails.interestRate;
-    const periodDays = contractDetails.loanDays;
+    const pawnedPrice = parseFloat(contractDetails.pawnPrice) || 0;
+    const interestRate = parseFloat(contractDetails.interestRate) || 0;
+    const periodDays = parseInt(contractDetails.loanDays) || 0;
     const dailyRate = interestRate / 100 / 30;
     return Math.round(pawnedPrice * dailyRate * periodDays);
   };
@@ -309,23 +309,23 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
   // Check if details have been modified
   const hasModifications = () => {
     return (
-      contractDetails.pawnPrice !== originalDetails.pawnPrice ||
-      contractDetails.interestRate !== originalDetails.interestRate ||
-      contractDetails.loanDays !== originalDetails.loanDays
+      parseFloat(contractDetails.pawnPrice) !== originalDetails.pawnPrice ||
+      parseFloat(contractDetails.interestRate) !== originalDetails.interestRate ||
+      parseInt(contractDetails.loanDays) !== originalDetails.loanDays
     );
   };
 
   // Get modification details for LINE message
   const getModificationDetails = () => {
     const changes = [];
-    if (contractDetails.pawnPrice !== originalDetails.pawnPrice) {
-      changes.push(`ราคา จาก ${originalDetails.pawnPrice.toLocaleString()} เป็น ${contractDetails.pawnPrice.toLocaleString()}`);
+    if (parseFloat(contractDetails.pawnPrice) !== originalDetails.pawnPrice) {
+      changes.push(`ราคา จาก ${originalDetails.pawnPrice.toLocaleString()} เป็น ${(parseFloat(contractDetails.pawnPrice) || 0).toLocaleString()}`);
     }
-    if (contractDetails.interestRate !== originalDetails.interestRate) {
-      changes.push(`ดอกเบี้ย จาก ${originalDetails.interestRate}% เป็น ${contractDetails.interestRate}%`);
+    if (parseFloat(contractDetails.interestRate) !== originalDetails.interestRate) {
+      changes.push(`ดอกเบี้ย จาก ${originalDetails.interestRate}% เป็น ${(parseFloat(contractDetails.interestRate) || 0)}%`);
     }
-    if (contractDetails.loanDays !== originalDetails.loanDays) {
-      changes.push(`จำนวนวัน จาก ${originalDetails.loanDays} เป็น ${contractDetails.loanDays}`);
+    if (parseInt(contractDetails.loanDays) !== originalDetails.loanDays) {
+      changes.push(`จำนวนวัน จาก ${originalDetails.loanDays} เป็น ${parseInt(contractDetails.loanDays) || 0}`);
     }
     return changes;
   };
@@ -811,14 +811,19 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                     <div>
                       <label className="block text-sm font-medium mb-1">ราคาจำนำ (บาท)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={contractDetails.pawnPrice}
-                        onChange={(e) => setContractDetails(prev => ({
-                          ...prev,
-                          pawnPrice: parseFloat(e.target.value) || 0
-                        }))}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          setContractDetails(prev => ({
+                            ...prev,
+                            pawnPrice: value
+                          }));
+                        }}
                         className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="1"
+                        placeholder="กรุณากรอกราคา"
                       />
                     </div>
 
@@ -826,15 +831,22 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                     <div>
                       <label className="block text-sm font-medium mb-1">อัตราดอกเบี้ย (%)</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]*\.?[0-9]*"
                         value={contractDetails.interestRate}
-                        onChange={(e) => setContractDetails(prev => ({
-                          ...prev,
-                          interestRate: parseFloat(e.target.value) || 0
-                        }))}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          // Allow only one decimal point
+                          const parts = value.split('.');
+                          const cleanValue = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : value;
+                          setContractDetails(prev => ({
+                            ...prev,
+                            interestRate: cleanValue
+                          }));
+                        }}
                         className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="0"
-                        step="0.1"
+                        placeholder="กรุณากรอกอัตราดอกเบี้ย"
                       />
                     </div>
 
@@ -842,14 +854,19 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                     <div>
                       <label className="block text-sm font-medium mb-1">จำนวนวันจำนำ</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={contractDetails.loanDays}
-                        onChange={(e) => setContractDetails(prev => ({
-                          ...prev,
-                          loanDays: parseInt(e.target.value) || 0
-                        }))}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          setContractDetails(prev => ({
+                            ...prev,
+                            loanDays: value
+                          }));
+                        }}
                         className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        min="1"
+                        placeholder="กรุณากรอกจำนวนวัน"
                       />
                     </div>
 
@@ -858,20 +875,20 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
                           <span>ราคาจำนำ:</span>
-                          <span className="font-semibold">{contractDetails.pawnPrice.toLocaleString()} บาท</span>
+                          <span className="font-semibold">{(parseFloat(contractDetails.pawnPrice) || 0).toLocaleString()} บาท</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>ดอกเบี้ย ({contractDetails.interestRate}%):</span>
+                          <span>ดอกเบี้ย ({(parseFloat(contractDetails.interestRate) || 0)}%):</span>
                           <span className="font-semibold">{calculateInterest().toLocaleString()} บาท</span>
                         </div>
                         <div className="flex justify-between">
                           <span>ระยะเวลา:</span>
-                          <span className="font-semibold">{contractDetails.loanDays} วัน</span>
+                          <span className="font-semibold">{parseInt(contractDetails.loanDays) || 0} วัน</span>
                         </div>
                         <div className="flex justify-between border-t pt-1">
                           <span className="font-semibold">รวม:</span>
                           <span className="font-bold text-green-600">
-                            {(contractDetails.pawnPrice + calculateInterest()).toLocaleString()} บาท
+                            {((parseFloat(contractDetails.pawnPrice) || 0) + calculateInterest()).toLocaleString()} บาท
                           </span>
                         </div>
                       </div>

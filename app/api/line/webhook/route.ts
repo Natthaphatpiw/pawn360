@@ -165,12 +165,20 @@ async function handleTextMessage(event: any) {
 
 async function requestRedemption(contractId: string, lineUserId: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    // Use the correct base URL for API calls
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://pawn360.vercel.app';
+
+    console.log('Making request to:', `${baseUrl}/api/customer/request-redemption`);
+
     const response = await fetch(`${baseUrl}/api/customer/request-redemption`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId, lineUserId })
     });
+
+    console.log('Response status:', response.status);
 
     const data = await response.json();
 
@@ -187,12 +195,20 @@ async function requestRedemption(contractId: string, lineUserId: string) {
 
 async function requestExtension(contractId: string, lineUserId: string) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    // Use the correct base URL for API calls
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://pawn360.vercel.app';
+
+    console.log('Making request to:', `${baseUrl}/api/customer/request-extension`);
+
     const response = await fetch(`${baseUrl}/api/customer/request-extension`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId, lineUserId })
     });
+
+    console.log('Response status:', response.status);
 
     const data = await response.json();
 

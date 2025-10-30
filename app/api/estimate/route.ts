@@ -115,15 +115,27 @@ Your response should be just the number, nothing else.`;
 
   console.log('📊 Raw market price from AI:', marketPrice);
 
-  // ตรวจสอบว่าราคาสูงเกินไปหรือไม่ (อาจเป็น satang แทน baht)
-  // ถ้าราคามากกว่า 10 ล้านบาท น่าจะผิดพลาด
+  // ตรวจสอบและแก้ไขราคาที่ผิดปกติ
+  // 1. ถ้าราคามากกว่า 10 ล้านบาท น่าจะเป็น satang แทน baht
   if (marketPrice > 10000000) {
     console.warn('⚠️ Market price seems too high, might be in satang. Converting to baht...');
     marketPrice = Math.round(marketPrice / 100);
-    console.log('📊 Converted market price:', marketPrice);
+    console.log('📊 Converted market price (satang to baht):', marketPrice);
   }
 
-  console.log('✅ Final market price:', marketPrice);
+  // 2. Cap ราคาสูงสุดสำหรับอุปกรณ์อิเล็กทรอนิกส์ (ไม่ควรเกิน 500,000 บาท สำหรับสินค้าราคาแพง)
+  if (marketPrice > 500000) {
+    console.warn('⚠️ Market price too high, capping at 500,000 THB');
+    marketPrice = 500000;
+  }
+
+  // 3. ตรวจสอบราคาต่ำสุด (ไม่ควรต่ำกว่า 100 บาท)
+  if (marketPrice < 100) {
+    console.warn('⚠️ Market price too low, setting minimum at 100 THB');
+    marketPrice = 100;
+  }
+
+  console.log('✅ Final validated market price:', marketPrice);
 
   return marketPrice;
 }

@@ -70,10 +70,10 @@ export async function POST(request: NextRequest) {
     // 4. เตรียมข้อมูลสัญญาและส่งการยืนยันเสมอ
     const startDate = new Date();
 
-    // ใช้ค่าที่ต่อรองแล้ว (ถ้ามี) หรือค่าเริ่มต้น
-    const pawnedPrice = item.negotiatedAmount || item.desiredAmount || 0;
-    const interestRate = item.negotiatedInterestRate || item.interestRate || 3;
-    const periodDays = item.negotiatedDays || item.loanDays || 30;
+    // ใช้ค่าที่ยืนยันแล้ว (confirmationNewContract) ถ้ามี มิเช่นนั้นใช้ค่าที่ต่อรองแล้ว
+    const pawnedPrice = item.confirmationNewContract?.pawnPrice || item.negotiatedAmount || item.desiredAmount || 0;
+    const interestRate = item.confirmationNewContract?.interestRate || item.negotiatedInterestRate || item.interestRate || 3;
+    const periodDays = item.confirmationNewContract?.loanDays || item.negotiatedDays || item.loanDays || 30;
 
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + periodDays);
