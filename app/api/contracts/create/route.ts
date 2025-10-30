@@ -49,20 +49,136 @@ export async function POST(request: NextRequest) {
 
     // Calculate dates and amounts - Always use current date for contract creation
     const startDate = new Date(); // Current date when contract is created
-    const periodDays = item.loanDays || 30;
+
+    // 🔥 ใช้ confirmationNewContract data ถ้ามี มิเช่นนั้นใช้ข้อมูลเดิม
+    const pawnedPrice = item.confirmationNewContract?.pawnPrice || item.desiredAmount || item.estimatedValue || 0;
+    const interestRate = item.confirmationNewContract?.interestRate || item.interestRate || 10;
+    const periodDays = item.confirmationNewContract?.loanDays || item.loanDays || 30;
+
     const dueDate = new Date(startDate);
     dueDate.setDate(dueDate.getDate() + periodDays);
 
-    const pawnedPrice = item.desiredAmount || item.estimatedValue || 0;
-    const interestRate = item.interestRate || 10;
     const totalInterest = (pawnedPrice * interestRate * periodDays) / (100 * 30);
     const remainingAmount = pawnedPrice + totalInterest;
 
-    // Generate contract number
-    const contractNumber = `STORE${Date.now()}`;
+    // Check if contract already exists for this item
+    const existingContract = await contractsCollection.findOne({
+      'item.itemId': new ObjectId(itemId)
+    });
+
+    if (existingContract) {
+      console.log(`Contract already exists for item ${itemId}, updating instead of creating new one`);
+
+      // Update existing contract with new data
+      await contractsCollection.updateOne(
+        { _id: existingContract._id },
+        {
+          $set: {
+            'pawnDetails.pawnedPrice': pawnedPrice,
+            'pawnDetails.interestRate': interestRate,
+            'pawnDetails.periodDays': periodDays,
+            'pawnDetails.totalInterest': totalInterest,
+            'pawnDetails.remainingAmount': remainingAmount,
+            'pawnDetails.serviceFee': contractData.serviceFee || 0,
+            'dates.startDate': startDate,
+            'dates.dueDate': dueDate,
+            'signatures': contractData.signatures,
+            'documents': existingContract.documents || {},
+            status: 'active',
+            updatedAt: new Date(),
+          }
+        }
+      );
+
+      // Update item with existing contract reference
+      await itemsCollection.updateOne(
+        { _id: new ObjectId(itemId) },
+        {
+          $set: {
+            status: 'active',
+            currentContractId: existingContract._id,
+            storeId: new ObjectId(storeId),
+            updatedAt: new Date(),
+          },
+          $addToSet: {
+            contractHistory: existingContract._id as any,
+          }
+        }
+      );
+
+      // Update customer
+      const currentCustomer = await customersCollection.findOne({ _id: customer._id });
+      const storeIdToAdd = new ObjectId(storeId);
+
+      if (!currentCustomer?.storeId) {
+        await customersCollection.updateOne(
+          { _id: customer._id },
+          {
+            $inc: {
+              totalContracts: 1,
+              totalValue: pawnedPrice,
+            },
+            $set: {
+              lastContractDate: new Date(),
+              updatedAt: new Date(),
+              storeId: [storeIdToAdd],
+            },
+            $addToSet: {
+              contractsID: existingContract._id as any,
+            },
+          }
+        );
+      } else if (Array.isArray(currentCustomer.storeId)) {
+        await customersCollection.updateOne(
+          { _id: customer._id },
+          {
+            $inc: {
+              totalContracts: 1,
+              totalValue: pawnedPrice,
+            },
+            $set: {
+              lastContractDate: new Date(),
+              updatedAt: new Date(),
+            },
+            $addToSet: {
+              storeId: storeIdToAdd,
+              contractsID: existingContract._id as any,
+            },
+          }
+        );
+      } else {
+        await customersCollection.updateOne(
+          { _id: customer._id },
+          {
+            $inc: {
+              totalContracts: 1,
+              totalValue: pawnedPrice,
+            },
+            $set: {
+              lastContractDate: new Date(),
+              updatedAt: new Date(),
+              storeId: [currentCustomer.storeId, storeIdToAdd],
+            },
+            $addToSet: {
+              contractsID: existingContract._id as any,
+            },
+          }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Contract updated successfully',
+        contractId: existingContract._id,
+        contractNumber: existingContract.contractNumber,
+      });
+    }
 
     // Upload contract images to S3 if provided
     const contractImageUrls: { contractHtmlUrl?: string; verificationPhotoUrl?: string } = {};
+
+    // Generate contract number for new contract
+    const contractNumber = `STORE${Date.now()}`;
 
     if (contractData.signatures?.seller?.signatureData || contractData.signatures?.buyer?.signatureData) {
       try {
