@@ -699,7 +699,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${(newContract.pawnedPrice || newContract.pawnPrice || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${(newContract.pawnPrice || newContract.pawnedPrice || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -848,7 +848,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${(contractData.pawnedPrice || contractData.pawnPrice || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${(contractData.pawnPrice || contractData.pawnedPrice || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {

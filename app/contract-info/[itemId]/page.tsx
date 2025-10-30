@@ -87,9 +87,10 @@ export default function ContractInfoPage({ params }: { params: { itemId: string 
         const itemData = response.data.item;
         const customerData = response.data.customer;
 
-        const price = itemData.desiredAmount || itemData.estimatedValue || 0;
-        const interestRate = itemData.interestRate || 10;
-        const periodDays = itemData.loanDays || 30;
+        // ใช้ข้อมูลจาก confirmationNewContract ถ้ามี (เป็นข้อมูลที่ถูกแก้ไขแล้ว)
+        const price = itemData.confirmationNewContract?.pawnPrice || itemData.desiredAmount || itemData.estimatedValue || 0;
+        const interestRate = itemData.confirmationNewContract?.interestRate || itemData.interestRate || 10;
+        const periodDays = itemData.confirmationNewContract?.loanDays || itemData.loanDays || 30;
         const dailyRate = interestRate / 100 / 30;
         const interest = Math.round(price * dailyRate * periodDays);
 

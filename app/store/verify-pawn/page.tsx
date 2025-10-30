@@ -209,11 +209,15 @@ function StoreVerifyPawnContent() {
 
         if (response.data.success) {
           setSuccess(true);
+          // ปิดหน้าต่างทันทีหลังแสดงข้อความสำเร็จ 1 วินาที
           setTimeout(() => {
-            if (window.liff) {
+            if (window.liff && window.liff.isInClient()) {
               window.liff.closeWindow();
+            } else {
+              // ถ้าไม่ใช่ LIFF ให้ redirect กลับไปหน้าแรก
+              window.location.href = '/';
             }
-          }, 2000);
+          }, 1000);
         }
       }
     } catch (err: any) {
@@ -430,13 +434,15 @@ function StoreVerifyPawnContent() {
                   ราคาที่จำนำ (บาท) *
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={editedAmount}
-                  onChange={(e) => setEditedAmount(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d]/g, '');
+                    setEditedAmount(value === '' ? 0 : parseInt(value));
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   required
-                  min="0"
-                  step="100"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -445,12 +451,15 @@ function StoreVerifyPawnContent() {
                     จำนวนวัน *
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={editedDays}
-                    onChange={(e) => setEditedDays(parseInt(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d]/g, '');
+                      setEditedDays(value === '' ? 0 : parseInt(value));
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                     required
-                    min="1"
                   />
                 </div>
                 <div>
@@ -458,13 +467,15 @@ function StoreVerifyPawnContent() {
                     อัตราดอกเบี้ย (%) *
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={editedInterestRate}
-                    onChange={(e) => setEditedInterestRate(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^\d.]/g, '');
+                      setEditedInterestRate(value === '' ? 0 : parseFloat(value));
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                     required
-                    min="0"
-                    step="0.1"
                   />
                 </div>
               </div>

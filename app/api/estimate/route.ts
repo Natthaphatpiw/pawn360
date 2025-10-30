@@ -111,9 +111,19 @@ Your response should be just the number, nothing else.`;
   });
 
   const priceText = response.output_text || '0';
-  const marketPrice = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
+  let marketPrice = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
 
-  console.log('📊 Market price from AI:', marketPrice);
+  console.log('📊 Raw market price from AI:', marketPrice);
+
+  // ตรวจสอบว่าราคาสูงเกินไปหรือไม่ (อาจเป็น satang แทน baht)
+  // ถ้าราคามากกว่า 10 ล้านบาท น่าจะผิดพลาด
+  if (marketPrice > 10000000) {
+    console.warn('⚠️ Market price seems too high, might be in satang. Converting to baht...');
+    marketPrice = Math.round(marketPrice / 100);
+    console.log('📊 Converted market price:', marketPrice);
+  }
+
+  console.log('✅ Final market price:', marketPrice);
 
   return marketPrice;
 }
