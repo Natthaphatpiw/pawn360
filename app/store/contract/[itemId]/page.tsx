@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
 import ContractForm from '@/components/ContractForm';
@@ -52,6 +53,7 @@ interface Customer {
 
 export default function StoreContractPage({ params }: { params: Promise<{ itemId: string }> }) {
   const { itemId } = use(params);
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState<'login' | 'contract'>('login');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +168,11 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
         setSuccess('สร้างสัญญาจำนำเรียบร้อยแล้ว');
         setContractSteps({ contractSigned: true, photoTaken: true });
         setShowContractModal(false);
+
+        // Redirect to contracts page after 2 seconds
+        setTimeout(() => {
+          router.push('/contracts');
+        }, 2000);
       }
     } catch (err: any) {
       console.error('Error creating contract:', err);
