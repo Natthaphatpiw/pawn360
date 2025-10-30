@@ -179,11 +179,19 @@ async function handleActionResponse(
       });
     } else if (notification.type === 'increase_principal') {
       // เพิ่มเงินต้น - แจ้งให้มารับเงิน (ไม่มี QR code)
-      // TODO: ดึงชื่อร้านจาก storeId
+      // ดึงชื่อร้านจาก storeId
+      const storesCollection = notificationsCollection.s.db.collection('stores');
+      let storeName = 'ร้านจำนำ'; // Default fallback
+
+      if (item.storeId) {
+        const store = await storesCollection.findOne({ _id: new ObjectId(item.storeId) });
+        storeName = store?.storeName || store?.name || storeName;
+      }
+
       flexMessage = createIncreasePrincipalCard({
         message,
         increaseAmount: notification.increaseAmount,
-        storeName: 'ร้านจำนำ' // TODO: ดึงจาก storeId
+        storeName: storeName
       });
     } else {
       // redemption/extension - แสดง QR code
@@ -286,7 +294,7 @@ async function handlePaymentVerified(
         { _id: item._id },
         {
           $set: {
-            status: 'redeemed',
+            status: 'redeem',
             redeemedAt: new Date(),
             updatedAt: new Date()
           }
@@ -323,8 +331,7 @@ async function handlePaymentVerified(
         contractNumber: item._id.toString()
       });
 
-      // อัพเดท confirmationNewContract.pawnPrice และ desiredAmount
-      // (Shop System จะอัพเดทแล้ว แต่อัพเดทที่นี่เผื่อ sync)
+      // อัพเดท confirmationNewContract.pawnPrice, desiredAmount และบันทึกประวัติ
       await itemsCollection.updateOne(
         { _id: item._id },
         {
@@ -332,6 +339,16 @@ async function handlePaymentVerified(
             'confirmationNewContract.pawnPrice': notification.newPrincipal, // 🔥 อัพเดทราคาจริง
             desiredAmount: notification.newPrincipal, // backward compatibility
             updatedAt: new Date()
+          },
+          $push: {
+            principalHistory: {
+              type: 'reduce',
+              changedAt: new Date(),
+              previousPrincipal: notification.currentPrincipal,
+              newPrincipal: notification.newPrincipal,
+              reduceAmount: notification.reduceAmount,
+              notificationId: notification._id
+            }
           }
         }
       );
@@ -343,7 +360,7 @@ async function handlePaymentVerified(
         contractNumber: item._id.toString()
       });
 
-      // อัพเดท confirmationNewContract.pawnPrice และ desiredAmount
+      // อัพเดท confirmationNewContract.pawnPrice, desiredAmount และบันทึกประวัติ
       await itemsCollection.updateOne(
         { _id: item._id },
         {
@@ -351,6 +368,16 @@ async function handlePaymentVerified(
             'confirmationNewContract.pawnPrice': notification.newPrincipal, // 🔥 อัพเดทราคาจริง
             desiredAmount: notification.newPrincipal, // backward compatibility
             updatedAt: new Date()
+          },
+          $push: {
+            principalHistory: {
+              type: 'increase',
+              changedAt: new Date(),
+              previousPrincipal: notification.currentPrincipal,
+              newPrincipal: notification.newPrincipal,
+              increaseAmount: notification.increaseAmount,
+              notificationId: notification._id
+            }
           }
         }
       );
