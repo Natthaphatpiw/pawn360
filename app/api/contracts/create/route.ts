@@ -169,25 +169,70 @@ export async function POST(request: NextRequest) {
     );
 
     // Update customer with contract info and storeId
-    await customersCollection.updateOne(
-      { _id: customer._id },
-      {
-        $inc: {
-          totalContracts: 1,
-          totalValue: pawnedPrice,
-        },
-        $set: {
-          lastContractDate: new Date(),
-          updatedAt: new Date(),
-        },
-        $addToSet: {
-          storeId: new ObjectId(storeId),
-        },
-        $push: {
-          contractsID: result.insertedId as any,
-        },
-      }
-    );
+    // First check if storeId is an array or single value and handle accordingly
+    const currentCustomer = await customersCollection.findOne({ _id: customer._id });
+    const storeIdToAdd = new ObjectId(storeId);
+
+    if (!currentCustomer?.storeId) {
+      // storeId doesn't exist, set it as an array
+      await customersCollection.updateOne(
+        { _id: customer._id },
+        {
+          $inc: {
+            totalContracts: 1,
+            totalValue: pawnedPrice,
+          },
+          $set: {
+            lastContractDate: new Date(),
+            updatedAt: new Date(),
+            storeId: [storeIdToAdd],
+          },
+          $push: {
+            contractsID: result.insertedId as any,
+          },
+        }
+      );
+    } else if (Array.isArray(currentCustomer.storeId)) {
+      // storeId is already an array, add to it
+      await customersCollection.updateOne(
+        { _id: customer._id },
+        {
+          $inc: {
+            totalContracts: 1,
+            totalValue: pawnedPrice,
+          },
+          $set: {
+            lastContractDate: new Date(),
+            updatedAt: new Date(),
+          },
+          $addToSet: {
+            storeId: storeIdToAdd,
+          },
+          $push: {
+            contractsID: result.insertedId as any,
+          },
+        }
+      );
+    } else {
+      // storeId exists as single ObjectId, convert to array
+      await customersCollection.updateOne(
+        { _id: customer._id },
+        {
+          $inc: {
+            totalContracts: 1,
+            totalValue: pawnedPrice,
+          },
+          $set: {
+            lastContractDate: new Date(),
+            updatedAt: new Date(),
+            storeId: [currentCustomer.storeId, storeIdToAdd],
+          },
+          $push: {
+            contractsID: result.insertedId as any,
+          },
+        }
+      );
+    }
 
     // Send notification to LINE
     try {
