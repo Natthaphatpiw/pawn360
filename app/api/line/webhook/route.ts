@@ -165,14 +165,11 @@ async function handleTextMessage(event: any) {
 
 async function requestRedemption(contractId: string, lineUserId: string) {
   try {
-    // Use the correct base URL for API calls
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'https://pawn360.vercel.app';
+    // For internal API calls, use relative path to avoid external calls
+    // This works in both development and production
+    console.log('Making request to: /api/customer/request-redemption');
 
-    console.log('Making request to:', `${baseUrl}/api/customer/request-redemption`);
-
-    const response = await fetch(`${baseUrl}/api/customer/request-redemption`, {
+    const response = await fetch('/api/customer/request-redemption', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId, lineUserId })
@@ -195,14 +192,11 @@ async function requestRedemption(contractId: string, lineUserId: string) {
 
 async function requestExtension(contractId: string, lineUserId: string) {
   try {
-    // Use the correct base URL for API calls
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'https://pawn360.vercel.app';
+    // For internal API calls, use relative path to avoid external calls
+    // This works in both development and production
+    console.log('Making request to: /api/customer/request-extension');
 
-    console.log('Making request to:', `${baseUrl}/api/customer/request-extension`);
-
-    const response = await fetch(`${baseUrl}/api/customer/request-extension`, {
+    const response = await fetch('/api/customer/request-extension', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId, lineUserId })

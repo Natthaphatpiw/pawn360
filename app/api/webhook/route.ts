@@ -201,13 +201,42 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   return;
                 }
 
-                // สร้างสัญญาจริง
-                const contractNumber = `PW${Date.now()}`;
+                // คำนวณ dueDate ก่อน
                 const startDate = new Date();
-                const proposedContract = confirmedContract;
-
                 const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + (proposedContract.loanDays || proposedContract.periodDays || 30));
+                dueDate.setDate(dueDate.getDate() + (confirmedContract.loanDays || confirmedContract.periodDays || 30));
+
+                // ตรวจสอบว่ามี contract สำหรับ item นี้อยู่แล้วหรือไม่
+                const existingContract = await contractsCollection.findOne({
+                  'item.itemId': new ObjectId(itemId)
+                });
+
+                if (existingContract) {
+                  console.log(`Contract already exists for item ${itemId}, updating instead of creating new one`);
+
+                  // อัพเดท contract ที่มีอยู่
+                  await contractsCollection.updateOne(
+                    { _id: existingContract._id },
+                    {
+                      $set: {
+                        'pawnDetails.pawnedPrice': confirmedContract.pawnPrice || confirmedContract.pawnedPrice,
+                        'pawnDetails.interestRate': confirmedContract.interestRate,
+                        'pawnDetails.periodDays': confirmedContract.loanDays || confirmedContract.periodDays,
+                        'pawnDetails.totalInterest': confirmedContract.interest || confirmedContract.interestAmount,
+                        'pawnDetails.remainingAmount': confirmedContract.total || confirmedContract.remainingAmount,
+                        'dates.dueDate': dueDate,
+                        updatedAt: new Date()
+                      }
+                    }
+                  );
+
+                  console.log(`Contract updated successfully for itemId: ${itemId}`);
+                  return;
+                }
+
+                // สร้างสัญญาจริง (ถ้ายังไม่มี)
+                const contractNumber = `PW${Date.now()}`;
+                const proposedContract = confirmedContract;
 
                 const newContract = {
                   contractNumber,
