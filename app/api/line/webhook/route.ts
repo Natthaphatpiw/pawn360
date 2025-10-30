@@ -165,7 +165,8 @@ async function handleTextMessage(event: any) {
 
 async function requestRedemption(contractId: string, lineUserId: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/customer/request-redemption`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    const response = await fetch(`${baseUrl}/api/customer/request-redemption`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId, lineUserId })
@@ -186,7 +187,8 @@ async function requestRedemption(contractId: string, lineUserId: string) {
 
 async function requestExtension(contractId: string, lineUserId: string) {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/customer/request-extension`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    const response = await fetch(`${baseUrl}/api/customer/request-extension`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contractId, lineUserId })
