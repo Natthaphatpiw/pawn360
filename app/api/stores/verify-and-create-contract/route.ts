@@ -70,20 +70,27 @@ export async function POST(request: NextRequest) {
     // 4. เตรียมข้อมูลสัญญาและส่งการยืนยันเสมอ
     const startDate = new Date();
 
-    // ใช้ค่าที่ยืนยันแล้ว (confirmationNewContract) ถ้ามี มิเช่นนั้นใช้ค่าที่ต่อรองแล้ว
-    const pawnedPrice = item.confirmationNewContract?.pawnPrice || item.negotiatedAmount || item.desiredAmount || 0;
-    const interestRate = item.confirmationNewContract?.interestRate || item.negotiatedInterestRate || item.interestRate || 3;
-    const periodDays = item.confirmationNewContract?.loanDays || item.negotiatedDays || item.loanDays || 30;
+    // แปลงค่าให้เป็น number เพื่อป้องกัน string concatenation
+    const pawnedPrice = parseFloat(String(item.confirmationNewContract?.pawnPrice || item.negotiatedAmount || item.desiredAmount || 0));
+    const interestRate = parseFloat(String(item.confirmationNewContract?.interestRate || item.negotiatedInterestRate || item.interestRate || 10));
+    const periodDays = parseInt(String(item.confirmationNewContract?.loanDays || item.negotiatedDays || item.loanDays || 30));
 
-    const dueDate = new Date();
+    // คำนวณ dueDate อย่างถูกต้อง
+    const dueDate = new Date(startDate.getTime());
     dueDate.setDate(dueDate.getDate() + periodDays);
 
-    // คำนวณดอกเบี้ยและยอดรวม
+    // คำนวณดอกเบี้ยและยอดรวม (ใช้ตัวเลขที่แปลงแล้ว)
     const interestAmount = (pawnedPrice * interestRate * (periodDays / 30)) / 100;
     const remainingAmount = pawnedPrice + interestAmount;
 
+    console.log(`💰 Contract preparation - Price: ${pawnedPrice}, Rate: ${interestRate}%, Days: ${periodDays}`);
+    console.log(`💰 Interest calculation: ${pawnedPrice} × ${interestRate}% × (${periodDays}/30) / 100 = ${interestAmount}`);
+    console.log(`💰 Remaining amount: ${pawnedPrice} + ${interestAmount} = ${remainingAmount}`);
+    console.log(`📅 Due date: Start ${startDate.toISOString()} + ${periodDays} days = ${dueDate.toISOString()}`);
+
     // เตรียมข้อมูลสัญญาสำหรับการยืนยัน
     const proposedContract = {
+      itemId: itemId, // เพิ่ม itemId สำหรับ LINE message
       pawnedPrice,
       interestRate,
       periodDays,

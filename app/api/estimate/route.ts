@@ -111,22 +111,35 @@ Your response should be just the number, nothing else.`;
   });
 
   const priceText = response.output_text || '0';
+  console.log('🤖 AI Response Text:', priceText);
+
   let marketPrice = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
 
   console.log('📊 Raw market price from AI:', marketPrice);
 
   // ตรวจสอบและแก้ไขราคาที่ผิดปกติ
-  // 1. ถ้าราคามากกว่า 10 ล้านบาท น่าจะเป็น satang แทน baht
-  if (marketPrice > 10000000) {
-    console.warn('⚠️ Market price seems too high, might be in satang. Converting to baht...');
-    marketPrice = Math.round(marketPrice / 100);
-    console.log('📊 Converted market price (satang to baht):', marketPrice);
+  // 1. ถ้าราคามากกว่า 1 ล้านบาท อาจจะเป็น satang หรือ AI ให้ราคาผิดปกติ
+  if (marketPrice > 1000000) {
+    console.warn('⚠️ Market price extremely high, attempting conversion...');
+
+    // ถ้ามากกว่า 10 ล้าน แปลงจาก satang
+    if (marketPrice > 10000000) {
+      marketPrice = Math.round(marketPrice / 100);
+      console.log('📊 Converted from satang to baht:', marketPrice);
+    }
+
+    // ถ้ายังมากกว่า 500k หลังแปลง ให้ cap ที่ 500k
+    if (marketPrice > 500000) {
+      console.warn('⚠️ Still too high after conversion, capping at 500,000 THB');
+      marketPrice = 500000;
+    }
   }
 
-  // 2. Cap ราคาสูงสุดสำหรับอุปกรณ์อิเล็กทรอนิกส์ (ไม่ควรเกิน 500,000 บาท สำหรับสินค้าราคาแพง)
-  if (marketPrice > 500000) {
-    console.warn('⚠️ Market price too high, capping at 500,000 THB');
-    marketPrice = 500000;
+  // 2. ตรวจสอบค่าที่สมเหตุสมผลสำหรับสินค้ามือสอง
+  // สินค้าอิเล็กทรอนิกส์มือสองทั่วไปไม่ควรเกิน 300,000 บาท
+  if (marketPrice > 300000) {
+    console.warn('⚠️ Market price unusually high for second-hand electronics, capping at 300,000 THB');
+    marketPrice = 300000;
   }
 
   // 3. ตรวจสอบราคาต่ำสุด (ไม่ควรต่ำกว่า 100 บาท)
