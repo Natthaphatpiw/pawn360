@@ -201,10 +201,20 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   return;
                 }
 
-                // คำนวณ dueDate ก่อน
+                // แปลงค่าให้เป็น number เพื่อป้องกัน string concatenation
+                const pawnedPrice = parseFloat(String(confirmedContract.pawnPrice || confirmedContract.pawnedPrice)) || 0;
+                const interestRate = parseFloat(String(confirmedContract.interestRate)) || 10;
+                const periodDays = parseInt(String(confirmedContract.loanDays || confirmedContract.periodDays)) || 30;
+                const totalInterest = parseFloat(String(confirmedContract.interest || confirmedContract.interestAmount)) || 0;
+                const remainingAmount = pawnedPrice + totalInterest;
+
+                // คำนวณ dueDate อย่างถูกต้อง
                 const startDate = new Date();
-                const dueDate = new Date();
-                dueDate.setDate(dueDate.getDate() + (confirmedContract.loanDays || confirmedContract.periodDays || 30));
+                const dueDate = new Date(startDate.getTime());
+                dueDate.setDate(dueDate.getDate() + periodDays);
+
+                console.log(`💰 Contract calculation - Price: ${pawnedPrice}, Interest: ${totalInterest}, Total: ${remainingAmount}, Days: ${periodDays}`);
+                console.log(`📅 Date calculation - Start: ${startDate.toISOString()}, Due: ${dueDate.toISOString()}, Period: ${periodDays} days`);
 
                 // ตรวจสอบว่ามี contract สำหรับ item นี้อยู่แล้วหรือไม่
                 const existingContract = await contractsCollection.findOne({
@@ -219,11 +229,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
                     { _id: existingContract._id },
                     {
                       $set: {
-                        'pawnDetails.pawnedPrice': confirmedContract.pawnPrice || confirmedContract.pawnedPrice,
-                        'pawnDetails.interestRate': confirmedContract.interestRate,
-                        'pawnDetails.periodDays': confirmedContract.loanDays || confirmedContract.periodDays,
-                        'pawnDetails.totalInterest': confirmedContract.interest || confirmedContract.interestAmount,
-                        'pawnDetails.remainingAmount': confirmedContract.total || confirmedContract.remainingAmount,
+                        'pawnDetails.pawnedPrice': pawnedPrice,
+                        'pawnDetails.interestRate': interestRate,
+                        'pawnDetails.periodDays': periodDays,
+                        'pawnDetails.totalInterest': totalInterest,
+                        'pawnDetails.remainingAmount': remainingAmount,
                         'dates.dueDate': dueDate,
                         updatedAt: new Date()
                       }
@@ -256,11 +266,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   },
                   pawnDetails: {
                     aiEstimatedPrice: item.estimatedValue || 0,
-                    pawnedPrice: proposedContract.pawnPrice || proposedContract.pawnedPrice,
-                    interestRate: proposedContract.interestRate,
-                    periodDays: proposedContract.loanDays || proposedContract.periodDays,
-                    totalInterest: proposedContract.interest || proposedContract.interestAmount,
-                    remainingAmount: proposedContract.total || proposedContract.remainingAmount,
+                    pawnedPrice: pawnedPrice,
+                    interestRate: interestRate,
+                    periodDays: periodDays,
+                    totalInterest: totalInterest,
+                    remainingAmount: remainingAmount,
                     fineAmount: 0,
                     payInterest: 0,
                     soldAmount: 0,
@@ -323,13 +333,13 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   }
                 );
 
-                // ส่งข้อความยืนยันสำเร็จให้ user
+                // ส่งข้อความยืนยันสำเร็จให้ user (ใช้ค่าที่แปลงแล้ว)
                 try {
                   await sendConfirmationSuccessMessage(item.lineId, {
                     contractNumber,
                     storeName: proposedContract.storeName,
-                    pawnedPrice: proposedContract.pawnPrice || proposedContract.pawnedPrice,
-                    remainingAmount: proposedContract.total || proposedContract.remainingAmount,
+                    pawnedPrice: pawnedPrice,
+                    remainingAmount: remainingAmount,
                     dueDate: dueDate.toISOString(),
                   });
                 } catch (messageError) {

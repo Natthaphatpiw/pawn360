@@ -381,8 +381,8 @@ export async function sendContractCompletionNotification(
       year: 'numeric'
     });
 
-    // สร้างเลขที่สัญญา
-    const contractNumber = `STORE${Date.now()}`;
+    // ใช้เลขที่สัญญาจาก contractData (ไม่สร้างใหม่)
+    const contractNumber = contractData.contractNumber || `PW${Date.now()}`;
 
     // สร้าง LIFF URL สำหรับรายละเอียดสัญญา
     const itemId = itemData._id.toString();

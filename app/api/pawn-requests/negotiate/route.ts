@@ -56,14 +56,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // แปลงค่าให้เป็น number ก่อนบันทึก
+    const amountNum = parseFloat(String(negotiatedAmount));
+    const daysNum = parseInt(String(negotiatedDays));
+    const rateNum = parseFloat(String(negotiatedInterestRate));
+
+    console.log(`💰 Negotiation data: Amount=${amountNum}, Days=${daysNum}, Rate=${rateNum}%`);
+
     // อัปเดตข้อมูลการต่อรองใน item
     await itemsCollection.updateOne(
       { _id: new ObjectId(itemId) },
       {
         $set: {
-          negotiatedAmount,
-          negotiatedDays,
-          negotiatedInterestRate,
+          negotiatedAmount: amountNum,
+          negotiatedDays: daysNum,
+          negotiatedInterestRate: rateNum,
           negotiationStatus: 'pending',
           updatedAt: new Date(),
         },
@@ -90,17 +97,19 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // คำนวณดอกเบี้ยและยอดรวม
-    const interest = (negotiatedAmount * negotiatedInterestRate * (negotiatedDays / 30)) / 100;
-    const totalAmount = negotiatedAmount + interest;
+    // คำนวณดอกเบี้ยและยอดรวม (ใช้ค่าที่แปลงแล้ว)
+    const interest = (amountNum * rateNum * (daysNum / 30)) / 100;
+    const totalAmount = amountNum + interest;
 
-    // ส่งการแจ้งเตือนไปยังลูกค้า
+    console.log(`💰 Negotiation calculation: Interest=${interest}, Total=${totalAmount}`);
+
+    // ส่งการแจ้งเตือนไปยังลูกค้า (ใช้ค่าที่แปลงแล้ว)
     await sendNegotiationMessage(
       item.lineId,
       itemId,
-      negotiatedAmount,
-      negotiatedDays,
-      negotiatedInterestRate,
+      amountNum,
+      daysNum,
+      rateNum,
       interest,
       totalAmount,
       presignedUrl

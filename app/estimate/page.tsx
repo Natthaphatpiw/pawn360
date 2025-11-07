@@ -150,7 +150,21 @@ export default function EstimatePage() {
   useEffect(() => {
     const calculateInterest = () => {
       const store = stores.find(s => s._id === selectedStore);
-      if (!store || !estimateResult) return;
+
+      console.log('💰 Calculating interest:', {
+        hasStore: !!store,
+        storeId: selectedStore,
+        hasEstimate: !!estimateResult,
+        interestType: interestCalculationType,
+        hasInterestPerday: !!store?.interestPerday,
+        hasInterestSet: !!store?.interestSet,
+        interestSetKeys: store?.interestSet ? Object.keys(store.interestSet) : []
+      });
+
+      if (!store || !estimateResult) {
+        console.log('⚠️ Missing store or estimate result');
+        return;
+      }
 
       const principal = parseFloat(desiredPrice) || estimateResult.estimatedPrice;
       const days = parseInt(pawnDuration);
@@ -160,27 +174,43 @@ export default function EstimatePage() {
       if (interestCalculationType === 'daily' && store.interestPerday) {
         // ดอกเบี้ยรายวัน: เงินต้น × อัตราดอกเบี้ยต่อวัน × จำนวนวัน
         interest = principal * store.interestPerday * days;
+        console.log(`📊 Daily interest: ${principal} × ${store.interestPerday} × ${days} = ${interest}`);
       } else if (interestCalculationType === 'monthly' && store.interestSet) {
         // ดอกเบี้ยรายเดือน: เงินต้น × อัตราดอกเบี้ยต่อเดือน × (จำนวนเดือน)
         // หากมีอัตราเฉพาะสำหรับจำนวนวันนี้ ให้ใช้ หากไม่มีให้คำนวณแบบสัดส่วน
         if (store.interestSet[days.toString()]) {
           // กรณีมีอัตราเฉพาะ เช่น 7 วัน = 7%
           interest = principal * store.interestSet[days.toString()];
+          console.log(`📊 Monthly interest (exact): ${principal} × ${store.interestSet[days.toString()]} = ${interest}`);
         } else {
           // กรณีไม่มีอัตราเฉพาะ คำนวณแบบสัดส่วนรายวัน
           // สมมติฐาน: เดือน = 30 วัน
           const monthlyRate = store.interestSet['30'] || 0.10; // default 10%
           const dailyRate = monthlyRate / 30;
           interest = principal * dailyRate * days;
+          console.log(`📊 Monthly interest (prorated): ${principal} × ${dailyRate} × ${days} = ${interest}`);
         }
+      } else {
+        console.warn('⚠️ No interest calculation method available:', {
+          calculationType: interestCalculationType,
+          hasPerday: !!store.interestPerday,
+          hasSet: !!store.interestSet
+        });
       }
 
+      console.log(`✅ Final interest: ${Math.round(interest)}, Total: ${Math.round(principal + interest)}`);
       setInterestAmount(Math.round(interest));
       setTotalAmount(Math.round(principal + interest));
     };
 
     if (selectedStore && pawnDuration && estimateResult) {
       calculateInterest();
+    } else {
+      console.log('⚠️ Interest calculation skipped:', {
+        hasSelectedStore: !!selectedStore,
+        hasDuration: !!pawnDuration,
+        hasEstimate: !!estimateResult
+      });
     }
   }, [selectedStore, pawnDuration, interestCalculationType, estimateResult, desiredPrice, stores]);
 

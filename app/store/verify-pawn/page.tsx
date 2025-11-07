@@ -374,13 +374,13 @@ function StoreVerifyPawnContent() {
             <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">ราคาประเมิน</p>
+                  <p className="text-sm text-gray-600">ราคาประเมิน AI</p>
                   <p className="font-medium text-gray-900">
                     {pawnRequest.estimatedValue?.toLocaleString() || '-'} บาท
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">ราคาที่ต้องการจำนำ</p>
+                  <p className="text-sm text-gray-600">ราคาที่ลูกค้าต้องการจำนำ</p>
                   <p className="font-medium text-green-600">
                     {(pawnRequest.negotiatedAmount || pawnRequest.desiredAmount)?.toLocaleString() || '-'} บาท
                   </p>
