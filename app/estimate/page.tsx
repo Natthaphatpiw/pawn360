@@ -146,44 +146,43 @@ export default function EstimatePage() {
     }
   }, [currentStep]);
 
-  // Calculate interest when store, duration, or type changes
+  // Calculate interest when store, duration, type, or desired price changes
   useEffect(() => {
+    const calculateInterest = () => {
+      const store = stores.find(s => s._id === selectedStore);
+      if (!store || !estimateResult) return;
+
+      const principal = parseFloat(desiredPrice) || estimateResult.estimatedPrice;
+      const days = parseInt(pawnDuration);
+
+      let interest = 0;
+
+      if (interestCalculationType === 'daily' && store.interestPerday) {
+        // ดอกเบี้ยรายวัน: เงินต้น × อัตราดอกเบี้ยต่อวัน × จำนวนวัน
+        interest = principal * store.interestPerday * days;
+      } else if (interestCalculationType === 'monthly' && store.interestSet) {
+        // ดอกเบี้ยรายเดือน: เงินต้น × อัตราดอกเบี้ยต่อเดือน × (จำนวนเดือน)
+        // หากมีอัตราเฉพาะสำหรับจำนวนวันนี้ ให้ใช้ หากไม่มีให้คำนวณแบบสัดส่วน
+        if (store.interestSet[days.toString()]) {
+          // กรณีมีอัตราเฉพาะ เช่น 7 วัน = 7%
+          interest = principal * store.interestSet[days.toString()];
+        } else {
+          // กรณีไม่มีอัตราเฉพาะ คำนวณแบบสัดส่วนรายวัน
+          // สมมติฐาน: เดือน = 30 วัน
+          const monthlyRate = store.interestSet['30'] || 0.10; // default 10%
+          const dailyRate = monthlyRate / 30;
+          interest = principal * dailyRate * days;
+        }
+      }
+
+      setInterestAmount(Math.round(interest));
+      setTotalAmount(Math.round(principal + interest));
+    };
+
     if (selectedStore && pawnDuration && estimateResult) {
       calculateInterest();
     }
-  }, [selectedStore, pawnDuration, interestCalculationType, estimateResult]);
-
-  // Functions for interest calculation
-  const calculateInterest = () => {
-    const store = stores.find(s => s._id === selectedStore);
-    if (!store || !estimateResult) return;
-
-    const principal = parseFloat(desiredPrice) || estimateResult.estimatedPrice;
-    const days = parseInt(pawnDuration);
-
-    let interest = 0;
-
-    if (interestCalculationType === 'daily' && store.interestPerday) {
-      // ดอกเบี้ยรายวัน: เงินต้น × อัตราดอกเบี้ยต่อวัน × จำนวนวัน
-      interest = principal * store.interestPerday * days;
-    } else if (interestCalculationType === 'monthly' && store.interestSet) {
-      // ดอกเบี้ยรายเดือน: เงินต้น × อัตราดอกเบี้ยต่อเดือน × (จำนวนเดือน)
-      // หากมีอัตราเฉพาะสำหรับจำนวนวันนี้ ให้ใช้ หากไม่มีให้คำนวณแบบสัดส่วน
-      if (store.interestSet[days.toString()]) {
-        // กรณีมีอัตราเฉพาะ เช่น 7 วัน = 7%
-        interest = principal * store.interestSet[days.toString()];
-      } else {
-        // กรณีไม่มีอัตราเฉพาะ คำนวณแบบสัดส่วนรายวัน
-        // สมมติฐาน: เดือน = 30 วัน
-        const monthlyRate = store.interestSet['30'] || 0.10; // default 10%
-        const dailyRate = monthlyRate / 30;
-        interest = principal * dailyRate * days;
-      }
-    }
-
-    setInterestAmount(Math.round(interest));
-    setTotalAmount(Math.round(principal + interest));
-  };
+  }, [selectedStore, pawnDuration, interestCalculationType, estimateResult, desiredPrice, stores]);
 
   const fetchStores = async () => {
     try {
@@ -197,8 +196,17 @@ export default function EstimatePage() {
   };
 
   const handleCreatePawnRequest = async () => {
-    if (!selectedStore || !estimateResult || !customer) {
+    if (!selectedStore || !estimateResult) {
       setError('กรุณาเลือกร้านและกรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    // Check if customer exists
+    if (!customer) {
+      setError('กรุณาลงทะเบียนก่อนสร้าง QR Code');
+      // Redirect to register page
+      const liffIdRegister = process.env.NEXT_PUBLIC_LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
+      window.location.href = `https://liff.line.me/${liffIdRegister}/register`;
       return;
     }
 
@@ -401,6 +409,9 @@ export default function EstimatePage() {
       // Call AI estimation API
       const response = await axios.post('/api/estimate', estimateData);
       setEstimateResult(response.data);
+
+      // Set desired price to estimated price by default
+      setDesiredPrice(response.data.estimatedPrice.toString());
 
       // Fetch stores for pawn_setup step
       await fetchStores();
@@ -647,7 +658,6 @@ export default function EstimatePage() {
               capture="environment"
               onChange={handleImageSelect}
               className="hidden"
-              multiple
             />
             <input
               ref={fileInputRef}
