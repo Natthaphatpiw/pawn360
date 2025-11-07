@@ -50,16 +50,22 @@ export async function POST(request: NextRequest) {
     // Calculate dates and amounts - Always use current date for contract creation
     const startDate = new Date(); // Current date when contract is created
 
-    // 🔥 ใช้ confirmationNewContract data ถ้ามี มิเช่นนั้นใช้ข้อมูลเดิม
-    const pawnedPrice = item.confirmationNewContract?.pawnPrice || item.desiredAmount || item.estimatedValue || 0;
-    const interestRate = item.confirmationNewContract?.interestRate || item.interestRate || 10;
-    const periodDays = item.confirmationNewContract?.loanDays || item.loanDays || 30;
+    // 🔥 แปลงค่าให้เป็น number เพื่อป้องกัน string concatenation
+    const pawnedPrice = parseFloat(String(item.confirmationNewContract?.pawnPrice || item.desiredAmount || item.estimatedValue || 0));
+    const interestRate = parseFloat(String(item.confirmationNewContract?.interestRate || item.interestRate || 10));
+    const periodDays = parseInt(String(item.confirmationNewContract?.loanDays || item.loanDays || 30));
 
-    const dueDate = new Date(startDate);
+    // คำนวณ dueDate อย่างถูกต้อง
+    const dueDate = new Date(startDate.getTime());
     dueDate.setDate(dueDate.getDate() + periodDays);
 
     const totalInterest = (pawnedPrice * interestRate * periodDays) / (100 * 30);
     const remainingAmount = pawnedPrice + totalInterest;
+
+    console.log(`💰 Contract creation - Price: ${pawnedPrice}, Rate: ${interestRate}%, Days: ${periodDays}`);
+    console.log(`💰 Interest calculation: (${pawnedPrice} × ${interestRate}% × ${periodDays}) / (100 × 30) = ${totalInterest}`);
+    console.log(`💰 Remaining amount: ${pawnedPrice} + ${totalInterest} = ${remainingAmount}`);
+    console.log(`📅 Date calculation - Start: ${startDate.toISOString()}, Due: ${dueDate.toISOString()}, Period: ${periodDays} days`);
 
     // Check if contract already exists for this item
     const existingContract = await contractsCollection.findOne({
@@ -69,7 +75,9 @@ export async function POST(request: NextRequest) {
     if (existingContract) {
       console.log(`Contract already exists for item ${itemId}, updating instead of creating new one`);
 
-      // Update existing contract with new data
+      console.log(`📝 Updating existing contract with numeric values`);
+
+      // Update existing contract with new data (using converted numeric values)
       await contractsCollection.updateOne(
         { _id: existingContract._id },
         {
@@ -177,8 +185,8 @@ export async function POST(request: NextRequest) {
     // Upload contract images to S3 if provided
     const contractImageUrls: { contractHtmlUrl?: string; verificationPhotoUrl?: string } = {};
 
-    // Generate contract number for new contract
-    const contractNumber = `STORE${Date.now()}`;
+    // Generate contract number for new contract (use PW prefix)
+    const contractNumber = `PW${Date.now()}`;
 
     if (contractData.signatures?.seller?.signatureData || contractData.signatures?.buyer?.signatureData) {
       try {
