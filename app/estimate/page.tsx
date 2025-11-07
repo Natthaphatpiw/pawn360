@@ -171,6 +171,7 @@ export default function EstimatePage() {
 
       let interest = 0;
 
+      // ลองคำนวณตามประเภทที่เลือกก่อน
       if (interestCalculationType === 'daily' && store.interestPerday) {
         // ดอกเบี้ยรายวัน: เงินต้น × อัตราดอกเบี้ยต่อวัน × จำนวนวัน
         interest = principal * store.interestPerday * days;
@@ -191,11 +192,31 @@ export default function EstimatePage() {
           console.log(`📊 Monthly interest (prorated): ${principal} × ${dailyRate} × ${days} = ${interest}`);
         }
       } else {
-        console.warn('⚠️ No interest calculation method available:', {
-          calculationType: interestCalculationType,
-          hasPerday: !!store.interestPerday,
-          hasSet: !!store.interestSet
-        });
+        // Fallback: ถ้าประเภทที่เลือกไม่มี ให้ลองใช้อีกประเภทหนึ่ง
+        console.warn('⚠️ Selected interest type not available, trying fallback...');
+
+        if (store.interestSet) {
+          // ลอง monthly ก่อน
+          if (store.interestSet[days.toString()]) {
+            interest = principal * store.interestSet[days.toString()];
+            console.log(`📊 Fallback monthly interest (exact): ${principal} × ${store.interestSet[days.toString()]} = ${interest}`);
+          } else {
+            const monthlyRate = store.interestSet['30'] || 0.10;
+            const dailyRate = monthlyRate / 30;
+            interest = principal * dailyRate * days;
+            console.log(`📊 Fallback monthly interest (prorated): ${principal} × ${dailyRate} × ${days} = ${interest}`);
+          }
+        } else if (store.interestPerday) {
+          // ถ้าไม่มี monthly ลอง daily
+          interest = principal * store.interestPerday * days;
+          console.log(`📊 Fallback daily interest: ${principal} × ${store.interestPerday} × ${days} = ${interest}`);
+        } else {
+          // ถ้าไม่มีเลย ใช้ default 10% ต่อเดือน
+          const defaultRate = 0.10;
+          const dailyRate = defaultRate / 30;
+          interest = principal * dailyRate * days;
+          console.warn(`⚠️ Using default 10% monthly rate: ${principal} × ${dailyRate} × ${days} = ${interest}`);
+        }
       }
 
       console.log(`✅ Final interest: ${Math.round(interest)}, Total: ${Math.round(principal + interest)}`);
