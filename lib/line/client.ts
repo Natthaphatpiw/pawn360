@@ -699,7 +699,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${(newContract.pawnPrice || newContract.pawnedPrice || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${(parseFloat(String(newContract.pawnPrice || newContract.pawnedPrice || 0))).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -708,7 +708,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${(newContract.interestAmount || newContract.interest || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${Math.round(parseFloat(String(newContract.interestAmount || newContract.interest || 0))).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -717,7 +717,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ระยะเวลา:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${newContract.periodDays || newContract.loanDays || 0} วัน`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${parseInt(String(newContract.periodDays || newContract.loanDays || 0))} วัน`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -726,7 +726,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'รวมทั้งสิ้น:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${(newContract.remainingAmount || newContract.total || 0).toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${Math.round(parseFloat(String(newContract.remainingAmount || newContract.total || 0))).toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
                   ]
                 }
               ]
