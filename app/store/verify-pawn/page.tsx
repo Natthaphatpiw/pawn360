@@ -200,16 +200,23 @@ function StoreVerifyPawnContent() {
           }, 3000);
         }
       } else {
-        // ไม่มีการแก้ไข - สร้างสัญญาได้เลย
-        const response = await axios.post('/api/stores/verify-and-create-contract', {
+        // ไม่มีการแก้ไข - ส่งคำขอยืนยันให้ลูกค้า
+        const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
           itemId,
           storeId: selectedStore._id,
           password,
+          newContract: {
+            pawnPrice: originalAmount,
+            interestRate: originalRate,
+            loanDays: originalDays,
+            item: `${pawnRequest?.brand} ${pawnRequest?.model}`,
+            storeId: selectedStore._id,
+            storeName: selectedStore.storeName
+          }
         });
 
-        if (response.data.success) {
+        if (confirmResponse.data.success) {
           setSuccess(true);
-          // ปิดหน้าต่างทันทีหลังแสดงข้อความสำเร็จ 1 วินาที
           setTimeout(() => {
             if (window.liff && window.liff.isInClient()) {
               window.liff.closeWindow();
@@ -217,7 +224,7 @@ function StoreVerifyPawnContent() {
               // ถ้าไม่ใช่ LIFF ให้ redirect กลับไปหน้าแรก
               window.location.href = '/';
             }
-          }, 1000);
+          }, 3000);
         }
       }
     } catch (err: any) {
