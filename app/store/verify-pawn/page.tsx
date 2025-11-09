@@ -202,9 +202,22 @@ function StoreVerifyPawnContent() {
       } else {
         // ไม่มีการแก้ไข - ส่งคำขอยืนยันให้ลูกค้า
         const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
+          lineId: pawnRequest.lineId,
           itemId,
-          storeId: selectedStore._id,
-          password,
+          modifications: {
+            // ไม่มีการแก้ไข แต่ต้องส่งเพื่อแสดงในข้อความ
+            original: {
+              amount: originalAmount,
+              days: originalDays,
+              rate: originalRate
+            },
+            new: {
+              amount: originalAmount,
+              days: originalDays,
+              rate: originalRate
+            },
+            hasChanges: false
+          },
           newContract: {
             pawnPrice: originalAmount,
             interestRate: originalRate,
