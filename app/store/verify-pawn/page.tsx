@@ -201,6 +201,11 @@ function StoreVerifyPawnContent() {
         }
       } else {
         // ไม่มีการแก้ไข - ส่งคำขอยืนยันให้ลูกค้า
+        if (!pawnRequest) {
+          setError('ไม่พบข้อมูลรายการจำนำ');
+          return;
+        }
+
         const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
           lineId: pawnRequest.lineId,
           itemId,
@@ -222,7 +227,7 @@ function StoreVerifyPawnContent() {
             pawnPrice: originalAmount,
             interestRate: originalRate,
             loanDays: originalDays,
-            item: `${pawnRequest?.brand} ${pawnRequest?.model}`,
+            item: `${pawnRequest.brand} ${pawnRequest.model}`,
             storeId: selectedStore._id,
             storeName: selectedStore.storeName
           }
