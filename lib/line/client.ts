@@ -606,26 +606,55 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
     console.log('Modifications:', modifications);
     console.log('New contract:', newContract);
 
+    // 🔥 Calculate interest and total amount
+    const pawnPrice = parseFloat(String(newContract.pawnPrice || newContract.pawnedPrice || 0));
+    const interestRate = parseFloat(String(newContract.interestRate || 10));
+    const loanDays = parseInt(String(newContract.periodDays || newContract.loanDays || 30));
+    const interestAmount = (pawnPrice * interestRate * loanDays) / (100 * 30);
+    const totalAmount = pawnPrice + interestAmount;
+
+    console.log(`💰 Calculated: Price=${pawnPrice}, Rate=${interestRate}%, Days=${loanDays}, Interest=${interestAmount}, Total=${totalAmount}`);
+
     // ตรวจสอบประเภทการยืนยัน และรูปแบบของ modifications
     const isContractCreation = modifications?.type === 'contract_creation';
 
     // Handle both array format and object format for modifications
     let changesList: string[] = [];
+    let hasChanges = false;
+
     if (Array.isArray(modifications)) {
       // Direct array format from ContractForm
       changesList = modifications;
+      hasChanges = modifications.length > 0;
     } else if (modifications?.changes && Array.isArray(modifications.changes)) {
       // Object format with changes property
       changesList = modifications.changes;
+      hasChanges = modifications.changes.length > 0;
+    } else if (modifications?.original && modifications?.new) {
+      // Object format from verify-pawn with original and new values
+      hasChanges = modifications.hasChanges || false;
+
+      // Build changes list if there are changes
+      if (hasChanges) {
+        if (modifications.original.amount !== modifications.new.amount) {
+          changesList.push(`ราคาจำนำ: ${modifications.original.amount.toLocaleString()} → ${modifications.new.amount.toLocaleString()} บาท`);
+        }
+        if (modifications.original.days !== modifications.new.days) {
+          changesList.push(`ระยะเวลา: ${modifications.original.days} → ${modifications.new.days} วัน`);
+        }
+        if (modifications.original.rate !== modifications.new.rate) {
+          changesList.push(`อัตราดอกเบี้ย: ${modifications.original.rate} → ${modifications.new.rate}%`);
+        }
+      }
     }
 
-    const headerText = isContractCreation ? 'ยืนยันการสร้างสัญญา' : 'มีการแก้ไขสัญญา';
-    const altText = isContractCreation ? `🔔 การสร้างสัญญาจำนำ` : `🔔 การแก้ไขสัญญา`;
+    const headerText = isContractCreation ? 'ยืนยันการสร้างสัญญา' : (hasChanges ? 'มีการแก้ไขสัญญา' : 'ยืนยันสัญญา');
+    const altText = isContractCreation ? `🔔 การสร้างสัญญาจำนำ` : (hasChanges ? `🔔 การแก้ไขสัญญา` : `🔔 ยืนยันสัญญา`);
     const modificationText = isContractCreation
       ? 'การสร้างสัญญาจำนำใหม่'
-      : (changesList.length > 0)
+      : (hasChanges && changesList.length > 0)
         ? changesList.join('\n• ')
-        : 'ไม่มีการเปลี่ยนแปลง';
+        : 'ใช้เงื่อนไขตามที่เสนอ (ไม่มีการแก้ไข)';
 
     const flexMessage = {
       type: 'flex',
@@ -699,7 +728,16 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${(parseFloat(String(newContract.pawnPrice || newContract.pawnedPrice || 0))).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${pawnPrice.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                  ]
+                },
+                {
+                  type: 'box',
+                  layout: 'baseline',
+                  spacing: 'sm',
+                  contents: [
+                    { type: 'text', text: 'อัตราดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: `${interestRate}% (${loanDays} วัน)`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -708,16 +746,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${Math.round(parseFloat(String(newContract.interestAmount || newContract.interest || 0))).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
-                  ]
-                },
-                {
-                  type: 'box',
-                  layout: 'baseline',
-                  spacing: 'sm',
-                  contents: [
-                    { type: 'text', text: 'ระยะเวลา:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${parseInt(String(newContract.periodDays || newContract.loanDays || 0))} วัน`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${Math.round(interestAmount).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
                 {
@@ -726,7 +755,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'รวมทั้งสิ้น:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: `${Math.round(parseFloat(String(newContract.remainingAmount || newContract.total || 0))).toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
+                    { type: 'text', text: `${Math.round(totalAmount).toLocaleString()} บาท`, wrap: true, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
                   ]
                 }
               ]

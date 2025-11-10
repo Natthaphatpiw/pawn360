@@ -9,6 +9,33 @@ import chromium from '@sparticuz/chromium';
 const BUCKET_NAME = 'piwp360';
 const CONTRACTS_FOLDER = 'contracts/';
 
+// Configure route for larger payloads
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
+// Helper to estimate base64 size
+function estimateBase64Size(base64String: string): number {
+  const base64Data = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+  return Math.ceil(base64Data.length * 0.75);
+}
+
+// Helper to reduce image quality
+function reduceImageQuality(base64Image: string, targetSizeKB: number = 800): string {
+  const targetBytes = targetSizeKB * 1024;
+  const currentSize = estimateBase64Size(base64Image);
+
+  if (currentSize <= targetBytes) {
+    return base64Image;
+  }
+
+  const ratio = targetBytes / currentSize;
+  const [prefix, base64Data] = base64Image.includes(',') ? base64Image.split(',') : ['', base64Image];
+  const newLength = Math.floor(base64Data.length * ratio);
+  const reducedData = base64Data.substring(0, newLength);
+
+  return prefix ? `${prefix},${reducedData}` : reducedData;
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Received save contract image request');
@@ -16,7 +43,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Request body keys:', Object.keys(body));
 
-    const { itemId, contractHTML, verificationPhoto } = body;
+    let { itemId, contractHTML, verificationPhoto } = body;
 
     console.log('Parsed data:', {
       itemId: itemId?.substring(0, 10) + '...',
@@ -25,6 +52,22 @@ export async function POST(request: NextRequest) {
       contractHTMLLength: contractHTML?.length,
       verificationPhotoLength: verificationPhoto?.length
     });
+
+    // 🔥 Reduce verification photo size if too large (target 800KB max)
+    let photoWasCompressed = false;
+    if (verificationPhoto) {
+      const photoSize = estimateBase64Size(verificationPhoto);
+      const photoSizeKB = photoSize / 1024;
+      console.log(`📸 Verification photo size: ${photoSizeKB.toFixed(2)}KB`);
+
+      if (photoSizeKB > 800) {
+        console.log('⚠️ Photo too large, reducing quality...');
+        verificationPhoto = reduceImageQuality(verificationPhoto, 800);
+        const newSize = estimateBase64Size(verificationPhoto) / 1024;
+        console.log(`✅ Reduced to ${newSize.toFixed(2)}KB`);
+        photoWasCompressed = true;
+      }
+    }
 
     if (!itemId) {
       console.error('Missing itemId');
@@ -240,7 +283,10 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'บันทึกสัญญาเรียบร้อยแล้ว',
       contractImageUrl: contractUploadResult ? `contracts/${contractUploadResult}` : null,
-      verificationPhotoUrl: photoUploadResult ? `contracts/${photoUploadResult}` : null
+      verificationPhotoUrl: photoUploadResult ? `contracts/${photoUploadResult}` : null,
+      ...(photoWasCompressed && {
+        warning: 'รูปภาพยืนยันตัวตนมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถอัปโหลดได้'
+      })
     });
 
   } catch (error) {

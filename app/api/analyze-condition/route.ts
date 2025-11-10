@@ -331,13 +331,9 @@ function reduceImageQuality(base64Image: string, targetSizeKB: number = 500): st
   return prefix ? `${prefix},${reducedData}` : reducedData;
 }
 
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // Increase body size limit to 10MB
-    },
-  },
-};
+// Configure route to accept larger payloads
+export const maxDuration = 60; // Maximum execution time: 60 seconds
+export const dynamic = 'force-dynamic'; // Always run dynamically
 
 export async function POST(request: NextRequest) {
   try {
@@ -355,29 +351,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาอัพโหลดรูปภาพอย่างน้อย 1 รูป' }, { status: 400 });
     }
 
-    // 🔥 Check total payload size and reduce image quality if needed
-    let processedImages = images;
-    const totalSize = images.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
+    // 🔥 Check if images are too large and need compression
+    const originalTotalSize = images.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
+    const originalSizeMB = originalTotalSize / (1024 * 1024);
+
+    console.log(`📊 Original images size: ${originalSizeMB.toFixed(2)}MB (${images.length} images)`);
+
+    // Target: 2.5MB total for safety margin (including JSON overhead)
+    const targetSizePerImage = Math.floor(2500 / images.length);
+    let imagesWereCompressed = false;
+
+    const processedImages = images.map((img: string) => {
+      const originalSize = estimateBase64Size(img) / 1024;
+      const compressed = reduceImageQuality(img, targetSizePerImage);
+      const compressedSize = estimateBase64Size(compressed) / 1024;
+
+      if (compressedSize < originalSize * 0.9) { // If reduced by more than 10%
+        imagesWereCompressed = true;
+      }
+
+      return compressed;
+    });
+
+    const totalSize = processedImages.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
     const totalSizeMB = totalSize / (1024 * 1024);
 
-    console.log(`📊 Total images size: ${totalSizeMB.toFixed(2)}MB (${images.length} images)`);
-
-    // If total size > 4MB, reduce image quality to stay under Vercel's limit
-    if (totalSizeMB > 4) {
-      console.log('⚠️ Images too large, reducing quality...');
-      // Target 400KB per image
-      const targetSizePerImage = Math.floor(3500 / images.length); // 3.5MB total, distributed across images
-      processedImages = images.map((img: string) => reduceImageQuality(img, targetSizePerImage));
-
-      const newTotalSize = processedImages.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
-      console.log(`✅ Reduced to ${(newTotalSize / (1024 * 1024)).toFixed(2)}MB`);
-    }
+    console.log(`✅ Processed size: ${totalSizeMB.toFixed(2)}MB${imagesWereCompressed ? ' (compressed)' : ''}`);
 
     console.log('🔄 Analyzing condition from images...');
     const conditionResult = await analyzeConditionFromImages(processedImages);
     console.log('✅ Condition analysis complete:', conditionResult);
 
-    return NextResponse.json(conditionResult);
+    // Add warning message if images were compressed
+    const result = {
+      ...conditionResult,
+      ...(imagesWereCompressed && {
+        warning: 'รูปภาพของคุณมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถวิเคราะห์ได้ กรุณาถ่ายรูปที่มีขนาดเล็กกว่านี้เพื่อผลลัพธ์ที่ดีขึ้น'
+      })
+    };
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error analyzing condition:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการวิเคราะห์สภาพ' }, { status: 500 });
