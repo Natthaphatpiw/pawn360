@@ -383,12 +383,13 @@ export async function POST(request: NextRequest) {
     console.log('✅ Condition analysis complete:', conditionResult);
 
     // Add warning message if images were compressed
-    const result = {
-      ...conditionResult,
-      ...(imagesWereCompressed && {
-        warning: 'รูปภาพของคุณมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถวิเคราะห์ได้ กรุณาถ่ายรูปที่มีขนาดเล็กกว่านี้เพื่อผลลัพธ์ที่ดีขึ้น'
-      })
+    const result: any = {
+      ...conditionResult
     };
+
+    if (imagesWereCompressed) {
+      result.warning = 'รูปภาพของคุณมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถวิเคราะห์ได้ กรุณาถ่ายรูปที่มีขนาดเล็กกว่านี้เพื่อผลลัพธ์ที่ดีขึ้น';
+    }
 
     return NextResponse.json(result);
   } catch (error) {
