@@ -170,80 +170,64 @@ function StoreVerifyPawnContent() {
     setError(null);
 
     try {
-      // ตรวจสอบว่ามีการแก้ไขข้อมูลการจำนำหรือไม่
+      // กำหนดค่าที่จะใช้ในการสร้างสัญญา (ใช้ค่าที่แก้ไขแล้ว)
+      const finalAmount = editedAmount;
+      const finalDays = editedDays;
+      const finalRate = editedInterestRate;
+
+      // กำหนดค่าดั้งเดิมสำหรับแสดงการเปลี่ยนแปลง
       const originalAmount = pawnRequest?.negotiatedAmount || pawnRequest?.desiredAmount || 0;
       const originalDays = pawnRequest?.negotiatedDays || pawnRequest?.loanDays || 30;
       const originalRate = pawnRequest?.negotiatedInterestRate || pawnRequest?.interestRate || 3;
 
+      // ตรวจสอบว่ามีการแก้ไขหรือไม่
       const hasChanges =
-        editedAmount !== originalAmount ||
-        editedDays !== originalDays ||
-        editedInterestRate !== originalRate;
+        finalAmount !== originalAmount ||
+        finalDays !== originalDays ||
+        finalRate !== originalRate;
 
-      if (hasChanges) {
-        // มีการแก้ไข - ส่งข้อเสนอไปให้ลูกค้ายืนยัน
-        const negotiateResponse = await axios.post('/api/pawn-requests/negotiate', {
-          itemId,
-          storeId: selectedStore._id,
-          password,
-          negotiatedAmount: editedAmount,
-          negotiatedDays: editedDays,
-          negotiatedInterestRate: editedInterestRate,
-        });
+      // ส่งคำขอยืนยันให้ลูกค้าเสมอ
+      if (!pawnRequest) {
+        setError('ไม่พบข้อมูลรายการจำนำ');
+        return;
+      }
 
-        if (negotiateResponse.data.success) {
-          setSuccess(true);
-          setTimeout(() => {
-            if (window.liff) {
-              window.liff.closeWindow();
-            }
-          }, 3000);
-        }
-      } else {
-        // ไม่มีการแก้ไข - ส่งคำขอยืนยันให้ลูกค้า
-        if (!pawnRequest) {
-          setError('ไม่พบข้อมูลรายการจำนำ');
-          return;
-        }
-
-        const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
-          lineId: pawnRequest.lineId,
-          itemId,
-          modifications: {
-            // ไม่มีการแก้ไข แต่ต้องส่งเพื่อแสดงในข้อความ
-            original: {
-              amount: originalAmount,
-              days: originalDays,
-              rate: originalRate
-            },
-            new: {
-              amount: originalAmount,
-              days: originalDays,
-              rate: originalRate
-            },
-            hasChanges: false
+      const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
+        lineId: pawnRequest.lineId,
+        itemId,
+        modifications: {
+          original: {
+            amount: originalAmount,
+            days: originalDays,
+            rate: originalRate
           },
-          newContract: {
-            pawnPrice: originalAmount,
-            interestRate: originalRate,
-            loanDays: originalDays,
-            item: `${pawnRequest.brand} ${pawnRequest.model}`,
-            storeId: selectedStore._id,
-            storeName: selectedStore.storeName
-          }
-        });
-
-        if (confirmResponse.data.success) {
-          setSuccess(true);
-          setTimeout(() => {
-            if (window.liff && window.liff.isInClient()) {
-              window.liff.closeWindow();
-            } else {
-              // ถ้าไม่ใช่ LIFF ให้ redirect กลับไปหน้าแรก
-              window.location.href = '/';
-            }
-          }, 3000);
+          new: {
+            amount: finalAmount,
+            days: finalDays,
+            rate: finalRate
+          },
+          hasChanges: hasChanges
+        },
+        newContract: {
+          pawnPrice: finalAmount,
+          interestRate: finalRate,
+          loanDays: finalDays,
+          item: `${pawnRequest.brand} ${pawnRequest.model}`,
+          storeId: selectedStore._id,
+          storeName: selectedStore.storeName
         }
+      });
+
+      if (confirmResponse.data.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          if (window.liff && window.liff.isInClient()) {
+            window.liff.closeWindow();
+          } else {
+            // ถ้าไม่ใช่ LIFF ให้ redirect กลับไปหน้าแรก
+            window.location.href = '/';
+          }
+        }, 3000);
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');

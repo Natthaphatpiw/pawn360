@@ -278,17 +278,12 @@ export default function EstimatePage() {
         accessories: formData.accessories,
         images: imageUrls,
         estimatedValue: estimateResult.estimatedPrice,
-        pawnDetails: {
-          storeId: selectedStore,
-          desiredAmount: parseFloat(desiredPrice) || estimateResult.estimatedPrice,
-          loanDays: parseInt(pawnDuration),
-          interestCalculationType: interestCalculationType,
-          interestAmount: interestAmount,
-          totalAmount: totalAmount,
-          interestRate: interestCalculationType === 'daily'
-            ? stores.find(s => s._id === selectedStore)?.interestPerday || 0
-            : (stores.find(s => s._id === selectedStore)?.interestSet?.[pawnDuration.toString()] || 0) / parseInt(pawnDuration) / 30 // Convert to daily rate
-        },
+        pawnedPrice: parseFloat(desiredPrice) || estimateResult.estimatedPrice,
+        interestRate: interestCalculationType === 'daily'
+          ? stores.find(s => s._id === selectedStore)?.interestPerday || 0
+          : (stores.find(s => s._id === selectedStore)?.interestSet?.[pawnDuration.toString()] || 0) / parseInt(pawnDuration) / 30, // Convert to daily rate
+        periodDays: parseInt(pawnDuration),
+        storeId: selectedStore,
         customer: customer,
         status: 'pending'
       };
