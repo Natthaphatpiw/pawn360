@@ -12,12 +12,12 @@ export async function POST(request: NextRequest) {
 
     const {
       itemId,
-      storeId,
+      storeId: bodyStoreId,
       contractData,
     } = body;
 
     // Validation
-    if (!itemId || !storeId || !contractData) {
+    if (!itemId || !contractData) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -46,6 +46,21 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // 🔥 Determine storeId: prioritize body > item.storeId > confirmationNewContract.storeId
+    const storeId = bodyStoreId ||
+                    item.storeId?.toString() ||
+                    item.confirmationNewContract?.storeId?.toString();
+
+    if (!storeId) {
+      console.error('❌ No storeId found in request body, item, or confirmationNewContract');
+      return NextResponse.json(
+        { error: 'ไม่พบข้อมูลร้านค้า กรุณาติดต่อเจ้าหน้าที่' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`🏪 Using storeId: ${storeId} (source: ${bodyStoreId ? 'request body' : item.storeId ? 'item.storeId' : 'confirmationNewContract'})`);
 
     // Calculate dates and amounts - Always use current date for contract creation
     const startDate = new Date(); // Current date when contract is created
