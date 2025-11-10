@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Request body keys:', Object.keys(body));
 
-    let { itemId, contractHTML, verificationPhoto } = body;
+    const { itemId, contractHTML } = body;
+    let verificationPhoto = body.verificationPhoto;
 
     console.log('Parsed data:', {
       itemId: itemId?.substring(0, 10) + '...',
@@ -279,15 +280,18 @@ export async function POST(request: NextRequest) {
 
     console.log('Contract document updated successfully');
 
-    return NextResponse.json({
+    const response: any = {
       success: true,
       message: 'บันทึกสัญญาเรียบร้อยแล้ว',
       contractImageUrl: contractUploadResult ? `contracts/${contractUploadResult}` : null,
-      verificationPhotoUrl: photoUploadResult ? `contracts/${photoUploadResult}` : null,
-      ...(photoWasCompressed && {
-        warning: 'รูปภาพยืนยันตัวตนมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถอัปโหลดได้'
-      })
-    });
+      verificationPhotoUrl: photoUploadResult ? `contracts/${photoUploadResult}` : null
+    };
+
+    if (photoWasCompressed) {
+      response.warning = 'รูปภาพยืนยันตัวตนมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถอัปโหลดได้';
+    }
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Error saving contract image:', error);
