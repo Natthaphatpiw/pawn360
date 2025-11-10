@@ -303,6 +303,42 @@ async function analyzeConditionFromImages(images: string[]): Promise<{
   }
 }
 
+// Helper function to estimate base64 image size in bytes
+function estimateBase64Size(base64String: string): number {
+  // Remove data URL prefix if present
+  const base64Data = base64String.includes(',') ? base64String.split(',')[1] : base64String;
+  // Base64 string length * 0.75 gives approximate size in bytes (accounting for padding)
+  return Math.ceil(base64Data.length * 0.75);
+}
+
+// Helper function to reduce image quality by truncating base64 data
+function reduceImageQuality(base64Image: string, targetSizeKB: number = 500): string {
+  const targetBytes = targetSizeKB * 1024;
+  const currentSize = estimateBase64Size(base64Image);
+
+  if (currentSize <= targetBytes) {
+    return base64Image;
+  }
+
+  // Calculate reduction ratio
+  const ratio = targetBytes / currentSize;
+  const [prefix, base64Data] = base64Image.includes(',') ? base64Image.split(',') : ['', base64Image];
+
+  // Truncate base64 data
+  const newLength = Math.floor(base64Data.length * ratio);
+  const reducedData = base64Data.substring(0, newLength);
+
+  return prefix ? `${prefix},${reducedData}` : reducedData;
+}
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb', // Increase body size limit to 10MB
+    },
+  },
+};
+
 export async function POST(request: NextRequest) {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -319,8 +355,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาอัพโหลดรูปภาพอย่างน้อย 1 รูป' }, { status: 400 });
     }
 
+    // 🔥 Check total payload size and reduce image quality if needed
+    let processedImages = images;
+    const totalSize = images.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
+    const totalSizeMB = totalSize / (1024 * 1024);
+
+    console.log(`📊 Total images size: ${totalSizeMB.toFixed(2)}MB (${images.length} images)`);
+
+    // If total size > 4MB, reduce image quality to stay under Vercel's limit
+    if (totalSizeMB > 4) {
+      console.log('⚠️ Images too large, reducing quality...');
+      // Target 400KB per image
+      const targetSizePerImage = Math.floor(3500 / images.length); // 3.5MB total, distributed across images
+      processedImages = images.map((img: string) => reduceImageQuality(img, targetSizePerImage));
+
+      const newTotalSize = processedImages.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
+      console.log(`✅ Reduced to ${(newTotalSize / (1024 * 1024)).toFixed(2)}MB`);
+    }
+
     console.log('🔄 Analyzing condition from images...');
-    const conditionResult = await analyzeConditionFromImages(images);
+    const conditionResult = await analyzeConditionFromImages(processedImages);
     console.log('✅ Condition analysis complete:', conditionResult);
 
     return NextResponse.json(conditionResult);
