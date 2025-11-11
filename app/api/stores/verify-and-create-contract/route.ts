@@ -6,9 +6,9 @@ import bcrypt from 'bcrypt';
 
 export async function POST(request: NextRequest) {
   try {
-    const { itemId, storeId, password } = await request.json();
+    const { itemId, phoneNumber, password } = await request.json();
 
-    if (!itemId || !storeId || !password) {
+    if (!itemId || !phoneNumber || !password) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -19,14 +19,13 @@ export async function POST(request: NextRequest) {
     const storesCollection = db.collection('stores');
     const itemsCollection = db.collection('items');
     const customersCollection = db.collection('customers');
-    const contractsCollection = db.collection('contracts');
 
-    // 1. ดึงข้อมูลร้านค้าและตรวจสอบรหัสผ่าน
-    const store = await storesCollection.findOne({ _id: new ObjectId(storeId) });
+    // 1. ดึงข้อมูลร้านค้าและตรวจสอบรหัสผ่านโดยใช้เบอร์โทรศัพท์
+    const store = await storesCollection.findOne({ phone: phoneNumber });
 
     if (!store) {
       return NextResponse.json(
-        { error: 'ไม่พบร้านค้า' },
+        { error: 'ไม่พบร้านค้าที่มีเบอร์โทรศัพท์นี้' },
         { status: 404 }
       );
     }
@@ -39,6 +38,9 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // ใช้ storeId จาก store ที่พบ
+    const storeId = store._id.toString();
 
     // 2. ดึงข้อมูลรายการจำนำ
     const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
@@ -108,7 +110,7 @@ export async function POST(request: NextRequest) {
       changes: [] // ไม่มีการเปลี่ยนแปลง เพราะเป็นการสร้างใหม่
     };
 
-    // บันทึกข้อมูลการยืนยันใน item
+    // บันทึกข้อมูลการยืนยันใน item พร้อม storeId ที่ถูกต้อง
     await itemsCollection.updateOne(
       { _id: new ObjectId(itemId) },
       {
@@ -116,7 +118,9 @@ export async function POST(request: NextRequest) {
           confirmationStatus: 'pending',
           confirmationModifications: modifications,
           confirmationProposedContract: proposedContract,
+          confirmationNewContract: proposedContract, // ใช้ confirmationNewContract แทน confirmationProposedContract
           confirmationTimestamp: new Date(),
+          storeId: new ObjectId(storeId), // บันทึก storeId ที่ถูกต้องใน item
           updatedAt: new Date()
         }
       }

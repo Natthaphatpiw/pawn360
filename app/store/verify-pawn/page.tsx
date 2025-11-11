@@ -5,10 +5,6 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 
-interface Store {
-  _id: string;
-  storeName: string;
-}
 
 interface PawnRequest {
   _id: string;
@@ -45,10 +41,7 @@ function StoreVerifyPawnContent() {
   const itemId = searchParams.get('itemId');
 
   const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [filteredStores, setFilteredStores] = useState<Store[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -70,22 +63,6 @@ function StoreVerifyPawnContent() {
     }
   }, [itemId]);
 
-  // ดึงรายชื่อร้านค้า
-  useEffect(() => {
-    fetchStores();
-  }, []);
-
-  // Filter stores based on search
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredStores(stores);
-    } else {
-      const filtered = stores.filter(store =>
-        store.storeName.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredStores(filtered);
-    }
-  }, [searchTerm, stores]);
 
   const fetchPawnRequest = async () => {
     try {
@@ -135,29 +112,12 @@ function StoreVerifyPawnContent() {
     }
   };
 
-  const fetchStores = async () => {
-    try {
-      const response = await axios.get('/api/stores');
-      if (response.data.success) {
-        setStores(response.data.stores);
-        setFilteredStores(response.data.stores);
-      }
-    } catch (err) {
-      console.error('Error fetching stores:', err);
-    }
-  };
-
-  const handleStoreSelect = (store: Store) => {
-    setSelectedStore(store);
-    setSearchTerm(store.storeName);
-    setFilteredStores([]);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedStore) {
-      setError('กรุณาเลือกร้านค้า');
+    if (!phoneNumber) {
+      setError('กรุณากรอกเบอร์โทรศัพท์');
       return;
     }
 
@@ -175,46 +135,20 @@ function StoreVerifyPawnContent() {
       const finalDays = editedDays;
       const finalRate = editedInterestRate;
 
-      // กำหนดค่าดั้งเดิมสำหรับแสดงการเปลี่ยนแปลง
-      const originalAmount = pawnRequest?.negotiatedAmount || pawnRequest?.desiredAmount || 0;
-      const originalDays = pawnRequest?.negotiatedDays || pawnRequest?.loanDays || 30;
-      const originalRate = pawnRequest?.negotiatedInterestRate || pawnRequest?.interestRate || 3;
-
-      // ตรวจสอบว่ามีการแก้ไขหรือไม่
-      const hasChanges =
-        finalAmount !== originalAmount ||
-        finalDays !== originalDays ||
-        finalRate !== originalRate;
-
       // ส่งคำขอยืนยันให้ลูกค้าเสมอ
       if (!pawnRequest) {
         setError('ไม่พบข้อมูลรายการจำนำ');
         return;
       }
 
-      const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
-        lineId: pawnRequest.lineId,
+      const confirmResponse = await axios.post('/api/stores/verify-and-create-contract', {
         itemId,
-        modifications: {
-          original: {
-            amount: originalAmount,
-            days: originalDays,
-            rate: originalRate
-          },
-          new: {
-            amount: finalAmount,
-            days: finalDays,
-            rate: finalRate
-          },
-          hasChanges: hasChanges
-        },
-        newContract: {
+        phoneNumber,
+        password,
+        contractData: {
           pawnPrice: finalAmount,
           interestRate: finalRate,
           loanDays: finalDays,
-          item: `${pawnRequest.brand} ${pawnRequest.model}`,
-          storeId: selectedStore._id,
-          storeName: selectedStore.storeName
         }
       });
 
@@ -514,36 +448,18 @@ function StoreVerifyPawnContent() {
           )}
         </div>
 
-        {/* Store Selection Form */}
+        {/* Store Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">เลือกร้านค้า</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setSelectedStore(null);
-                }}
-                placeholder="ค้นหาร้านค้า..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              {filteredStores.length > 0 && searchTerm && !selectedStore && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {filteredStores.map((store) => (
-                    <div
-                      key={store._id}
-                      onClick={() => handleStoreSelect(store)}
-                      className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
-                    >
-                      {store.storeName}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">เบอร์โทรศัพท์ร้านค้า</label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d]/g, ''))}
+              placeholder="กรอกเบอร์โทรศัพท์ร้านค้า"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
           </div>
 
           <div>
@@ -575,7 +491,7 @@ function StoreVerifyPawnContent() {
 
           <button
             type="submit"
-            disabled={isSubmitting || !selectedStore}
+            disabled={isSubmitting || !phoneNumber}
             className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'กำลังสร้างสัญญา...' : 'ยืนยันและสร้างสัญญา'}
