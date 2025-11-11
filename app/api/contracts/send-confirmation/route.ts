@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const itemsCollection = db.collection('items');
 
     // Update item with pending confirmation status
-    // Also update the item's storeId to match the selected store
+    // Always update the item's storeId to match the selected store
     await itemsCollection.updateOne(
       { _id: new ObjectId(itemId) },
       {
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
           confirmationNewContract: newContract,
           confirmationTimestamp: new Date(),
           updatedAt: new Date(),
-          // 🔥 Update item's storeId to match the selected store
+          // 🔥 Always update item's storeId to match the selected store
           storeId: newContract.storeId ? new ObjectId(newContract.storeId) : undefined
         }
       }
