@@ -79,7 +79,7 @@ function StoreContractContent() {
   const [success, setSuccess] = useState<string | null>(null);
 
   // Login data
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [username, setUsername] = useState<string>('');
   const [selectedStore, setSelectedStore] = useState<any>(null);
   const [password, setPassword] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -93,27 +93,27 @@ function StoreContractContent() {
     photoTaken: false
   });
 
-  const findStoreByPhone = async (phone: string) => {
+  const findStoreByUsername = async (username: string) => {
     try {
       const response = await axios.get('/api/stores');
       if (response.data.success) {
-        // Normalize phone number: trim whitespace and remove special characters
-        const normalizedInputPhone = phone.trim().replace(/[\s-()]/g, '');
+        // Normalize username: trim whitespace
+        const normalizedInputUsername = username.trim().toLowerCase();
         
-        console.log('🔍 Searching for phone:', normalizedInputPhone);
+        console.log('🔍 Searching for username:', normalizedInputUsername);
         console.log('📋 Total stores:', response.data.stores.length);
         
         const store = response.data.stores.find((s: any) => {
-          if (!s.phone) return false;
-          const normalizedStorePhone = s.phone.trim().replace(/[\s-()]/g, '');
-          console.log(`  Comparing: "${normalizedInputPhone}" vs "${normalizedStorePhone}" (${s.storeName})`);
-          return normalizedStorePhone === normalizedInputPhone;
+          if (!s.username) return false;
+          const normalizedStoreUsername = s.username.trim().toLowerCase();
+          console.log(`  Comparing: "${normalizedInputUsername}" vs "${normalizedStoreUsername}" (${s.storeName})`);
+          return normalizedStoreUsername === normalizedInputUsername;
         });
         
         if (store) {
           console.log('✅ Store found:', store.storeName);
         } else {
-          console.log('❌ No store found for phone:', normalizedInputPhone);
+          console.log('❌ No store found for username:', normalizedInputUsername);
         }
         
         return store || null;
@@ -161,8 +161,8 @@ function StoreContractContent() {
   }, [itemId]);
 
   const handleLogin = async () => {
-    if (!phoneNumber) {
-      setError('กรุณากรอกเบอร์โทรศัพท์ร้านค้า');
+    if (!username) {
+      setError('กรุณากรอก Username ร้านค้า');
       return;
     }
 
@@ -176,11 +176,11 @@ function StoreContractContent() {
     setSuccess(null);
 
     try {
-      // ค้นหาร้านค้าจากเบอร์โทร
-      const store = await findStoreByPhone(phoneNumber);
+      // ค้นหาร้านค้าจาก username
+      const store = await findStoreByUsername(username);
       
       if (!store) {
-        setError('ไม่พบร้านค้าที่ใช้เบอร์โทรนี้');
+        setError('ไม่พบร้านค้าที่ใช้ Username นี้');
         setLoginLoading(false);
         return;
       }
@@ -289,15 +289,15 @@ function StoreContractContent() {
                 </div>
               )}
 
-              {/* Phone Number Input */}
+              {/* Username Input */}
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
-                  เบอร์โทรศัพท์ร้านค้า*
+                  Username ร้านค้า*
                 </label>
                 <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-3 py-2 focus:outline-none"
                   style={{
                     border: '1px solid #E0E0E0',
@@ -306,9 +306,10 @@ function StoreContractContent() {
                     color: '#333333',
                     height: '44px'
                   }}
-                  placeholder="กรอกเบอร์โทรศัพท์ร้านค้า"
+                  placeholder="กรอก Username ร้านค้า"
+                  autoComplete="username"
                 />
-                <p className="text-xs mt-1" style={{ color: '#999999' }}>กรอกเบอร์โทรศัพท์ที่ลงทะเบียนกับร้านค้า</p>
+                <p className="text-xs mt-1" style={{ color: '#999999' }}>กรอก Username ที่ลงทะเบียนกับร้านค้า</p>
               </div>
 
               {/* Password Input */}
@@ -337,7 +338,7 @@ function StoreContractContent() {
               <div className="space-y-3">
                 <button
                   onClick={handleLogin}
-                  disabled={loginLoading || !phoneNumber || !password}
+                  disabled={loginLoading || !username || !password}
                   className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
                   style={{
                     backgroundColor: loginLoading ? '#D1D5DB' : '#2D7A46',
