@@ -97,7 +97,25 @@ function StoreContractContent() {
     try {
       const response = await axios.get('/api/stores');
       if (response.data.success) {
-        const store = response.data.stores.find((s: any) => s.phone === phone);
+        // Normalize phone number: trim whitespace and remove special characters
+        const normalizedInputPhone = phone.trim().replace(/[\s-()]/g, '');
+        
+        console.log('🔍 Searching for phone:', normalizedInputPhone);
+        console.log('📋 Total stores:', response.data.stores.length);
+        
+        const store = response.data.stores.find((s: any) => {
+          if (!s.phone) return false;
+          const normalizedStorePhone = s.phone.trim().replace(/[\s-()]/g, '');
+          console.log(`  Comparing: "${normalizedInputPhone}" vs "${normalizedStorePhone}" (${s.storeName})`);
+          return normalizedStorePhone === normalizedInputPhone;
+        });
+        
+        if (store) {
+          console.log('✅ Store found:', store.storeName);
+        } else {
+          console.log('❌ No store found for phone:', normalizedInputPhone);
+        }
+        
         return store || null;
       }
       return null;
