@@ -45,7 +45,7 @@ function StoreVerifyPawnContent() {
   const itemId = searchParams.get('itemId');
 
   const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [username, setUsername] = useState('');
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -116,27 +116,27 @@ function StoreVerifyPawnContent() {
     }
   };
 
-  const findStoreByPhone = async (phone: string): Promise<Store | null> => {
+  const findStoreByUsername = async (username: string): Promise<Store | null> => {
     try {
       const response = await axios.get('/api/stores');
       if (response.data.success) {
-        // Normalize phone number: trim whitespace and remove special characters
-        const normalizedInputPhone = phone.trim().replace(/[\s-()]/g, '');
+        // Normalize username: trim whitespace
+        const normalizedInputUsername = username.trim().toLowerCase();
         
-        console.log('🔍 Searching for phone:', normalizedInputPhone);
+        console.log('🔍 Searching for username:', normalizedInputUsername);
         console.log('📋 Total stores:', response.data.stores.length);
         
         const store = response.data.stores.find((s: any) => {
-          if (!s.phone) return false;
-          const normalizedStorePhone = s.phone.trim().replace(/[\s-()]/g, '');
-          console.log(`  Comparing: "${normalizedInputPhone}" vs "${normalizedStorePhone}" (${s.storeName})`);
-          return normalizedStorePhone === normalizedInputPhone;
+          if (!s.username) return false;
+          const normalizedStoreUsername = s.username.trim().toLowerCase();
+          console.log(`  Comparing: "${normalizedInputUsername}" vs "${normalizedStoreUsername}" (${s.storeName})`);
+          return normalizedStoreUsername === normalizedInputUsername;
         });
         
         if (store) {
           console.log('✅ Store found:', store.storeName);
         } else {
-          console.log('❌ No store found for phone:', normalizedInputPhone);
+          console.log('❌ No store found for username:', normalizedInputUsername);
         }
         
         return store || null;
@@ -151,8 +151,8 @@ function StoreVerifyPawnContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!phoneNumber) {
-      setError('กรุณากรอกเบอร์โทรศัพท์ร้านค้า');
+    if (!username) {
+      setError('กรุณากรอก Username ร้านค้า');
       return;
     }
 
@@ -165,11 +165,11 @@ function StoreVerifyPawnContent() {
     setError(null);
 
     try {
-      // ค้นหาร้านค้าจากเบอร์โทร
-      const store = await findStoreByPhone(phoneNumber);
+      // ค้นหาร้านค้าจาก username
+      const store = await findStoreByUsername(username);
       
       if (!store) {
-        setError('ไม่พบร้านค้าที่ใช้เบอร์โทรนี้');
+        setError('ไม่พบร้านค้าที่ใช้ Username นี้');
         setIsSubmitting(false);
         return;
       }
@@ -534,16 +534,17 @@ function StoreVerifyPawnContent() {
         {/* Store Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">เบอร์โทรศัพท์ร้านค้า</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Username ร้านค้า</label>
             <input
-              type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              placeholder="กรอกเบอร์โทรศัพท์ร้านค้า (เช่น 0812345678)"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="กรอก Username ร้านค้า"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
+              autoComplete="username"
             />
-            <p className="text-xs text-gray-500 mt-1">กรอกเบอร์โทรศัพท์ที่ลงทะเบียนกับร้านค้า</p>
+            <p className="text-xs text-gray-500 mt-1">กรอก Username ที่ลงทะเบียนกับร้านค้า</p>
           </div>
 
           <div>

@@ -60,7 +60,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
   const [success, setSuccess] = useState<string | null>(null);
 
   // Login data
-  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [username, setUsername] = useState<string>('');
   const [selectedStore, setSelectedStore] = useState<any>(null);
   const [password, setPassword] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -81,27 +81,27 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
     }
   }, [itemId]);
 
-  const findStoreByPhone = async (phone: string) => {
+  const findStoreByUsername = async (username: string) => {
     try {
       const response = await axios.get('/api/stores');
       if (response.data.success) {
-        // Normalize phone number: trim whitespace and remove special characters
-        const normalizedInputPhone = phone.trim().replace(/[\s-()]/g, '');
+        // Normalize username: trim whitespace
+        const normalizedInputUsername = username.trim().toLowerCase();
         
-        console.log('🔍 Searching for phone:', normalizedInputPhone);
+        console.log('🔍 Searching for username:', normalizedInputUsername);
         console.log('📋 Total stores:', response.data.stores.length);
         
         const store = response.data.stores.find((s: any) => {
-          if (!s.phone) return false;
-          const normalizedStorePhone = s.phone.trim().replace(/[\s-()]/g, '');
-          console.log(`  Comparing: "${normalizedInputPhone}" vs "${normalizedStorePhone}" (${s.storeName})`);
-          return normalizedStorePhone === normalizedInputPhone;
+          if (!s.username) return false;
+          const normalizedStoreUsername = s.username.trim().toLowerCase();
+          console.log(`  Comparing: "${normalizedInputUsername}" vs "${normalizedStoreUsername}" (${s.storeName})`);
+          return normalizedStoreUsername === normalizedInputUsername;
         });
         
         if (store) {
           console.log('✅ Store found:', store.storeName);
         } else {
-          console.log('❌ No store found for phone:', normalizedInputPhone);
+          console.log('❌ No store found for username:', normalizedInputUsername);
         }
         
         return store || null;
@@ -132,8 +132,8 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
   };
 
   const handleLogin = async () => {
-    if (!phoneNumber || !password) {
-      setError('กรุณากรอกเบอร์โทรศัพท์และรหัสผ่าน');
+    if (!username || !password) {
+      setError('กรุณากรอก Username และรหัสผ่าน');
       return;
     }
 
@@ -141,11 +141,11 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
     setError(null);
 
     try {
-      // ค้นหาร้านค้าจากเบอร์โทร
-      const store = await findStoreByPhone(phoneNumber);
+      // ค้นหาร้านค้าจาก username
+      const store = await findStoreByUsername(username);
       
       if (!store) {
-        setError('ไม่พบร้านค้าที่ใช้เบอร์โทรนี้');
+        setError('ไม่พบร้านค้าที่ใช้ Username นี้');
         setLoginLoading(false);
         return;
       }
@@ -241,7 +241,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
               {/* Header */}
               <div className="text-center mb-6">
                 <h1 className="text-2xl font-bold mb-2" style={{ color: '#1E293B' }}>เข้าสู่ระบบร้านค้า</h1>
-                <p className="text-sm" style={{ color: '#6B7280' }}>กรุณากรอกเบอร์โทรศัพท์และรหัสผ่าน</p>
+                <p className="text-sm" style={{ color: '#6B7280' }}>กรุณากรอก Username และรหัสผ่าน</p>
               </div>
 
               {/* Error Message */}
@@ -251,15 +251,15 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
                 </div>
               )}
 
-              {/* Phone Number Input */}
+              {/* Username Input */}
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2" style={{ color: '#666666' }}>
-                  เบอร์โทรศัพท์ร้านค้า*
+                  Username ร้านค้า*
                 </label>
                 <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-3 py-2 focus:outline-none"
                   style={{
                     border: '1px solid #E0E0E0',
@@ -268,9 +268,10 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
                     color: '#333333',
                     height: '44px'
                   }}
-                  placeholder="กรอกเบอร์โทรศัพท์ร้านค้า"
+                  placeholder="กรอก Username ร้านค้า"
+                  autoComplete="username"
                 />
-                <p className="text-xs mt-1" style={{ color: '#999999' }}>กรอกเบอร์โทรศัพท์ที่ลงทะเบียนกับร้านค้า</p>
+                <p className="text-xs mt-1" style={{ color: '#999999' }}>กรอก Username ที่ลงทะเบียนกับร้านค้า</p>
               </div>
 
               {/* Password Input */}
@@ -297,7 +298,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
               {/* Login Button */}
               <button
                 onClick={handleLogin}
-                disabled={loginLoading || !phoneNumber || !password}
+                disabled={loginLoading || !username || !password}
                 className="w-full py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium text-base"
                 style={{
                   backgroundColor: loginLoading ? '#D1D5DB' : '#2D7A46',
