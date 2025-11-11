@@ -25,7 +25,7 @@ interface EstimateResponse {
   marketPrice: number;
   pawnPrice: number;
   confidence: number;
-  normalizedInput: string;
+  normalizedInput: NormalizedData;
   calculation: {
     marketPrice: string;
     pawnPrice: string;
@@ -33,84 +33,113 @@ interface EstimateResponse {
   };
 }
 
-// Agent 1: Normalize input data
-async function normalizeInput(input: EstimateRequest): Promise<string> {
-  const prompt = `Normalize and clean the following product information for accurate pricing. Correct any typos, standardize formatting, and make the description suitable for market research:
-
-Product Type: ${input.itemType}
-Brand: ${input.brand}
-Model: ${input.model}
-Serial Number: ${input.serialNo}
-Accessories: ${input.accessories}
-Condition: ${input.condition}%
-Defects: ${input.defects}
-Additional Notes: ${input.note}
-
-Please provide a clean, standardized description that would be suitable for searching second-hand market prices. Focus on key specifications and condition details.`;
-
-  const response = await openai.responses.create({
-    model: 'gpt-4.1-mini',
-    input: prompt,
-    // max_tokens: 300,
-    // temperature: 0.1,
-  });
-
-  return response.output_text || '';
+interface NormalizedData {
+  productName: string;
+  priceRange: {
+    min: number;
+    max: number;
+  };
 }
 
-// Agent 2: Get market price using simple prompt engineering
-async function getMarketPrice(normalizedInput: string): Promise<number> {
-  const prompt = `You are a professional pawn shop appraiser in Thailand with 15+ years of experience in second-hand electronics valuation. Your task is to provide the most accurate median market price for second-hand items based on current Thai market data.
+// Agent 1: Normalize input data และประเมิน price range
+async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
+  const prompt = `คุณเป็นผู้เชี่ยวชาญด้านการประเมินราคาสินค้ามือสองในประเทศไทย วิเคราะห์ข้อมูลสินค้าต่อไปนี้และทำ 2 สิ่ง:
 
-Analyze this item and provide the MEDIAN selling price (not minimum or maximum price) that this item would realistically sell for on Thai marketplaces.
+1. **Normalize ชื่อสินค้า**: สร้างชื่อสินค้าที่สะอาด กระชับ เหมาะสำหรับค้นหาราคาตลาด
+2. **ประเมิน Price Range**: คาดการณ์ช่วงราคาขั้นต่ำและสูงสุดที่สินค้าชิ้นนี้น่าจะมีในตลาดมือสองไทย
 
-${normalizedInput}
+ข้อมูลสินค้า:
+- ประเภท: ${input.itemType}
+- ยี่ห้อ: ${input.brand}
+- รุ่น: ${input.model}
+- Serial Number: ${input.serialNo}
+- อุปกรณ์เสริม: ${input.accessories}
+- สภาพ: ${input.condition}%
+- ตำหนิ: ${input.defects}
+- หมายเหตุ: ${input.note}
 
-IMPORTANT CONSIDERATIONS FOR ACCURATE VALUATION:
+**คำแนะนำ**:
+- ชื่อสินค้าควรรวม Brand + Model + ข้อมูลสำคัญ (ความจุ, สี, รุ่นปี ถ้ามี)
+- Price Range ให้พิจารณาจาก:
+  - ราคาใหม่ของสินค้ารุ่นนี้ (ถ้ายังขายอยู่)
+  - อายุการใช้งานโดยประมาณ
+  - ความนิยมของรุ่นนี้ในตลาด
+  - ตลาดมือสองปัจจุบันใน Kaidee, Facebook Marketplace, Shopee
+  - ราคาขั้นต่ำ = สภาพแย่ที่สุดที่ยังขายได้
+  - ราคาสูงสุด = สภาพดีมาก พร้อมอุปกรณ์ครบ
 
-1. **Market Position**: Provide the MEDIAN price (50th percentile) of actual selling prices on platforms like Kaidee, Facebook Marketplace, Shopee, and local second-hand stores in Thailand.
+**ตอบกลับในรูปแบบ JSON เท่านั้น**:
+{
+  "productName": "ชื่อสินค้าที่ normalize แล้ว",
+  "priceRange": {
+    "min": ราคาขั้นต่ำ (ตัวเลข),
+    "max": ราคาสูงสุด (ตัวเลข)
+  }
+}
 
-2. **Current Market Conditions**:
-   - Economic situation in Thailand
-   - Demand for this specific item type
-   - Availability of new vs used alternatives
-   - Seasonal demand fluctuations
+ตัวอย่าง:
+{
+  "productName": "iPhone 12 Pro 128GB",
+  "priceRange": {
+    "min": 8000,
+    "max": 18000
+  }
+}`;
 
-3. **Item-Specific Factors**:
-   - Age and depreciation (newer = higher value)
-   - Brand reputation and reliability
-   - Model popularity and after-sales support
-   - Technical specifications and performance
-   - Market saturation of similar models
-
-4. **Condition Impact**: The condition score will be applied separately, so provide the market price assuming GOOD condition unless otherwise specified in the item details.
-
-5. **Regional Pricing**: Focus on Bangkok and major cities in Thailand. Avoid international prices.
-
-6. **Real Transaction Data**: Base your estimate on actual completed sales, not asking prices or inflated listings.
-
-METHODOLOGY:
-- Research similar items currently listed/sold
-- Calculate the median of realistic selling prices
-- Adjust for current market trends
-- Consider bulk market data, not individual outliers
-
-OUTPUT FORMAT:
-Provide ONLY a single number representing the median market price in Thai Baht (THB), without any currency symbols, commas, or additional text.
-
-Example: If similar items sell for 12000, 15000, 18000, and 22000 baht, the median would be around 16500, so output: 16500
-
-Your response should be just the number, nothing else.`;
-
-  const response = await openai.responses.create({
+  const response = await openai.chat.completions.create({
     model: 'gpt-4.1-mini',
-    tools: [{ type: "web_search_preview" }],
-    input: prompt,
-    // max_tokens: 100,
-    // temperature: 0.2,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
   });
 
-  const priceText = response.output_text || '0';
+  const content = response.choices[0]?.message?.content || '{}';
+  const parsed = JSON.parse(content);
+
+  return {
+    productName: parsed.productName || `${input.brand} ${input.model}`,
+    priceRange: {
+      min: parsed.priceRange?.min || 100,
+      max: parsed.priceRange?.max || 10000
+    }
+  };
+}
+
+// Agent 2: Get market price using simple prompt engineering - ใช้เฉพาะชื่อสินค้า
+async function getMarketPrice(productName: string, priceRange: { min: number; max: number }): Promise<number> {
+  const prompt = `คุณเป็นผู้เชี่ยวชาญประเมินราคาสินค้ามือสองในประเทศไทย มีประสบการณ์มากกว่า 15 ปี
+
+**งาน**: หาราคากลาง (median price) ของสินค้ามือสองนี้ในตลาดไทยปัจจุบัน
+
+**สินค้า**: ${productName}
+
+**ช่วงราคาที่คาดการณ์**: ${priceRange.min.toLocaleString()} - ${priceRange.max.toLocaleString()} บาท
+
+**วิธีการประเมิน**:
+1. ค้นหาราคาขายจริงในตลาดมือสองไทย (Kaidee, Facebook Marketplace, Shopee, ร้านมือสอง)
+2. รวบรวมราคาที่พบ 5-10 ราคา
+3. คำนวณค่ากลาง (median) ของราคาเหล่านั้น
+4. ตรวจสอบว่าราคาอยู่ในช่วงที่สมเหตุสมผล (${priceRange.min.toLocaleString()} - ${priceRange.max.toLocaleString()} บาท)
+
+**ข้อควรพิจารณา**:
+- ใช้ราคาขายจริง ไม่ใช่ราคาเปิดขาย
+- เน้นตลาดไทย โดยเฉพาะกรุงเทพและปริมณฑล
+- พิจารณาสภาพทั่วไป (ไม่ใช่สภาพดีเยี่ยมหรือแย่มาก)
+- ไม่รวมราคาที่ผิดปกติ (outliers)
+- พิจารณาความนิยมและอุปสงค์ปัจจุบัน
+
+**ตอบเฉพาะตัวเลข**: ให้ตอบเป็นตัวเลขราคากลางเท่านั้น ไม่ต้องมีสกุลเงิน เครื่องหมาย หรือคำอธิบายใดๆ
+
+ตัวอย่าง: หากพบราคา 12000, 15000, 18000, 22000 บาท ค่ากลางคือ 16500 ให้ตอบ: 16500`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4.1-mini',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.2,
+    max_tokens: 50,
+  });
+
+  const priceText = response.choices[0]?.message?.content || '0';
   console.log('🤖 AI Response Text:', priceText);
 
   let marketPrice = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
@@ -173,15 +202,24 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
       );
     }
 
-    // Agent 1: Normalize input
-    console.log('🔄 Normalizing input...');
-    const normalizedInput = await normalizeInput(body);
-    console.log('✅ Input normalized:', normalizedInput);
+    // Agent 1: Normalize input และประเมิน price range
+    console.log('🔄 Agent 1: Normalizing input and estimating price range...');
+    const normalizedData = await normalizeInput(body);
+    console.log('✅ Normalized product name:', normalizedData.productName);
+    console.log('✅ Estimated price range:', normalizedData.priceRange);
 
-    // Agent 2: Get market price using simple prompt engineering
-    console.log('🔄 Getting market price...');
-    const marketPrice = await getMarketPrice(normalizedInput);
-    console.log('✅ Market price:', marketPrice);
+    // Agent 2: Get market price โดยใช้เฉพาะชื่อสินค้าที่ normalize แล้ว
+    console.log('🔄 Agent 2: Getting median market price...');
+    const marketPrice = await getMarketPrice(normalizedData.productName, normalizedData.priceRange);
+    console.log('✅ Market price (median):', marketPrice);
+
+    // ตรวจสอบว่าราคาอยู่ในช่วงที่เหมาะสม
+    if (marketPrice < normalizedData.priceRange.min || marketPrice > normalizedData.priceRange.max) {
+      console.warn(`⚠️ Market price ${marketPrice} is outside range ${normalizedData.priceRange.min}-${normalizedData.priceRange.max}`);
+      // ถ้าราคานอกช่วง ให้ใช้ค่ากลางของ range
+      const adjustedPrice = Math.round((normalizedData.priceRange.min + normalizedData.priceRange.max) / 2);
+      console.log(`📊 Adjusted to mid-range: ${adjustedPrice}`);
+    }
 
     // Calculate pawn price: market price * 0.6 (for pawn shop pricing)
     const pawnPrice = Math.round(marketPrice * 0.6);
@@ -205,11 +243,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
       marketPrice: marketPrice,
       pawnPrice: pawnPrice,
       confidence: 0.85, // Fixed confidence score for simple method
-      normalizedInput: normalizedInput,
+      normalizedInput: normalizedData,
       calculation: {
-        marketPrice: `ราคาตลาดมือสองที่ประเมินโดย AI`,
-        pawnPrice: `ราคาจำนำ = ราคาตลาด × 0.6`,
-        finalPrice: `ราคาประเมิน = ราคาจำนำ × สภาพสินค้า (${conditionScore})`
+        marketPrice: `ราคาตลาดมือสอง (median) จากช่วง ${normalizedData.priceRange.min.toLocaleString()}-${normalizedData.priceRange.max.toLocaleString()} บาท`,
+        pawnPrice: `ราคาจำนำ = ${marketPrice.toLocaleString()} × 0.6 = ${pawnPrice.toLocaleString()} บาท`,
+        finalPrice: `ราคาประเมิน = ${pawnPrice.toLocaleString()} × สภาพ ${(conditionScore * 100).toFixed(0)}% = ${finalPrice.toLocaleString()} บาท`
       }
     });
 
