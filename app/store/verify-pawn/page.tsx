@@ -5,6 +5,10 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
 
+interface Store {
+  _id: string;
+  storeName: string;
+}
 
 interface PawnRequest {
   _id: string;
@@ -42,6 +46,7 @@ function StoreVerifyPawnContent() {
 
   const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -62,7 +67,6 @@ function StoreVerifyPawnContent() {
       fetchPawnRequest();
     }
   }, [itemId]);
-
 
   const fetchPawnRequest = async () => {
     try {
@@ -112,12 +116,25 @@ function StoreVerifyPawnContent() {
     }
   };
 
+  const findStoreByPhone = async (phone: string): Promise<Store | null> => {
+    try {
+      const response = await axios.get('/api/stores');
+      if (response.data.success) {
+        const store = response.data.stores.find((s: any) => s.phone === phone);
+        return store || null;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error fetching stores:', err);
+      return null;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!phoneNumber) {
-      setError('กรุณากรอกเบอร์โทรศัพท์');
+      setError('กรุณากรอกเบอร์โทรศัพท์ร้านค้า');
       return;
     }
 
@@ -130,10 +147,43 @@ function StoreVerifyPawnContent() {
     setError(null);
 
     try {
+      // ค้นหาร้านค้าจากเบอร์โทร
+      const store = await findStoreByPhone(phoneNumber);
+      
+      if (!store) {
+        setError('ไม่พบร้านค้าที่ใช้เบอร์โทรนี้');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // ตรวจสอบรหัสผ่าน
+      const verifyResponse = await axios.post('/api/stores', {
+        storeId: store._id,
+        password: password
+      });
+
+      if (!verifyResponse.data.success) {
+        setError('รหัสผ่านไม่ถูกต้อง');
+        setIsSubmitting(false);
+        return;
+      }
+
+      setSelectedStore(store);
       // กำหนดค่าที่จะใช้ในการสร้างสัญญา (ใช้ค่าที่แก้ไขแล้ว)
       const finalAmount = editedAmount;
       const finalDays = editedDays;
       const finalRate = editedInterestRate;
+
+      // กำหนดค่าดั้งเดิมสำหรับแสดงการเปลี่ยนแปลง
+      const originalAmount = pawnRequest?.negotiatedAmount || pawnRequest?.desiredAmount || 0;
+      const originalDays = pawnRequest?.negotiatedDays || pawnRequest?.loanDays || 30;
+      const originalRate = pawnRequest?.negotiatedInterestRate || pawnRequest?.interestRate || 3;
+
+      // ตรวจสอบว่ามีการแก้ไขหรือไม่
+      const hasChanges =
+        finalAmount !== originalAmount ||
+        finalDays !== originalDays ||
+        finalRate !== originalRate;
 
       // ส่งคำขอยืนยันให้ลูกค้าเสมอ
       if (!pawnRequest) {
@@ -141,14 +191,29 @@ function StoreVerifyPawnContent() {
         return;
       }
 
-      const confirmResponse = await axios.post('/api/stores/verify-and-create-contract', {
+      const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
+        lineId: pawnRequest.lineId,
         itemId,
-        phoneNumber,
-        password,
-        contractData: {
+        modifications: {
+          original: {
+            amount: originalAmount,
+            days: originalDays,
+            rate: originalRate
+          },
+          new: {
+            amount: finalAmount,
+            days: finalDays,
+            rate: finalRate
+          },
+          hasChanges: hasChanges
+        },
+        newContract: {
           pawnPrice: finalAmount,
           interestRate: finalRate,
           loanDays: finalDays,
+          item: `${pawnRequest.brand} ${pawnRequest.model}`,
+          storeId: store._id,
+          storeName: store.storeName
         }
       });
 
@@ -455,11 +520,12 @@ function StoreVerifyPawnContent() {
             <input
               type="tel"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value.replace(/[^\d]/g, ''))}
-              placeholder="กรอกเบอร์โทรศัพท์ร้านค้า"
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="กรอกเบอร์โทรศัพท์ร้านค้า (เช่น 0812345678)"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">กรอกเบอร์โทรศัพท์ที่ลงทะเบียนกับร้านค้า</p>
           </div>
 
           <div>
@@ -491,10 +557,10 @@ function StoreVerifyPawnContent() {
 
           <button
             type="submit"
-            disabled={isSubmitting || !phoneNumber}
+            disabled={isSubmitting}
             className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
-            {isSubmitting ? 'กำลังสร้างสัญญา...' : 'ยืนยันและสร้างสัญญา'}
+            {isSubmitting ? 'กำลังดำเนินการ...' : 'ส่งคำขอยืนยันไปยังลูกค้า'}
           </button>
         </form>
       </div>

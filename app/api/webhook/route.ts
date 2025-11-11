@@ -196,9 +196,6 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 // เลือกใช้ข้อมูลการยืนยัน (confirmationNewContract มี priority สูงกว่า confirmationProposedContract)
                 const confirmedContract = item.confirmationNewContract || item.confirmationProposedContract;
 
-                // ใช้ storeId จาก item.storeId ซึ่งได้ถูกตั้งค่าไว้แล้ว หรือจาก confirmedContract
-                const storeIdToUse = item.storeId?.toString() || confirmedContract?.storeId?.toString();
-
                 if (!confirmedContract) {
                   console.error('No confirmed contract data found');
                   return;
@@ -284,7 +281,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
                     extendedDate: null,
                     redeemedDate: null,
                   },
-                  storeId: new ObjectId(storeIdToUse),
+                  storeId: new ObjectId(proposedContract.storeId),
                   storeName: proposedContract.storeName,
                   // เพิ่มฟิลด์สำหรับบันทึก URL
                   documents: {
@@ -305,13 +302,12 @@ async function handlePostbackEvent(event: WebhookEvent) {
                       status: 'contracted',
                       confirmationStatus: 'confirmed',
                       contractId: result.insertedId,
-                      storeId: new ObjectId(storeIdToUse),
+                      storeId: new ObjectId(proposedContract.storeId),
                       updatedAt: new Date()
                     },
                     $unset: {
                       confirmationModifications: 1,
                       confirmationProposedContract: 1,
-                      confirmationNewContract: 1,
                       confirmationTimestamp: 1
                     },
                     $push: {
@@ -325,7 +321,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   { lineId: item.lineId },
                   {
                     $set: {
-                      storeId: new ObjectId(storeIdToUse),
+                      storeId: new ObjectId(proposedContract.storeId),
                     },
                     $push: {
                       contractsID: result.insertedId as any,
