@@ -18,6 +18,7 @@
     "@line/bot-sdk": "^10.3.0",
     "@line/liff": "^2.27.2",
     "@sparticuz/chromium": "^141.0.0",
+    "@supabase/supabase-js": "^2.86.0",
     "@types/bcrypt": "^6.0.0",
     "@types/html2canvas": "^0.5.35",
     "axios": "^1.12.2",

@@ -6,6 +6,8 @@ import axios from 'axios';
 import Image from 'next/image';
 import { Camera, ChevronUp, ChevronDown, Search, X, Check } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
+import PawnSummary from './pawn-summary';
+import SuccessConfirmation from './success-confirmation';
 
 const sarabun = Sarabun({
   subsets: ['latin'],
@@ -134,7 +136,7 @@ interface Customer {
   pawnRequests: any[];
 }
 
-type Step = 'form' | 'estimate_result' | 'pawn_setup' | 'qr_display';
+type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'success_confirmation';
 
 export default function EstimatePage() {
   const { profile, isLoading, error: liffError } = useLiff();
@@ -196,6 +198,10 @@ export default function EstimatePage() {
   // Apple product search
   const [showAppleResults, setShowAppleResults] = useState(false);
   const [selectedAppleProduct, setSelectedAppleProduct] = useState<any>(null);
+
+  // Success confirmation data
+  const [loanRequestId, setLoanRequestId] = useState<string>('');
+  const [itemId, setItemId] = useState<string>('');
 
   // Check customer exists
   const checkCustomerExists = async () => {
@@ -560,8 +566,14 @@ export default function EstimatePage() {
       setEstimateResult(estimateResponse.data);
       setDesiredPrice(estimateResponse.data.estimatedPrice.toString());
 
-      // Move to estimate result step
-      setCurrentStep('estimate_result');
+      // Update form data with condition from AI
+      setFormData(prev => ({
+        ...prev,
+        condition: conditionResponse.data.score * 100
+      }));
+
+      // Move to pawn summary step
+      setCurrentStep('pawn_summary');
 
     } catch (error: any) {
       console.error('Error during analysis and estimation:', error);
@@ -1206,6 +1218,77 @@ export default function EstimatePage() {
                   : 'ประเมินราคาด้วย AI'}
             </button>
           </>
+        )}
+
+        {/* Pawn Summary Step */}
+        {currentStep === 'pawn_summary' && estimateResult && profile?.userId && (
+          <PawnSummary
+            itemData={{
+              itemType: formData.itemType,
+              brand: formData.brand,
+              model: formData.model,
+              capacity: formData.capacity,
+              condition: formData.condition,
+              images: uploadedImageUrls,
+              estimatedPrice: estimateResult.estimatedPrice,
+              appleAccessories: formData.appleAccessories
+                ? Object.entries(formData.appleAccessories)
+                    .filter(([, value]) => value)
+                    .map(([key]) => key)
+                : [],
+              processor: formData.cpu,
+              ram: formData.ram,
+              storage: formData.storage,
+              gpu: formData.gpu,
+              lenses: formData.lenses
+                ?.filter(l => l.trim() !== '')
+                .map(l => ({ brand: '', model: l })),
+            }}
+            lineId={profile.userId}
+            onBack={() => setCurrentStep('form')}
+            onSuccess={(reqId, itmId) => {
+              setLoanRequestId(reqId);
+              setItemId(itmId);
+              setCurrentStep('success_confirmation');
+            }}
+          />
+        )}
+
+        {/* Success Confirmation Step */}
+        {currentStep === 'success_confirmation' && (
+          <SuccessConfirmation
+            loanRequestId={loanRequestId}
+            itemId={itemId}
+            onBackToHome={() => {
+              setCurrentStep('form');
+              setFormData({
+                itemType: '',
+                brand: '',
+                model: '',
+                capacity: '',
+                serialNo: '',
+                accessories: '',
+                condition: 50,
+                defects: '',
+                note: '',
+                lenses: ['', ''],
+                appleSearchTerm: '',
+                appleAccessories: {
+                  box: false,
+                  adapter: false,
+                  cable: false,
+                  receipt: false,
+                },
+              });
+              setImages([]);
+              setImageUrls([]);
+              setEstimateResult(null);
+              setConditionResult(null);
+              setSelectedStore('');
+              setLoanRequestId('');
+              setItemId('');
+            }}
+          />
         )}
 
         {/* Estimate Result Step */}
