@@ -92,12 +92,19 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  const handleLoanAmountChange = (value: string) => {
-    const numericValue = value.replace(/,/g, '');
-    if (!isNaN(parseFloat(numericValue)) && parseFloat(numericValue) <= maxLoanAmount) {
-      setLoanAmount(formatNumber(parseFloat(numericValue)));
-    } else if (value === '') {
+  const handleLoanAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Remove all non-numeric characters except digits
+    const numericValue = value.replace(/[^\d]/g, '');
+
+    if (numericValue === '') {
       setLoanAmount('');
+      return;
+    }
+
+    const amount = parseInt(numericValue);
+    if (amount <= maxLoanAmount) {
+      setLoanAmount(numericValue);
     }
   };
 
@@ -209,14 +216,15 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           <div className="relative">
             <input
               type="text"
-              value={loanAmount}
-              onChange={(e) => handleLoanAmountChange(e.target.value)}
-              placeholder={formatNumber(maxLoanAmount)}
+              inputMode="numeric"
+              value={loanAmount ? parseInt(loanAmount).toLocaleString('en-US') : ''}
+              onChange={handleLoanAmountChange}
+              placeholder={maxLoanAmount.toLocaleString('en-US')}
               className="w-full p-4 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 font-bold"
             />
             <span className="absolute right-4 top-4.5 text-gray-400 text-sm">THB</span>
           </div>
-          <p className="text-gray-500 text-xs mt-2 text-right">วงเงินสูงสุด {formatNumber(maxLoanAmount)} บาท</p>
+          <p className="text-gray-500 text-xs mt-2 text-right">วงเงินสูงสุด {maxLoanAmount.toLocaleString('en-US')} บาท</p>
         </div>
 
         <div className="h-px bg-gray-200 my-6"></div>

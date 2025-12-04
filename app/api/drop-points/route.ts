@@ -11,8 +11,9 @@ export async function GET() {
     const { data, error } = await supabase
       .from('drop_points')
       .select('*')
-      .eq('status', 'ACTIVE')
-      .order('branch_name', { ascending: true });
+      .eq('is_active', true)
+      .eq('is_accepting_items', true)
+      .order('drop_point_name', { ascending: true });
 
     if (error) {
       console.error('Error fetching drop points:', error);
@@ -22,8 +23,21 @@ export async function GET() {
       );
     }
 
+    // Map database fields to expected frontend fields
+    const branches = (data || []).map((dp: any) => ({
+      branch_id: dp.drop_point_id,
+      branch_name: dp.drop_point_name,
+      address: `${dp.addr_house_no || ''} ${dp.addr_street || ''}, ${dp.addr_sub_district || ''}, ${dp.addr_district || ''}`.trim(),
+      district: dp.addr_district,
+      province: dp.addr_province,
+      postal_code: dp.addr_postcode,
+      phone_number: dp.phone_number,
+      google_maps_link: dp.google_map_url,
+      operating_hours: formatOperatingHours(dp.opening_hours),
+    }));
+
     return NextResponse.json({
-      branches: data || [],
+      branches,
     });
   } catch (error) {
     console.error('Error in drop-points API:', error);
@@ -31,5 +45,20 @@ export async function GET() {
       { error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+function formatOperatingHours(hoursJson: any): string {
+  try {
+    if (typeof hoursJson === 'string') {
+      hoursJson = JSON.parse(hoursJson);
+    }
+    // Format to readable string, e.g., "จันทร์-ศุกร์: 09:00-21:00"
+    if (hoursJson?.monday) {
+      return `จันทร์-ศุกร์: ${hoursJson.monday}, เสาร์: ${hoursJson.saturday || hoursJson.monday}, อาทิตย์: ${hoursJson.sunday || hoursJson.monday}`;
+    }
+    return 'โปรดติดต่อสาขา';
+  } catch (e) {
+    return 'โปรดติดต่อสาขา';
   }
 }

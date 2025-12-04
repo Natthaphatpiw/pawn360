@@ -709,5 +709,242 @@ GROUP BY i.investor_id, i.firstname, i.lastname, w.available_balance, w.committe
 --   ('สาขา ปิ่นเกล้า', 'DP-PINKLAO', '02-333-3333', 'กรุงเทพมหานคร', 'บางกอกน้อย', 'https://maps.google.com/?q=Central+Pinklao');
 
 -- =====================================================
+-- 11. MOCK DATA INSERTS
+-- =====================================================
+
+-- Insert mock drop points
+INSERT INTO drop_points (drop_point_id, drop_point_name, drop_point_code, phone_number, email,
+                        addr_house_no, addr_street, addr_sub_district, addr_district, addr_province, addr_country, addr_postcode,
+                        google_map_url, latitude, longitude, opening_hours, capacity, current_items_count,
+                        manager_name, manager_phone, manager_line_id, is_active, is_accepting_items)
+VALUES
+  ('550e8400-e29b-41d4-a716-446655440001', 'สาขา สยามสแควร์', 'DP-SIAM', '021111111', 'siam@pawnline.com',
+   '123', 'พระรามที่ 1', 'ปทุมวัน', 'ปทุมวัน', 'กรุงเทพมหานคร', 'Thailand', '10330',
+   'https://maps.google.com/?q=Siam+Square', 13.7456, 100.5346,
+   '{"monday": "09:00-21:00", "tuesday": "09:00-21:00", "wednesday": "09:00-21:00", "thursday": "09:00-21:00", "friday": "09:00-21:00", "saturday": "09:00-20:00", "sunday": "10:00-20:00"}',
+   200, 45, 'นายสมชาย จิตดี', '0811111111', 'U1234567890abcdef', TRUE, TRUE),
+
+  ('550e8400-e29b-41d4-a716-446655440002', 'สาขา เซ็นทรัล ลาดพร้าว', 'DP-LADPRAO', '022222222', 'ladprao@pawnline.com',
+   '456', 'พหลโยธิน', 'จตุจักร', 'จตุจักร', 'กรุงเทพมหานคร', 'Thailand', '10900',
+   'https://maps.google.com/?q=Central+Plaza+Ladprao', 13.8196, 100.5592,
+   '{"monday": "10:00-22:00", "tuesday": "10:00-22:00", "wednesday": "10:00-22:00", "thursday": "10:00-22:00", "friday": "10:00-22:00", "saturday": "10:00-21:00", "sunday": "11:00-21:00"}',
+   150, 28, 'นางสาวสมหญิง ใจดี', '0812222222', 'U1234567890abcdef222', TRUE, TRUE),
+
+  ('550e8400-e29b-41d4-a716-446655440003', 'สาขา ปิ่นเกล้า', 'DP-PINKLAO', '023333333', 'pinklao@pawnline.com',
+   '789', 'อ่อนนุช', 'บางกอกน้อย', 'บางกอกน้อย', 'กรุงเทพมหานคร', 'Thailand', '10700',
+   'https://maps.google.com/?q=Central+Pinklao', 13.7597, 100.4771,
+   '{"monday": "09:00-20:00", "tuesday": "09:00-20:00", "wednesday": "09:00-20:00", "thursday": "09:00-20:00", "friday": "09:00-20:00", "saturday": "09:00-19:00", "sunday": "10:00-19:00"}',
+   100, 12, 'นายวัชรพล สดใส', '0813333333', 'U1234567890abcdef333', TRUE, TRUE);
+
+-- Insert mock admin users
+INSERT INTO admin_users (admin_id, username, email, password_hash, firstname, lastname, phone_number, role, permissions, is_active)
+VALUES
+  ('660e8400-e29b-41d4-a716-446655440001', 'superadmin', 'superadmin@pawnline.com', '$2b$10$dummy.hash.for.mock.data', 'อดุลย์', 'แอดมิน', '0810000001', 'SUPER_ADMIN', '{"all": true}', TRUE),
+  ('660e8400-e29b-41d4-a716-446655440002', 'admin1', 'admin1@pawnline.com', '$2b$10$dummy.hash.for.mock.data', 'สมชาย', 'ดูแล', '0810000002', 'ADMIN', '{"users": true, "contracts": true, "reports": true}', TRUE),
+  ('660e8400-e29b-41d4-a716-446655440003', 'support1', 'support1@pawnline.com', '$2b$10$dummy.hash.for.mock.data', 'สมหญิง', 'ช่วยเหลือ', '0810000003', 'SUPPORT', '{"support": true}', TRUE);
+
+-- Insert mock pawners (customers)
+INSERT INTO pawners (customer_id, line_id, firstname, lastname, customer_signature_id, phone_number, national_id, email,
+                    addr_house_no, addr_street, addr_sub_district, addr_district, addr_province, addr_country, addr_postcode,
+                    kyc_status, uppass_slug, kyc_verified_at, bank_name, bank_account_no, bank_account_type, bank_account_name,
+                    is_active, is_blocked, created_at, updated_at)
+VALUES
+  ('770e8400-e29b-41d4-a716-446655440001', 'pawner001', 'วิชัย', 'พานิชย์', 'sig_001', '0811111111', '1234567890123', 'wichai@email.com',
+   '15/5', 'สุขุมวิท', 'คลองเตย', 'คลองเตย', 'กรุงเทพมหานคร', 'Thailand', '10110',
+   'VERIFIED', 'uppass_001', NOW() - INTERVAL '30 days', 'กสิกรไทย', '1234567890', 'SAVINGS', 'วิชัย พานิชย์',
+   TRUE, FALSE, NOW() - INTERVAL '60 days', NOW() - INTERVAL '5 days'),
+
+  ('770e8400-e29b-41d4-a716-446655440002', 'pawner002', 'นรินทร์', 'สุวรรณ', 'sig_002', '0812222222', '2345678901234', 'narinth@email.com',
+   '42', 'สาทร', 'สาทร', 'สาทร', 'กรุงเทพมหานคร', 'Thailand', '10120',
+   'VERIFIED', 'uppass_002', NOW() - INTERVAL '45 days', 'ไทยพาณิชย์', '2345678901', 'SAVINGS', 'นรินทร์ สุวรรณ',
+   TRUE, FALSE, NOW() - INTERVAL '90 days', NOW() - INTERVAL '10 days'),
+
+  ('770e8400-e29b-41d4-a716-446655440003', 'pawner003', 'ปรียาภรณ์', 'นาคสุข', 'sig_003', '0813333333', '3456789012345', 'priyapon@email.com',
+   '88/1', 'เพชรบุรี', 'ทุ่งพญาไท', 'ราชเทวี', 'กรุงเทพมหานคร', 'Thailand', '10400',
+   'VERIFIED', 'uppass_003', NOW() - INTERVAL '20 days', 'กรุงศรีอยุธยา', '3456789012', 'CURRENT', 'ปรียาภรณ์ นาคสุข',
+   TRUE, FALSE, NOW() - INTERVAL '45 days', NOW() - INTERVAL '2 days'),
+
+  ('770e8400-e29b-41d4-a716-446655440004', 'pawner004', 'ธนพล', 'รัตนชัย', 'sig_004', '0814444444', '4567890123456', 'thanapon@email.com',
+   '25', 'ลาดพร้าว', 'ลาดพร้าว', 'ลาดพร้าว', 'กรุงเทพมหานคร', 'Thailand', '10230',
+   'PENDING', 'uppass_004', NULL, 'กรุงไทย', '4567890123', 'SAVINGS', 'ธนพล รัตนชัย',
+   TRUE, FALSE, NOW() - INTERVAL '15 days', NOW() - INTERVAL '1 day'),
+
+  ('770e8400-e29b-41d4-a716-446655440005', 'pawner005', 'สุนิสา', 'จันทรา', 'sig_005', '0815555555', '5678901234567', 'sunisa@email.com',
+   '67', 'พหลโยธิน', 'พญาไท', 'พญาไท', 'กรุงเทพมหานคร', 'Thailand', '10400',
+   'VERIFIED', 'uppass_005', NOW() - INTERVAL '60 days', 'ธนชาติ', '5678901234', 'SAVINGS', 'สุนิสา จันทรา',
+   TRUE, FALSE, NOW() - INTERVAL '120 days', NOW() - INTERVAL '15 days');
+
+-- Insert mock investors
+INSERT INTO investors (investor_id, line_id, firstname, lastname, investor_signature_id, phone_number, national_id, email,
+                      addr_house_no, addr_street, addr_sub_district, addr_district, addr_province, addr_country, addr_postcode,
+                      kyc_status, uppass_slug, kyc_verified_at, bank_name, bank_account_no, bank_account_type, bank_account_name,
+                      auto_invest_enabled, preferred_loan_types, min_investment_amount, max_investment_amount,
+                      is_active, is_blocked, investor_tier, created_at, updated_at)
+VALUES
+  ('880e8400-e29b-41d4-a716-446655440001', 'investor001', 'ภาคภูมิ', 'วงศ์สวัสดิ์', 'inv_sig_001', '0821111111', '1111111111111', 'pakpoom@email.com',
+   '100', 'สีลม', 'สีลม', 'บางรัก', 'กรุงเทพมหานคร', 'Thailand', '10500',
+   'VERIFIED', 'inv_uppass_001', NOW() - INTERVAL '90 days', 'กสิกรไทย', '1111111111', 'CURRENT', 'ภาคภูมิ วงศ์สวัสดิ์',
+   TRUE, ARRAY['โทรศัพท์มือถือ', 'โน้ตบุค'], 5000.00, 500000.00,
+   TRUE, FALSE, 'VIP', NOW() - INTERVAL '180 days', NOW() - INTERVAL '30 days'),
+
+  ('880e8400-e29b-41d4-a716-446655440002', 'investor002', 'วรัญญา', 'ชัยวัฒน์', 'inv_sig_002', '0822222222', '2222222222222', 'woranya@email.com',
+   '250', 'สุขุมวิท', 'คลองเตย', 'คลองเตย', 'กรุงเทพมหานคร', 'Thailand', '10110',
+   'VERIFIED', 'inv_uppass_002', NOW() - INTERVAL '60 days', 'ไทยพาณิชย์', '2222222222', 'SAVINGS', 'วรัญญา ชัยวัฒน์',
+   TRUE, ARRAY['โทรศัพท์มือถือ', 'กล้อง', 'Apple'], 10000.00, 200000.00,
+   TRUE, FALSE, 'PREMIUM', NOW() - INTERVAL '120 days', NOW() - INTERVAL '15 days'),
+
+  ('880e8400-e29b-41d4-a716-446655440003', 'investor003', 'ประเสริฐ', 'ธนากร', 'inv_sig_003', '0823333333', '3333333333333', 'praset@email.com',
+   '75', 'อารีย์', 'พญาไท', 'พญาไท', 'กรุงเทพมหานคร', 'Thailand', '10400',
+   'VERIFIED', 'inv_uppass_003', NOW() - INTERVAL '120 days', 'กรุงศรีอยุธยา', '3333333333', 'CURRENT', 'ประเสริฐ ธนากร',
+   FALSE, ARRAY['อุปกรณ์เสริมโทรศัพท์'], 2000.00, 100000.00,
+   TRUE, FALSE, 'STANDARD', NOW() - INTERVAL '200 days', NOW() - INTERVAL '45 days'),
+
+  ('880e8400-e29b-41d4-a716-446655440004', 'investor004', 'นันทนา', 'พิพัฒน์', 'inv_sig_004', '0824444444', '4444444444444', 'nuntana@email.com',
+   '150', 'พระรามที่ 4', 'ปทุมวัน', 'ปทุมวัน', 'กรุงเทพมหานคร', 'Thailand', '10330',
+   'VERIFIED', 'inv_uppass_004', NOW() - INTERVAL '30 days', 'กรุงไทย', '4444444444', 'SAVINGS', 'นันทนา พิพัฒน์',
+   TRUE, ARRAY['โทรศัพท์มือถือ', 'โน้ตบุค', 'Apple'], 15000.00, 300000.00,
+   TRUE, FALSE, 'PREMIUM', NOW() - INTERVAL '90 days', NOW() - INTERVAL '7 days');
+
+-- Insert mock wallets for investors
+INSERT INTO wallets (wallet_id, investor_id, available_balance, committed_balance, maximum_commitment, total_invested, total_earned, total_withdrawn, is_active, created_at, updated_at)
+VALUES
+  ('990e8400-e29b-41d4-a716-446655440001', '880e8400-e29b-41d4-a716-446655440001', 150000.00, 50000.00, 200000.00, 450000.00, 22500.00, 150000.00, TRUE, NOW() - INTERVAL '180 days', NOW() - INTERVAL '1 day'),
+  ('990e8400-e29b-41d4-a716-446655440002', '880e8400-e29b-41d4-a716-446655440002', 300000.00, 75000.00, 500000.00, 280000.00, 14000.00, 80000.00, TRUE, NOW() - INTERVAL '120 days', NOW() - INTERVAL '2 days'),
+  ('990e8400-e29b-41d4-a716-446655440003', '880e8400-e29b-41d4-a716-446655440003', 50000.00, 15000.00, 100000.00, 80000.00, 3200.00, 20000.00, TRUE, NOW() - INTERVAL '200 days', NOW() - INTERVAL '5 days'),
+  ('990e8400-e29b-41d4-a716-446655440004', '880e8400-e29b-41d4-a716-446655440004', 200000.00, 30000.00, 300000.00, 150000.00, 7500.00, 50000.00, TRUE, NOW() - INTERVAL '90 days', NOW() - INTERVAL '3 days');
+
+-- Insert mock items
+INSERT INTO items (item_id, customer_id, item_type, brand, model, capacity, serial_number, cpu, ram, storage, gpu,
+                  item_condition, ai_condition_score, ai_condition_reason, estimated_value, ai_confidence,
+                  accessories, defects, notes, image_urls, item_status, drop_point_id, received_at_drop_point, created_at, updated_at)
+VALUES
+  ('aa0e8400-e29b-41d4-a716-446655440001', '770e8400-e29b-41d4-a716-446655440001', 'โทรศัพท์มือถือ', 'Apple', 'iPhone 14 Pro', '256GB', 'F2L123456789', NULL, NULL, NULL, NULL,
+   95, 94.5, 'สภาพดีเยี่ยม ไม่มีรอยขีดข่วน', 32000.00, 0.92,
+   'กล่อง เคส กระจกนิรภัย', 'ไม่มี', 'ใช้งานน้อย ซื้อใหม่ปีที่แล้ว', ARRAY['https://example.com/item1_1.jpg', 'https://example.com/item1_2.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440001', NOW() - INTERVAL '7 days', NOW() - INTERVAL '10 days', NOW() - INTERVAL '2 days'),
+
+  ('aa0e8400-e29b-41d4-a716-446655440002', '770e8400-e29b-41d4-a716-446655440002', 'โน้ตบุค', 'Apple', 'MacBook Pro M2', '512GB', 'F3M987654321', 'Apple M2', '16GB', '512GB SSD', 'Integrated',
+   88, 87.2, 'สภาพดี มีรอยขีดเล็กน้อย', 55000.00, 0.89,
+   'ชาร์จเจอร์ กล่อง', 'รอยขีดที่ฝา', 'ใช้ทำงานประจำ', ARRAY['https://example.com/item2_1.jpg', 'https://example.com/item2_2.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '5 days', NOW() - INTERVAL '8 days', NOW() - INTERVAL '1 day'),
+
+  ('aa0e8400-e29b-41d4-a716-446655440003', '770e8400-e29b-41d4-a716-446655440003', 'กล้อง', 'Canon', 'EOS R5', NULL, 'C5R123456789', NULL, NULL, NULL, NULL,
+   92, 91.8, 'สภาพดีเยี่ยม', 120000.00, 0.94,
+   'เลนส์ 2 ตัว ชาร์จเจอร์ แบตเตอรี่', 'ไม่มี', 'ใช้ถ่ายงานแต่งงาน', ARRAY['https://example.com/item3_1.jpg', 'https://example.com/item3_2.jpg', 'https://example.com/item3_3.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440001', NOW() - INTERVAL '3 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '1 day'),
+
+  ('aa0e8400-e29b-41d4-a716-446655440004', '770e8400-e29b-41d4-a716-446655440004', 'โทรศัพท์มือถือ', 'Samsung', 'Galaxy S23 Ultra', '256GB', 'G2S456789012', NULL, NULL, NULL, NULL,
+   85, 84.3, 'สภาพดี มีรอยขีดที่กรอบ', 28000.00, 0.87,
+   'กล่อง ชาร์จเร็ว S Pen', 'รอยขีดที่กรอบ', 'ใช้งานปกติ', ARRAY['https://example.com/item4_1.jpg', 'https://example.com/item4_2.jpg'],
+   'PENDING', NULL, NULL, NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'),
+
+  ('aa0e8400-e29b-41d4-a716-446655440005', '770e8400-e29b-41d4-a716-446655440005', 'อุปกรณ์เสริมโทรศัพท์', 'Apple', 'AirPods Pro (2nd Gen)', NULL, 'AP2P789012345', NULL, NULL, NULL, NULL,
+   90, 89.7, 'สภาพดีเยี่ยม', 8500.00, 0.91,
+   'เคสหูฟัง กล่อง', 'ไม่มี', 'หูฟังไร้สายชั้นนำ', ARRAY['https://example.com/item5_1.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440003', NOW() - INTERVAL '4 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '1 day');
+
+-- Insert mock item lenses (for camera)
+INSERT INTO item_lenses (lens_id, item_id, lens_model, lens_serial_number, lens_condition, created_at)
+VALUES
+  ('bb0e8400-e29b-41d4-a716-446655440001', 'aa0e8400-e29b-41d4-a716-446655440003', 'Canon RF 24-70mm f/2.8L IS USM', 'RF2470F28123456', 95, NOW() - INTERVAL '6 days'),
+  ('bb0e8400-e29b-41d4-a716-446655440002', 'aa0e8400-e29b-41d4-a716-446655440003', 'Canon RF 70-200mm f/2.8L IS USM', 'RF70200F28789012', 90, NOW() - INTERVAL '6 days');
+
+-- Insert mock item valuations
+INSERT INTO item_valuations (valuation_id, item_id, valuation_type, valuated_by, estimated_value, condition_score, notes, created_at)
+VALUES
+  ('cc0e8400-e29b-41d4-a716-446655440001', 'aa0e8400-e29b-41d4-a716-446655440001', 'AI_INITIAL', 'AI', 32000.00, 95, 'AI valuation based on market data', NOW() - INTERVAL '10 days'),
+  ('cc0e8400-e29b-41d4-a716-446655440002', 'aa0e8400-e29b-41d4-a716-446655440002', 'AI_INITIAL', 'AI', 55000.00, 88, 'AI valuation based on market data', NOW() - INTERVAL '8 days'),
+  ('cc0e8400-e29b-41d4-a716-446655440003', 'aa0e8400-e29b-41d4-a716-446655440003', 'AI_INITIAL', 'AI', 120000.00, 92, 'AI valuation based on market data', NOW() - INTERVAL '6 days'),
+  ('cc0e8400-e29b-41d4-a716-446655440004', 'aa0e8400-e29b-41d4-a716-446655440003', 'DROP_POINT_VERIFY', '550e8400-e29b-41d4-a716-446655440001', 118000.00, 90, 'Verified at drop point - condition confirmed', NOW() - INTERVAL '5 days');
+
+-- Insert mock loan requests
+INSERT INTO loan_requests (request_id, item_id, customer_id, requested_amount, requested_duration_days, drop_point_id, delivery_method, delivery_fee, request_status, expires_at, created_at, updated_at)
+VALUES
+  ('dd0e8400-e29b-41d4-a716-446655440001', 'aa0e8400-e29b-41d4-a716-446655440001', '770e8400-e29b-41d4-a716-446655440001', 25000.00, 90, '550e8400-e29b-41d4-a716-446655440001', 'WALK_IN', 0.00, 'OFFER_ACCEPTED', NOW() - INTERVAL '6 days', NOW() - INTERVAL '10 days', NOW() - INTERVAL '6 days'),
+  ('dd0e8400-e29b-41d4-a716-446655440002', 'aa0e8400-e29b-41d4-a716-446655440002', '770e8400-e29b-41d4-a716-446655440002', 40000.00, 120, '550e8400-e29b-41d4-a716-446655440002', 'DELIVERY', 150.00, 'OFFER_ACCEPTED', NOW() - INTERVAL '4 days', NOW() - INTERVAL '8 days', NOW() - INTERVAL '4 days'),
+  ('dd0e8400-e29b-41d4-a716-446655440003', 'aa0e8400-e29b-41d4-a716-446655440003', '770e8400-e29b-41d4-a716-446655440003', 80000.00, 180, '550e8400-e29b-41d4-a716-446655440001', 'COURIER', 200.00, 'AWAITING_OFFERS', NOW() + INTERVAL '2 days', NOW() - INTERVAL '2 days', NOW() - INTERVAL '1 day'),
+  ('dd0e8400-e29b-41d4-a716-446655440004', 'aa0e8400-e29b-41d4-a716-446655440005', '770e8400-e29b-41d4-a716-446655440005', 6500.00, 60, '550e8400-e29b-41d4-a716-446655440003', 'WALK_IN', 0.00, 'PENDING', NOW() + INTERVAL '4 days', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day');
+
+-- Insert mock loan offers
+INSERT INTO loan_offers (offer_id, request_id, investor_id, offer_amount, interest_rate, duration_days, offer_status, expires_at, accepted_at, created_at, updated_at)
+VALUES
+  ('ee0e8400-e29b-41d4-a716-446655440001', 'dd0e8400-e29b-41d4-a716-446655440001', '880e8400-e29b-41d4-a716-446655440001', 25000.00, 0.025, 90, 'ACCEPTED', NOW() - INTERVAL '5 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '9 days', NOW() - INTERVAL '6 days'),
+  ('ee0e8400-e29b-41d4-a716-446655440002', 'dd0e8400-e29b-41d4-a716-446655440001', '880e8400-e29b-41d4-a716-446655440002', 24000.00, 0.028, 90, 'REJECTED', NOW() - INTERVAL '5 days', NULL, NOW() - INTERVAL '8 days', NOW() - INTERVAL '6 days'),
+  ('ee0e8400-e29b-41d4-a716-446655440003', 'dd0e8400-e29b-41d4-a716-446655440002', '880e8400-e29b-41d4-a716-446655440001', 40000.00, 0.022, 120, 'ACCEPTED', NOW() - INTERVAL '3 days', NOW() - INTERVAL '4 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '4 days'),
+  ('ee0e8400-e29b-41d4-a716-446655440004', 'dd0e8400-e29b-41d4-a716-446655440003', '880e8400-e29b-41d4-a716-446655440004', 75000.00, 0.020, 180, 'PENDING', NOW() + INTERVAL '1 day', NULL, NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day'),
+  ('ee0e8400-e29b-41d4-a716-446655440005', 'dd0e8400-e29b-41d4-a716-446655440003', '880e8400-e29b-41d4-a716-446655440002', 78000.00, 0.021, 180, 'PENDING', NOW() + INTERVAL '1 day', NULL, NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day');
+
+-- Insert mock contracts
+INSERT INTO contracts (contract_id, contract_number, customer_id, investor_id, drop_point_id, item_id, loan_request_id, loan_offer_id,
+                      contract_start_date, contract_end_date, contract_duration_days,
+                      loan_principal_amount, interest_rate, interest_amount, total_amount, platform_fee_rate, platform_fee_amount,
+                      amount_paid, interest_paid, principal_paid, contract_status, funding_status,
+                      funded_at, disbursed_at, created_at, updated_at)
+VALUES
+  ('ff0e8400-e29b-41d4-a716-446655440001', 'CTR-20241201-0001', '770e8400-e29b-41d4-a716-446655440001', '880e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440001', 'aa0e8400-e29b-41d4-a716-446655440001', 'dd0e8400-e29b-41d4-a716-446655440001', 'ee0e8400-e29b-41d4-a716-446655440001',
+   NOW() - INTERVAL '60 days', NOW() - INTERVAL '30 days' + INTERVAL '90 days', 90,
+   25000.00, 0.025, 625.00, 25625.00, 0.10, 62.50,
+   25625.00, 625.00, 25000.00, 'COMPLETED', 'DISBURSED',
+   NOW() - INTERVAL '59 days', NOW() - INTERVAL '58 days', NOW() - INTERVAL '60 days', NOW() - INTERVAL '30 days'),
+
+  ('ff0e8400-e29b-41d4-a716-446655440002', 'CTR-20241201-0002', '770e8400-e29b-41d4-a716-446655440002', '880e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002', 'aa0e8400-e29b-41d4-a716-446655440002', 'dd0e8400-e29b-41d4-a716-446655440002', 'ee0e8400-e29b-41d4-a716-446655440003',
+   NOW() - INTERVAL '45 days', NOW() + INTERVAL '75 days', 120,
+   40000.00, 0.022, 880.00, 40880.00, 0.10, 88.00,
+   20440.00, 440.00, 20000.00, 'ACTIVE', 'DISBURSED',
+   NOW() - INTERVAL '44 days', NOW() - INTERVAL '43 days', NOW() - INTERVAL '45 days', NOW() - INTERVAL '2 days'),
+
+  ('ff0e8400-e29b-41d4-a716-446655440003', 'CTR-20241201-0003', '770e8400-e29b-41d4-a716-446655440003', '880e8400-e29b-41d4-a716-446655440004', '550e8400-e29b-41d4-a716-446655440001', 'aa0e8400-e29b-41d4-a716-446655440003', NULL, NULL,
+   NOW() - INTERVAL '30 days', NOW() + INTERVAL '150 days', 180,
+   75000.00, 0.020, 1500.00, 76500.00, 0.10, 150.00,
+   0.00, 0.00, 0.00, 'PENDING_SIGNATURE', 'PENDING',
+   NULL, NULL, NOW() - INTERVAL '30 days', NOW() - INTERVAL '1 day');
+
+-- Insert mock payments
+INSERT INTO payments (payment_id, contract_id, payment_type, amount, principal_portion, interest_portion, fee_portion, payment_method, payment_status, transaction_ref, verified_by, verified_at, payment_date, notes, created_at)
+VALUES
+  ('550e8400-e29b-41d4-a716-446655440010', 'ff0e8400-e29b-41d4-a716-446655440001', 'FULL_REPAYMENT', 25625.00, 25000.00, 625.00, 0.00, 'BANK_TRANSFER', 'COMPLETED', 'TXN_20241230_001', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '30 days', NOW() - INTERVAL '30 days', 'Full repayment on due date', NOW() - INTERVAL '30 days'),
+  ('550e8400-e29b-41d4-a716-446655440011', 'ff0e8400-e29b-41d4-a716-446655440002', 'INTEREST', 440.00, 0.00, 440.00, 0.00, 'PROMPTPAY', 'COMPLETED', 'TXN_20241215_002', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '15 days', NOW() - INTERVAL '15 days', 'Monthly interest payment', NOW() - INTERVAL '15 days'),
+  ('550e8400-e29b-41d4-a716-446655440012', 'ff0e8400-e29b-41d4-a716-446655440002', 'PRINCIPAL', 10000.00, 10000.00, 0.00, 0.00, 'BANK_TRANSFER', 'COMPLETED', 'TXN_20241201_003', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', 'Partial principal repayment', NOW() - INTERVAL '1 day');
+
+-- Insert mock repayment schedules
+INSERT INTO repayment_schedules (schedule_id, contract_id, due_date, amount_due, principal_due, interest_due, amount_paid, schedule_status, paid_at, created_at)
+VALUES
+  ('660e8400-e29b-41d4-a716-446655440010', 'ff0e8400-e29b-41d4-a716-446655440001', NOW() - INTERVAL '30 days', 25625.00, 25000.00, 625.00, 25625.00, 'PAID', NOW() - INTERVAL '30 days', NOW() - INTERVAL '60 days'),
+  ('660e8400-e29b-41d4-a716-446655440011', 'ff0e8400-e29b-41d4-a716-446655440002', NOW() + INTERVAL '15 days', 1360.00, 3333.33, 26.67, 0.00, 'PENDING', NULL, NOW() - INTERVAL '45 days'),
+  ('660e8400-e29b-41d4-a716-446655440012', 'ff0e8400-e29b-41d4-a716-446655440002', NOW() + INTERVAL '45 days', 1360.00, 3333.33, 26.67, 0.00, 'PENDING', NULL, NOW() - INTERVAL '45 days'),
+  ('660e8400-e29b-41d4-a716-446655440013', 'ff0e8400-e29b-41d4-a716-446655440002', NOW() + INTERVAL '75 days', 1360.00, 3333.33, 26.67, 0.00, 'PENDING', NULL, NOW() - INTERVAL '45 days');
+
+-- Insert mock platform revenue
+INSERT INTO platform_revenue (revenue_id, contract_id, revenue_type, amount, description, created_at)
+VALUES
+  ('770e8400-e29b-41d4-a716-446655440010', 'ff0e8400-e29b-41d4-a716-446655440001', 'INTEREST_FEE', 62.50, 'Platform fee from completed contract interest', NOW() - INTERVAL '30 days'),
+  ('770e8400-e29b-41d4-a716-446655440011', 'ff0e8400-e29b-41d4-a716-446655440002', 'INTEREST_FEE', 44.00, 'Platform fee from interest payment', NOW() - INTERVAL '15 days');
+
+-- Insert mock wallet transactions
+INSERT INTO wallet_transactions (transaction_id, wallet_id, transaction_type, amount, balance_before, balance_after, reference_type, reference_id, description, created_at)
+VALUES
+  ('880e8400-e29b-41d4-a716-446655440010', '990e8400-e29b-41d4-a716-446655440001', 'COMMITMENT', 25000.00, 150000.00, 125000.00, 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440001', 'Fund commitment for contract CTR-20241201-0001', NOW() - INTERVAL '59 days'),
+  ('880e8400-e29b-41d4-a716-446655440011', '990e8400-e29b-41d4-a716-446655440001', 'REPAYMENT', 25625.00, 125000.00, 150625.00, 'PAYMENT', '550e8400-e29b-41d4-a716-446655440010', 'Full repayment received', NOW() - INTERVAL '30 days'),
+  ('880e8400-e29b-41d4-a716-446655440012', '990e8400-e29b-41d4-a716-446655440001', 'COMMITMENT_RELEASE', 25000.00, 150625.00, 175625.00, 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440001', 'Commitment released after repayment', NOW() - INTERVAL '30 days'),
+  ('880e8400-e29b-41d4-a716-446655440013', '990e8400-e29b-41d4-a716-446655440001', 'INTEREST_EARNED', 562.50, 175625.00, 176187.50, 'PAYMENT', '550e8400-e29b-41d4-a716-446655440010', 'Interest earned from contract', NOW() - INTERVAL '30 days');
+
+-- Insert mock notifications
+INSERT INTO notifications (notification_id, recipient_type, recipient_id, notification_type, title, message, related_entity_type, related_entity_id, is_read, sent_via, created_at)
+VALUES
+  ('990e8400-e29b-41d4-a716-446655440010', 'PAWNER', '770e8400-e29b-41d4-a716-446655440001', 'CONTRACT_COMPLETED', 'สัญญาเสร็จสิ้น', 'สัญญาจำนำของคุณได้เสร็จสิ้นแล้ว คุณสามารถมารับสินค้าได้ที่จุดรับฝาก', 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440001', TRUE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '30 days'),
+  ('990e8400-e29b-41d4-a716-446655440011', 'INVESTOR', '880e8400-e29b-41d4-a716-446655440001', 'PAYMENT_RECEIVED', 'ได้รับการชำระเงิน', 'คุณได้รับการชำระเงินเต็มจำนวนจากสัญญา CTR-20241201-0001', 'PAYMENT', '550e8400-e29b-41d4-a716-446655440010', TRUE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '30 days'),
+  ('990e8400-e29b-41d4-a716-446655440012', 'PAWNER', '770e8400-e29b-41d4-a716-446655440002', 'PAYMENT_REMINDER', 'ใกล้ถึงกำหนดชำระ', 'สัญญาจำนำของคุณจะครบกำหนดในอีก 15 วัน กรุณาชำระเงินให้ตรงเวลา', 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440002', FALSE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '2 days'),
+  ('990e8400-e29b-41d4-a716-446655440013', 'ADMIN', '660e8400-e29b-41d4-a716-446655440001', 'NEW_CONTRACT', 'สัญญาใหม่', 'มีสัญญาจำนำใหม่ที่รอการอนุมัติ CTR-20241201-0003', 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440003', TRUE, ARRAY['IN_APP'], NOW() - INTERVAL '30 days');
+
+-- Insert mock activity logs
+INSERT INTO activity_logs (log_id, actor_type, actor_id, action, entity_type, entity_id, description, metadata, ip_address, user_agent, created_at)
+VALUES
+  ('aa0e8400-e29b-41d4-a716-446655440010', 'PAWNER', '770e8400-e29b-41d4-a716-446655440001', 'CREATE_LOAN_REQUEST', 'LOAN_REQUEST', 'dd0e8400-e29b-41d4-a716-446655440001', 'Customer created loan request for iPhone 14 Pro', '{"item_type": "โทรศัพท์มือถือ", "requested_amount": 25000}', '192.168.1.100', 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)', NOW() - INTERVAL '10 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440011', 'INVESTOR', '880e8400-e29b-41d4-a716-446655440001', 'CREATE_LOAN_OFFER', 'LOAN_OFFER', 'ee0e8400-e29b-41d4-a716-446655440001', 'Investor submitted loan offer', '{"offer_amount": 25000, "interest_rate": 0.025}', '192.168.1.101', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', NOW() - INTERVAL '9 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440012', 'PAWNER', '770e8400-e29b-41d4-a716-446655440001', 'ACCEPT_LOAN_OFFER', 'LOAN_OFFER', 'ee0e8400-e29b-41d4-a716-446655440001', 'Customer accepted loan offer', '{"accepted_amount": 25000}', '192.168.1.100', 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)', NOW() - INTERVAL '6 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440013', 'ADMIN', '660e8400-e29b-41d4-a716-446655440002', 'VERIFY_PAYMENT', 'PAYMENT', '550e8400-e29b-41d4-a716-446655440010', 'Admin verified payment transaction', '{"payment_amount": 25625}', '10.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', NOW() - INTERVAL '30 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440014', 'SYSTEM', NULL, 'CONTRACT_COMPLETED', 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440001', 'Contract automatically marked as completed', '{"completion_reason": "FULL_REPAYMENT"}', NULL, 'SYSTEM', NOW() - INTERVAL '30 days');
+
+-- =====================================================
 -- END OF SCHEMA
 -- =====================================================
