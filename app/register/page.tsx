@@ -1,297 +1,419 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
-export default function RegisterPage() {
-  const { profile, isLoading, error: liffError } = useLiff();
-  const [formData, setFormData] = useState({
-    title: 'นาย',
-    firstName: '',
-    lastName: '',
-    phone: '',
-    idNumber: '',
-    houseNumber: '',
-    village: '',
-    street: '',
-    subDistrict: '',
-    district: '',
-    province: '',
-    postcode: '',
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+interface PawnerData {
+  customer_id: string;
+  line_id: string;
+  firstname: string;
+  lastname: string;
+  stats: {
+    totalContracts: number;
+    activeContracts: number;
+    endedContracts: number;
   };
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError(null);
+interface RegisterFormData {
+  firstname: string;
+  lastname: string;
+  phoneNumber: string;
+  nationalId: string;
+  address: {
+    houseNo: string;
+    village: string;
+    street: string;
+    subDistrict: string;
+    district: string;
+    province: string;
+    country: string;
+    postcode: string;
+  };
+}
 
-    try {
-      if (!profile?.userId) {
-        throw new Error('LINE profile not found');
+export default function PawnerRegister() {
+  const { profile, isLoading: liffLoading } = useLiff();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [pawnerData, setPawnerData] = useState<PawnerData | null>(null);
+  const [formData, setFormData] = useState<RegisterFormData>({
+    firstname: '',
+    lastname: '',
+    phoneNumber: '',
+    nationalId: '',
+    address: {
+      houseNo: '',
+      village: '',
+      street: '',
+      subDistrict: '',
+      district: '',
+      province: '',
+      country: 'Thailand',
+      postcode: ''
+    }
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Check if user exists in database
+  useEffect(() => {
+    const checkUser = async () => {
+      if (!profile?.userId) return;
+
+      try {
+        const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
+        if (response.data.exists) {
+          setPawnerData(response.data.pawner);
+        }
+      } catch (error) {
+        console.error('Error checking pawner:', error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const response = await axios.post('/api/users/register', {
-        lineId: profile.userId,
-        title: formData.title,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone,
-        idNumber: formData.idNumber,
+    if (profile?.userId) {
+      checkUser();
+    }
+  }, [profile?.userId]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    
+    if (name.startsWith('addr_')) {
+      const addressField = name.replace('addr_', '');
+      setFormData(prev => ({
+        ...prev,
         address: {
-          houseNumber: formData.houseNumber,
-          village: formData.village,
-          street: formData.street,
-          subDistrict: formData.subDistrict,
-          district: formData.district,
-          province: formData.province,
-          country: 'ประเทศไทย',
-          postcode: formData.postcode,
-        },
-      });
-
-      if (response.data.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          if (window.liff) {
-            window.liff.closeWindow();
-          }
-        }, 2000);
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
-    } finally {
-      setIsSubmitting(false);
+          ...prev.address,
+          [addressField]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     }
   };
 
-  if (isLoading) {
+  const handleSubmit = async () => {
+    if (!profile?.userId) {
+      setError('กรุณาเข้าสู่ระบบ LINE');
+      return;
+    }
+
+    // Validation
+    if (!formData.firstname || !formData.lastname || !formData.phoneNumber || !formData.nationalId) {
+      setError('กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await axios.post('/api/pawners/register', {
+        lineId: profile.userId,
+        ...formData
+      });
+
+      if (response.data.success) {
+        // Redirect to eKYC page
+        router.push(`/ekyc?customerId=${response.data.pawner.customer_id}`);
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการลงทะเบียน');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (liffLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
       </div>
     );
   }
 
-  if (liffError) {
+  // If user exists, show profile page
+  if (pawnerData) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{liffError}</p>
+      <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center">
+        
+        {/* Member Card Container */}
+        <div className="w-full max-w-sm bg-[#F9EFE6] rounded-3xl p-6 pt-10 pb-8 shadow-sm mb-6 relative mt-4">
+          
+          {/* Inner White Card (Profile Info) */}
+          <div className="bg-white rounded-2xl p-6 text-center shadow-sm mb-6 mx-2">
+            <h1 className="text-lg font-bold text-gray-800 mb-1">
+              {pawnerData.firstname} {pawnerData.lastname}
+            </h1>
+            <p className="text-gray-400 text-xs font-light">
+              Member ID: {pawnerData.customer_id.substring(0, 8)}
+            </p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-3 gap-2 text-center divide-x divide-[#E0C8B6]">
+            <div className="px-1">
+              <div className="text-xl font-bold text-gray-700 mb-1">
+                {pawnerData.stats.totalContracts}
+              </div>
+              <div className="text-[10px] text-gray-600 font-medium">
+                สัญญาทั้งหมด
+              </div>
+            </div>
+
+            <div className="px-1">
+              <div className="text-xl font-bold text-gray-700 mb-1">
+                {pawnerData.stats.activeContracts}
+              </div>
+              <div className="text-[10px] text-gray-600 font-medium">
+                สัญญายังไม่สิ้นสุด
+              </div>
+            </div>
+
+            <div className="px-1">
+              <div className="text-xl font-bold text-gray-700 mb-1">
+                {pawnerData.stats.endedContracts}
+              </div>
+              <div className="text-[10px] text-gray-600 font-medium">
+                สัญญาสิ้นสุดแล้ว
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Action Buttons */}
+        <div className="w-full max-w-sm space-y-3">
+          
+          {/* Pawn Entry Button */}
+          <button 
+            onClick={() => router.push('/estimate')}
+            className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+          >
+            <span className="text-base font-bold">จำนำสินค้า</span>
+            <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
+          </button>
+
+          {/* Contract List Button */}
+          <button 
+            onClick={() => router.push('/pawner/list-item')}
+            className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+          >
+            <span className="text-base font-bold">รายการจำนำ</span>
+            <span className="text-[10px] opacity-80 font-light">Contract list</span>
+          </button>
+
+        </div>
+
       </div>
     );
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 max-w-md text-center">
-          <div className="text-green-600 text-5xl mb-4">✓</div>
-          <h2 className="text-green-800 font-semibold text-lg mb-2">สมัครสมาชิกสำเร็จ!</h2>
-          <p className="text-green-600">กำลังปิดหน้าต่าง...</p>
-        </div>
-      </div>
-    );
-  }
+  // If user doesn't exist, show registration form
+  return <RegisterForm 
+    formData={formData} 
+    handleInputChange={handleInputChange}
+    handleSubmit={handleSubmit}
+    submitting={submitting}
+    error={error}
+  />;
+}
 
+// Helper Component for Register Form Fields
+const RegisterField = ({ 
+  labelEn, 
+  labelTh, 
+  placeholder, 
+  value, 
+  onChange, 
+  name,
+  type = "text" 
+}: {
+  labelEn: string;
+  labelTh: string;
+  placeholder: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  name: string;
+  type?: string;
+}) => (
+  <div className="mb-4">
+    <div className="mb-1">
+      <div className="text-gray-800 font-bold text-sm md:text-base">{labelEn}</div>
+      <div className="text-gray-500 text-xs font-light">{labelTh}</div>
+    </div>
+    <input
+      type={type}
+      name={name}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800"
+    />
+  </div>
+);
+
+function RegisterForm({ 
+  formData, 
+  handleInputChange, 
+  handleSubmit, 
+  submitting, 
+  error 
+}: {
+  formData: RegisterFormData;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSubmit: () => void;
+  submitting: boolean;
+  error: string | null;
+}) {
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">สมัครสมาชิก Pawn360</h1>
+    <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 flex justify-center">
+      <div className="w-full max-w-md pb-20">
+        
+        {/* Personal Info Group */}
+        <div className="space-y-1">
+          <RegisterField
+            labelEn="First name"
+            labelTh="ชื่อจริง"
+            placeholder="ชื่อจริง"
+            name="firstname"
+            value={formData.firstname}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Last name"
+            labelTh="นามสกุล"
+            placeholder="นามสกุล"
+            name="lastname"
+            value={formData.lastname}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Phone number"
+            labelTh="เบอร์โทรศัพท์"
+            placeholder="000-000-0000"
+            name="phoneNumber"
+            type="tel"
+            value={formData.phoneNumber}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="ID"
+            labelTh="เลขบัตรประชาชน 13 หลัก"
+            placeholder="X-XXXX-XXXXX-XX-X"
+            name="nationalId"
+            value={formData.nationalId}
+            onChange={handleInputChange}
+          />
+        </div>
 
+        <div className="h-px bg-gray-300 my-6"></div>
+
+        {/* Address Header */}
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-gray-800">Address</h2>
+          <p className="text-gray-500 text-xs">ที่อยู่</p>
+        </div>
+
+        {/* Address Fields Group */}
+        <div className="space-y-1">
+          <RegisterField
+            labelEn="Address (เลขที่)"
+            labelTh=""
+            placeholder="บ้านเลขที่"
+            name="addr_houseNo"
+            value={formData.address.houseNo}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Village/Building (หมู่บ้าน/อาคาร)"
+            labelTh=""
+            placeholder="ชื่อหมู่บ้าน/อาคาร"
+            name="addr_village"
+            value={formData.address.village}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Street (ตรอก/ซอย/ถนน)"
+            labelTh=""
+            placeholder="ถนน/ตรอก/ซอย"
+            name="addr_street"
+            value={formData.address.street}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Sub-district (แขวง/ตำบล)"
+            labelTh=""
+            placeholder="แขวง/ตำบล"
+            name="addr_subDistrict"
+            value={formData.address.subDistrict}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="District (เขต/อำเภอ)"
+            labelTh=""
+            placeholder="เขต/อำเภอ"
+            name="addr_district"
+            value={formData.address.district}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Province (จังหวัด)"
+            labelTh=""
+            placeholder="จังหวัด"
+            name="addr_province"
+            value={formData.address.province}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Country (ประเทศ)"
+            labelTh=""
+            placeholder="ประเทศ"
+            name="addr_country"
+            value={formData.address.country}
+            onChange={handleInputChange}
+          />
+          <RegisterField
+            labelEn="Postcode (รหัสไปรษณีย์)"
+            labelTh=""
+            placeholder="XXXXX"
+            name="addr_postcode"
+            value={formData.address.postcode}
+            onChange={handleInputChange}
+          />
+        </div>
+
+        {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600">{error}</p>
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Personal Information */}
-          <div>
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">ข้อมูลส่วนตัว</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">คำนำหน้า</label>
-                <select
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="นาย">นาย</option>
-                  <option value="นาง">นาง</option>
-                  <option value="นางสาว">นางสาว</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ชื่อ</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">นามสกุล</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Contact Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">เบอร์โทรศัพท์</label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="0812345678"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">เลขบัตรประชาชน</label>
-              <input
-                type="text"
-                name="idNumber"
-                value={formData.idNumber}
-                onChange={handleChange}
-                placeholder="1234567890123"
-                maxLength={13}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Address */}
-          <div>
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">ที่อยู่</h2>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">บ้านเลขที่</label>
-                  <input
-                    type="text"
-                    name="houseNumber"
-                    value={formData.houseNumber}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">หมู่บ้าน (ถ้ามี)</label>
-                  <input
-                    type="text"
-                    name="village"
-                    value={formData.village}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">ถนน (ถ้ามี)</label>
-                <input
-                  type="text"
-                  name="street"
-                  value={formData.street}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">ตำบล/แขวง</label>
-                  <input
-                    type="text"
-                    name="subDistrict"
-                    value={formData.subDistrict}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">อำเภอ/เขต</label>
-                  <input
-                    type="text"
-                    name="district"
-                    value={formData.district}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">จังหวัด</label>
-                  <input
-                    type="text"
-                    name="province"
-                    value={formData.province}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">รหัสไปรษณีย์</label>
-                  <input
-                    type="text"
-                    name="postcode"
-                    value={formData.postcode}
-                    onChange={handleChange}
-                    placeholder="10110"
-                    maxLength={5}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        {/* Submit Button */}
+        <div className="mt-8 mb-4">
+          <button 
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'กำลังสมัคร...' : 'ยืนยันการสมัคร'}
+            <span className="text-base font-bold">
+              {submitting ? 'กำลังบันทึก...' : 'ดำเนินการต่อ'}
+            </span>
+            {!submitting && (
+              <span className="text-[10px] font-light opacity-90">Continue</span>
+            )}
           </button>
-        </form>
+        </div>
+
       </div>
     </div>
   );
