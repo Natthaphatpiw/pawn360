@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
 import liff from '@line/liff';
@@ -31,24 +31,14 @@ interface Contract {
   };
 }
 
-export default function ContractActionsPage({ params }: { params: Promise<{ contractId: string }> }) {
-  const [contractId, setContractId] = useState<string>('');
-
+export default function ContractActionsPage({ params }: { params: { contractId: string } }) {
+  const { contractId } = params;
   const router = useRouter();
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [lineUserId, setLineUserId] = useState<string>('');
-  const [resolvedContractId, setResolvedContractId] = useState<string>('');
-
-  useEffect(() => {
-    const getParams = async () => {
-      const resolvedParams = await params;
-      setResolvedContractId(resolvedParams.contractId);
-    };
-    getParams();
-  }, [params]);
 
   useEffect(() => {
     const initializeLiff = async () => {
@@ -71,7 +61,7 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
     const fetchContract = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/contracts/${resolvedContractId}`);
+        const response = await axios.get(`/api/contracts/${contractId}`);
         if (response.data.success) {
           setContract(response.data.contract);
         }
@@ -82,11 +72,11 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
       }
     };
 
-    if (resolvedContractId) {
+    if (contractId) {
       initializeLiff();
       fetchContract();
     }
-  }, [resolvedContractId]);
+  }, [contractId]);
 
   const handleAction = async (actionType: string) => {
     if (!lineUserId) {

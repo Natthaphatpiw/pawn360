@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
 
@@ -62,16 +62,8 @@ interface ContractData {
   total: number;
 }
 
-export default function ContractInfoPage({ params }: { params: Promise<{ itemId: string }> }) {
-  const [itemId, setItemId] = useState<string>('');
-
-  useEffect(() => {
-    const getParams = async () => {
-      const resolvedParams = await params;
-      setItemId(resolvedParams.itemId);
-    };
-    getParams();
-  }, [params]);
+export default function ContractInfoPage({ params }: { params: { itemId: string } }) {
+  const { itemId } = params;
   const router = useRouter();
 
   const [item, setItem] = useState<Item | null>(null);
@@ -88,9 +80,6 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
 
         // Fetch item and customer data
         const response = await axios.get(`/api/pawn-requests/${itemId}`);
-        if (!response.data) {
-          throw new Error('ไม่พบข้อมูลคำขอจำนำ');
-        }
         setItem(response.data.item);
         setCustomer(response.data.customer);
 

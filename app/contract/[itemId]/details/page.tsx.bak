@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
+import Image from 'next/image';
 
 const sarabun = Sarabun({
   subsets: ['latin'],
@@ -62,16 +63,8 @@ interface ContractData {
   total: number;
 }
 
-export default function ContractInfoPage({ params }: { params: Promise<{ itemId: string }> }) {
-  const [itemId, setItemId] = useState<string>('');
-
-  useEffect(() => {
-    const getParams = async () => {
-      const resolvedParams = await params;
-      setItemId(resolvedParams.itemId);
-    };
-    getParams();
-  }, [params]);
+export default function ContractDetailsPage({ params }: { params: { itemId: string } }) {
+  const { itemId } = params;
   const router = useRouter();
 
   const [item, setItem] = useState<Item | null>(null);
@@ -80,6 +73,7 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [remainingDays, setRemainingDays] = useState<number>(0);
+  const [liffReady, setLiffReady] = useState(false);
 
   useEffect(() => {
     const fetchContractData = async () => {
@@ -88,9 +82,6 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
 
         // Fetch item and customer data
         const response = await axios.get(`/api/pawn-requests/${itemId}`);
-        if (!response.data) {
-          throw new Error('ไม่พบข้อมูลคำขอจำนำ');
-        }
         setItem(response.data.item);
         setCustomer(response.data.customer);
 
@@ -98,10 +89,9 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
         const itemData = response.data.item;
         const customerData = response.data.customer;
 
-        // ใช้ข้อมูลจาก confirmationNewContract ถ้ามี (เป็นข้อมูลที่ถูกแก้ไขแล้ว)
-        const price = itemData.confirmationNewContract?.pawnPrice || itemData.desiredAmount || itemData.estimatedValue || 0;
-        const interestRate = itemData.confirmationNewContract?.interestRate || itemData.interestRate || 10;
-        const periodDays = itemData.confirmationNewContract?.loanDays || itemData.loanDays || 30;
+        const price = itemData.desiredAmount || itemData.estimatedValue || 0;
+        const interestRate = itemData.interestRate || 10;
+        const periodDays = itemData.loanDays || 30;
         const dailyRate = interestRate / 100 / 30;
         const interest = Math.round(price * dailyRate * periodDays);
 
@@ -144,6 +134,60 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
     }
   }, [itemId]);
 
+  useEffect(() => {
+    // Initialize LIFF (optional - for QR scan feature)
+    const initLiff = async () => {
+      console.log('Initializing LIFF for contract details (optional)...');
+      try {
+        if (typeof window !== 'undefined' && window.liff) {
+          console.log('LIFF object found, initializing...');
+          await window.liff.init({ liffId: '2008216710-gn6BwQjo' });
+          console.log('LIFF initialized successfully');
+
+          if (window.liff.isLoggedIn()) {
+            console.log('User is logged in to LIFF');
+            setLiffReady(true);
+          } else {
+            console.log('User is not logged in - QR scan will not be available');
+            setLiffReady(false);
+          }
+        } else {
+          console.error('LIFF object not found - QR scan will not be available');
+          setLiffReady(false);
+        }
+      } catch (error) {
+        console.error('LIFF initialization failed - QR scan will not be available:', error);
+        setLiffReady(false);
+      }
+    };
+
+    initLiff();
+  }, []);
+
+  const handleScan = async () => {
+    if (!liffReady || !window.liff) {
+      alert('LIFF ยังไม่พร้อมใช้งาน');
+      return;
+    }
+
+    try {
+      const result = await window.liff.scanCodeV2();
+      alert(`สแกนสำเร็จ: ${result.value}`);
+      // Handle scan result here
+    } catch (error) {
+      console.error('Scan failed:', error);
+      alert('เกิดข้อผิดพลาดในการสแกน');
+    }
+  };
+
+  const handleClose = () => {
+    if (liffReady && window.liff) {
+      window.liff.closeWindow();
+    } else {
+      router.back();
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -162,10 +206,10 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
           <div className="text-red-500 text-xl mb-4">❌</div>
           <p className="text-gray-600">{error || 'ไม่พบข้อมูลสัญญา'}</p>
           <button
-            onClick={() => router.back()}
+            onClick={handleClose}
             className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg"
           >
-            ย้อนกลับ
+            ปิด
           </button>
         </div>
       </div>
@@ -178,7 +222,7 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <button
-            onClick={() => router.back()}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 text-xl"
           >
             ✕
@@ -259,18 +303,19 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
           </div>
         </div>
 
-        {/* Close Button */}
+        {/* Scan Button */}
         <button
-          onClick={() => router.back()}
-          className="w-full py-4 px-6 rounded-lg font-medium text-white text-lg"
+          onClick={handleScan}
+          disabled={!liffReady}
+          className="w-full py-4 px-6 rounded-lg font-medium text-white text-lg disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ backgroundColor: '#0A4215' }}
         >
-          ปิด
+          {liffReady ? 'แสกน QR Code' : 'กำลังโหลด...'}
         </button>
 
         {/* Footer Note */}
         <div className="text-center mt-4 text-xs text-gray-500">
-          ข้อมูลสัญญาจำนำ
+          แสกน QR Code เพื่อตรวจสอบข้อมูล
         </div>
       </div>
     </div>

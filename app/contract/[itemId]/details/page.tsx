@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
 import Image from 'next/image';
@@ -63,8 +63,16 @@ interface ContractData {
   total: number;
 }
 
-export default function ContractDetailsPage({ params }: { params: { itemId: string } }) {
-  const { itemId } = params;
+export default function ContractDetailsPage({ params }: { params: Promise<{ itemId: string }> }) {
+  const [itemId, setItemId] = useState<string>('');
+
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setItemId(resolvedParams.itemId);
+    };
+    getParams();
+  }, [params]);
   const router = useRouter();
 
   const [item, setItem] = useState<Item | null>(null);

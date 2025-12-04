@@ -1,20 +1,44 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 
 export default function EKYCPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const customerId = searchParams.get('customerId');
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+
+  // Get customer ID from pawner data
+  useEffect(() => {
+    const getCustomerId = async () => {
+      if (!profile?.userId) return;
+
+      try {
+        const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
+        if (response.data.exists) {
+          setCustomerId(response.data.pawner.customer_id);
+        } else {
+          router.push('/register');
+        }
+      } catch (error) {
+        console.error('Error getting customer ID:', error);
+        router.push('/register');
+      }
+    };
+
+    if (profile?.userId) {
+      getCustomerId();
+    }
+  }, [profile?.userId, router]);
 
   const handleStartKYC = async () => {
     if (!customerId) {
-      setError('ไม่พบข้อมูลลูกค้า');
+      setError('ไม่พบข้อมูลลูกค้า กรุณาลงทะเบียนก่อน');
       return;
     }
 
@@ -39,6 +63,17 @@ export default function EKYCPage() {
       setLoading(false);
     }
   };
+
+  if (liffLoading || !customerId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C0562F] mx-auto"></div>
+          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6">

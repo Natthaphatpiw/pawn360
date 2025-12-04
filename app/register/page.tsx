@@ -123,7 +123,7 @@ export default function PawnerRegister() {
 
       if (response.data.success) {
         // Redirect to eKYC page
-        router.push(`/ekyc?customerId=${response.data.pawner.customer_id}`);
+        router.push('/ekyc');
       }
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -194,8 +194,8 @@ export default function PawnerRegister() {
         <div className="w-full max-w-sm space-y-3">
           
           {/* Pawn Entry Button */}
-          <button 
-            onClick={() => router.push('/estimate')}
+          <button
+            onClick={() => router.push('/pawn')}
             className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
           >
             <span className="text-base font-bold">จำนำสินค้า</span>
