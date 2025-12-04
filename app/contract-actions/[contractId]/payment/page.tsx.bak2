@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import Image from 'next/image';
 
@@ -25,15 +25,8 @@ interface Contract {
 }
 
 export default function PaymentPage({ params }: { params: Promise<{ contractId: string }> }) {
-  const [contractId, setContractId] = useState<string>('');
-
-  useEffect(() => {
-    const getParams = async () => {
-      const resolvedParams = await params;
-      setContractId(resolvedParams.contractId);
-    };
-    getParams();
-  }, [params]);
+  const params = await params;
+  const { contractId } = params;
   const router = useRouter();
   const searchParams = useSearchParams();
   const actionType = searchParams.get('action') || 'redeem';
@@ -53,9 +46,6 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
       try {
         setLoading(true);
         const response = await axios.get(`/api/contracts/${contractId}`);
-        if (!response.data) {
-          throw new Error('ไม่พบข้อมูลสัญญา');
-        }
         if (response.data.success) {
           setContract(response.data.contract);
         }

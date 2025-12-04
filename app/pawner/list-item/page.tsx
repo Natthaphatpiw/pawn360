@@ -170,12 +170,12 @@ export default function PawnerContractList() {
         </button>
         
         {/* Contract List Button (Active State) */}
-        <button 
+        <button
           onClick={() => router.push('/register')}
           className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
         >
-          <span className="text-base font-bold">กลับหน้าหลัก</span>
-          <span className="text-[10px] opacity-80 font-light">Back to home</span>
+          <span className="text-base font-bold">หน้าหลัก</span>
+          <span className="text-[10px] opacity-80 font-light">Home</span>
         </button>
       </div>
 
