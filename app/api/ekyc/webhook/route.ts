@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { Client } from '@line/bot-sdk';
 import crypto from 'crypto';
+
+const lineClient = new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
+});
 
 // Verify webhook signature (if UpPass provides signature header)
 function verifyWebhookSignature(payload: string, signature: string | null): boolean {
@@ -65,11 +71,16 @@ export async function POST(request: NextRequest) {
       let dbStatus = 'PENDING';
       let rejectionReason = null;
 
-      if (kycStatus === 'accepted') {
+      // UpPass sends: status: "complete", other_status.ekyc: "pass"/"fail"
+      if (kycStatus === 'complete' && ekycStatus === 'pass') {
         dbStatus = 'VERIFIED';
+      } else if (kycStatus === 'complete' && ekycStatus === 'fail') {
+        dbStatus = 'REJECTED';
+        rejectionReason = 'eKYC verification failed';
+      } else if (kycStatus === 'accepted') {
+        dbStatus = 'VERIFIED'; // Legacy support
       } else if (kycStatus === 'rejected') {
         dbStatus = 'REJECTED';
-        // Extract rejection reason from eKYC status or other fields
         if (ekycStatus) {
           rejectionReason = `eKYC Status: ${ekycStatus}`;
         }
@@ -126,13 +137,10 @@ export async function POST(request: NextRequest) {
 
         if (message) {
           try {
-            await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/line/notify`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lineId: pawner.line_id,
-                message
-              })
+            // Send LINE message directly using LINE Bot SDK
+            await lineClient.pushMessage(pawner.line_id, {
+              type: 'text',
+              text: message
             });
             console.log(`📱 LINE notification sent to ${pawner.line_id}`);
           } catch (notifyError) {
@@ -176,13 +184,9 @@ export async function POST(request: NextRequest) {
         // Notify user
         if (pawner?.line_id) {
           try {
-            await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/line/notify`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lineId: pawner.line_id,
-                message: `❌ การยืนยันตัวตนไม่สำเร็จ\n\nครบจำนวนครั้งที่พยายามแล้ว\nกรุณาติดต่อฝ่ายสนับสนุน`
-              })
+            await lineClient.pushMessage(pawner.line_id, {
+              type: 'text',
+              text: `❌ การยืนยันตัวตนไม่สำเร็จ\n\nครบจำนวนครั้งที่พยายามแล้ว\nกรุณาติดต่อฝ่ายสนับสนุน`
             });
           } catch (error) {
             console.error('Failed to send notification:', error);
