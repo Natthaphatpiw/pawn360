@@ -35,7 +35,7 @@ interface RegisterFormData {
 }
 
 export default function PawnerRegister() {
-  const { profile, isLoading: liffLoading } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [pawnerData, setPawnerData] = useState<PawnerData | null>(null);
@@ -60,9 +60,24 @@ export default function PawnerRegister() {
 
   // Check if user exists in database and KYC status
   useEffect(() => {
-    const checkUser = async () => {
-      if (!profile?.userId) return;
+    // Wait for LIFF to finish loading first
+    if (liffLoading) return;
 
+    // If LIFF failed, stop the spinner and show an error
+    if (liffError) {
+      setError('ไม่สามารถเชื่อมต่อ LINE LIFF ได้ กรุณาลองใหม่อีกครั้ง');
+      setLoading(false);
+      return;
+    }
+
+    // If LIFF finished but no profile (opened outside LIFF), stop spinner
+    if (!profile?.userId) {
+      setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE LIFF');
+      setLoading(false);
+      return;
+    }
+
+    const checkUser = async () => {
       try {
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
         if (response.data.exists) {
@@ -89,10 +104,8 @@ export default function PawnerRegister() {
       }
     };
 
-    if (profile?.userId) {
-      checkUser();
-    }
-  }, [profile?.userId, router]);
+    checkUser();
+  }, [liffLoading, liffError, profile?.userId, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
