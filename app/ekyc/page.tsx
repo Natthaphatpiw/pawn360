@@ -10,6 +10,7 @@ export default function EKYCPage() {
   const { profile, isLoading: liffLoading } = useLiff();
 
   const [loading, setLoading] = useState(false);
+  const [checkingCustomer, setCheckingCustomer] = useState(true); // New state for initial check
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
@@ -17,8 +18,13 @@ export default function EKYCPage() {
   // Get customer ID and check KYC status
   useEffect(() => {
     const checkCustomer = async () => {
-      if (!profile?.userId) return;
+      if (!profile?.userId) {
+        setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE LIFF');
+        setCheckingCustomer(false);
+        return;
+      }
 
+      setCheckingCustomer(true);
       try {
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
         if (response.data.exists) {
@@ -42,13 +48,15 @@ export default function EKYCPage() {
       } catch (error) {
         console.error('Error getting customer ID:', error);
         setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+      } finally {
+        setCheckingCustomer(false);
       }
     };
 
-    if (profile?.userId) {
+    if (!liffLoading && profile?.userId) {
       checkCustomer();
     }
-  }, [profile?.userId, router]);
+  }, [profile?.userId, router, liffLoading]);
 
   const handleStartKYC = async () => {
     if (!customerId) {
@@ -79,7 +87,8 @@ export default function EKYCPage() {
     }
   };
 
-  if (liffLoading || !customerId) {
+  // Show loading when LIFF is loading or checking customer
+  if (liffLoading || checkingCustomer) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -88,6 +97,31 @@ export default function EKYCPage() {
         </div>
       </div>
     );
+  }
+
+  // Show error state if no customer ID after loading completes
+  if (!customerId && error) {
+    return (
+      <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
+        <div className="w-full max-w-md">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-6">
+            <p className="text-red-600">{error}</p>
+          </div>
+          <button
+            onClick={() => router.push('/register')}
+            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white font-bold py-4 rounded-2xl transition-all"
+          >
+            กลับไปหน้าลงทะเบียน
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If still no customerId after all checks, redirect to register
+  if (!customerId) {
+    router.push('/register');
+    return null;
   }
 
   return (
