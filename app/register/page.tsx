@@ -72,14 +72,19 @@ export default function PawnerRegister() {
 
     // If LIFF finished but no profile (opened outside LIFF), stop spinner
     if (!profile?.userId) {
+      console.log('Profile or userId not found:', { profile, userId: profile?.userId });
       setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE LIFF');
       setLoading(false);
       return;
     }
 
+    console.log('Profile found, checking user with lineId:', profile.userId);
+
     const checkUser = async () => {
       try {
+        console.log('Calling API /api/pawners/check with lineId:', profile.userId);
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
+        console.log('API response:', response.data);
         if (response.data.exists) {
           const pawner = response.data.pawner;
 
@@ -97,8 +102,9 @@ export default function PawnerRegister() {
             return;
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error checking pawner:', error);
+        setError('เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้ กรุณาลองใหม่อีกครั้ง');
       } finally {
         setLoading(false);
       }

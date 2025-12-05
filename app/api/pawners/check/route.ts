@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error && error.code !== 'PGRST116') {
+      console.error('Database error:', error);
       throw error;
     }
 

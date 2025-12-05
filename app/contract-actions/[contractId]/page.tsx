@@ -71,7 +71,7 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
     const fetchContract = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/contracts/${resolvedContractId}`);
+        const response = await axios.get(`/api/pawners/contract/${resolvedContractId}`);
         if (response.data.success) {
           setContract(response.data.contract);
         }

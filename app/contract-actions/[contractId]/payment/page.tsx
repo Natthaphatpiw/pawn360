@@ -52,7 +52,7 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
     const fetchContract = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/contracts/${contractId}`);
+        const response = await axios.get(`/api/pawners/contract/${contractId}`);
         if (!response.data) {
           throw new Error('ไม่พบข้อมูลสัญญา');
         }
