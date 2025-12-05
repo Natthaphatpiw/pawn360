@@ -37,7 +37,7 @@ export default function IncreasePrincipalPage() {
     const fetchContract = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/contracts/${contractId}`);
+        const response = await axios.get(`/api/pawners/contract/${contractId}`);
         if (response.data.success) {
           setContract(response.data.contract);
         }
