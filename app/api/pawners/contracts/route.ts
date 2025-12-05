@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       const item = Array.isArray(contract.items) ? contract.items[0] : contract.items;
       const brand = item && typeof item === 'object' && 'brand' in item ? item.brand : '';
       const model = item && typeof item === 'object' && 'model' in item ? item.model : '';
-
+      
       return {
         contract_id: contract.contract_id,
         contract_number: contract.contract_number,

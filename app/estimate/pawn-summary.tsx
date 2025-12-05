@@ -44,6 +44,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const [duration, setDuration] = useState<string>('30');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -66,11 +67,20 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const checkRegistration = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get(`/api/pawner/check-registration?lineId=${lineId}`);
-      setIsRegistered(response.data.isRegistered);
+      const response = await axios.get(`/api/pawners/check?lineId=${lineId}`);
+
+      if (response.data.exists) {
+        const status = response.data.pawner.kyc_status;
+        setKycStatus(status);
+        setIsRegistered(status === 'VERIFIED');
+      } else {
+        setIsRegistered(false);
+        setKycStatus(null);
+      }
     } catch (error) {
       console.error('Error checking registration:', error);
       setIsRegistered(false);
+      setKycStatus(null);
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +167,11 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   };
 
   const handleRegister = () => {
-    window.location.href = '/pawner/register';
+    if (kycStatus && kycStatus !== 'VERIFIED') {
+      window.location.href = '/ekyc';
+    } else {
+      window.location.href = '/register';
+    }
   };
 
   if (isLoading) {
@@ -364,14 +378,18 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
             <span className="text-[10px] font-light opacity-90">Continue</span>
           </button>
 
-          {/* Register - Only show if not registered */}
+          {/* Register / Verify - Only show if not verified */}
           {!isRegistered && (
             <button
               onClick={handleRegister}
               className="w-full bg-[#C97C5D] hover:bg-[#B85C38] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-all active:scale-[0.98]"
             >
-              <span className="text-base font-bold">ลงทะเบียน</span>
-              <span className="text-[10px] font-light opacity-90">Register</span>
+              <span className="text-base font-bold">
+                {kycStatus ? 'ยืนยันตัวตน' : 'ลงทะเบียน'}
+              </span>
+              <span className="text-[10px] font-light opacity-90">
+                {kycStatus ? 'Verify identity' : 'Register'}
+              </span>
             </button>
           )}
 
@@ -394,11 +412,14 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           </button>
         </div>
 
-        {/* Warning message if not registered */}
+        {/* Warning message if not registered or not verified */}
         {!isRegistered && (
           <div className="mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
             <p className="text-sm text-yellow-800">
-              <span className="font-semibold">หมายเหตุ:</span> คุณยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อนดำเนินการต่อ
+              <span className="font-semibold">หมายเหตุ:</span>{' '}
+              {kycStatus
+                ? 'บัญชีของคุณยังไม่ผ่านการยืนยันตัวตน กรุณายืนยันก่อนทำรายการ'
+                : 'คุณยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อนดำเนินการต่อ'}
             </p>
           </div>
         )}
