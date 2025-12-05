@@ -10,6 +10,7 @@ interface PawnerData {
   line_id: string;
   firstname: string;
   lastname: string;
+  kyc_status: string;
   stats: {
     totalContracts: number;
     activeContracts: number;
@@ -60,47 +61,27 @@ export default function PawnerRegister() {
 
   // Check if user exists in database and KYC status
   useEffect(() => {
-    // Wait for LIFF to finish loading first
     if (liffLoading) return;
 
-    // If LIFF failed, stop the spinner and show an error
     if (liffError) {
       setError('ไม่สามารถเชื่อมต่อ LINE LIFF ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
       return;
     }
 
-    // If LIFF finished but no profile (opened outside LIFF), stop spinner
     if (!profile?.userId) {
-      console.log('Profile or userId not found:', { profile, userId: profile?.userId });
       setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE LIFF');
       setLoading(false);
       return;
     }
 
-    console.log('Profile found, checking user with lineId:', profile.userId);
-
     const checkUser = async () => {
       try {
-        console.log('Calling API /api/pawners/check with lineId:', profile.userId);
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
-        console.log('API response:', response.data);
         if (response.data.exists) {
           const pawner = response.data.pawner;
-
-          // Check KYC status
-          if (pawner.kyc_status === 'VERIFIED') {
-            // User is fully registered and verified - show profile
-            setPawnerData(response.data.pawner);
-          } else if (pawner.kyc_status === 'PENDING') {
-            // User is waiting for KYC verification - redirect to waiting page
-            router.push('/ekyc/waiting');
-            return;
-          } else {
-            // User registered but not started/completed KYC - redirect to eKYC
-            router.push('/ekyc');
-            return;
-          }
+          // Always show profile; UI will gate actions by kyc_status
+          setPawnerData(pawner);
         }
       } catch (error: any) {
         console.error('Error checking pawner:', error);
@@ -111,7 +92,7 @@ export default function PawnerRegister() {
     };
 
     checkUser();
-  }, [liffLoading, liffError, profile?.userId, router]);
+  }, [liffLoading, liffError, profile?.userId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -225,7 +206,7 @@ export default function PawnerRegister() {
 
         {/* Action Buttons */}
         <div className="w-full max-w-sm space-y-3">
-          
+
           {/* Pawn Entry Button */}
           <button
             onClick={() => router.push('/estimate')}
@@ -236,13 +217,30 @@ export default function PawnerRegister() {
           </button>
 
           {/* Contract List Button */}
-          <button 
+          <button
             onClick={() => router.push('/pawner/list-item')}
             className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
             <span className="text-base font-bold">รายการจำนำ</span>
             <span className="text-[10px] opacity-80 font-light">Contract list</span>
           </button>
+
+          {/* Verify Identity Button - show when not VERIFIED */}
+          {pawnerData.kyc_status !== 'VERIFIED' && (
+            <button
+              onClick={() => {
+                if (pawnerData.kyc_status === 'PENDING') {
+                  router.push('/ekyc/waiting');
+                } else {
+                  router.push('/ekyc');
+                }
+              }}
+              className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+            >
+              <span className="text-base font-bold">ยืนยันตัวตน</span>
+              <span className="text-[10px] opacity-80 font-light">Verify identity</span>
+            </button>
+          )}
 
         </div>
 
