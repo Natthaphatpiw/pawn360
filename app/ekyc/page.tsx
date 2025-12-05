@@ -12,27 +12,41 @@ export default function EKYCPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
 
-  // Get customer ID from pawner data
+  // Get customer ID and check KYC status
   useEffect(() => {
-    const getCustomerId = async () => {
+    const checkCustomer = async () => {
       if (!profile?.userId) return;
 
       try {
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
         if (response.data.exists) {
-          setCustomerId(response.data.pawner.customer_id);
+          const pawner = response.data.pawner;
+          setCustomerId(pawner.customer_id);
+          setKycStatus(pawner.kyc_status);
+
+          // Redirect based on KYC status
+          if (pawner.kyc_status === 'VERIFIED') {
+            // Already verified - go to register page
+            router.push('/register');
+          } else if (pawner.kyc_status === 'PENDING') {
+            // Waiting for verification - go to waiting page
+            router.push('/ekyc/waiting');
+          }
+          // else stay on this page (NOT_VERIFIED or REJECTED)
         } else {
+          // Not registered - go to register
           router.push('/register');
         }
       } catch (error) {
         console.error('Error getting customer ID:', error);
-        router.push('/register');
+        setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
       }
     };
 
     if (profile?.userId) {
-      getCustomerId();
+      checkCustomer();
     }
   }, [profile?.userId, router]);
 
@@ -53,6 +67,7 @@ export default function EKYCPage() {
 
       if (response.data.success && response.data.url) {
         // 2. Redirect to UpPass verification page
+        // User will be redirected back after completing eKYC
         window.location.href = response.data.url;
       } else {
         throw new Error('Failed to get verification URL');
@@ -66,7 +81,7 @@ export default function EKYCPage() {
 
   if (liffLoading || !customerId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C0562F] mx-auto"></div>
           <p className="mt-4 text-gray-600">กำลังโหลด...</p>
@@ -76,36 +91,75 @@ export default function EKYCPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-6">
-      <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-gray-100">
-        <div className="mb-6">
-          <div className="w-20 h-20 bg-[#F9EFE6] rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
+      <div className="w-full max-w-md">
+
+        {/* Icon */}
+        <div className="flex justify-center mb-6">
+          <div className="w-20 h-20 bg-[#F9EFE6] rounded-full flex items-center justify-center">
             <svg className="w-10 h-10 text-[#C0562F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold mb-2 text-gray-800">ยืนยันตัวตน (eKYC)</h1>
-          <p className="text-gray-500 mb-8 text-sm">
-            กรุณาเตรียมบัตรประชาชนเพื่อทำการยืนยันตัวตน <br />
-            สำหรับการใช้งานระบบจำนำ P2P
-          </p>
         </div>
 
+        {/* Title */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">ยืนยันตัวตน</h1>
+          <p className="text-sm text-gray-500">Identity Verification (eKYC)</p>
+        </div>
+
+        {/* Instructions */}
+        <div className="bg-[#F9EFE6] rounded-2xl p-6 mb-6">
+          <h2 className="font-bold text-gray-800 mb-3">กรุณาเตรียม:</h2>
+          <ul className="space-y-2 text-sm text-gray-700">
+            <li className="flex items-start">
+              <span className="text-[#C0562F] mr-2">•</span>
+              <span>บัตรประชาชนตัวจริง (ไม่ใช่สำเนา)</span>
+            </li>
+            <li className="flex items-start">
+              <span className="text-[#C0562F] mr-2">•</span>
+              <span>สถานที่มีแสงสว่างเพียงพอ</span>
+            </li>
+            <li className="flex items-start">
+              <span className="text-[#C0562F] mr-2">•</span>
+              <span>เตรียมพร้อมถ่ายภาพใบหน้า (Selfie)</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Rejection reason if any */}
+        {kycStatus === 'REJECTED' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-red-600">
+              การยืนยันตัวตนครั้งก่อนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง
+            </p>
+          </div>
+        )}
+
+        {/* Error Message */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
             {error}
           </div>
         )}
 
+        {/* Start Button */}
         <button
           onClick={handleStartKYC}
           disabled={loading}
-          className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-md disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white font-bold py-4 rounded-2xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
         >
-          {loading ? 'กำลังเชื่อมต่อระบบ...' : 'เริ่มยืนยันตัวตน'}
+          <span className="text-base">
+            {loading ? 'กำลังเชื่อมต่อ...' : 'เริ่มยืนยันตัวตน'}
+          </span>
+          {!loading && (
+            <div className="text-[10px] font-light opacity-90 mt-1">Start Verification</div>
+          )}
         </button>
 
-        <p className="text-xs text-gray-500 mt-4">
+        {/* Note */}
+        <p className="text-xs text-gray-500 text-center mt-4">
           ระบบจะนำท่านไปยังหน้ายืนยันตัวตนของ UpPass
         </p>
       </div>

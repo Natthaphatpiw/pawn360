@@ -58,7 +58,7 @@ export default function PawnerRegister() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user exists in database
+  // Check if user exists in database and KYC status
   useEffect(() => {
     const checkUser = async () => {
       if (!profile?.userId) return;
@@ -66,7 +66,21 @@ export default function PawnerRegister() {
       try {
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
         if (response.data.exists) {
-          setPawnerData(response.data.pawner);
+          const pawner = response.data.pawner;
+
+          // Check KYC status
+          if (pawner.kyc_status === 'VERIFIED') {
+            // User is fully registered and verified - show profile
+            setPawnerData(response.data.pawner);
+          } else if (pawner.kyc_status === 'PENDING') {
+            // User is waiting for KYC verification - redirect to waiting page
+            router.push('/ekyc/waiting');
+            return;
+          } else {
+            // User registered but not started/completed KYC - redirect to eKYC
+            router.push('/ekyc');
+            return;
+          }
         }
       } catch (error) {
         console.error('Error checking pawner:', error);
@@ -78,7 +92,7 @@ export default function PawnerRegister() {
     if (profile?.userId) {
       checkUser();
     }
-  }, [profile?.userId]);
+  }, [profile?.userId, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -195,7 +209,7 @@ export default function PawnerRegister() {
           
           {/* Pawn Entry Button */}
           <button
-            onClick={() => router.push('/pawn')}
+            onClick={() => router.push('/estimate')}
             className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
           >
             <span className="text-base font-bold">จำนำสินค้า</span>
