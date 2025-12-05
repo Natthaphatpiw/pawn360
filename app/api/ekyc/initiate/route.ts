@@ -47,9 +47,10 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         answers: {
-          th_first_name: pawner.firstname || '',
-          th_last_name: pawner.lastname || '',
-          id_card_number: pawner.national_id || ''
+          // Optional: pass pre-filled answers if available
+          ...(pawner.firstname && { th_first_name: pawner.firstname }),
+          ...(pawner.lastname && { th_last_name: pawner.lastname }),
+          ...(pawner.national_id && { id_card_number: pawner.national_id })
         }
       })
     });
