@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
           message = `❌ การยืนยันตัวตนไม่สำเร็จ\n\nเหตุผล: ${rejectionReason || 'ไม่สามารถยืนยันตัวตนได้'}\n\nกรุณาลองใหม่อีกครั้ง`;
         } else if (dbStatus === 'PENDING') {
           message = `⏳ รอการตรวจสอบ\n\nข้อมูลการยืนยันตัวตนของคุณอยู่ระหว่างการตรวจสอบ\nเราจะแจ้งให้ทราบเมื่อเสร็จสิ้น`;
-        }
+      }
 
         if (message) {
           try {
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       if (receivedSlug) {
         const supabase = supabaseAdmin();
         const { data: investor } = await supabase
-          .from('investors')
+        .from('investors')
           .update({
             kyc_status: 'REJECTED',
             kyc_rejection_reason: `Max attempts reached: ${eventType}`,

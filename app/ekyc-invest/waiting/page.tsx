@@ -49,7 +49,7 @@ export default function EKYCInvestWaitingPage() {
 
       // Then poll every 3 seconds
       pollingRef.current = setInterval(pollKYCStatus, 3000);
-    }
+      }
 
     return () => {
       if (pollingRef.current) {
@@ -109,7 +109,7 @@ export default function EKYCInvestWaitingPage() {
 
   // Timeout screen
   if (timeLeft === 0) {
-    return (
+  return (
       <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
         <div className="w-full max-w-md text-center">
           {/* Error Icon */}
@@ -117,7 +117,7 @@ export default function EKYCInvestWaitingPage() {
             <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center">
               <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+                </svg>
             </div>
           </div>
 
