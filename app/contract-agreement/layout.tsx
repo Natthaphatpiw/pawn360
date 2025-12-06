@@ -5,7 +5,7 @@ export default function ContractAgreementLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Use pawner LIFF ID (same as register)
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
+  // Use dedicated LIFF ID for contract agreement
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT || '2008216710-5YORGA1N';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }
