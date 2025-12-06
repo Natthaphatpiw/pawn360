@@ -1,135 +1,212 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { Client } from '@line/bot-sdk';
+import crypto from 'crypto';
 
-// LINE Messaging API configuration for Investor
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=';
+const lineClient = new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c'
+});
 
-async function sendLineMessage(lineId: string, message: string) {
+// Verify webhook signature (if UpPass provides signature header)
+function verifyWebhookSignature(payload: string, signature: string | null): boolean {
+  if (!signature) return true; // Skip verification if no signature
+
+  const secret = process.env.UPPASS_WEBHOOK_SECRET_INVEST;
+  if (!secret) return true; // Skip if no secret configured
+
   try {
-    const response = await fetch('https://api.line.me/v2/bot/message/push', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
-      },
-      body: JSON.stringify({
-        to: lineId,
-        messages: [
-          {
-            type: 'text',
-            text: message
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      console.error('Failed to send LINE message:', await response.text());
-    }
-  } catch (error) {
-    console.error('Error sending LINE message:', error);
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    );
+  } catch {
+    return false;
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    console.log('UpPass Investor Webhook received:', JSON.stringify(body, null, 2));
+    // Get raw body for signature verification
+    const rawBody = await request.text();
+    const payload = JSON.parse(rawBody);
 
-    const { event, data } = body;
+    // Optional: Verify webhook signature
+    const signature = request.headers.get('x-uppass-signature');
+    if (!verifyWebhookSignature(rawBody, signature)) {
+      console.error('Invalid webhook signature');
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      );
+    }
 
-    if (event === 'verification.completed' || event === 'form.submitted') {
-      const { external_id, slug, status, verification_data } = data;
+    console.log('Investor eKYC Webhook Received:', JSON.stringify(payload, null, 2));
 
-      if (!external_id) {
-        console.error('No external_id found in webhook data');
-        return NextResponse.json({ error: 'No external_id' }, { status: 400 });
+    // Extract data from webhook payload
+    const eventType = payload.event?.type;
+    const appData = payload.application;
+    const extraData = payload.extra;
+    const answers = payload.answers;
+
+    // Handle different event types
+    if (eventType === 'submit_form' || eventType === 'update_status') {
+      const receivedSlug = appData?.slug;
+      const kycStatus = appData?.status; // 'accepted', 'rejected', 'review_needed'
+      const ekycStatus = appData?.other_status?.ekyc;
+
+      if (!receivedSlug) {
+        console.error('Missing slug in payload');
+        return NextResponse.json(
+          { error: 'Missing slug in payload' },
+          { status: 400 }
+        );
+      }
+
+      // Map UpPass status to our status
+      let dbStatus = 'PENDING';
+      let rejectionReason = null;
+
+      // UpPass sends: status: "complete", other_status.ekyc: "pass"/"fail"
+      if (kycStatus === 'complete' && ekycStatus === 'pass') {
+        dbStatus = 'VERIFIED';
+      } else if (kycStatus === 'complete' && ekycStatus === 'fail') {
+        dbStatus = 'REJECTED';
+        rejectionReason = 'eKYC verification failed';
+      } else if (kycStatus === 'accepted') {
+        dbStatus = 'VERIFIED'; // Legacy support
+      } else if (kycStatus === 'rejected') {
+        dbStatus = 'REJECTED';
+        if (ekycStatus) {
+          rejectionReason = `eKYC Status: ${ekycStatus}`;
+        }
+      } else if (kycStatus === 'review_needed') {
+        dbStatus = 'PENDING';
       }
 
       const supabase = supabaseAdmin();
 
-      // Get investor
-      const { data: investor, error: investorError } = await supabase
-        .from('investors')
-        .select('*')
-        .eq('investor_id', external_id)
-        .single();
-
-      if (investorError || !investor) {
-        console.error('Investor not found:', external_id);
-        return NextResponse.json({ error: 'Investor not found' }, { status: 404 });
-      }
-
-      // Determine KYC status
-      let kycStatus = 'PENDING';
-      let rejectionReason = null;
-
-      if (status === 'approved' || status === 'verified') {
-        kycStatus = 'VERIFIED';
-      } else if (status === 'rejected' || status === 'failed') {
-        kycStatus = 'REJECTED';
-        rejectionReason = data.rejection_reason || 'ไม่ผ่านการตรวจสอบ กรุณาลองใหม่อีกครั้ง';
-      }
-
-      // Update investor
-      const updateData: any = {
-        kyc_status: kycStatus,
-        kyc_data: verification_data || data,
-        updated_at: new Date().toISOString()
+      // Prepare kyc_data with full information
+      const kycData = {
+        application: appData,
+        extra: extraData,
+        answers: answers,
+        event: payload.event,
+        processed_at: new Date().toISOString()
       };
 
-      if (kycStatus === 'VERIFIED') {
-        updateData.kyc_verified_at = new Date().toISOString();
-      }
-
-      if (rejectionReason) {
-        updateData.kyc_rejection_reason = rejectionReason;
-      }
-
-      const { error: updateError } = await supabase
+      // Update investor record
+      const { data: investor, error: updateError } = await supabase
         .from('investors')
-        .update(updateData)
-        .eq('investor_id', external_id);
+        .update({
+          kyc_status: dbStatus,
+          kyc_verified_at: dbStatus === 'VERIFIED' ? new Date().toISOString() : null,
+          kyc_rejection_reason: rejectionReason,
+          kyc_data: kycData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('uppass_slug', receivedSlug)
+        .select('investor_id, line_id, firstname, lastname, kyc_status')
+        .single();
 
       if (updateError) {
-        console.error('Error updating investor:', updateError);
-        throw updateError;
-      }
-
-      // Send LINE notification
-      if (kycStatus === 'VERIFIED') {
-        await sendLineMessage(
-          investor.line_id,
-          'ยินดีด้วยครับ การยืนยันตัวตนสำเร็จแล้ว คุณสามารถลงทุนบนแพลตฟอร์มของ Pawnly ได้แล้ว 🎉'
-        );
-      } else if (kycStatus === 'REJECTED') {
-        await sendLineMessage(
-          investor.line_id,
-          `การยืนยันตัวตนไม่สำเร็จ: ${rejectionReason}\n\nกรุณาลองยืนยันตัวตนอีกครั้ง`
+        console.error('Supabase Update Error:', updateError);
+        return NextResponse.json(
+          { error: 'DB Update Failed' },
+          { status: 500 }
         );
       }
 
-      console.log(`Investor ${external_id} KYC status updated to ${kycStatus}`);
+      console.log(`✅ Updated Investor ${investor?.investor_id} to status ${dbStatus}`);
 
-      return NextResponse.json({
-        success: true,
-        message: 'Webhook processed successfully'
-      });
+      // Send LINE notification based on status
+      if (investor?.line_id) {
+        let message = '';
+
+        if (dbStatus === 'VERIFIED') {
+          message = `🎉 ยินดีด้วยครับ การยืนยันตัวตนสำเร็จแล้ว คุณสามารถลงทุนบนแพลตฟอร์มของ Pawnly ได้แล้ว`;
+        } else if (dbStatus === 'REJECTED') {
+          message = `❌ การยืนยันตัวตนไม่สำเร็จ\n\nเหตุผล: ${rejectionReason || 'ไม่สามารถยืนยันตัวตนได้'}\n\nกรุณาลองใหม่อีกครั้ง`;
+        } else if (dbStatus === 'PENDING') {
+          message = `⏳ รอการตรวจสอบ\n\nข้อมูลการยืนยันตัวตนของคุณอยู่ระหว่างการตรวจสอบ\nเราจะแจ้งให้ทราบเมื่อเสร็จสิ้น`;
+        }
+
+        if (message) {
+          try {
+            // Send LINE message directly using LINE Bot SDK
+            await lineClient.pushMessage(investor.line_id, {
+              type: 'text',
+              text: message
+            });
+            console.log(`📱 LINE notification sent to investor ${investor.line_id}`);
+          } catch (notifyError) {
+            console.error('Failed to send LINE notification:', notifyError);
+            // Don't fail the webhook if notification fails
+          }
+        }
+      }
+    } else if (eventType === 'drop_off') {
+      // Handle drop off - user didn't complete verification
+      console.log('⚠️ Investor dropped off verification');
+      const receivedSlug = appData?.slug;
+      if (receivedSlug) {
+        const supabase = supabaseAdmin();
+        await supabase
+          .from('investors')
+          .update({
+            kyc_status: 'NOT_VERIFIED',
+            kyc_data: { event: 'drop_off', timestamp: new Date().toISOString() }
+          })
+          .eq('uppass_slug', receivedSlug);
+      }
+    } else if (eventType === 'ekyc_front_card_reached_max_attempts' ||
+               eventType === 'ekyc_liveness_reached_max_attempt') {
+      // Handle max attempts reached
+      console.log(`⚠️ Investor max attempts reached: ${eventType}`);
+      const receivedSlug = appData?.slug;
+      if (receivedSlug) {
+        const supabase = supabaseAdmin();
+        const { data: investor } = await supabase
+          .from('investors')
+          .update({
+            kyc_status: 'REJECTED',
+            kyc_rejection_reason: `Max attempts reached: ${eventType}`,
+            kyc_data: { event: eventType, timestamp: new Date().toISOString() }
+          })
+          .eq('uppass_slug', receivedSlug)
+          .select('line_id, firstname, lastname')
+          .single();
+
+        // Notify user
+        if (investor?.line_id) {
+          try {
+            await lineClient.pushMessage(investor.line_id, {
+              type: 'text',
+              text: `❌ การยืนยันตัวตนไม่สำเร็จ\n\nครบจำนวนครั้งที่พยายามแล้ว\nกรุณาติดต่อฝ่ายสนับสนุน`
+            });
+          } catch (error) {
+            console.error('Failed to send notification:', error);
+          }
+        }
+      }
     }
 
+    // Always return 200 OK for webhooks
     return NextResponse.json({
-      success: true,
-      message: 'Event not handled'
+      received: true,
+      event_type: eventType,
+      processed_at: new Date().toISOString()
     });
 
   } catch (error: any) {
-    console.error('Webhook processing error:', error);
+    console.error('❌ Investor Webhook Handler Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Internal Server Error' },
       { status: 500 }
     );
   }
 }
-
-// Allow UpPass to send webhooks
-export const runtime = 'nodejs';

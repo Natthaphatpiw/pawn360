@@ -10,7 +10,6 @@ export async function POST(request: NextRequest) {
       lastname,
       phoneNumber,
       nationalId,
-      email,
       address,
       bankInfo
     } = body;
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseAdmin();
 
-    // Check if investor already exists
+    // Check if user already exists
     const { data: existing } = await supabase
       .from('investors')
       .select('investor_id')
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Investor already registered' },
+        { error: 'User already registered' },
         { status: 400 }
       );
     }
@@ -48,7 +47,6 @@ export async function POST(request: NextRequest) {
         lastname,
         phone_number: phoneNumber,
         national_id: nationalId,
-        email: email || null,
         addr_house_no: address?.houseNo,
         addr_village: address?.village,
         addr_street: address?.street,
@@ -64,32 +62,15 @@ export async function POST(request: NextRequest) {
         kyc_status: 'NOT_VERIFIED',
         is_active: true,
         is_blocked: false,
-        investor_tier: 'STANDARD',
+        min_investment_amount: 1000, // Default minimum
         auto_invest_enabled: false,
-        min_investment_amount: 1000.00
+        investor_tier: 'STANDARD'
       }])
       .select()
       .single();
 
     if (error) {
       throw error;
-    }
-
-    // Create wallet for investor
-    const { error: walletError } = await supabase
-      .from('wallets')
-      .insert([{
-        investor_id: investor.investor_id,
-        available_balance: 0,
-        committed_balance: 0,
-        total_invested: 0,
-        total_earned: 0,
-        total_withdrawn: 0,
-        is_active: true
-      }]);
-
-    if (walletError) {
-      console.error('Error creating wallet:', walletError);
     }
 
     return NextResponse.json({

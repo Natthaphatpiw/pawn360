@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/client';
+import { Client } from '@line/bot-sdk';
 import crypto from 'crypto';
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c';
+
+const lineClient = new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
+  channelSecret: CHANNEL_SECRET
+});
 
 // Verify LINE signature
 function verifySignature(body: string, signature: string): boolean {
@@ -48,15 +55,77 @@ export async function POST(request: NextRequest) {
       // Handle different event types
       switch (type) {
         case 'message':
-          // Handle incoming messages
+          // Handle incoming messages from investors
           console.log('Message from investor:', event.message);
-          // You can add auto-reply logic here if needed
+
+          // Check if investor exists and get their KYC status
+          try {
+            const supabase = supabaseAdmin();
+            const { data: investor } = await supabase
+              .from('investors')
+              .select('firstname, lastname, kyc_status, investor_id')
+              .eq('line_id', source.userId)
+              .single();
+
+            if (investor) {
+              let replyMessage = '';
+
+              if (investor.kyc_status === 'VERIFIED') {
+                replyMessage = `สวัสดีครับ คุณ${investor.firstname} ${investor.lastname}\n\nการยืนยันตัวตนของคุณเสร็จสิ้นแล้ว คุณสามารถลงทุนได้แล้ว\n\nกดที่นี่เพื่อเข้าสู่ระบบลงทุน:`;
+              } else if (investor.kyc_status === 'PENDING') {
+                replyMessage = `สวัสดีครับ คุณ${investor.firstname} ${investor.lastname}\n\nข้อมูลการยืนยันตัวตนของคุณอยู่ระหว่างการตรวจสอบ\nกรุณารอผลการตรวจสอบ`;
+              } else if (investor.kyc_status === 'REJECTED') {
+                replyMessage = `สวัสดีครับ คุณ${investor.firstname} ${investor.lastname}\n\nการยืนยันตัวตนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง\n\nกดที่นี่เพื่อเริ่มยืนยันตัวตน:`;
+              } else {
+                // NOT_VERIFIED or other status
+                replyMessage = `สวัสดีครับ คุณ${investor.firstname} ${investor.lastname}\n\nคุณยังไม่ได้ยืนยันตัวตน กรุณาทำการยืนยันตัวตนก่อน\n\nกดที่นี่เพื่อเริ่มยืนยันตัวตน:`;
+              }
+
+              // Send reply using LINE Bot SDK
+              if (replyToken) {
+                await lineClient.replyMessage(replyToken, {
+                  type: 'text',
+                  text: replyMessage
+                });
+              }
+            } else {
+              // Investor not found in database
+              const replyMessage = `สวัสดีครับ\n\nดูเหมือนคุณยังไม่ได้ลงทะเบียนเป็นนักลงทุน\nกรุณาลงทะเบียนก่อน:\n\nลงทะเบียนนักลงทุน:`;
+
+              if (replyToken) {
+                await lineClient.replyMessage(replyToken, {
+                  type: 'text',
+                  text: replyMessage
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Error handling investor message:', error);
+            // Send generic error message
+            if (replyToken) {
+              await lineClient.replyMessage(replyToken, {
+                type: 'text',
+                text: 'ขออภัย เกิดข้อผิดพลาดในการประมวลผล กรุณาลองใหม่อีกครั้ง'
+              });
+            }
+          }
           break;
 
         case 'follow':
           // User added the bot as friend
           console.log('New investor follower:', source.userId);
-          // You can send welcome message here
+
+          // Send welcome message
+          try {
+            const welcomeMessage = `🎉 ยินดีต้อนรับสู่ Pawnly Investor\n\nเพื่อเริ่มลงทุน คุณต้องทำการยืนยันตัวตนก่อน\n\nกดที่นี่เพื่อลงทะเบียน:`;
+
+            await lineClient.pushMessage(source.userId, {
+              type: 'text',
+              text: welcomeMessage
+            });
+          } catch (error) {
+            console.error('Error sending welcome message:', error);
+          }
           break;
 
         case 'unfollow':

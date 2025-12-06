@@ -3,12 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const lineId = searchParams.get('lineId');
 
     if (!lineId) {
       return NextResponse.json(
-        { error: 'LINE ID is required' },
+        { error: 'Line ID is required' },
         { status: 400 }
       );
     }
@@ -18,45 +18,51 @@ export async function GET(request: NextRequest) {
     // Check if investor exists
     const { data: investor, error } = await supabase
       .from('investors')
-      .select(`
-        *,
-        wallet:wallets(*)
-      `)
+      .select('*')
       .eq('line_id', lineId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
+      console.error('Database error:', error);
       throw error;
     }
 
     if (!investor) {
       return NextResponse.json({
         exists: false,
-        investor: null
+        message: 'Investor not found'
       });
     }
 
-    // Get contract statistics
+    // Get contract statistics for this investor
     const { data: contracts } = await supabase
       .from('contracts')
-      .select('contract_id, contract_status')
+      .select('contract_id, contract_status, loan_principal_amount')
       .eq('investor_id', investor.investor_id);
 
-    const stats = {
-      totalContracts: contracts?.length || 0,
-      activeContracts: contracts?.filter(c =>
-        c.contract_status === 'ACTIVE' || c.contract_status === 'PENDING_SIGNATURE'
-      ).length || 0,
-      endedContracts: contracts?.filter(c =>
-        c.contract_status === 'COMPLETED' || c.contract_status === 'LIQUIDATED'
-      ).length || 0
-    };
+    const totalContracts = contracts?.length || 0;
+    const activeContracts = contracts?.filter(
+      c => c.contract_status === 'ACTIVE' || c.contract_status === 'PENDING_SIGNATURE'
+    ).length || 0;
+    const endedContracts = contracts?.filter(
+      c => c.contract_status === 'COMPLETED' || c.contract_status === 'TERMINATED'
+    ).length || 0;
+
+    // Calculate total invested amount
+    const totalInvestedAmount = contracts?.reduce((sum, contract) => {
+      return sum + (contract.loan_principal_amount || 0);
+    }, 0) || 0;
 
     return NextResponse.json({
       exists: true,
       investor: {
         ...investor,
-        stats
+        stats: {
+          totalContracts,
+          activeContracts,
+          endedContracts,
+          totalInvestedAmount
+        }
       }
     });
 
