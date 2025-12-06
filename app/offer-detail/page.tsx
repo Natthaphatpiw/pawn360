@@ -189,6 +189,8 @@ function OfferDetailContent() {
   );
 }
 
+export const dynamic = 'force-dynamic';
+
 export default function OfferDetailPage() {
   return (
     <Suspense fallback={
