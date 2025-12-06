@@ -31,7 +31,7 @@ function ContractAgreementContent() {
       return;
     }
 
-    if (!signatureRef.current?.isEmpty()) {
+    if (signatureRef.current?.isEmpty()) {
       setError('กรุณาเซ็นลายเซ็นในช่องที่กำหนด');
       return;
     }
