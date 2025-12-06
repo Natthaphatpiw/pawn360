@@ -529,12 +529,16 @@ export default function EstimatePage() {
 
       setConditionResult(conditionResponse.data);
       setIsAnalyzing(false);
+      console.log('✅ Condition analysis completed');
 
       // Step 2: Upload images
+      console.log('📤 Starting image upload...');
       const uploadedUrls = await uploadImages();
       setUploadedImageUrls(uploadedUrls);
+      console.log('✅ Image upload completed:', uploadedUrls);
 
       // Step 3: Estimate price with AI
+      console.log('🧠 Starting price estimation...');
       const estimateData = {
         itemType: formData.itemType,
         brand: formData.brand,
@@ -563,6 +567,7 @@ export default function EstimatePage() {
       };
 
       const estimateResponse = await axios.post('/api/estimate', estimateData);
+      console.log('✅ Price estimation completed:', estimateResponse.data);
       setEstimateResult(estimateResponse.data);
       setDesiredPrice(estimateResponse.data.estimatedPrice.toString());
 
@@ -573,6 +578,7 @@ export default function EstimatePage() {
       }));
 
       // Move to pawn summary step
+      console.log('🎯 Moving to pawn summary step');
       setCurrentStep('pawn_summary');
 
     } catch (error: any) {
@@ -1221,7 +1227,15 @@ export default function EstimatePage() {
         )}
 
         {/* Pawn Summary Step */}
-        {currentStep === 'pawn_summary' && estimateResult && profile?.userId && (
+        {(() => {
+          console.log('🔍 Checking pawn summary conditions:', {
+            currentStep,
+            hasEstimateResult: !!estimateResult,
+            hasProfileUserId: !!profile?.userId,
+            shouldShow: currentStep === 'pawn_summary' && estimateResult && profile?.userId
+          });
+          return currentStep === 'pawn_summary' && estimateResult && profile?.userId;
+        })() && (
           <PawnSummary
             itemData={{
               itemType: formData.itemType,
@@ -1247,6 +1261,7 @@ export default function EstimatePage() {
             lineId={profile.userId}
             onBack={() => setCurrentStep('form')}
             onSuccess={(reqId, itmId) => {
+              console.log('🎉 onSuccess called with:', reqId, itmId);
               setLoanRequestId(reqId);
               setItemId(itmId);
               setCurrentStep('success_confirmation');
@@ -1259,6 +1274,10 @@ export default function EstimatePage() {
           <SuccessConfirmation
             loanRequestId={loanRequestId}
             itemId={itemId}
+            onContinue={() => {
+              // Redirect to contract agreement page
+              window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
+            }}
             onBackToHome={() => {
               setCurrentStep('form');
               setFormData({

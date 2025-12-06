@@ -6,9 +6,10 @@ interface SuccessConfirmationProps {
   loanRequestId: string;
   itemId: string;
   onBackToHome: () => void;
+  onContinue?: () => void;
 }
 
-export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHome }: SuccessConfirmationProps) {
+export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHome, onContinue }: SuccessConfirmationProps) {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
 
@@ -33,9 +34,37 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
         </p>
 
         {/* Footer Note */}
-        <p className="text-gray-500 text-xs md:text-sm leading-relaxed px-4">
+        <p className="text-gray-500 text-xs md:text-sm leading-relaxed px-4 mb-6">
           หากเกินระยะเวลาที่กำหนด สามารถกดเสนออีกครั้งได้ที่หน้ารายละเอียดข้อเสนอ
         </p>
+
+        {/* Action Buttons */}
+        <div className="w-full space-y-3">
+          {/* Continue Button */}
+          <button
+            onClick={() => {
+              if (onContinue) {
+                onContinue();
+              } else {
+                // Default: redirect to contract agreement
+                window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
+              }
+            }}
+            className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
+          >
+            <span className="text-base font-bold">ดำเนินการต่อ</span>
+            <span className="text-[10px] font-light opacity-90">Continue</span>
+          </button>
+
+          {/* Back to Home Button */}
+          <button
+            onClick={onBackToHome}
+            className="w-full bg-white border border-[#7CAB4A] hover:bg-gray-50 text-[#7CAB4A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+          >
+            <span className="text-base font-bold">กลับหน้าหลัก</span>
+            <span className="text-[10px] font-light opacity-90">Back to Home</span>
+          </button>
+        </div>
 
         {/* Hidden data for tracking (optional) */}
         <div className="hidden">

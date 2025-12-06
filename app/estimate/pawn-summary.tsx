@@ -38,6 +38,8 @@ interface PawnSummaryProps {
 }
 
 export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: PawnSummaryProps) {
+  console.log('🎯 PawnSummary component rendered with:', { itemData, lineId });
+
   const [loanAmount, setLoanAmount] = useState<string>('');
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('pickup');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
@@ -119,7 +121,11 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   };
 
   const handleSubmit = async () => {
-    if (!isRegistered || loanAmountNum === 0) return;
+    console.log('🚀 handleSubmit called in pawn-summary');
+    if (!isRegistered || loanAmountNum === 0) {
+      console.log('❌ Validation failed:', { isRegistered, loanAmountNum });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -138,9 +144,9 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
 
       const response = await axios.post('/api/loan-request/create', submissionData);
 
-      // Show success message and redirect to contract agreement
-      alert('สร้างคำขอจำนำเรียบร้อยแล้ว กำลังไปหน้าต่อไป...');
-      window.location.href = `/contract-agreement?loanRequestId=${response.data.loanRequestId}&itemId=${response.data.itemId}`;
+      // Call onSuccess callback instead of redirecting directly
+      console.log('✅ Calling onSuccess with:', response.data.loanRequestId, response.data.itemId);
+      onSuccess(response.data.loanRequestId, response.data.itemId);
     } catch (error) {
       console.error('Error submitting loan request:', error);
       alert('เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');
