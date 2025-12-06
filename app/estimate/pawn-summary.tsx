@@ -137,7 +137,10 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
       };
 
       const response = await axios.post('/api/loan-request/create', submissionData);
-      onSuccess(response.data.loanRequestId, response.data.itemId);
+
+      // Show success message and redirect to contract agreement
+      alert('สร้างคำขอจำนำเรียบร้อยแล้ว กำลังไปหน้าต่อไป...');
+      window.location.href = `/contract-agreement?loanRequestId=${response.data.loanRequestId}&itemId=${response.data.itemId}`;
     } catch (error) {
       console.error('Error submitting loan request:', error);
       alert('เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');

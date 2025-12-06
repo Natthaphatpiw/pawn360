@@ -32,7 +32,8 @@
     "puppeteer": "^24.25.0",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-signature-canvas": "^1.1.0-alpha.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

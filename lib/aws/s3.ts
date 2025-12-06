@@ -110,6 +110,69 @@ export async function getImagePresignedUrl(imageKey: string, expiresIn: number =
 }
 
 /**
+ * อัปโหลดลายเซ็นไปยัง AWS S3
+ * @param contractId - ID ของสัญญา
+ * @param signatureDataURL - Data URL ของลายเซ็น (base64)
+ * @returns Presigned URL ของลายเซ็นใน S3
+ */
+export async function uploadSignatureToS3(
+  contractId: string,
+  signatureDataURL: string
+): Promise<string> {
+  try {
+    const client = getS3Client();
+
+    // Convert data URL to buffer
+    const base64Data = signatureDataURL.replace(/^data:image\/png;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const fileName = `signature-${contractId}.png`;
+    const key = `${FOLDER_PREFIX}${fileName}`;
+
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/png',
+    });
+
+    await client.send(command);
+
+    // สร้าง Presigned URL
+    const presignedUrl = await getSignaturePresignedUrl(contractId);
+    return presignedUrl;
+  } catch (error) {
+    console.error('Error uploading signature to S3:', error);
+    throw error;
+  }
+}
+
+/**
+ * สร้าง Presigned URL สำหรับดาวน์โหลดลายเซ็น
+ * @param contractId - ID ของสัญญา
+ * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
+ * @returns Presigned URL
+ */
+export async function getSignaturePresignedUrl(contractId: string, expiresIn: number = 7 * 24 * 3600): Promise<string> {
+  try {
+    const client = getS3Client();
+    const fileName = `signature-${contractId}.png`;
+    const key = `${FOLDER_PREFIX}${fileName}`;
+
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const signedUrl = await getSignedUrl(client, command, { expiresIn });
+    return signedUrl;
+  } catch (error) {
+    console.error('Error generating presigned URL for signature:', error);
+    throw error;
+  }
+}
+
+/**
  * ทดสอบการเชื่อมต่อกับ S3
  */
 export async function testS3Connection(): Promise<boolean> {
