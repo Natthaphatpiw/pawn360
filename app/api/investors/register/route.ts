@@ -1,0 +1,107 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/client';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      lineId,
+      firstname,
+      lastname,
+      phoneNumber,
+      nationalId,
+      email,
+      address,
+      bankInfo
+    } = body;
+
+    // Validation
+    if (!lineId || !firstname || !lastname || !phoneNumber || !nationalId) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = supabaseAdmin();
+
+    // Check if investor already exists
+    const { data: existing } = await supabase
+      .from('investors')
+      .select('investor_id')
+      .eq('line_id', lineId)
+      .single();
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'Investor already registered' },
+        { status: 400 }
+      );
+    }
+
+    // Insert new investor
+    const { data: investor, error } = await supabase
+      .from('investors')
+      .insert([{
+        line_id: lineId,
+        firstname,
+        lastname,
+        phone_number: phoneNumber,
+        national_id: nationalId,
+        email: email || null,
+        addr_house_no: address?.houseNo,
+        addr_village: address?.village,
+        addr_street: address?.street,
+        addr_sub_district: address?.subDistrict,
+        addr_district: address?.district,
+        addr_province: address?.province,
+        addr_country: address?.country || 'Thailand',
+        addr_postcode: address?.postcode,
+        bank_name: bankInfo?.bankName || null,
+        bank_account_no: bankInfo?.accountNo || null,
+        bank_account_type: bankInfo?.accountType || null,
+        bank_account_name: bankInfo?.accountName || null,
+        kyc_status: 'NOT_VERIFIED',
+        is_active: true,
+        is_blocked: false,
+        investor_tier: 'STANDARD',
+        auto_invest_enabled: false,
+        min_investment_amount: 1000.00
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    // Create wallet for investor
+    const { error: walletError } = await supabase
+      .from('wallets')
+      .insert([{
+        investor_id: investor.investor_id,
+        available_balance: 0,
+        committed_balance: 0,
+        total_invested: 0,
+        total_earned: 0,
+        total_withdrawn: 0,
+        is_active: true
+      }]);
+
+    if (walletError) {
+      console.error('Error creating wallet:', walletError);
+    }
+
+    return NextResponse.json({
+      success: true,
+      investor
+    });
+
+  } catch (error: any) {
+    console.error('Error registering investor:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
