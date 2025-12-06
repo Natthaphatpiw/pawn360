@@ -31,12 +31,27 @@ export async function POST(request: NextRequest) {
 
     // 2. Call UpPass API to create eKYC session for investors
     const lang = 'th';
-    const formSlug = process.env.UPPASS_FORM_SLUG_INVEST || 'investor';
-    const uppassApiKey = process.env.UPPASS_API_KEY_INVEST || 'sk_d3NfM0ZvRzZQaG1SdjdCRV9IREw4QUxOMFREOkFEPD88WmFhQDdyLHVZczlzbFlaNHtyVltKI2h0dyhe';
-    const uppassApiUrl = process.env.UPPASS_API_URL_INVEST || 'https://app.uppass.io';
+    // TEMPORARY: Use same config as pawner until investor form is created in UpPass
+    const formSlug = process.env.UPPASS_FORM_SLUG_INVEST || process.env.UPPASS_FORM_SLUG || 'pawner';
+    const uppassApiKey = process.env.UPPASS_API_KEY_INVEST || process.env.UPPASS_API_KEY;
+    const uppassApiUrl = process.env.UPPASS_API_URL_INVEST || process.env.UPPASS_API_URL || 'https://app.uppass.io'; // Corrected: Use app.uppass.io as per documentation
 
-    if (!formSlug || !uppassApiKey) {
-      throw new Error('UpPass investor configuration missing');
+    console.log('UpPass Investor API Config:', {
+      url: uppassApiUrl,
+      fullUrl: `${uppassApiUrl}/${lang}/api/forms/${formSlug}/create/`,
+      formSlug,
+      apiKey: uppassApiKey ? uppassApiKey.substring(0, 10) + '...' : 'NOT_SET',
+      hasFormSlug: !!formSlug,
+      hasApiKey: !!uppassApiKey,
+      usingPawnerFallback: !process.env.UPPASS_FORM_SLUG_INVEST
+    });
+
+    if (!formSlug) {
+      throw new Error('UPPASS_FORM_SLUG or UPPASS_FORM_SLUG_INVEST environment variable is not set');
+    }
+
+    if (!uppassApiKey) {
+      throw new Error('UPPASS_API_KEY or UPPASS_API_KEY_INVEST environment variable is not set');
     }
 
     const upPassResponse = await fetch(`${uppassApiUrl}/${lang}/api/forms/${formSlug}/create/`, {
@@ -55,7 +70,21 @@ export async function POST(request: NextRequest) {
       })
     });
 
-    const upPassData = await upPassResponse.json();
+    console.log('UpPass Response Status:', upPassResponse.status);
+    console.log('UpPass Response Headers:', Object.fromEntries(upPassResponse.headers.entries()));
+
+    // Check if response is HTML (error page) before trying to parse JSON
+    const responseText = await upPassResponse.text();
+    console.log('UpPass Raw Response:', responseText.substring(0, 500) + '...');
+
+    let upPassData;
+    try {
+      upPassData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse UpPass response as JSON:', parseError);
+      console.error('Response was:', responseText);
+      throw new Error(`UpPass API returned non-JSON response: ${responseText.substring(0, 200)}`);
+    }
 
     if (!upPassResponse.ok) {
       console.error('UpPass Investor Error:', upPassData);
