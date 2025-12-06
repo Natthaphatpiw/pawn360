@@ -43,7 +43,7 @@ CREATE TABLE pawners (
   -- ข้อมูลธนาคาร
   bank_name VARCHAR(100),
   bank_account_no VARCHAR(50),
-  bank_account_type VARCHAR(20) CHECK (bank_account_type IN ('SAVINGS', 'CURRENT')),
+  bank_account_type VARCHAR(50) CHECK (bank_account_type IN ('บัญชีออมทรัพย์', 'บัญชีเงินฝากประจำ', 'บัญชีกระแสรายวัน', 'บัญชีเงินตราต่างประเทศ')),
   bank_account_name VARCHAR(200),
 
   -- Status & Metadata
@@ -97,7 +97,7 @@ CREATE TABLE investors (
   -- ข้อมูลธนาคาร
   bank_name VARCHAR(100),
   bank_account_no VARCHAR(50),
-  bank_account_type VARCHAR(20) CHECK (bank_account_type IN ('SAVINGS', 'CURRENT')),
+  bank_account_type VARCHAR(50) CHECK (bank_account_type IN ('บัญชีออมทรัพย์', 'บัญชีเงินฝากประจำ', 'บัญชีกระแสรายวัน', 'บัญชีเงินตราต่างประเทศ')),
   bank_account_name VARCHAR(200),
 
   -- Investor Settings
@@ -944,6 +944,145 @@ VALUES
   ('aa0e8400-e29b-41d4-a716-446655440012', 'PAWNER', '770e8400-e29b-41d4-a716-446655440001', 'ACCEPT_LOAN_OFFER', 'LOAN_OFFER', 'ee0e8400-e29b-41d4-a716-446655440001', 'Customer accepted loan offer', '{"accepted_amount": 25000}', '192.168.1.100', 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)', NOW() - INTERVAL '6 days'),
   ('aa0e8400-e29b-41d4-a716-446655440013', 'ADMIN', '660e8400-e29b-41d4-a716-446655440002', 'VERIFY_PAYMENT', 'PAYMENT', '550e8400-e29b-41d4-a716-446655440010', 'Admin verified payment transaction', '{"payment_amount": 25625}', '10.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', NOW() - INTERVAL '30 days'),
   ('aa0e8400-e29b-41d4-a716-446655440014', 'SYSTEM', NULL, 'CONTRACT_COMPLETED', 'CONTRACT', 'ff0e8400-e29b-41d4-a716-446655440001', 'Contract automatically marked as completed', '{"completion_reason": "FULL_REPAYMENT"}', NULL, 'SYSTEM', NOW() - INTERVAL '30 days');
+
+-- =====================================================
+-- ADDITIONAL MOCK DATA FOR SPECIFIC CONTRACTS
+-- =====================================================
+
+-- Insert mock items for the specific pawner
+INSERT INTO items (item_id, customer_id, item_type, brand, model, capacity, serial_number, cpu, ram, storage, gpu,
+                  item_condition, ai_condition_score, ai_condition_reason, estimated_value, ai_confidence,
+                  accessories, defects, notes, image_urls, item_status, drop_point_id, received_at_drop_point, created_at, updated_at)
+VALUES
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525a1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'โทรศัพท์มือถือ', 'Samsung', 'Galaxy S24 Ultra', '512GB', 'GS24U123456789', NULL, NULL, NULL, NULL,
+   92, 91.3, 'สภาพดีเยี่ยม มีเคสครอบครบ', 35000.00, 0.93,
+   'กล่อง แบตเตอรี่ชาร์จ S Pen', 'ไม่มี', 'ซื้อใหม่ปีนี้ ใช้งานน้อย', ARRAY['https://example.com/s24u_1.jpg', 'https://example.com/s24u_2.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '5 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '1 day'),
+
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525a2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'โน้ตบุค', 'Apple', 'MacBook Air M3', '256GB', 'MBA3M987654321', 'Apple M3', '8GB', '256GB SSD', 'Integrated',
+   88, 87.5, 'สภาพดี มีร่องรอยการใช้งานปกติ', 42000.00, 0.89,
+   'ชาร์จเจอร์ กล่อง', 'รอยขีดเล็กน้อยที่ฝา', 'ใช้ทำงานประจำและเรียน', ARRAY['https://example.com/mba_m3_1.jpg', 'https://example.com/mba_m3_2.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '3 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '1 day'),
+
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'กล้อง', 'Sony', 'α7 IV', NULL, 'A7IV456789012', NULL, NULL, NULL, NULL,
+   85, 84.7, 'สภาพดี มีรอยขีดที่ตัวกล้อง', 85000.00, 0.88,
+   'เลนส์ 2 ตัว แบตเตอรี่ ชาร์จเจอร์', 'รอยขีดที่ตัวกล้อง', 'ใช้ถ่ายงานโปรเฟสชั่นแนล', ARRAY['https://example.com/a7iv_1.jpg', 'https://example.com/a7iv_2.jpg', 'https://example.com/a7iv_3.jpg'],
+   'APPROVED', '550e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '1 day', NOW() - INTERVAL '4 days', NOW() - INTERVAL '1 day');
+
+-- Insert mock item lenses for the camera
+INSERT INTO item_lenses (lens_id, item_id, lens_model, lens_serial_number, lens_condition, created_at)
+VALUES
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525b1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', 'Sony FE 24-70mm f/2.8 GM', 'FE2470F28123456', 90, NOW() - INTERVAL '4 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525b2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', 'Sony FE 70-200mm f/2.8 GM OSS', 'FE70200F28789012', 85, NOW() - INTERVAL '4 days');
+
+-- Insert mock item valuations
+INSERT INTO item_valuations (valuation_id, item_id, valuation_type, valuated_by, estimated_value, condition_score, notes, created_at)
+VALUES
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525c1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a1', 'AI_INITIAL', 'AI', 35000.00, 92, 'AI valuation based on market data', NOW() - INTERVAL '7 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525c2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a2', 'AI_INITIAL', 'AI', 42000.00, 88, 'AI valuation based on market data', NOW() - INTERVAL '6 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525c3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', 'AI_INITIAL', 'AI', 85000.00, 85, 'AI valuation based on market data', NOW() - INTERVAL '4 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525c4', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', 'DROP_POINT_VERIFY', '550e8400-e29b-41d4-a716-446655440002', 84000.00, 83, 'Verified at drop point - condition confirmed', NOW() - INTERVAL '3 days');
+
+-- Insert mock loan requests
+INSERT INTO loan_requests (request_id, item_id, customer_id, requested_amount, requested_duration_days, drop_point_id, delivery_method, delivery_fee, request_status, expires_at, created_at, updated_at)
+VALUES
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525d1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 28000.00, 120, '550e8400-e29b-41d4-a716-446655440002', 'WALK_IN', 0.00, 'OFFER_ACCEPTED', NOW() - INTERVAL '6 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '6 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525d2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 32000.00, 90, '550e8400-e29b-41d4-a716-446655440002', 'DELIVERY', 150.00, 'OFFER_ACCEPTED', NOW() - INTERVAL '5 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '5 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525d3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 65000.00, 180, '550e8400-e29b-41d4-a716-446655440002', 'COURIER', 200.00, 'OFFER_ACCEPTED', NOW() - INTERVAL '3 days', NOW() - INTERVAL '4 days', NOW() - INTERVAL '3 days');
+
+-- Insert mock loan offers
+INSERT INTO loan_offers (offer_id, request_id, investor_id, offer_amount, interest_rate, duration_days, offer_status, expires_at, accepted_at, created_at, updated_at)
+VALUES
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525e1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d1', '880e8400-e29b-41d4-a716-446655440001', 28000.00, 0.024, 120, 'ACCEPTED', NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '7 days', NOW() - INTERVAL '6 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525e2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d2', '880e8400-e29b-41d4-a716-446655440001', 32000.00, 0.022, 90, 'ACCEPTED', NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days', NOW() - INTERVAL '6 days', NOW() - INTERVAL '5 days'),
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525e3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d3', '880e8400-e29b-41d4-a716-446655440001', 65000.00, 0.020, 180, 'ACCEPTED', NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days', NOW() - INTERVAL '4 days', NOW() - INTERVAL '3 days');
+
+-- Insert mock contracts
+INSERT INTO contracts (contract_id, contract_number, customer_id, investor_id, drop_point_id, item_id, loan_request_id, loan_offer_id,
+                      contract_start_date, contract_end_date, contract_duration_days,
+                      loan_principal_amount, interest_rate, interest_amount, total_amount, platform_fee_rate, platform_fee_amount,
+                      amount_paid, interest_paid, principal_paid, contract_status, funding_status,
+                      funded_at, disbursed_at, created_at, updated_at)
+VALUES
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', 'CTR-20241215-0004', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', '880e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d1', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e1',
+   NOW() - INTERVAL '60 days', NOW() - INTERVAL '30 days' + INTERVAL '120 days', 120,
+   28000.00, 0.024, 672.00, 28672.00, 0.10, 67.20,
+   14336.00, 336.00, 14000.00, 'ACTIVE', 'DISBURSED',
+   NOW() - INTERVAL '59 days', NOW() - INTERVAL '58 days', NOW() - INTERVAL '60 days', NOW() - INTERVAL '2 days'),
+
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'CTR-20241215-0005', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', '880e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d2', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e2',
+   NOW() - INTERVAL '45 days', NOW() - INTERVAL '15 days' + INTERVAL '90 days', 90,
+   32000.00, 0.022, 704.00, 32704.00, 0.10, 70.40,
+   32704.00, 704.00, 32000.00, 'COMPLETED', 'DISBURSED',
+   NOW() - INTERVAL '44 days', NOW() - INTERVAL '43 days', NOW() - INTERVAL '45 days', NOW() - INTERVAL '15 days'),
+
+  ('2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', 'CTR-20241215-0006', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', '880e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d3', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e3',
+   NOW() - INTERVAL '30 days', NOW() + INTERVAL '150 days', 180,
+   65000.00, 0.020, 1300.00, 66300.00, 0.10, 130.00,
+   16575.00, 325.00, 16250.00, 'ACTIVE', 'DISBURSED',
+   NOW() - INTERVAL '29 days', NOW() - INTERVAL '28 days', NOW() - INTERVAL '30 days', NOW() - INTERVAL '1 day');
+
+-- Insert mock payments for these contracts
+INSERT INTO payments (payment_id, contract_id, payment_type, amount, principal_portion, interest_portion, fee_portion, payment_method, payment_status, transaction_ref, verified_by, verified_at, payment_date, notes, created_at)
+VALUES
+  ('550e8400-e29b-41d4-a716-446655440014', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', 'INTEREST', 336.00, 0.00, 336.00, 0.00, 'PROMPTPAY', 'COMPLETED', 'TXN_20241201_004', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '30 days', NOW() - INTERVAL '30 days', 'Monthly interest payment - Contract 1', NOW() - INTERVAL '30 days'),
+  ('550e8400-e29b-41d4-a716-446655440015', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', 'PRINCIPAL', 7000.00, 7000.00, 0.00, 0.00, 'BANK_TRANSFER', 'COMPLETED', 'TXN_20241201_005', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', 'Partial principal payment - Contract 1', NOW() - INTERVAL '1 day'),
+  ('550e8400-e29b-41d4-a716-446655440016', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'FULL_REPAYMENT', 32704.00, 32000.00, 704.00, 0.00, 'BANK_TRANSFER', 'COMPLETED', 'TXN_20241215_006', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '15 days', NOW() - INTERVAL '15 days', 'Full repayment - Contract 2', NOW() - INTERVAL '15 days'),
+  ('550e8400-e29b-41d4-a716-446655440017', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', 'INTEREST', 325.00, 0.00, 325.00, 0.00, 'PROMPTPAY', 'COMPLETED', 'TXN_20241215_007', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '15 days', NOW() - INTERVAL '15 days', 'Monthly interest payment - Contract 3', NOW() - INTERVAL '15 days'),
+  ('550e8400-e29b-41d4-a716-446655440018', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', 'PRINCIPAL', 8125.00, 8125.00, 0.00, 0.00, 'BANK_TRANSFER', 'COMPLETED', 'TXN_20241201_008', '660e8400-e29b-41d4-a716-446655440002', NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', 'Partial principal payment - Contract 3', NOW() - INTERVAL '1 day');
+
+-- Insert mock repayment schedules
+INSERT INTO repayment_schedules (schedule_id, contract_id, due_date, amount_due, principal_due, interest_due, amount_paid, schedule_status, paid_at, created_at)
+VALUES
+  ('660e8400-e29b-41d4-a716-446655440015', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', NOW() + INTERVAL '15 days', 1192.00, 1166.67, 25.33, 0.00, 'PENDING', NULL, NOW() - INTERVAL '60 days'),
+  ('660e8400-e29b-41d4-a716-446655440016', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', NOW() + INTERVAL '45 days', 1192.00, 1166.67, 25.33, 0.00, 'PENDING', NULL, NOW() - INTERVAL '60 days'),
+  ('660e8400-e29b-41d4-a716-446655440017', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', NOW() + INTERVAL '75 days', 1192.00, 1166.67, 25.33, 0.00, 'PENDING', NULL, NOW() - INTERVAL '60 days'),
+  ('660e8400-e29b-41d4-a716-446655440018', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', NOW() - INTERVAL '15 days', 32704.00, 32000.00, 704.00, 32704.00, 'PAID', NOW() - INTERVAL '15 days', NOW() - INTERVAL '45 days'),
+  ('660e8400-e29b-41d4-a716-446655440019', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', NOW() + INTERVAL '15 days', 1837.50, 1805.56, 31.94, 0.00, 'PENDING', NULL, NOW() - INTERVAL '30 days'),
+  ('660e8400-e29b-41d4-a716-446655440020', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', NOW() + INTERVAL '45 days', 1837.50, 1805.56, 31.94, 0.00, 'PENDING', NULL, NOW() - INTERVAL '30 days');
+
+-- Insert mock platform revenue
+INSERT INTO platform_revenue (revenue_id, contract_id, revenue_type, amount, description, created_at)
+VALUES
+  ('770e8400-e29b-41d4-a716-446655440015', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', 'INTEREST_FEE', 33.60, 'Platform fee from interest payment - Contract 1', NOW() - INTERVAL '30 days'),
+  ('770e8400-e29b-41d4-a716-446655440016', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'INTEREST_FEE', 70.40, 'Platform fee from completed contract interest - Contract 2', NOW() - INTERVAL '15 days'),
+  ('770e8400-e29b-41d4-a716-446655440017', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', 'INTEREST_FEE', 32.50, 'Platform fee from interest payment - Contract 3', NOW() - INTERVAL '15 days');
+
+-- Insert mock wallet transactions
+INSERT INTO wallet_transactions (transaction_id, wallet_id, transaction_type, amount, balance_before, balance_after, reference_type, reference_id, description, created_at)
+VALUES
+  ('880e8400-e29b-41d4-a716-446655440014', '990e8400-e29b-41d4-a716-446655440001', 'COMMITMENT', 28000.00, 175625.00, 147625.00, 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', 'Fund commitment for Galaxy S24 Ultra contract', NOW() - INTERVAL '59 days'),
+  ('880e8400-e29b-41d4-a716-446655440015', '990e8400-e29b-41d4-a716-446655440001', 'COMMITMENT', 32000.00, 147625.00, 115625.00, 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'Fund commitment for MacBook Air M3 contract', NOW() - INTERVAL '44 days'),
+  ('880e8400-e29b-41d4-a716-446655440016', '990e8400-e29b-41d4-a716-446655440001', 'REPAYMENT', 32704.00, 115625.00, 148329.00, 'PAYMENT', '550e8400-e29b-41d4-a716-446655440016', 'Full repayment received for MacBook Air M3', NOW() - INTERVAL '15 days'),
+  ('880e8400-e29b-41d4-a716-446655440017', '990e8400-e29b-41d4-a716-446655440001', 'COMMITMENT_RELEASE', 32000.00, 148329.00, 180329.00, 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'Commitment released after MacBook Air M3 repayment', NOW() - INTERVAL '15 days'),
+  ('880e8400-e29b-41d4-a716-446655440018', '990e8400-e29b-41d4-a716-446655440001', 'COMMITMENT', 65000.00, 180329.00, 115329.00, 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', 'Fund commitment for Sony α7 IV contract', NOW() - INTERVAL '29 days'),
+  ('880e8400-e29b-41d4-a716-446655440019', '990e8400-e29b-41d4-a716-446655440001', 'INTEREST_EARNED', 297.00, 115329.00, 115626.00, 'PAYMENT', '550e8400-e29b-41d4-a716-446655440014', 'Interest earned from Galaxy S24 Ultra contract', NOW() - INTERVAL '30 days'),
+  ('880e8400-e29b-41d4-a716-446655440020', '990e8400-e29b-41d4-a716-446655440001', 'INTEREST_EARNED', 633.00, 115626.00, 116259.00, 'PAYMENT', '550e8400-e29b-41d4-a716-446655440016', 'Interest earned from MacBook Air M3 contract', NOW() - INTERVAL '15 days'),
+  ('880e8400-e29b-41d4-a716-446655440021', '990e8400-e29b-41d4-a716-446655440001', 'INTEREST_EARNED', 292.50, 116259.00, 116551.50, 'PAYMENT', '550e8400-e29b-41d4-a716-446655440017', 'Interest earned from Sony α7 IV contract', NOW() - INTERVAL '15 days');
+
+-- Insert mock notifications
+INSERT INTO notifications (notification_id, recipient_type, recipient_id, notification_type, title, message, related_entity_type, related_entity_id, is_read, sent_via, created_at)
+VALUES
+  ('990e8400-e29b-41d4-a716-446655440014', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'CONTRACT_COMPLETED', 'สัญญาเสร็จสิ้น', 'สัญญาจำนำ MacBook Air M3 ได้เสร็จสิ้นแล้ว คุณสามารถมารับสินค้าได้ที่จุดรับฝาก', 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', TRUE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '15 days'),
+  ('990e8400-e29b-41d4-a716-446655440015', 'INVESTOR', '880e8400-e29b-41d4-a716-446655440001', 'PAYMENT_RECEIVED', 'ได้รับการชำระเงิน', 'คุณได้รับการชำระเงินเต็มจำนวนจากสัญญา CTR-20241215-0005 (MacBook Air M3)', 'PAYMENT', '550e8400-e29b-41d4-a716-446655440016', TRUE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '15 days'),
+  ('990e8400-e29b-41d4-a716-446655440016', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'PAYMENT_REMINDER', 'ใกล้ถึงกำหนดชำระ', 'สัญญาจำนำ Galaxy S24 Ultra จะครบกำหนดในอีก 15 วัน กรุณาชำระเงินให้ตรงเวลา', 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f1', FALSE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '2 days'),
+  ('990e8400-e29b-41d4-a716-446655440017', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'PAYMENT_REMINDER', 'ใกล้ถึงกำหนดชำระ', 'สัญญาจำนำ Sony α7 IV จะครบกำหนดในอีก 15 วัน กรุณาชำระเงินให้ตรงเวลา', 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', FALSE, ARRAY['IN_APP', 'LINE'], NOW() - INTERVAL '2 days'),
+  ('990e8400-e29b-41d4-a716-446655440018', 'ADMIN', '660e8400-e29b-41d4-a716-446655440001', 'NEW_CONTRACT', 'สัญญาใหม่', 'มีสัญญาจำนำใหม่ 3 สัญญาจากลูกค้าเดิมที่รอการอนุมัติ', 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f3', TRUE, ARRAY['IN_APP'], NOW() - INTERVAL '30 days');
+
+-- Insert mock activity logs
+INSERT INTO activity_logs (log_id, actor_type, actor_id, action, entity_type, entity_id, description, metadata, ip_address, user_agent, created_at)
+VALUES
+  ('aa0e8400-e29b-41d4-a716-446655440015', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'CREATE_LOAN_REQUEST', 'LOAN_REQUEST', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d1', 'Customer created loan request for Galaxy S24 Ultra', '{"item_type": "โทรศัพท์มือถือ", "requested_amount": 28000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '7 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440016', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'CREATE_LOAN_REQUEST', 'LOAN_REQUEST', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d2', 'Customer created loan request for MacBook Air M3', '{"item_type": "โน้ตบุค", "requested_amount": 32000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '6 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440017', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'CREATE_LOAN_REQUEST', 'LOAN_REQUEST', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525d3', 'Customer created loan request for Sony α7 IV', '{"item_type": "กล้อง", "requested_amount": 65000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '4 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440018', 'INVESTOR', '880e8400-e29b-41d4-a716-446655440001', 'CREATE_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e1', 'Investor submitted loan offer for Galaxy S24 Ultra', '{"offer_amount": 28000, "interest_rate": 0.024}', '192.168.1.106', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0)', NOW() - INTERVAL '7 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440019', 'INVESTOR', '880e8400-e29b-41d4-a716-446655440001', 'CREATE_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e2', 'Investor submitted loan offer for MacBook Air M3', '{"offer_amount": 32000, "interest_rate": 0.022}', '192.168.1.106', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0)', NOW() - INTERVAL '6 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440020', 'INVESTOR', '880e8400-e29b-41d4-a716-446655440001', 'CREATE_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e3', 'Investor submitted loan offer for Sony α7 IV', '{"offer_amount": 65000, "interest_rate": 0.020}', '192.168.1.106', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0)', NOW() - INTERVAL '4 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440021', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'ACCEPT_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e1', 'Customer accepted loan offer for Galaxy S24 Ultra', '{"accepted_amount": 28000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '6 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440022', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'ACCEPT_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e2', 'Customer accepted loan offer for MacBook Air M3', '{"accepted_amount": 32000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '5 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440023', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'ACCEPT_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e3', 'Customer accepted loan offer for Sony α7 IV', '{"accepted_amount": 65000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '3 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440024', 'ADMIN', '660e8400-e29b-41d4-a716-446655440002', 'VERIFY_PAYMENT', 'PAYMENT', '550e8400-e29b-41d4-a716-446655440016', 'Admin verified payment for MacBook Air M3 contract', '{"payment_amount": 32704}', '10.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', NOW() - INTERVAL '15 days'),
+  ('aa0e8400-e29b-41d4-a716-446655440025', 'SYSTEM', NULL, 'CONTRACT_COMPLETED', 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'Contract automatically marked as completed for MacBook Air M3', '{"completion_reason": "FULL_REPAYMENT"}', NULL, 'SYSTEM', NOW() - INTERVAL '15 days');
 
 -- =====================================================
 -- END OF SCHEMA

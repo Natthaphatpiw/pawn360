@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { ChevronDown, AlertCircle, ChevronLeft, X } from 'lucide-react';
 
@@ -32,7 +32,8 @@ interface ContractDetail {
 const PawnContractDetail = () => {
   const { profile, isLoading: liffLoading } = useLiff();
   const router = useRouter();
-  const contractId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '';
+  const params = useParams();
+  const contractId = params.contractId as string;
 
   // State ควบคุมการแสดงผล Modal
   const [activeModal, setActiveModal] = useState<string | null>(null); // 'redeem', 'interest', 'decrease', 'increase' or null

@@ -33,6 +33,12 @@ interface RegisterFormData {
     country: string;
     postcode: string;
   };
+  bankInfo: {
+    bankName: string;
+    accountNo: string;
+    accountType: string;
+    accountName: string;
+  };
 }
 
 export default function PawnerRegister() {
@@ -54,6 +60,12 @@ export default function PawnerRegister() {
       province: '',
       country: 'Thailand',
       postcode: ''
+    },
+    bankInfo: {
+      bankName: '',
+      accountNo: '',
+      accountType: '',
+      accountName: ''
     }
   });
   const [submitting, setSubmitting] = useState(false);
@@ -94,9 +106,9 @@ export default function PawnerRegister() {
     checkUser();
   }, [liffLoading, liffError, profile?.userId]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
+
     if (name.startsWith('addr_')) {
       const addressField = name.replace('addr_', '');
       setFormData(prev => ({
@@ -104,6 +116,15 @@ export default function PawnerRegister() {
         address: {
           ...prev.address,
           [addressField]: value
+        }
+      }));
+    } else if (name.startsWith('bank_')) {
+      const bankField = name.replace('bank_', '');
+      setFormData(prev => ({
+        ...prev,
+        bankInfo: {
+          ...prev.bankInfo,
+          [bankField]: value
         }
       }));
     } else {
@@ -292,15 +313,15 @@ const RegisterField = ({
   </div>
 );
 
-function RegisterForm({ 
-  formData, 
-  handleInputChange, 
-  handleSubmit, 
-  submitting, 
-  error 
+function RegisterForm({
+  formData,
+  handleInputChange,
+  handleSubmit,
+  submitting,
+  error
 }: {
   formData: RegisterFormData;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => void;
   handleSubmit: () => void;
   submitting: boolean;
   error: string | null;
@@ -418,6 +439,78 @@ function RegisterForm({
             placeholder="XXXXX"
             name="addr_postcode"
             value={formData.address.postcode}
+            onChange={handleInputChange}
+          />
+        </div>
+
+        <div className="h-px bg-gray-300 my-6"></div>
+
+        {/* Bank Account Header */}
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-gray-800">Bank Account (Optional)</h2>
+          <p className="text-gray-500 text-xs">ข้อมูลบัญชีธนาคาร (ไม่บังคับ)</p>
+        </div>
+
+        {/* Bank Account Fields Group */}
+        <div className="space-y-1">
+          {/* Bank Name Dropdown */}
+          <div className="mb-4">
+            <div className="mb-1">
+              <div className="text-gray-800 font-bold text-sm md:text-base">Bank Name</div>
+              <div className="text-gray-500 text-xs font-light">ชื่อธนาคาร</div>
+            </div>
+            <select
+              name="bank_bankName"
+              value={formData.bankInfo.bankName}
+              onChange={handleInputChange}
+              className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800"
+            >
+              <option value="">เลือกธนาคาร</option>
+              <option value="พร้อมเพย์">พร้อมเพย์</option>
+              <option value="กสิกรไทย">กสิกรไทย</option>
+              <option value="ไทยพาณิชย์">ไทยพาณิชย์</option>
+              <option value="กรุงเทพ">กรุงเทพ</option>
+              <option value="กรุงไทย">กรุงไทย</option>
+              <option value="ธนชาต">ธนชาต</option>
+            </select>
+          </div>
+
+          <RegisterField
+            labelEn="Account No."
+            labelTh="หมายเลขบัญชี"
+            placeholder="0000000000"
+            name="bank_accountNo"
+            type="text"
+            value={formData.bankInfo.accountNo}
+            onChange={handleInputChange}
+          />
+
+          {/* Account Type Dropdown */}
+          <div className="mb-4">
+            <div className="mb-1">
+              <div className="text-gray-800 font-bold text-sm md:text-base">Account Type</div>
+              <div className="text-gray-500 text-xs font-light">ประเภทบัญชี</div>
+            </div>
+            <select
+              name="bank_accountType"
+              value={formData.bankInfo.accountType}
+              onChange={handleInputChange}
+              className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800"
+            >
+              <option value="">เลือกประเภทบัญชี</option>
+              <option value="บัญชีออมทรัพย์">บัญชีออมทรัพย์</option>
+              <option value="บัญชีเงินฝากประจำ">บัญชีเงินฝากประจำ</option>
+              <option value="บัญชีกระแสรายวัน">บัญชีกระแสรายวัน</option>
+              <option value="บัญชีเงินตราต่างประเทศ">บัญชีเงินตราต่างประเทศ</option>
+            </select>
+          </div>
+
+          <RegisterField
+            labelEn="Account Name"
+            labelTh="ชื่อเจ้าของบัญชี"
+            placeholder="ชื่อเจ้าของบัญชี"
+            name="bank_accountName"
+            value={formData.bankInfo.accountName}
             onChange={handleInputChange}
           />
         </div>
