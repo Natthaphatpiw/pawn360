@@ -51,8 +51,17 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
                 onContinue();
               } else {
                 // Default: navigate to contract agreement
-                // Use Next.js router for client-side navigation (works in LIFF)
-                router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
+                if (liffObject && liffObject.isInClient()) {
+                  // Open contract-agreement LIFF (different LIFF ID)
+                  const contractAgreementLiffUrl = `https://liff.line.me/2008216710-5YORGA1N?loanRequestId=${loanRequestId}&itemId=${itemId}`;
+                  liffObject.openWindow({
+                    url: contractAgreementLiffUrl,
+                    external: true  // Open as external LIFF app
+                  });
+                } else {
+                  // Fallback for web browser
+                  window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
+                }
               }
             }}
             className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
