@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
       lastname,
       phoneNumber,
       nationalId,
-      address
+      address,
+      bankInfo
     } = body;
 
     // Validation
@@ -54,6 +55,10 @@ export async function POST(request: NextRequest) {
         addr_province: address?.province,
         addr_country: address?.country || 'Thailand',
         addr_postcode: address?.postcode,
+        bank_name: bankInfo?.bankName || null,
+        bank_account_no: bankInfo?.accountNo || null,
+        bank_account_type: bankInfo?.accountType || null,
+        bank_account_name: bankInfo?.accountName || null,
         kyc_status: 'NOT_VERIFIED',
         is_active: true,
         is_blocked: false,
