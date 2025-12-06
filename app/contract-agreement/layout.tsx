@@ -5,7 +5,10 @@ export default function ContractAgreementLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Use dedicated LIFF ID for contract agreement
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT || '2008216710-5YORGA1N';
+  // Use dedicated LIFF ID for contract agreement (fallback to register LIFF if not set)
+  const liffId =
+    process.env.NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT ||
+    process.env.NEXT_PUBLIC_LIFF_ID_REGISTER ||
+    '2008216710-BEZ5XNyd';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }

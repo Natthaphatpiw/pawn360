@@ -2,7 +2,6 @@
 
 import { Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useLiff } from '@/lib/liff/liff-provider';
 
 interface SuccessConfirmationProps {
   loanRequestId: string;
@@ -13,7 +12,6 @@ interface SuccessConfirmationProps {
 
 export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHome, onContinue }: SuccessConfirmationProps) {
   const router = useRouter();
-  const { liffObject } = useLiff();
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
 
@@ -50,18 +48,8 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
               if (onContinue) {
                 onContinue();
               } else {
-                // Default: navigate to contract agreement
-                if (liffObject && liffObject.isInClient()) {
-                  // Open contract-agreement LIFF (different LIFF ID)
-                  const contractAgreementLiffUrl = `https://liff.line.me/2008216710-5YORGA1N?loanRequestId=${loanRequestId}&itemId=${itemId}`;
-                  liffObject.openWindow({
-                    url: contractAgreementLiffUrl,
-                    external: true  // Open as external LIFF app
-                  });
-                } else {
-                  // Fallback for web browser
-                  window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
-                }
+                // Default: navigate to contract agreement within same LIFF/web view
+                router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
               }
             }}
             className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
