@@ -1,223 +1,216 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
-interface Contract {
-  _id: string;
-  contractNumber: string;
-  status: string;
-  item: {
-    brand: string;
-    model: string;
-    type?: string;
-    images?: string[];
-  };
-  pawnDetails: {
-    pawnedPrice: number;
-    interestRate?: number;
-    periodDays?: number;
-    remainingAmount?: number;
-  };
-  dates: {
-    startDate: string;
-    dueDate: string;
-  };
+interface ContractItem {
+  item_id: string;
+  item_type: string;
+  brand: string;
+  model: string;
+  capacity: string | null;
+  estimated_value: number;
+  item_condition: number;
+  image_urls: string[];
 }
 
-export default function ContractsPage() {
-  const { profile, isLoading, error: liffError } = useLiff();
+interface Contract {
+  contract_id: string;
+  contract_number: string;
+  contract_start_date: string;
+  contract_end_date: string;
+  contract_duration_days: number;
+  loan_principal_amount: number;
+  interest_rate: number;
+  interest_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  contract_status: string;
+  funding_status: string;
+  items: ContractItem;
+  remainingDays: number;
+  displayStatus: string;
+}
+
+export default function PawnerContractList() {
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
+  const router = useRouter();
   const [contracts, setContracts] = useState<Contract[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [userName, setUserName] = useState('');
 
-  // Auto-fetch contracts when profile is loaded
   useEffect(() => {
-    if (profile?.userId && !hasSearched) {
-      handleSearch();
+    if (liffLoading) return;
+
+    if (liffError) {
+      setError('ไม่สามารถเชื่อมต่อ LINE LIFF ได้ กรุณาลองใหม่อีกครั้ง');
+      setLoading(false);
+      return;
     }
-  }, [profile]);
 
-  const handleSearch = async () => {
-    setIsSearching(true);
-    setError(null);
-    setHasSearched(true);
+    if (!profile?.userId) {
+      setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE LIFF');
+      setLoading(false);
+      return;
+    }
 
+    fetchContracts();
+  }, [liffLoading, liffError, profile?.userId]);
+
+  const fetchContracts = async () => {
     try {
-      if (!profile?.userId) {
-        throw new Error('LINE profile not found');
+      if (!profile?.userId) return;
+
+      // Fetch customer info first
+      const customerResponse = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
+      if (customerResponse.data.exists && customerResponse.data.pawner) {
+        const pawner = customerResponse.data.pawner;
+        setUserName(`${pawner.firstname} ${pawner.lastname}`);
       }
 
-      // เช็คจาก lineId เท่านั้น
-      const response = await axios.get(`/api/contracts/by-line-id?lineId=${profile.userId}`);
+      // Fetch contracts
+      const response = await axios.get(`/api/contracts/by-customer?lineId=${profile.userId}`);
 
       if (response.data.success) {
         setContracts(response.data.contracts);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการค้นหาสัญญา');
+    } catch (error: any) {
+      console.error('Error fetching contracts:', error);
+      setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
     } finally {
-      setIsSearching(false);
+      setLoading(false);
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear() + 543; // BE
+    return `${day}/${month}/${year}`;
   };
 
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (liffError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{liffError}</p>
-        </div>
-      </div>
-    );
-  }
-
-
-  // Function to get status style and text
-  const getStatusInfo = (status: string, dueDate: string) => {
-    const currentDate = new Date();
-    const due = new Date(dueDate);
-    const daysLeft = Math.ceil((due.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (status === 'overdue' || daysLeft < 0) {
-      return { text: 'ครบกำหนด', bg: '#FFEBEE', textColor: '#C62828' };
-    } else if (daysLeft <= 7) {
-      return { text: 'ใกล้ครบกำหนด', bg: '#FFF3E0', textColor: '#EF6C00' };
-    } else {
-      return { text: 'ปกติ', bg: '#E8F5E9', textColor: '#1B5E20' };
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ปกติ':
+        return { text: 'ปกติ', bg: 'bg-[#E8F5E9]', textCol: 'text-[#4CAF50]' };
+      case 'ครบกำหนด':
+        return { text: 'ครบกำหนด', bg: 'bg-[#FFEBEE]', textCol: 'text-[#EF5350]' };
+      case 'ใกล้ครบกำหนด':
+        return { text: 'ใกล้ครบกำหนด', bg: 'bg-[#FFF3E0]', textCol: 'text-[#FF9800]' };
+      case 'เสร็จสิ้น':
+        return { text: 'เสร็จสิ้น', bg: 'bg-gray-100', textCol: 'text-gray-600' };
+      default:
+        return { text: status, bg: 'bg-gray-100', textCol: 'text-gray-500' };
     }
   };
 
-  // Function to calculate days left
-  const getDaysLeft = (dueDate: string) => {
-    const currentDate = new Date();
-    const due = new Date(dueDate);
-    const daysLeft = Math.ceil((due.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysLeft;
+  const getItemName = (item: ContractItem) => {
+    if (item.capacity) {
+      return `${item.brand} ${item.model} ${item.capacity}`;
+    }
+    return `${item.brand} ${item.model}`;
   };
 
+  if (liffLoading || loading) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
+          <p className="text-red-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white p-4">
+    <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 flex flex-col">
+
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="mb-4 flex justify-between items-end">
         <div>
-          <h1 className="text-xl font-bold text-black">รายการสัญญาจำนำ</h1>
-          <p className="text-sm" style={{ color: '#4A4644' }}>
-            {profile?.displayName || 'ผู้ใช้'}
+          <h1 className="text-xl font-bold text-gray-800 leading-tight">รายการสัญญาจำนำ</h1>
+          <p className="text-gray-500 text-sm font-light mt-1">
+            {userName || profile?.displayName || 'ผู้ใช้'}
           </p>
         </div>
-        <span className="text-sm" style={{ color: '#9E9E9E' }}>
+        <div className="text-gray-400 text-xs font-light mb-1">
           ทั้งหมด {contracts.length} รายการ
-        </span>
+        </div>
       </div>
 
-      {/* Loading State */}
-      {isSearching && (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+      {/* List Container */}
+      <div className="flex-1 overflow-y-auto space-y-3 pb-24 no-scrollbar">
+        {contracts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">ไม่มีรายการสัญญาจำนำ</p>
           </div>
-        </div>
-      )}
+        ) : (
+          contracts.map((contract) => {
+            const status = getStatusBadge(contract.displayStatus);
+            return (
+              <div
+                key={contract.contract_id}
+                className="bg-white rounded-2xl p-5 shadow-sm relative cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => router.push(`/contracts/${contract.contract_id}`)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-bold text-gray-800 text-lg">
+                    {getItemName(contract.items)}
+                  </h3>
+                  <span className="text-gray-400 text-xs font-light">{contract.contract_number}</span>
+                </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="p-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600 text-sm">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Contracts List */}
-      {!isSearching && (
-        <div className="space-y-3">
-          {contracts.length === 0 ? (
-            <div className="text-center py-8">
-              <p style={{ color: '#4A4644' }}>ไม่พบรายการจำนำ</p>
-            </div>
-          ) : (
-            contracts.map((contract) => {
-              const statusInfo = getStatusInfo(contract.status, contract.dates.dueDate);
-              const daysLeft = getDaysLeft(contract.dates.dueDate);
-              return (
-                <div
-                  key={contract._id}
-                  className="rounded-xl shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow"
-                  style={{ backgroundColor: '#F0EFEF' }}
-                  onClick={() => window.location.href = `/contract-actions/${contract._id}`}
-                >
-                  <div className="bg-white rounded-lg p-4">
-                    <div className="flex justify-between">
-                      <div className="flex-1">
-                        <h2 className="font-bold text-black text-lg">
-                          {contract.item.brand} {contract.item.model}
-                        </h2>
-                        <p className="text-sm mt-1" style={{ color: '#4A4644' }}>
-                          มูลค่า: {contract.pawnDetails.pawnedPrice.toLocaleString()} บาท
-                        </p>
-                        <p className="text-sm mt-1" style={{ color: '#4A4644' }}>
-                          วันครบกำหนด: {formatDate(contract.dates.dueDate)}
-                        </p>
-                        <p className="text-sm mt-1" style={{ color: '#4A4644' }}>
-                          เหลือเวลา: {daysLeft > 0 ? `${daysLeft} วัน` : 'หมดอายุแล้ว'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm" style={{ color: '#4A4644' }}>รหัสสัญญา</p>
-                        <p className="text-sm font-medium text-black">{contract.contractNumber}</p>
-                        <span
-                          className="inline-block mt-2 px-3 py-1 text-sm rounded-full font-medium"
-                          style={{
-                            backgroundColor: statusInfo.bg,
-                            color: statusInfo.textColor
-                          }}
-                        >
-                          {statusInfo.text}
-                        </span>
-                      </div>
-                    </div>
+                <div className="space-y-1 mb-1">
+                  <div className="text-gray-500 text-sm">
+                    มูลค่า: <span className="text-gray-700">{contract.loan_principal_amount.toLocaleString()} บาท</span>
+                  </div>
+                  <div className="text-gray-500 text-sm">
+                    วันครบกำหนด: <span className="text-gray-700">{formatDate(contract.contract_end_date)}</span>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
-      )}
 
-      {/* Footer Button */}
-      <div className="mt-6">
+                {/* Status Badge */}
+                <div className="flex justify-end mt-2">
+                  <span className={`${status.bg} ${status.textCol} text-xs font-bold px-4 py-1.5 rounded-full`}>
+                    {status.text}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 bg-transparent p-4 flex flex-col gap-3 max-w-md mx-auto w-full">
+        {/* Pawn Entry Button */}
         <button
-          className="w-full py-4 rounded-xl font-bold text-center"
-          style={{ backgroundColor: '#E8F5E9', color: '#1B5E20' }}
+          onClick={() => router.push('/estimate')}
+          className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
         >
-          จำนำสินค้า
-          <div className="text-sm font-normal">Pawn entry</div>
+          <span className="text-base font-bold">จำนำสินค้า</span>
+          <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
+        </button>
+
+        {/* Contract List Button (Active State) */}
+        <button className="w-full bg-white border border-[#C08D6E] text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm">
+          <span className="text-base font-bold">รายการจำนำ</span>
+          <span className="text-[10px] opacity-80 font-light">Contract list</span>
         </button>
       </div>
+
     </div>
   );
 }
