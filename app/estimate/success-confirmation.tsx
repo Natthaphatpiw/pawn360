@@ -1,6 +1,7 @@
 'use client';
 
 import { Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 
 interface SuccessConfirmationProps {
@@ -11,6 +12,7 @@ interface SuccessConfirmationProps {
 }
 
 export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHome, onContinue }: SuccessConfirmationProps) {
+  const router = useRouter();
   const { liffObject } = useLiff();
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
@@ -49,17 +51,8 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
                 onContinue();
               } else {
                 // Default: navigate to contract agreement
-                if (liffObject && liffObject.isInClient()) {
-                  // In LINE LIFF client, use liff.openWindow
-                  const url = `${window.location.origin}/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
-                  liffObject.openWindow({
-                    url: url,
-                    external: false
-                  });
-                } else {
-                  // Fallback for web browser
-                  window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
-                }
+                // Use Next.js router for client-side navigation (works in LIFF)
+                router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
               }
             }}
             className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
