@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import SignatureCanvas from 'react-signature-canvas';
 import axios from 'axios';
 
-export default function ContractAgreementPage() {
+function ContractAgreementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useLiff();
@@ -198,5 +198,20 @@ export default function ContractAgreementPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function ContractAgreementPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F] mx-auto"></div>
+          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    }>
+      <ContractAgreementContent />
+    </Suspense>
   );
 }

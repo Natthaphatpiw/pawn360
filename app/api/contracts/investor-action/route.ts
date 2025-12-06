@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { Client } from '@line/bot-sdk';
+import { Client, FlexMessage } from '@line/bot-sdk';
 
 const investorLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
@@ -41,8 +41,6 @@ export async function POST(request: NextRequest) {
     }
 
     const investorId = investor.investor_id;
-
-    const supabase = supabaseAdmin();
 
     // Get contract details
     const { data: contract, error: contractError } = await supabase
@@ -126,7 +124,7 @@ function createAcceptedCard(contract: any) {
     year: 'numeric'
   });
 
-  return {
+  const card = {
     type: 'flex',
     altText: 'ข้อเสนอของคุณได้รับการตอบรับแล้ว',
     contents: {
@@ -237,4 +235,6 @@ function createAcceptedCard(contract: any) {
       }
     }
   };
+
+  return card as FlexMessage;
 }
