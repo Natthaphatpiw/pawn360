@@ -128,16 +128,16 @@ export default function EKYCInvestPage() {
     <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
       <div className="w-full max-w-md">
 
-        {/* Icon */}
+          {/* Icon */}
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 bg-[#E9EFF6] rounded-full flex items-center justify-center">
             <svg className="w-10 h-10 text-[#1E3A8A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+              </svg>
+            </div>
           </div>
-        </div>
 
-        {/* Title */}
+          {/* Title */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">ยืนยันตัวตนนักลงทุน</h1>
           <p className="text-sm text-gray-500">Investor Identity Verification (eKYC)</p>
@@ -147,20 +147,20 @@ export default function EKYCInvestPage() {
         <div className="bg-[#E9EFF6] rounded-2xl p-6 mb-6">
           <h2 className="font-bold text-gray-800 mb-3">กรุณาเตรียม:</h2>
           <ul className="space-y-2 text-sm text-gray-700">
-            <li className="flex items-start">
+              <li className="flex items-start">
               <span className="text-[#1E3A8A] mr-2">•</span>
               <span>บัตรประชาชนตัวจริง (ไม่ใช่สำเนา)</span>
-            </li>
-            <li className="flex items-start">
+              </li>
+              <li className="flex items-start">
               <span className="text-[#1E3A8A] mr-2">•</span>
               <span>สถานที่มีแสงสว่างเพียงพอ</span>
-            </li>
-            <li className="flex items-start">
+              </li>
+              <li className="flex items-start">
               <span className="text-[#1E3A8A] mr-2">•</span>
               <span>เตรียมพร้อมถ่ายภาพใบหน้า (Selfie)</span>
-            </li>
-          </ul>
-        </div>
+              </li>
+            </ul>
+          </div>
 
         {/* Rejection reason if any */}
         {kycStatus === 'REJECTED' && (
@@ -171,31 +171,31 @@ export default function EKYCInvestPage() {
           </div>
         )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-            {error}
-          </div>
-        )}
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
 
-        {/* Start Button */}
-        <button
-          onClick={handleStartKYC}
-          disabled={loading}
+          {/* Start Button */}
+          <button
+            onClick={handleStartKYC}
+            disabled={loading}
           className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white font-bold py-4 rounded-2xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-        >
+          >
           <span className="text-base">
             {loading ? 'กำลังเชื่อมต่อ...' : 'เริ่มยืนยันตัวตน'}
-          </span>
+              </span>
           {!loading && (
             <div className="text-[10px] font-light opacity-90 mt-1">Start Verification</div>
-          )}
-        </button>
+            )}
+          </button>
 
         {/* Note */}
         <p className="text-xs text-gray-500 text-center mt-4">
           ระบบจะนำท่านไปยังหน้ายืนยันตัวตนของ UpPass
-        </p>
+          </p>
       </div>
     </div>
   );

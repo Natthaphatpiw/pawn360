@@ -497,8 +497,8 @@ function RegisterForm({
           <p className="text-gray-400 text-xs mb-4 font-light">โปรดกรอกข้อมูลบัญชีสำหรับรับเงิน</p>
 
           <BankDropdown
-            value={formData.bankInfo.bankName}
-            onChange={handleInputChange}
+                value={formData.bankInfo.bankName}
+                onChange={handleInputChange}
           />
 
           <RegisterField
