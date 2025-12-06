@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const lang = 'th';
     const formSlug = process.env.UPPASS_FORM_SLUG;
     const uppassApiKey = process.env.UPPASS_API_KEY;
-    const uppassApiUrl = process.env.UPPASS_API_URL || 'https://api.uppass.io';
+    const uppassApiUrl = process.env.UPPASS_API_URL || 'https://app.uppass.io';
 
     if (!formSlug || !uppassApiKey) {
       throw new Error('UpPass configuration missing');
