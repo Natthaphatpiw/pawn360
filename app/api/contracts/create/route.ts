@@ -1,399 +1,264 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db/mongodb';
-import { Contract } from '@/lib/db/models';
-import { sendTextMessage } from '@/lib/line/client';
-import { getS3Client } from '@/lib/aws/s3';
-import { ObjectId } from 'mongodb';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { supabaseAdmin } from '@/lib/supabase/client';
+import { uploadSignatureToS3 } from '@/lib/aws/s3';
+import { Client } from '@line/bot-sdk';
+
+const investorLineClient = new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c'
+});
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-
     const {
+      loanRequestId,
       itemId,
-      storeId: bodyStoreId,
-      contractData,
+      accepted,
+      signature,
+      lineId
     } = body;
 
-    // Validation
-    if (!itemId || !contractData) {
+    if (!loanRequestId || !itemId || !accepted || !signature || !lineId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    const { db } = await connectToDatabase();
-    const contractsCollection = db.collection<Contract>('contracts');
-    const itemsCollection = db.collection('items');
-    const customersCollection = db.collection('customers');
+    const supabase = supabaseAdmin();
 
-    // Get item details
-    const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
-    if (!item) {
+    // 1. Get loan request and item data
+    const { data: loanRequest, error: loanRequestError } = await supabase
+      .from('loan_requests')
+      .select(`
+        *,
+        items:item_id (*),
+        pawners:customer_id (*),
+        drop_points:drop_point_id (*)
+      `)
+      .eq('request_id', loanRequestId)
+      .single();
+
+    if (loanRequestError || !loanRequest) {
       return NextResponse.json(
-        { error: 'Item not found' },
+        { error: 'Loan request not found' },
         { status: 404 }
       );
     }
 
-    // Get customer details using lineId from item
-    const customer = await customersCollection.findOne({ lineId: item.lineId });
-    if (!customer) {
-      return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
-      );
+    // 2. Upload signature to S3
+    const contractId = `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    let signedContractUrl = null;
+
+    try {
+      signedContractUrl = await uploadSignatureToS3(contractId, signature);
+      console.log('Signature uploaded to S3:', signedContractUrl);
+    } catch (s3Error) {
+      console.error('Failed to upload signature to S3:', s3Error);
+      // Continue without signature URL for now
     }
 
-    // 🔥 Determine storeId: prioritize body > item.storeId > confirmationNewContract.storeId
-    const storeId = bodyStoreId ||
-                    item.storeId?.toString() ||
-                    item.confirmationNewContract?.storeId?.toString();
+    // 3. Create contract record
+    const contractStartDate = new Date();
+    const contractEndDate = new Date();
+    contractEndDate.setDate(contractStartDate.getDate() + loanRequest.requested_duration_days);
 
-    if (!storeId) {
-      console.error('❌ No storeId found in request body, item, or confirmationNewContract');
-      return NextResponse.json(
-        { error: 'ไม่พบข้อมูลร้านค้า กรุณาติดต่อเจ้าหน้าที่' },
-        { status: 400 }
-      );
-    }
+    const interestRate = 0.03; // 3% per month
+    const interestAmount = loanRequest.requested_amount * interestRate;
+    const platformFeeAmount = interestAmount * 0.1; // 10% of interest
+    const totalAmount = loanRequest.requested_amount + interestAmount;
 
-    console.log(`🏪 Using storeId: ${storeId} (source: ${bodyStoreId ? 'request body' : item.storeId ? 'item.storeId' : 'confirmationNewContract'})`);
-
-    // Calculate dates and amounts - Always use current date for contract creation
-    const startDate = new Date(); // Current date when contract is created
-
-    // 🔥 แปลงค่าให้เป็น number เพื่อป้องกัน string concatenation
-    const pawnedPrice = parseFloat(String(item.confirmationNewContract?.pawnPrice || item.desiredAmount || item.estimatedValue || 0));
-    const interestRate = parseFloat(String(item.confirmationNewContract?.interestRate || item.interestRate || 10));
-    const periodDays = parseInt(String(item.confirmationNewContract?.loanDays || item.loanDays || 30));
-
-    // คำนวณ dueDate อย่างถูกต้อง
-    const dueDate = new Date(startDate.getTime());
-    dueDate.setDate(dueDate.getDate() + periodDays);
-
-    const totalInterest = (pawnedPrice * interestRate * periodDays) / (100 * 30);
-    const remainingAmount = pawnedPrice + totalInterest;
-
-    console.log(`💰 Contract creation - Price: ${pawnedPrice}, Rate: ${interestRate}%, Days: ${periodDays}`);
-    console.log(`💰 Interest calculation: (${pawnedPrice} × ${interestRate}% × ${periodDays}) / (100 × 30) = ${totalInterest}`);
-    console.log(`💰 Remaining amount: ${pawnedPrice} + ${totalInterest} = ${remainingAmount}`);
-    console.log(`📅 Date calculation - Start: ${startDate.toISOString()}, Due: ${dueDate.toISOString()}, Period: ${periodDays} days`);
-
-    // Check if contract already exists for this item
-    const existingContract = await contractsCollection.findOne({
-      'item.itemId': new ObjectId(itemId)
-    });
-
-    if (existingContract) {
-      console.log(`Contract already exists for item ${itemId}, updating instead of creating new one`);
-
-      console.log(`📝 Updating existing contract with numeric values`);
-
-      // Update existing contract with new data (using converted numeric values)
-      await contractsCollection.updateOne(
-        { _id: existingContract._id },
-        {
-          $set: {
-            'pawnDetails.pawnedPrice': pawnedPrice,
-            'pawnDetails.interestRate': interestRate,
-            'pawnDetails.periodDays': periodDays,
-            'pawnDetails.totalInterest': totalInterest,
-            'pawnDetails.remainingAmount': remainingAmount,
-            'pawnDetails.serviceFee': contractData.serviceFee || 0,
-            'dates.startDate': startDate,
-            'dates.dueDate': dueDate,
-            'signatures': contractData.signatures,
-            'documents': existingContract.documents || {},
-            status: 'active',
-            updatedAt: new Date(),
-          }
-        }
-      );
-
-      // Update item with existing contract reference
-      await itemsCollection.updateOne(
-        { _id: new ObjectId(itemId) },
-        {
-          $set: {
-            status: 'active',
-            currentContractId: existingContract._id,
-            storeId: new ObjectId(storeId),
-            updatedAt: new Date(),
-          },
-          $addToSet: {
-            contractHistory: existingContract._id as any,
-          }
-        }
-      );
-
-      // Update customer
-      const currentCustomer = await customersCollection.findOne({ _id: customer._id });
-      const storeIdToAdd = new ObjectId(storeId);
-
-      if (!currentCustomer?.storeId) {
-        await customersCollection.updateOne(
-          { _id: customer._id },
-          {
-            $inc: {
-              totalContracts: 1,
-              totalValue: pawnedPrice,
-            },
-            $set: {
-              lastContractDate: new Date(),
-              updatedAt: new Date(),
-              storeId: [storeIdToAdd],
-            },
-            $addToSet: {
-              contractsID: existingContract._id as any,
-            },
-          }
-        );
-      } else if (Array.isArray(currentCustomer.storeId)) {
-        await customersCollection.updateOne(
-          { _id: customer._id },
-          {
-            $inc: {
-              totalContracts: 1,
-              totalValue: pawnedPrice,
-            },
-            $set: {
-              lastContractDate: new Date(),
-              updatedAt: new Date(),
-            },
-            $addToSet: {
-              storeId: storeIdToAdd,
-              contractsID: existingContract._id as any,
-            },
-          }
-        );
-      } else {
-        await customersCollection.updateOne(
-          { _id: customer._id },
-          {
-            $inc: {
-              totalContracts: 1,
-              totalValue: pawnedPrice,
-            },
-            $set: {
-              lastContractDate: new Date(),
-              updatedAt: new Date(),
-              storeId: [currentCustomer.storeId, storeIdToAdd],
-            },
-            $addToSet: {
-              contractsID: existingContract._id as any,
-            },
-          }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Contract updated successfully',
-        contractId: existingContract._id,
-        contractNumber: existingContract.contractNumber,
-      });
-    }
-
-    // Upload contract images to S3 if provided
-    const contractImageUrls: { contractHtmlUrl?: string; verificationPhotoUrl?: string } = {};
-
-    // Generate contract number for new contract (use PW prefix)
-    const contractNumber = `PW${Date.now()}`;
-
-    if (contractData.signatures?.seller?.signatureData || contractData.signatures?.buyer?.signatureData) {
-      try {
-        // Generate contract PDF/HTML and upload to S3
-        // For now, we'll store the signature data in the contract
-        // TODO: Generate proper PDF from contract data
-      } catch (error) {
-        console.error('Error uploading contract images:', error);
-      }
-    }
-
-    if (contractData.verificationPhoto) {
-      try {
-        // Upload verification photo to S3
-        const s3Client = getS3Client();
-        const photoBuffer = Buffer.from(contractData.verificationPhoto.split(',')[1], 'base64');
-        const photoFileName = `contract-${contractNumber}-verification.jpg`;
-        const photoKey = `contracts/${photoFileName}`;
-
-        const uploadCommand = new PutObjectCommand({
-          Bucket: process.env.AWS_S3_BUCKET_NAME || 'piwp360',
-          Key: photoKey,
-          Body: photoBuffer,
-          ContentType: 'image/jpeg',
-        });
-
-        await s3Client.send(uploadCommand);
-        contractImageUrls.verificationPhotoUrl = `https://${process.env.AWS_S3_BUCKET_NAME || 'piwp360'}.s3.amazonaws.com/${photoKey}`;
-      } catch (error) {
-        console.error('Error uploading verification photo:', error);
-      }
-    }
-
-    // Create contract
-    const newContract: Contract = {
-      contractNumber,
-      status: 'active',
-      customerId: customer._id,
-      lineId: customer.lineId,
-      item: {
-        brand: item.brand,
-        model: item.model,
-        type: item.type,
-        serialNo: item.serialNo,
-        accessories: item.accessories,
-        condition: item.condition,
-        defects: item.defects,
-        note: item.note,
-        images: item.images,
-      },
-      pawnDetails: {
-        aiEstimatedPrice: item.estimatedValue || 0,
-        pawnedPrice: pawnedPrice,
-        interestRate: interestRate,
-        periodDays: periodDays,
-        totalInterest,
-        remainingAmount,
-        fineAmount: 0,
-        payInterest: 0,
-        soldAmount: 0,
-        serviceFee: contractData.serviceFee || 0,
-      },
-      dates: {
-        startDate,
-        dueDate,
-        redeemDate: null,
-        suspendedDate: null,
-      },
-      transactionHistory: [],
-      storeId: new ObjectId(storeId),
-      createdBy: new ObjectId(storeId), // ใช้ storeId เป็น createdBy เพราะเป็นพนักงานร้าน
-      userId: new ObjectId(storeId),
-      // New fields for signatures and images
-      signatures: contractData.signatures,
-      documents: contractImageUrls,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const contractRecord = {
+      contract_id: contractId,
+      contract_number: contractId,
+      customer_id: loanRequest.customer_id,
+      investor_id: null, // Will be assigned when investor accepts
+      drop_point_id: loanRequest.drop_point_id,
+      item_id: loanRequest.item_id,
+      loan_request_id: loanRequest.request_id,
+      contract_start_date: contractStartDate.toISOString(),
+      contract_end_date: contractEndDate.toISOString(),
+      contract_duration_days: loanRequest.requested_duration_days,
+      loan_principal_amount: loanRequest.requested_amount,
+      interest_rate: interestRate,
+      interest_amount: interestAmount,
+      total_amount: totalAmount,
+      platform_fee_rate: 0.1,
+      platform_fee_amount: platformFeeAmount,
+      contract_status: 'PENDING_SIGNATURE',
+      funding_status: 'PENDING',
+      signed_contract_url: signedContractUrl,
     };
 
-    // Insert contract
-    const result = await contractsCollection.insertOne(newContract);
+    const { data: contract, error: contractError } = await supabase
+      .from('contracts')
+      .insert(contractRecord)
+      .select()
+      .single();
 
-    if (!result.insertedId) {
+    if (contractError || !contract) {
+      console.error('Error creating contract:', contractError);
       return NextResponse.json(
         { error: 'Failed to create contract' },
         { status: 500 }
       );
     }
 
-    // Update item status and link to contract
-    await itemsCollection.updateOne(
-      { _id: new ObjectId(itemId) },
-      {
-        $set: {
-          status: 'active',
-          currentContractId: result.insertedId,
-          storeId: new ObjectId(storeId),
-          updatedAt: new Date(),
-        },
-        $push: {
-          contractHistory: result.insertedId as any,
-        },
-      }
-    );
+    // 4. Update item status
+    await supabase
+      .from('items')
+      .update({ item_status: 'IN_CONTRACT' })
+      .eq('item_id', itemId);
 
-    // Update customer with contract info and storeId
-    // First check if storeId is an array or single value and handle accordingly
-    const currentCustomer = await customersCollection.findOne({ _id: customer._id });
-    const storeIdToAdd = new ObjectId(storeId);
+    // 5. Update loan request status
+    await supabase
+      .from('loan_requests')
+      .update({ request_status: 'OFFER_ACCEPTED' })
+      .eq('request_id', loanRequestId);
 
-    if (!currentCustomer?.storeId) {
-      // storeId doesn't exist, set it as an array
-      await customersCollection.updateOne(
-        { _id: customer._id },
-        {
-          $inc: {
-            totalContracts: 1,
-            totalValue: pawnedPrice,
-          },
-          $set: {
-            lastContractDate: new Date(),
-            updatedAt: new Date(),
-            storeId: [storeIdToAdd],
-          },
-          $push: {
-            contractsID: result.insertedId as any,
-          },
-        }
-      );
-    } else if (Array.isArray(currentCustomer.storeId)) {
-      // storeId is already an array, add to it
-      await customersCollection.updateOne(
-        { _id: customer._id },
-        {
-          $inc: {
-            totalContracts: 1,
-            totalValue: pawnedPrice,
-          },
-          $set: {
-            lastContractDate: new Date(),
-            updatedAt: new Date(),
-          },
-          $addToSet: {
-            storeId: storeIdToAdd,
-          },
-          $push: {
-            contractsID: result.insertedId as any,
-          },
-        }
-      );
-    } else {
-      // storeId exists as single ObjectId, convert to array
-      await customersCollection.updateOne(
-        { _id: customer._id },
-        {
-          $inc: {
-            totalContracts: 1,
-            totalValue: pawnedPrice,
-          },
-          $set: {
-            lastContractDate: new Date(),
-            updatedAt: new Date(),
-            storeId: [currentCustomer.storeId, storeIdToAdd],
-          },
-          $push: {
-            contractsID: result.insertedId as any,
-          },
-        }
-      );
-    }
-
-    // Send notification to LINE
+    // 6. Send LINE offer cards to all active investors
     try {
-      const message = `สัญญาเลขที่ ${contractNumber} ของคุณได้ถูกสร้างเรียบร้อยแล้ว\n\nรายละเอียด:\n- สินค้า: ${item.brand} ${item.model}\n- จำนวนเงิน: ${pawnedPrice.toLocaleString()} บาท\n- อัตราดอกเบี้ย: ${interestRate}%\n- ระยะเวลา: ${periodDays} วัน\n- วันครบกำหนด: ${dueDate.toLocaleDateString('th-TH')}`;
+      const { data: investors } = await supabase
+        .from('investors')
+        .select('investor_id, line_id, firstname, lastname')
+        .eq('is_active', true)
+        .eq('is_blocked', false);
 
-      await sendTextMessage(customer.lineId, message);
-    } catch (error) {
-      console.error('Error sending notification:', error);
-      // Continue even if notification fails
+      if (investors && investors.length > 0) {
+        const offerCard = createPawnOfferCard(contract, loanRequest);
+
+        for (const investor of investors) {
+          try {
+            await investorLineClient.pushMessage(investor.line_id, offerCard);
+            console.log(`Sent offer card to investor ${investor.line_id}`);
+          } catch (msgError) {
+            console.error(`Failed to send offer to investor ${investor.line_id}:`, msgError);
+          }
+        }
+      }
+    } catch (investorError) {
+      console.error('Error sending offers to investors:', investorError);
+      // Don't fail the contract creation if messaging fails
     }
 
     return NextResponse.json({
       success: true,
-      contractId: result.insertedId,
-      contractNumber,
-      message: 'Contract created successfully',
+      contractId: contract.contract_id,
+      message: 'Contract created successfully and offers sent to investors',
     });
-  } catch (error) {
-    console.error('Error creating contract:', error);
+
+  } catch (error: any) {
+    console.error('Error in contract creation:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
+}
+
+function createPawnOfferCard(contract: any, loanRequest: any) {
+  return {
+    type: 'flex',
+    altText: 'ข้อเสนอจำนำ',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: 'ข้อเสนอจำนำ',
+          weight: 'bold',
+          size: 'lg',
+          color: '#ffffff',
+        }],
+        backgroundColor: '#C0562F',
+        paddingAll: 'lg',
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'image',
+          url: loanRequest.items?.image_urls?.[0] || 'https://via.placeholder.com/300x300?text=No+Image',
+          size: 'full',
+          aspectRatio: '1:1',
+          aspectMode: 'cover',
+        }, {
+          type: 'box',
+          layout: 'vertical',
+          margin: 'lg',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'วงเงิน:', color: '#666666', size: 'sm', flex: 0 },
+                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#1DB446', size: 'md', weight: 'bold', flex: 0, align: 'end' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'ระยะเวลา:', color: '#666666', size: 'sm', flex: 0 },
+                { type: 'text', text: `${contract.contract_duration_days} วัน`, color: '#666666', size: 'md', weight: 'bold', flex: 0, align: 'end' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 0 },
+                { type: 'text', text: `${contract.interest_amount.toLocaleString()} บาท`, color: '#666666', size: 'md', weight: 'bold', flex: 0, align: 'end' }
+              ]
+            },
+            {
+              type: 'separator',
+              margin: 'md'
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              margin: 'md',
+              contents: [
+                { type: 'text', text: 'ยอดสุทธิ:', color: '#666666', size: 'sm', flex: 0 },
+                { type: 'text', text: `${contract.total_amount.toLocaleString()} บาท`, color: '#E91E63', size: 'xl', weight: 'bold', flex: 0, align: 'end' }
+              ]
+            }
+          ]
+        }]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [{
+          type: 'button',
+          action: {
+            type: 'uri',
+            label: 'ดูข้อเสนอ',
+            uri: `https://liff.line.me/2008641671-O4zZnvW9/offer-detail?contractId=${contract.contract_id}`
+          },
+          style: 'primary',
+          color: '#1DB446'
+        }, {
+          type: 'button',
+          action: {
+            type: 'postback',
+            label: 'ปฏิเสธ',
+            data: `action=decline_offer&contractId=${contract.contract_id}`
+          },
+          style: 'secondary',
+          color: '#E91E63'
+        }]
+      }
+    }
+  };
 }

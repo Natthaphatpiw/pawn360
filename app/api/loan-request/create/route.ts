@@ -45,16 +45,21 @@ export async function POST(request: NextRequest) {
       brand: itemData.brand,
       model: itemData.model,
       capacity: itemData.capacity || null,
-      color: itemData.color || null,
-      processor: itemData.processor || null,
+      serial_number: itemData.serialNumber || null,
+      cpu: itemData.processor || null,
       ram: itemData.ram || null,
       storage: itemData.storage || null,
       gpu: itemData.gpu || null,
-      condition_score: itemData.condition,
+      item_condition: itemData.condition,
+      ai_condition_score: itemData.aiConditionScore || null,
+      ai_condition_reason: itemData.aiConditionReason || null,
       estimated_value: itemData.estimatedPrice,
+      ai_confidence: itemData.aiConfidence || null,
+      accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
+      defects: itemData.defects || null,
+      notes: itemData.notes || null,
       image_urls: itemData.images,
       item_status: 'PENDING',
-      accessories_included: itemData.appleAccessories || [],
     };
 
     const { data: item, error: itemError } = await supabase
@@ -89,16 +94,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Create loan request
+    const deliveryMethodMap = {
+      'delivery': 'DELIVERY',
+      'pickup': 'WALK_IN',
+      'courier': 'COURIER'
+    };
+
     const loanRequestRecord = {
       customer_id: customerId,
       item_id: item.item_id,
       drop_point_id: branchId,
-      requested_loan_amount: loanAmount,
-      loan_duration_months: duration,
-      interest_rate: interestRate,
-      delivery_method: deliveryMethod,
+      requested_amount: loanAmount,
+      requested_duration_days: duration,
+      delivery_method: deliveryMethodMap[deliveryMethod as keyof typeof deliveryMethodMap] || 'WALK_IN',
       delivery_fee: deliveryFee,
       request_status: 'PENDING',
+      expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours from now
     };
 
     const { data: loanRequest, error: loanRequestError } = await supabase

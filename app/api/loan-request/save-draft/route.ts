@@ -41,16 +41,21 @@ export async function POST(request: NextRequest) {
       brand: itemData.brand,
       model: itemData.model,
       capacity: itemData.capacity || null,
-      color: itemData.color || null,
-      processor: itemData.processor || null,
+      serial_number: itemData.serialNumber || null,
+      cpu: itemData.processor || null,
       ram: itemData.ram || null,
       storage: itemData.storage || null,
       gpu: itemData.gpu || null,
-      condition_score: itemData.condition,
+      item_condition: itemData.condition,
+      ai_condition_score: itemData.aiConditionScore || null,
+      ai_condition_reason: itemData.aiConditionReason || null,
       estimated_value: itemData.estimatedPrice,
+      ai_confidence: itemData.aiConfidence || null,
+      accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
+      defects: itemData.defects || null,
+      notes: itemData.notes || null,
       image_urls: itemData.images,
-      item_status: 'DRAFT',
-      accessories_included: itemData.appleAccessories || [],
+      item_status: 'PENDING', // Changed from DRAFT to PENDING
     };
 
     const { data: item, error: itemError } = await supabase

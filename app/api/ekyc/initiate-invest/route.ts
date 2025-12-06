@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
 
     // 2. Call UpPass API to create eKYC session for investors
     const lang = 'th';
-    // TEMPORARY: Use same config as pawner until investor form is created in UpPass
-    const formSlug = process.env.UPPASS_FORM_SLUG_INVEST || process.env.UPPASS_FORM_SLUG || 'pawner';
+    // IMPORTANT: You need to create a form named 'investor' in your UpPass dashboard, or temporarily use the same form as pawner
+    const formSlug = process.env.UPPASS_FORM_SLUG_INVEST || 'pawner'; // Change 'pawner' to 'investor' after creating the form in UpPass
     const uppassApiKey = process.env.UPPASS_API_KEY_INVEST || process.env.UPPASS_API_KEY;
-    const uppassApiUrl = process.env.UPPASS_API_URL_INVEST || process.env.UPPASS_API_URL || 'https://app.uppass.io'; // Corrected: Use app.uppass.io as per documentation
+    const uppassApiUrl = process.env.UPPASS_API_URL_INVEST || process.env.UPPASS_API_URL || 'https://app.uppass.io'; // Use app.uppass.io as per documentation
 
     console.log('UpPass Investor API Config:', {
       url: uppassApiUrl,
