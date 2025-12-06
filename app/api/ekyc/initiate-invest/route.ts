@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import crypto from 'crypto';
-
-const UPPASS_API_KEY = process.env.UPPASS_API_KEY_INVEST || 'sk_d3NfM0ZvRzZQaG1SdjdCRV9IREw4QUxOMFREOkFEPD88WmFhQDdyLHVZczlzbFlaNHtyVltKI2h0dyhe';
-const UPPASS_FORM_SLUG = process.env.UPPASS_FORM_SLUG_INVEST || 'investor';
-const UPPASS_API_URL = process.env.UPPASS_API_URL || 'https://app.uppass.io';
 
 export async function POST(request: NextRequest) {
   try {
-    const { investorId } = await request.json();
+    const body = await request.json();
+    const { investorId } = body;
 
     if (!investorId) {
       return NextResponse.json(
@@ -19,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseAdmin();
 
-    // Get investor details
+    // 1. Get investor data
     const { data: investor, error: investorError } = await supabase
       .from('investors')
       .select('*')
@@ -33,64 +29,72 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already verified
-    if (investor.kyc_status === 'VERIFIED') {
-      return NextResponse.json(
-        { error: 'KYC already verified' },
-        { status: 400 }
-      );
+    // 2. Call UpPass API to create eKYC session for investors
+    const lang = 'th';
+    const formSlug = process.env.UPPASS_FORM_SLUG_INVEST || 'investor';
+    const uppassApiKey = process.env.UPPASS_API_KEY_INVEST || 'sk_d3NfM0ZvRzZQaG1SdjdCRV9IREw4QUxOMFREOkFEPD88WmFhQDdyLHVZczlzbFlaNHtyVltKI2h0dyhe';
+    const uppassApiUrl = process.env.UPPASS_API_URL_INVEST || 'https://app.uppass.io';
+
+    if (!formSlug || !uppassApiKey) {
+      throw new Error('UpPass investor configuration missing');
     }
 
-    // Generate unique slug for this verification
-    const uniqueSlug = `investor-${investorId}-${crypto.randomBytes(8).toString('hex')}`;
-
-    // Create UpPass verification session
-    const uppassResponse = await fetch(`${UPPASS_API_URL}/api/v1/forms/${UPPASS_FORM_SLUG}/sessions`, {
+    const upPassResponse = await fetch(`${uppassApiUrl}/${lang}/api/forms/${formSlug}/create/`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${UPPASS_API_KEY}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${uppassApiKey}`
       },
       body: JSON.stringify({
-        external_id: investorId,
-        slug: uniqueSlug,
-        prefill: {
-          first_name: investor.firstname,
-          last_name: investor.lastname,
-          national_id: investor.national_id,
-          phone: investor.phone_number,
-        },
-        redirect_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://pawnline.vercel.app'}/ekyc-invest/waiting`,
-      }),
+        answers: {
+          // Optional: pass pre-filled answers if available
+          ...(investor.firstname && { th_first_name: investor.firstname }),
+          ...(investor.lastname && { th_last_name: investor.lastname }),
+          ...(investor.national_id && { id_card_number: investor.national_id })
+        }
+      })
     });
 
-    if (!uppassResponse.ok) {
-      const errorData = await uppassResponse.json();
-      console.error('UpPass API error:', errorData);
+    const upPassData = await upPassResponse.json();
+
+    if (!upPassResponse.ok) {
+      console.error('UpPass Investor Error:', upPassData);
       throw new Error('Failed to create verification session');
     }
 
-    const uppassData = await uppassResponse.json();
+    // 3. Extract form_url and slug from response
+    const { form_url, detail } = upPassData;
+    const sessionSlug = detail?.slug;
 
-    // Update investor with uppass_slug and set status to PENDING
-    await supabase
+    if (!sessionSlug) {
+      throw new Error('Invalid response from UpPass');
+    }
+
+    // 4. Update investor record with uppass_slug and set status to PENDING
+    const { error: updateError } = await supabase
       .from('investors')
       .update({
-        uppass_slug: uniqueSlug,
+        uppass_slug: sessionSlug,
         kyc_status: 'PENDING',
         updated_at: new Date().toISOString()
       })
       .eq('investor_id', investorId);
 
+    if (updateError) {
+      throw updateError;
+    }
+
+    // 5. Return the verification URL to frontend
     return NextResponse.json({
       success: true,
-      url: uppassData.url || uppassData.verification_url
+      url: form_url,
+      sessionSlug
     });
 
   } catch (error: any) {
-    console.error('eKYC initiation error:', error);
+    console.error('Error initiating investor eKYC:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to initiate eKYC' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
