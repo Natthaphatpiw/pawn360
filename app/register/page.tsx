@@ -45,6 +45,14 @@ export default function PawnerRegister() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+
+  console.log('🔍 PawnerRegister state:', {
+    liffLoading,
+    liffError,
+    loading,
+    hasProfile: !!profile,
+    userId: profile?.userId
+  });
   const [pawnerData, setPawnerData] = useState<PawnerData | null>(null);
   const [formData, setFormData] = useState<RegisterFormData>({
     firstname: '',
@@ -73,32 +81,46 @@ export default function PawnerRegister() {
 
   // Check if user exists in database and KYC status
   useEffect(() => {
-    if (liffLoading) return;
+    console.log('🔄 useEffect triggered:', { liffLoading, liffError, hasProfile: !!profile });
+
+    if (liffLoading) {
+      console.log('⏳ LIFF still loading...');
+      return;
+    }
 
     if (liffError) {
+      console.error('❌ LIFF error:', liffError);
       setError('ไม่สามารถเชื่อมต่อ LINE LIFF ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
       return;
     }
 
     if (!profile?.userId) {
+      console.warn('⚠️ No profile userId found');
       setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE LIFF');
       setLoading(false);
       return;
     }
 
     const checkUser = async () => {
+      console.log('🔍 Checking user with lineId:', profile.userId);
       try {
         const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
+        console.log('✅ Pawner check response:', response.data);
+
         if (response.data.exists) {
           const pawner = response.data.pawner;
+          console.log('👤 Pawner found:', pawner);
           // Always show profile; UI will gate actions by kyc_status
           setPawnerData(pawner);
+        } else {
+          console.log('👤 Pawner not found - showing registration form');
         }
       } catch (error: any) {
-        console.error('Error checking pawner:', error);
+        console.error('❌ Error checking pawner:', error);
         setError('เกิดข้อผิดพลาดในการตรวจสอบข้อมูลผู้ใช้ กรุณาลองใหม่อีกครั้ง');
       } finally {
+        console.log('🏁 Setting loading to false');
         setLoading(false);
       }
     };
@@ -169,6 +191,7 @@ export default function PawnerRegister() {
   };
 
   if (liffLoading || loading) {
+    console.log('⏳ Showing loading spinner:', { liffLoading, loading });
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>

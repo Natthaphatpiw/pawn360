@@ -36,25 +36,42 @@ export function LiffProvider({
 
   useEffect(() => {
     const initializeLiff = async () => {
+      console.log('🔄 Initializing LIFF with ID:', liffId, '(type:', typeof liffId, ')');
+
       try {
         if (!liffId) {
           throw new Error('LIFF ID is not provided');
         }
 
+        if (typeof window === 'undefined') {
+          console.log('⚠️ Running on server side, skipping LIFF init');
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('📱 Calling liff.init...');
         await liff.init({ liffId });
+        console.log('✅ LIFF initialized successfully');
         setLiffObject(liff);
 
-        if (liff.isLoggedIn()) {
+        const isLoggedIn = liff.isLoggedIn();
+        console.log('🔐 LIFF login status:', isLoggedIn);
+
+        if (isLoggedIn) {
+          console.log('👤 Getting user profile...');
           setIsLoggedIn(true);
           const userProfile = await liff.getProfile();
+          console.log('✅ User profile obtained:', userProfile);
           setProfile(userProfile);
         } else {
+          console.log('🔑 User not logged in, calling liff.login()');
           liff.login();
         }
       } catch (err: any) {
-        console.error('LIFF initialization failed:', err);
+        console.error('❌ LIFF initialization failed:', err);
         setError(err.message || 'Failed to initialize LIFF');
       } finally {
+        console.log('🏁 LIFF initialization completed');
         setIsLoading(false);
       }
     };

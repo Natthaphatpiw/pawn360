@@ -1244,7 +1244,7 @@ export default function EstimatePage() {
               capacity: formData.capacity,
               condition: formData.condition,
               images: uploadedImageUrls,
-              estimatedPrice: estimateResult.estimatedPrice,
+              estimatedPrice: estimateResult?.estimatedPrice || 0,
               appleAccessories: formData.appleAccessories
                 ? Object.entries(formData.appleAccessories)
                     .filter(([, value]) => value)
