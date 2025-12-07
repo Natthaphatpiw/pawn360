@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
@@ -9,6 +8,8 @@ import { Camera, ChevronUp, ChevronDown, Search, X, Check } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 import PawnSummary from './pawn-summary';
 import SuccessConfirmation from './success-confirmation';
+import ContractAgreementStep from './contract-agreement-step';
+import ContractSuccess from './contract-success';
 
 const sarabun = Sarabun({
   subsets: ['latin'],
@@ -137,10 +138,9 @@ interface Customer {
   pawnRequests: any[];
 }
 
-type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'success_confirmation';
+type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'success_confirmation' | 'contract_agreement' | 'contract_success';
 
 export default function EstimatePage() {
-  const router = useRouter();
   const { profile, isLoading, error: liffError } = useLiff();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +204,7 @@ export default function EstimatePage() {
   // Success confirmation data
   const [loanRequestId, setLoanRequestId] = useState<string>('');
   const [itemId, setItemId] = useState<string>('');
+  const [contractId, setContractId] = useState<string>('');
 
   // Check customer exists
   const checkCustomerExists = async () => {
@@ -1285,8 +1286,8 @@ export default function EstimatePage() {
             loanRequestId={loanRequestId}
             itemId={itemId}
             onContinue={() => {
-              // Navigate to contract agreement page using Next.js router (same LIFF app)
-              router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
+              // Go to contract agreement step (same page, no navigation needed)
+              setCurrentStep('contract_agreement');
             }}
             onBackToHome={() => {
               setCurrentStep('form');
@@ -1316,6 +1317,57 @@ export default function EstimatePage() {
               setSelectedStore('');
               setLoanRequestId('');
               setItemId('');
+            }}
+          />
+        )}
+
+        {/* Contract Agreement Step */}
+        {currentStep === 'contract_agreement' && profile?.userId && (
+          <ContractAgreementStep
+            loanRequestId={loanRequestId}
+            itemId={itemId}
+            lineId={profile.userId}
+            onBack={() => setCurrentStep('success_confirmation')}
+            onSuccess={(newContractId) => {
+              setContractId(newContractId);
+              setCurrentStep('contract_success');
+            }}
+          />
+        )}
+
+        {/* Contract Success Step */}
+        {currentStep === 'contract_success' && (
+          <ContractSuccess
+            contractId={contractId}
+            onBackToHome={() => {
+              setCurrentStep('form');
+              setFormData({
+                itemType: '',
+                brand: '',
+                model: '',
+                capacity: '',
+                serialNo: '',
+                accessories: '',
+                condition: 50,
+                defects: '',
+                note: '',
+                lenses: ['', ''],
+                appleSearchTerm: '',
+                appleAccessories: {
+                  box: false,
+                  adapter: false,
+                  cable: false,
+                  receipt: false,
+                },
+              });
+              setImages([]);
+              setImageUrls([]);
+              setEstimateResult(null);
+              setConditionResult(null);
+              setSelectedStore('');
+              setLoanRequestId('');
+              setItemId('');
+              setContractId('');
             }}
           />
         )}
