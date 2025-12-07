@@ -56,9 +56,9 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
               if (onContinue) {
                 onContinue();
               } else {
-                // Default: navigate to contract agreement with full page reload
+                // Default: navigate to contract agreement using Next.js router to keep LIFF context
                 console.log('🔄 Redirecting to contract-agreement...');
-                window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
+                router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
               }
             }}
             className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"

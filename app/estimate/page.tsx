@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
@@ -139,6 +140,7 @@ interface Customer {
 type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'success_confirmation';
 
 export default function EstimatePage() {
+  const router = useRouter();
   const { profile, isLoading, error: liffError } = useLiff();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -1283,8 +1285,8 @@ export default function EstimatePage() {
             loanRequestId={loanRequestId}
             itemId={itemId}
             onContinue={() => {
-              // Redirect to contract agreement page
-              window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
+              // Redirect to contract agreement page using Next.js router to keep LIFF context
+              router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
             }}
             onBackToHome={() => {
               setCurrentStep('form');
