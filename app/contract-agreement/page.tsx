@@ -52,8 +52,8 @@ function ContractAgreementContent() {
       });
 
       if (response.data.success) {
-        // Redirect to success page or contract details
-        router.push(`/contract/${response.data.contractId}`);
+        // Redirect to pawner contract details page
+        router.push(`/pawner/contract/${response.data.contractId}`);
       }
     } catch (error: any) {
       console.error('Error submitting agreement:', error);

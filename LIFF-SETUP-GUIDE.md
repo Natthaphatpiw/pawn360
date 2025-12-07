@@ -38,6 +38,13 @@
 - **Scope:** profile, chat_message.write
 - ❌ **อย่าใช้:** `https://pawn360.vercel.app`
 
+### 6. รายละเอียดสัญญาผู้จำนำ (Pawner Contract Details)
+- **LIFF ID:** `2008216710-yyyyyyyy` (สร้างใหม่)
+- **Endpoint URL:** `https://pawn360.vercel.app/pawner/contract`
+- **Size:** Full screen
+- **Scope:** profile, chat_message.write
+- ❌ **อย่าใช้:** `https://pawn360.vercel.app`
+
 ---
 
 ## 📱 Rich Menu Configuration
@@ -117,6 +124,7 @@ LIFF_ID_PAWN=2008216710-54P86MRY
 LIFF_ID_CONTRACTS=2008216710-WJXR6xOM
 LIFF_ID_STORE=2008216710-de1ovYZL
 LIFF_ID_CONTRACT_AGREEMENT=2008216710-xxxxxxxx
+LIFF_ID_PAWNER_CONTRACT=2008216710-yyyyyyyy
 
 # Frontend LIFF IDs (NEXT_PUBLIC_*)
 NEXT_PUBLIC_LIFF_ID_REGISTER=2008216710-BEZ5XNyd
@@ -124,6 +132,7 @@ NEXT_PUBLIC_LIFF_ID_PAWN=2008216710-54P86MRY
 NEXT_PUBLIC_LIFF_ID_CONTRACTS=2008216710-WJXR6xOM
 NEXT_PUBLIC_LIFF_ID_STORE=2008216710-de1ovYZL
 NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT=2008216710-xxxxxxxx
+NEXT_PUBLIC_LIFF_ID_PAWNER_CONTRACT=2008216710-yyyyyyyy
 
 # LINE Configuration
 LINE_CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
@@ -142,12 +151,13 @@ RICH_MENU_ID_MEMBER=richmenu-d58a81249cf5f525da5ba9594cd8e111
 
 ## 📋 Checklist
 
-- [ ] ตั้งค่า LIFF Endpoint URL ทั้ง 5 LIFF ใน LINE Developers Console
+- [ ] ตั้งค่า LIFF Endpoint URL ทั้ง 6 LIFF ใน LINE Developers Console
 - [ ] แก้ Rich Menu URLs ให้เป็น LIFF URL ทั้งหมด
 - [ ] ตรวจสอบ Environment Variables ใน Vercel
 - [ ] Redeploy Vercel (ถ้าเพิ่ม env vars ใหม่)
 - [ ] ทดสอบกดปุ่ม Rich Menu ทุกปุ่ม
 - [ ] ทดสอบการสร้างสัญญาจำนำหลังจากประเมินราคาเสร็จสิ้น
+- [ ] ทดสอบการดูรายละเอียดสัญญาหลังจากสร้างสัญญาสำเร็จ
 
 ---
 
