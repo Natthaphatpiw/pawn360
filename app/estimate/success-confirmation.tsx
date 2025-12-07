@@ -45,11 +45,20 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
           {/* Continue Button */}
           <button
             onClick={() => {
+              console.log('🚀 Continuing with loanRequestId:', loanRequestId, 'itemId:', itemId);
+
+              if (!loanRequestId || !itemId || loanRequestId === 'undefined' || itemId === 'undefined') {
+                console.error('❌ Invalid loanRequestId or itemId:', { loanRequestId, itemId });
+                alert('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+                return;
+              }
+
               if (onContinue) {
                 onContinue();
               } else {
-                // Default: navigate to contract agreement within same LIFF/web view
-                router.push(`/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`);
+                // Default: navigate to contract agreement with full page reload
+                console.log('🔄 Redirecting to contract-agreement...');
+                window.location.href = `/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
               }
             }}
             className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"

@@ -105,10 +105,15 @@ function OfferDetailContent() {
     );
   }
 
-  const InfoRow = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex justify-between items-start mb-2">
-      <div className="font-bold text-gray-700 w-5/12">{label}:</div>
-      <div className="text-left w-7/12 text-gray-600 font-medium pl-4">
+  const InfoRow = ({ label, value, valueColor = 'text-gray-800', isBoldValue = false }: {
+    label: string;
+    value: string;
+    valueColor?: string;
+    isBoldValue?: boolean;
+  }) => (
+    <div className="flex justify-between items-start py-1">
+      <div className="font-bold text-gray-700 text-sm w-1/3">{label}</div>
+      <div className={`text-right w-2/3 text-sm ${valueColor} ${isBoldValue ? 'font-bold' : 'font-medium'}`}>
         {value}
       </div>
     </div>
@@ -126,6 +131,9 @@ function OfferDetailContent() {
       {/* Main Content Card */}
       <div className="w-full max-w-sm bg-[#F0F0F0] rounded-3xl p-5 mb-6">
 
+        {/* Title */}
+        <h1 className="text-lg font-bold text-gray-800 mb-4">รายละเอียดข้อเสนอ</h1>
+
         {/* Product Image */}
         <div className="w-full aspect-square bg-gray-200 rounded-xl overflow-hidden mb-6 shadow-sm">
           <img
@@ -140,13 +148,15 @@ function OfferDetailContent() {
           <InfoRow label="ชื่อผู้จำนำ" value={`${contract.pawners?.firstname} ${contract.pawners?.lastname}`} />
           <InfoRow label="สินค้า" value={`${contract.items?.brand} ${contract.items?.model}`} />
           <InfoRow label="ความจุ" value={contract.items?.capacity || 'ไม่ระบุ'} />
-          <InfoRow label="สภาพ" value={`${contract.items?.item_condition}/100`} />
+          <InfoRow label="สภาพ" value={`${contract.items?.item_condition}%`} />
           <InfoRow label="ตำหนิ" value={contract.items?.defects || 'ไม่มี'} />
-          <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString()} บาท`} />
-          <InfoRow label="ดอกเบี้ย" value={`${contract.interest_rate * 100}%`} />
+          <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString()}.00`} />
+          <InfoRow label="ดอกเบี้ย" value={`${(contract.interest_rate * 100).toFixed(1)}% | ${(contract.interest_amount).toLocaleString()}`} />
           <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
           <InfoRow label="วันที่เสนอ" value={new Date().toLocaleDateString('th-TH')} />
         </div>
+
+        <div className="h-px bg-white my-3 opacity-60"></div>
 
         {/* Remarks */}
         <div className="mb-6">
@@ -166,11 +176,9 @@ function OfferDetailContent() {
         <button
           onClick={handleAccept}
           disabled={actionLoading}
-          className="w-full bg-[#88B459] hover:bg-[#769F4A] text-white rounded-2xl py-4 flex items-center justify-center shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50"
+          className="w-full bg-[#88B459] hover:bg-[#769F4A] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
         >
-          <span className="text-base font-bold">
-            {actionLoading ? 'กำลังดำเนินการ...' : 'ยอมรับ'}
-          </span>
+          <span className="text-base font-bold">ยอมรับ</span>
           <span className="text-[10px] font-light opacity-90">Accept</span>
         </button>
 
@@ -178,10 +186,10 @@ function OfferDetailContent() {
         <button
           onClick={handleDecline}
           disabled={actionLoading}
-          className="w-full bg-[#DE6B6B] hover:bg-[#C95A5A] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] disabled:opacity-50"
+          className="w-full bg-[#DE6B6B] hover:bg-[#C95A5A] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
         >
-          <span className="text-base font-bold">ปฏิเสธ</span>
-          <span className="text-[10px] font-light opacity-90">Decline</span>
+          <span className="text-base font-bold">Decline</span>
+          <span className="text-[10px] font-light opacity-90">ปฏิเสธ</span>
         </button>
       </div>
 

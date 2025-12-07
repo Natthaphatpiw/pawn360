@@ -23,13 +23,17 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Get customer_id from lineId
+    console.log('🔍 Looking for pawner with lineId:', lineId);
     const { data: pawnerData, error: pawnerError } = await supabase
       .from('pawners')
       .select('customer_id')
       .eq('line_id', lineId)
       .single();
 
+    console.log('📋 Pawner query result:', { pawnerData, pawnerError });
+
     if (pawnerError || !pawnerData) {
+      console.error('❌ Pawner not found:', { pawnerError, lineId });
       return NextResponse.json(
         { error: 'Pawner not found' },
         { status: 404 }
@@ -37,6 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     const customerId = pawnerData.customer_id;
+    console.log('✅ Found customerId:', customerId);
 
     // Create item record
     const itemRecord = {
@@ -112,19 +117,31 @@ export async function POST(request: NextRequest) {
       expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours from now
     };
 
+    console.log('📝 Creating loan request with data:', loanRequestRecord);
     const { data: loanRequest, error: loanRequestError } = await supabase
       .from('loan_requests')
       .insert(loanRequestRecord)
       .select()
       .single();
 
+    console.log('📋 Loan request creation result:', { loanRequest, loanRequestError });
+
     if (loanRequestError || !loanRequest) {
-      console.error('Error creating loan request:', loanRequestError);
+      console.error('❌ Error creating loan request:', loanRequestError);
       return NextResponse.json(
         { error: 'Failed to create loan request' },
         { status: 500 }
       );
     }
+
+    console.log('✅ Loan request created with ID:', loanRequest.loan_request_id);
+
+    console.log('✅ Loan request created successfully:', {
+      loanRequestId: loanRequest.loan_request_id,
+      itemId: item.item_id,
+      loanRequest: loanRequest,
+      item: item
+    });
 
     return NextResponse.json({
       success: true,
