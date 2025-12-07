@@ -415,7 +415,7 @@ CREATE TABLE contracts (
 
   -- Parties
   customer_id UUID NOT NULL REFERENCES pawners(customer_id),
-  investor_id UUID NOT NULL REFERENCES investors(investor_id),
+  investor_id UUID REFERENCES investors(investor_id),
   drop_point_id UUID REFERENCES drop_points(drop_point_id),
 
   -- Related
