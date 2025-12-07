@@ -12,6 +12,7 @@ const requiredEnvVars = [
   'NEXT_PUBLIC_LIFF_ID_CONTRACTS',
   'NEXT_PUBLIC_LIFF_ID_STORE',
   'NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT',
+  'NEXT_PUBLIC_LIFF_ID_PAWNER_CONTRACT',
 ];
 
 console.log('📋 Required Environment Variables:');
@@ -29,6 +30,7 @@ const liffMappings = [
   { path: '/contracts', env: 'NEXT_PUBLIC_LIFF_ID_CONTRACTS' },
   { path: '/store/verify-pawn', env: 'NEXT_PUBLIC_LIFF_ID_STORE' },
   { path: '/contract-agreement', env: 'NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT' },
+  { path: '/pawner/contract', env: 'NEXT_PUBLIC_LIFF_ID_PAWNER_CONTRACT' },
 ];
 
 liffMappings.forEach(({ path, env }) => {
@@ -47,6 +49,11 @@ console.log('   - Name: Contract Agreement');
 console.log('   - Endpoint URL: https://pawn360.vercel.app/contract-agreement');
 console.log('   - Size: Full screen');
 console.log('   - Scopes: profile, chat_message.write');
-console.log('3. Copy the LIFF ID and add to environment variables');
-console.log('4. Update NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT in Vercel');
-console.log('5. Redeploy the application');
+console.log('3. Create new LIFF app for pawner contract details:');
+console.log('   - Name: Pawner Contract Details');
+console.log('   - Endpoint URL: https://pawn360.vercel.app/pawner/contract');
+console.log('   - Size: Full screen');
+console.log('   - Scopes: profile, chat_message.write');
+console.log('4. Copy the LIFF IDs and add to environment variables');
+console.log('5. Update NEXT_PUBLIC_LIFF_ID_CONTRACT_AGREEMENT and NEXT_PUBLIC_LIFF_ID_PAWNER_CONTRACT in Vercel');
+console.log('6. Redeploy the application');
