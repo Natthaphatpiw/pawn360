@@ -41,11 +41,14 @@ function OfferDetailContent() {
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching contract details for:', contractId);
       const response = await axios.get(`/api/contracts/${contractId}`);
+      console.log('✅ Contract data received:', response.data);
       setContract(response.data.contract);
     } catch (error: any) {
-      console.error('Error fetching contract:', error);
-      setError('ไม่สามารถโหลดรายละเอียดข้อเสนอได้');
+      console.error('❌ Error fetching contract:', error);
+      console.error('Error details:', error.response?.data);
+      setError(error.response?.data?.error || 'ไม่สามารถโหลดรายละเอียดข้อเสนอได้');
     } finally {
       setLoading(false);
     }
@@ -104,11 +107,35 @@ function OfferDetailContent() {
     );
   }
 
+  if (!contractId) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="text-red-600 mb-4">ไม่พบ Contract ID</div>
+          <div className="text-sm text-gray-500 mb-4">
+            Debug: {JSON.stringify({
+              directParam: searchParams.get('contractId'),
+              liffState: searchParams.get('liff.state'),
+              allParams: Array.from(searchParams.entries())
+            })}
+          </div>
+          <button
+            onClick={() => router.back()}
+            className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+          >
+            กลับ
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !contract) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="w-full max-w-md text-center">
           <div className="text-red-600 mb-4">{error || 'ไม่พบข้อมูลข้อเสนอ'}</div>
+          <div className="text-sm text-gray-500 mb-4">Contract ID: {contractId}</div>
           <button
             onClick={() => router.back()}
             className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
@@ -213,6 +240,8 @@ function OfferDetailContent() {
 }
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export default function OfferDetailPage() {
   return (
