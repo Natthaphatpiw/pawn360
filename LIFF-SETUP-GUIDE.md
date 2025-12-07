@@ -45,6 +45,16 @@
 - **Scope:** profile, chat_message.write
 - ❌ **อย่าใช้:** `https://pawn360.vercel.app`
 
+### 7. ข้อเสนอจำนำสำหรับนักลงทุน (Investor Offer Detail) 🚨 **สำคัญ!**
+- **Channel:** `2008641309` (Investor Channel)
+- **LIFF ID:** `2008641309-xxxxxxxx` (สร้างใหม่ใน Investor Channel)
+- **Endpoint URL:** `https://pawn360.vercel.app/offer-detail`
+- **Size:** Full screen
+- **Scope:** profile, openid
+- **Environment Variable:** `NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL`
+- ❌ **อย่าใช้:** `https://pawn360.vercel.app`
+- ⚠️ **สำคัญ:** ต้องสร้างใน Investor Channel ไม่ใช่ Pawner Channel!
+
 ---
 
 ## 📱 Rich Menu Configuration
