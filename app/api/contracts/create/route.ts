@@ -132,13 +132,16 @@ export async function POST(request: NextRequest) {
       .update({ request_status: 'OFFER_ACCEPTED' })
       .eq('request_id', loanRequestId);
 
-    // 6. Send LINE offer cards to all active investors
+    // 6. Send LINE offer cards to all active investors with valid LINE IDs
     try {
       const { data: investors } = await supabase
         .from('investors')
         .select('investor_id, line_id, firstname, lastname')
         .eq('is_active', true)
-        .eq('is_blocked', false);
+        .eq('is_blocked', false)
+        .not('line_id', 'is', null)
+        .neq('line_id', '')
+        .like('line_id', 'U%'); // Only valid LINE user IDs starting with 'U'
 
       if (investors && investors.length > 0) {
         const offerCard = createPawnOfferCard(contract, loanRequest);
@@ -151,6 +154,8 @@ export async function POST(request: NextRequest) {
             console.error(`Failed to send offer to investor ${investor.line_id}:`, msgError);
           }
         }
+      } else {
+        console.log('No active investors with valid LINE IDs found');
       }
     } catch (investorError) {
       console.error('Error sending offers to investors:', investorError);
@@ -259,7 +264,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
           action: {
             type: 'uri',
             label: 'ดูข้อเสนอ',
-            uri: `https://liff.line.me/2008641671-O4zZnvW9/offer-detail?contractId=${contract.contract_id}`
+            uri: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app'}/offer-detail?contractId=${contract.contract_id}`
           },
           style: 'primary',
           color: '#1DB446'
