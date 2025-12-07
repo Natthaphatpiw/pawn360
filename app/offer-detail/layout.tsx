@@ -1,5 +1,7 @@
 import { LiffProvider } from '@/lib/liff/liff-provider';
 
+export const dynamic = 'force-dynamic';
+
 export default function OfferDetailLayout({
   children,
 }: {
