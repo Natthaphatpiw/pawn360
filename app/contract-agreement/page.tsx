@@ -9,7 +9,7 @@ import axios from 'axios';
 function ContractAgreementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
+  const { profile, isLoading: isLiffLoading } = useLiff();
 
   const [accepted, setAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,6 +18,7 @@ function ContractAgreementContent() {
 
   const loanRequestId = searchParams.get('loanRequestId');
   const itemId = searchParams.get('itemId');
+  const lineId = profile?.userId;
 
   useEffect(() => {
     if (!loanRequestId || !itemId) {
@@ -26,26 +27,18 @@ function ContractAgreementContent() {
   }, [loanRequestId, itemId, router]);
 
   const handleSubmit = async () => {
-    console.log('🚀 Contract agreement submit initiated');
-    console.log('📊 Current state:', { accepted, loanRequestId, itemId, profile: profile?.userId });
-
     if (!accepted) {
       setError('กรุณายอมรับเงื่อนไขและข้อตกลง');
       return;
     }
 
-    if (!loanRequestId || !itemId) {
-      setError('ข้อมูลคำขอไม่ครบถ้วน กรุณาลองใหม่อีกครั้ง');
-      return;
-    }
-
-    if (!profile?.userId) {
-      setError('ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
-      return;
-    }
-
     if (signatureRef.current?.isEmpty()) {
       setError('กรุณาเซ็นลายเซ็นในช่องที่กำหนด');
+      return;
+    }
+
+    if (!lineId) {
+      setError('ไม่สามารถระบุตัวตนได้ กรุณาลองใหม่อีกครั้ง');
       return;
     }
 
@@ -56,27 +49,12 @@ function ContractAgreementContent() {
       // Get signature as data URL
       const signatureDataURL = signatureRef.current?.toDataURL();
 
-      if (!signatureDataURL || signatureDataURL === 'data:,') {
-        setError('ลายเซ็นไม่ถูกต้อง กรุณาเซ็นใหม่อีกครั้ง');
-        return;
-      }
-
-      console.log('📝 Contract agreement submit data:', {
-        loanRequestId,
-        itemId,
-        accepted,
-        signatureLength: signatureDataURL?.length,
-        lineId: profile?.userId,
-        hasProfile: !!profile,
-        profileKeys: profile ? Object.keys(profile) : null
-      });
-
       const response = await axios.post('/api/contracts/create', {
         loanRequestId,
         itemId,
         accepted,
         signature: signatureDataURL,
-        lineId: profile?.userId
+        lineId
       });
 
       if (response.data.success) {
@@ -95,44 +73,12 @@ function ContractAgreementContent() {
     signatureRef.current?.clear();
   };
 
-  if (liffLoading) {
+  if (!loanRequestId || !itemId || isLiffLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลดระบบ LINE...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (liffError) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">เกิดข้อผิดพลาดในการเชื่อมต่อ LINE: {liffError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-[#C0562F] text-white px-6 py-3 rounded-lg"
-          >
-            ลองใหม่
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!loanRequestId || !itemId) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">ข้อมูลคำขอไม่ครบถ้วน</p>
-          <button
-            onClick={() => router.push('/estimate')}
-            className="bg-[#C0562F] text-white px-6 py-3 rounded-lg"
-          >
-            กลับไปเริ่มใหม่
-          </button>
+          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
         </div>
       </div>
     );

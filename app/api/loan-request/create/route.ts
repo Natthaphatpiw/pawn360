@@ -143,12 +143,6 @@ export async function POST(request: NextRequest) {
       item: item
     });
 
-    console.log('📤 Returning response:', {
-      success: true,
-      loanRequestId: loanRequest.request_id,
-      itemId: item.item_id
-    });
-
     return NextResponse.json({
       success: true,
       loanRequestId: loanRequest.request_id,
