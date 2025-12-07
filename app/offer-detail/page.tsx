@@ -15,7 +15,22 @@ function OfferDetailContent() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const contractId = searchParams.get('contractId');
+  // Get contractId from either direct param or from liff.state
+  let contractId = searchParams.get('contractId');
+
+  // If not found, try to extract from liff.state
+  if (!contractId) {
+    const liffState = searchParams.get('liff.state');
+    if (liffState) {
+      // liff.state format: /offer-detail?contractId=xxx
+      const match = liffState.match(/contractId=([^&]+)/);
+      if (match) {
+        contractId = match[1];
+      }
+    }
+  }
+
+  console.log('📍 Extracted contractId:', contractId);
 
   useEffect(() => {
     if (contractId) {
