@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('✅ Loan request created with ID:', loanRequest.loan_request_id);
+    console.log('✅ Loan request created with ID:', loanRequest.request_id);
 
     console.log('✅ Loan request created successfully:', {
       loanRequestId: loanRequest.loan_request_id,
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      loanRequestId: loanRequest.loan_request_id,
+      loanRequestId: loanRequest.request_id,
       itemId: item.item_id,
       message: 'Loan request created successfully',
     });
