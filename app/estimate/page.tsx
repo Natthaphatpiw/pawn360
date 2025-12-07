@@ -1262,6 +1262,14 @@ export default function EstimatePage() {
             onBack={() => setCurrentStep('form')}
             onSuccess={(reqId, itmId) => {
               console.log('🎉 onSuccess called with:', reqId, itmId);
+
+              if (!reqId || !itmId) {
+                console.error('❌ Invalid reqId or itmId received:', { reqId, itmId });
+                alert('เกิดข้อผิดพลาดในการสร้างคำขอ กรุณาลองใหม่อีกครั้ง');
+                return;
+              }
+
+              console.log('📊 Setting state - loanRequestId:', reqId, 'itemId:', itmId);
               setLoanRequestId(reqId);
               setItemId(itmId);
               setCurrentStep('success_confirmation');

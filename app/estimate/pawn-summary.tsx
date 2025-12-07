@@ -144,6 +144,14 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
 
       const response = await axios.post('/api/loan-request/create', submissionData);
 
+      console.log('📡 API Response:', response.data);
+
+      if (!response.data.loanRequestId || !response.data.itemId) {
+        console.error('❌ Missing loanRequestId or itemId in response:', response.data);
+        alert('เกิดข้อผิดพลาดในการสร้างคำขอ กรุณาลองใหม่อีกครั้ง');
+        return;
+      }
+
       // Call onSuccess callback instead of redirecting directly
       console.log('✅ Calling onSuccess with:', response.data.loanRequestId, response.data.itemId);
       onSuccess(response.data.loanRequestId, response.data.itemId);
