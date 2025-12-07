@@ -1,30 +1,28 @@
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useLiff } from '@/lib/liff/liff-provider';
+import { useState, useRef } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import axios from 'axios';
 
-function ContractAgreementContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { profile, isLoading: isLiffLoading } = useLiff();
+interface ContractAgreementStepProps {
+  loanRequestId: string;
+  itemId: string;
+  lineId: string;
+  onBack: () => void;
+  onSuccess: (contractId: string) => void;
+}
 
+export default function ContractAgreementStep({
+  loanRequestId,
+  itemId,
+  lineId,
+  onBack,
+  onSuccess
+}: ContractAgreementStepProps) {
   const [accepted, setAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signatureRef = useRef<SignatureCanvas>(null);
-
-  const loanRequestId = searchParams.get('loanRequestId');
-  const itemId = searchParams.get('itemId');
-  const lineId = profile?.userId;
-
-  useEffect(() => {
-    if (!loanRequestId || !itemId) {
-      router.push('/estimate');
-    }
-  }, [loanRequestId, itemId, router]);
 
   const handleSubmit = async () => {
     if (!accepted) {
@@ -58,8 +56,7 @@ function ContractAgreementContent() {
       });
 
       if (response.data.success) {
-        // Redirect to pawner contract details page
-        router.push(`/pawner/contract/${response.data.contractId}`);
+        onSuccess(response.data.contractId);
       }
     } catch (error: any) {
       console.error('Error submitting agreement:', error);
@@ -72,17 +69,6 @@ function ContractAgreementContent() {
   const clearSignature = () => {
     signatureRef.current?.clear();
   };
-
-  if (!loanRequestId || !itemId || isLiffLoading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white font-sans p-4 pb-8">
@@ -137,7 +123,7 @@ function ContractAgreementContent() {
               type="checkbox"
               checked={accepted}
               onChange={(e) => setAccepted(e.target.checked)}
-              className="mt-1 w-4 h-4 text-[#C0562F] border-gray-300 rounded focus:ring-[#C0562F]"
+              className="mt-1 w-5 h-5 text-[#C0562F] border-gray-300 rounded focus:ring-[#C0562F]"
             />
             <div className="text-sm text-gray-700">
               <span className="font-bold">ข้าพเจ้าได้อ่านและยอมรับใน</span>
@@ -179,23 +165,36 @@ function ContractAgreementContent() {
           </div>
         )}
 
-        {/* Submit Button */}
-        <button
-          onClick={handleSubmit}
-          disabled={!accepted || isSubmitting}
-          className={`w-full rounded-2xl py-4 flex flex-col items-center justify-center shadow-md transition-all active:scale-[0.98] ${
-            accepted
-              ? 'bg-[#C0562F] hover:bg-[#A04D2D] text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          <span className="text-base font-bold">
-            {isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันและดำเนินการต่อ'}
-          </span>
-          <span className="text-[10px] font-light opacity-90">
-            {isSubmitting ? 'Processing...' : 'Confirm & Continue'}
-          </span>
-        </button>
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Submit Button */}
+          <button
+            onClick={handleSubmit}
+            disabled={!accepted || isSubmitting}
+            className={`w-full rounded-2xl py-4 flex flex-col items-center justify-center shadow-md transition-all active:scale-[0.98] ${
+              accepted
+                ? 'bg-[#C0562F] hover:bg-[#A04D2D] text-white'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-base font-bold">
+              {isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันและดำเนินการต่อ'}
+            </span>
+            <span className="text-[10px] font-light opacity-90">
+              {isSubmitting ? 'Processing...' : 'Confirm & Continue'}
+            </span>
+          </button>
+
+          {/* Back Button */}
+          <button
+            onClick={onBack}
+            disabled={isSubmitting}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl py-3 flex flex-col items-center justify-center transition-colors"
+          >
+            <span className="text-base font-bold">ย้อนกลับ</span>
+            <span className="text-[10px] font-light opacity-70">Back</span>
+          </button>
+        </div>
 
         {/* Note */}
         <p className="text-xs text-gray-500 text-center mt-4">
@@ -204,22 +203,5 @@ function ContractAgreementContent() {
 
       </div>
     </div>
-  );
-}
-
-export const dynamic = 'force-dynamic';
-
-export default function ContractAgreementPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    }>
-      <ContractAgreementContent />
-    </Suspense>
   );
 }
