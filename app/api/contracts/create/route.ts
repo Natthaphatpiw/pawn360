@@ -264,7 +264,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
           action: {
             type: 'uri',
             label: 'ดูข้อเสนอ',
-            uri: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app'}/offer-detail?contractId=${contract.contract_id}`
+            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL || '2008641671-O4zZnvW9'}/offer-detail?contractId=${contract.contract_id}`
           },
           style: 'primary',
           color: '#1DB446'
