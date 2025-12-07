@@ -19,7 +19,22 @@ export async function POST(request: NextRequest) {
       lineId
     } = body;
 
+    console.log('📝 Contract creation request:', {
+      loanRequestId,
+      itemId,
+      accepted,
+      signatureLength: signature?.length,
+      lineId
+    });
+
     if (!loanRequestId || !itemId || !accepted || !signature || !lineId) {
+      console.error('❌ Missing required fields:', {
+        hasLoanRequestId: !!loanRequestId,
+        hasItemId: !!itemId,
+        hasAccepted: !!accepted,
+        hasSignature: !!signature,
+        hasLineId: !!lineId
+      });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
