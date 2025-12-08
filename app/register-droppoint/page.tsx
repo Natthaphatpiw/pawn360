@@ -9,7 +9,7 @@ import { MapPin, Phone, Mail, Clock, User, Building2 } from 'lucide-react';
 function RegisterDropPointContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { liff, profile, isLoggedIn, isLoading: liffLoading } = useLiff();
+  const { liffObject, profile, isLoggedIn, isLoading: liffLoading } = useLiff();
 
   const [loading, setLoading] = useState(false);
   const [existingDropPoint, setExistingDropPoint] = useState<any>(null);

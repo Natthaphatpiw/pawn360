@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client, WebhookEvent, FlexMessage } from '@line/bot-sdk';
+import { Client, WebhookEvent, FlexMessage, MessageEvent, TextEventMessage } from '@line/bot-sdk';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 // Drop Point LINE OA credentials
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         await handleFollow(event);
       } else if (event.type === 'message' && event.message.type === 'text') {
         // Handle text messages
-        await handleTextMessage(event);
+        await handleTextMessage(event as MessageEvent & { message: TextEventMessage });
       } else if (event.type === 'postback') {
         // Handle postback actions
         await handlePostback(event);
@@ -99,7 +99,7 @@ async function handleFollow(event: WebhookEvent & { type: 'follow' }) {
   }
 }
 
-async function handleTextMessage(event: WebhookEvent & { type: 'message'; message: { type: 'text'; text: string } }) {
+async function handleTextMessage(event: MessageEvent & { message: TextEventMessage }) {
   const userId = event.source.userId;
   const text = event.message.text.toLowerCase();
   if (!userId) return;

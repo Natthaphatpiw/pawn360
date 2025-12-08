@@ -271,14 +271,6 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
         contents: [{
           type: 'button',
           action: {
-            type: 'clipboard',
-            label: 'Copy เลขบัญชี',
-            clipboardText: contract.pawners?.bank_account_no || ''
-          },
-          style: 'secondary'
-        }, {
-          type: 'button',
-          action: {
             type: 'uri',
             label: 'ส่งหลักฐานการชำระเงิน',
             uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_INVEST_PAYMENT || '2008641671-MPKmDQ1y'}?contractId=${contract.contract_id}`
