@@ -65,8 +65,7 @@ export async function POST(request: NextRequest) {
         payment_method: 'BANK_TRANSFER',
         payment_status: 'PENDING_CONFIRMATION',
         paid_by_investor_id: investor.investor_id,
-        payment_slip_url: paymentSlipUrl,
-        paid_at: new Date().toISOString()
+        payment_slip_url: paymentSlipUrl
       })
       .select()
       .single();
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
       .from('contracts')
       .update({
         payment_status: 'INVESTOR_PAID',
-        investor_paid_at: new Date().toISOString(),
+        payment_slip_url: paymentSlipUrl,
         updated_at: new Date().toISOString()
       })
       .eq('contract_id', contractId);
