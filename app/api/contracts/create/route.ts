@@ -264,7 +264,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
           action: {
             type: 'uri',
             label: 'ดูข้อเสนอ',
-            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL || 'CREATE_NEW_LIFF_APP'}/offer-detail?contractId=${contract.contract_id}`
+            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL || 'CREATE_NEW_LIFF_APP'}?contractId=${contract.contract_id}`
           },
           style: 'primary',
           color: '#1DB446'
