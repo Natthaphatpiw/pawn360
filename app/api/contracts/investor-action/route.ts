@@ -8,8 +8,8 @@ const investorLineClient = new Client({
 });
 
 const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || 'UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=',
+  channelSecret: process.env.LINE_CHANNEL_SECRET || '8937117af202d6550b7ab212fdc54291'
 });
 
 export async function POST(request: NextRequest) {
@@ -126,7 +126,7 @@ function createAcceptedCard(contract: any) {
 
   const card = {
     type: 'flex',
-    altText: 'ข้อเสนอของคุณได้รับการตอบรับแล้ว',
+    altText: 'มีนักลงทุนสนใจสินค้าของคุณ!',
     contents: {
       type: 'bubble',
       header: {
@@ -134,14 +134,28 @@ function createAcceptedCard(contract: any) {
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: 'ข้อเสนอของคุณได้รับการตอบรับแล้ว',
+          text: '🎉 มีนักลงทุนสนใจ!',
           weight: 'bold',
           size: 'lg',
           color: '#ffffff',
           align: 'center'
+        }, {
+          type: 'text',
+          text: 'สินค้าของคุณมีผู้สนใจปล่อยเงินจำนำ',
+          size: 'sm',
+          color: '#ffffff',
+          align: 'center',
+          margin: 'sm'
         }],
-        backgroundColor: '#0A4215',
+        backgroundColor: '#1DB446',
         paddingAll: 'lg'
+      },
+      hero: {
+        type: 'image',
+        url: contract.items?.image_urls?.[0] || 'https://via.placeholder.com/300x200?text=No+Image',
+        size: 'full',
+        aspectRatio: '20:13',
+        aspectMode: 'cover'
       },
       body: {
         type: 'box',
@@ -149,7 +163,6 @@ function createAcceptedCard(contract: any) {
         contents: [{
           type: 'box',
           layout: 'vertical',
-          margin: 'lg',
           spacing: 'sm',
           contents: [
             {
@@ -175,15 +188,6 @@ function createAcceptedCard(contract: any) {
               layout: 'baseline',
               spacing: 'sm',
               contents: [
-                { type: 'text', text: 'วันที่ทำรายการ:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: new Date().toLocaleDateString('th-TH'), color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
-              ]
-            },
-            {
-              type: 'box',
-              layout: 'baseline',
-              spacing: 'sm',
-              contents: [
                 { type: 'text', text: 'วันครบกำหนด:', color: '#666666', size: 'sm', flex: 2 },
                 { type: 'text', text: dueDateString, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
               ]
@@ -198,12 +202,17 @@ function createAcceptedCard(contract: any) {
               ]
             },
             {
+              type: 'separator',
+              margin: 'lg'
+            },
+            {
               type: 'box',
               layout: 'baseline',
               spacing: 'sm',
+              margin: 'lg',
               contents: [
-                { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: `${contract.interest_rate * 100}% | ${contract.interest_amount.toLocaleString()} บาท`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                { type: 'text', text: 'วงเงินจำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#1DB446', size: 'lg', flex: 5, weight: 'bold' }
               ]
             },
             {
@@ -211,8 +220,17 @@ function createAcceptedCard(contract: any) {
               layout: 'baseline',
               spacing: 'sm',
               contents: [
-                { type: 'text', text: 'มูลค่า:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
+                { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
+                { type: 'text', text: `${contract.interest_amount.toLocaleString()} บาท`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'ยอดชำระคืน:', color: '#666666', size: 'sm', flex: 2 },
+                { type: 'text', text: `${contract.total_amount.toLocaleString()} บาท`, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
               ]
             }
           ]
@@ -225,12 +243,20 @@ function createAcceptedCard(contract: any) {
         contents: [{
           type: 'button',
           action: {
-            type: 'uri',
-            label: 'นำทางไป drop point',
-            uri: contract.drop_points?.google_maps_link || '#'
+            type: 'postback',
+            label: 'ยืนยันการจำนำ',
+            data: `action=confirm_pawn&contractId=${contract.contract_id}`
           },
           style: 'primary',
-          color: '#0A4215'
+          color: '#1DB446'
+        }, {
+          type: 'button',
+          action: {
+            type: 'uri',
+            label: 'นำทางไป Drop Point',
+            uri: contract.drop_points?.google_maps_link || 'https://maps.google.com'
+          },
+          style: 'secondary'
         }]
       }
     }
