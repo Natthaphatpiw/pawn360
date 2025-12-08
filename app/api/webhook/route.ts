@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { WebhookEvent, Client } from '@line/bot-sdk';
+import { WebhookEvent, Client, FlexMessage } from '@line/bot-sdk';
 import { verifySignature, sendStoreLocationCard, sendConfirmationSuccessMessage } from '@/lib/line/client';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
+import { supabaseAdmin } from '@/lib/supabase/client';
+
+// Drop Point LINE OA client
+const dropPointLineClient = new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || ''
+});
+
+// Investor LINE OA client
+const investorLineClient = new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c'
+});
 
 export async function GET() {
   return NextResponse.json({
@@ -431,11 +444,317 @@ async function handlePostbackEvent(event: WebhookEvent) {
               } catch (error) {
                 console.error('Error processing upload_slip:', error);
               }
+    } else if (action === 'confirm_pawn') {
+      // Handle confirm_pawn postback - Pawner confirms to bring item to drop point
+      const contractId = params.get('contractId');
+      if (!contractId) {
+        console.error('No contractId in confirm_pawn postback');
+        return;
+      }
+
+      try {
+        console.log(`Processing confirm_pawn for contractId: ${contractId}`);
+        const supabase = supabaseAdmin();
+
+        // Get contract with drop point info
+        const { data: contract, error: contractError } = await supabase
+          .from('contracts')
+          .select(`
+            *,
+            items:item_id (*),
+            pawners:customer_id (*),
+            drop_points:drop_point_id (*),
+            investors:investor_id (*)
+          `)
+          .eq('contract_id', contractId)
+          .single();
+
+        if (contractError || !contract) {
+          console.error('Contract not found:', contractError);
+          return;
+        }
+
+        // Update contract status
+        await supabase
+          .from('contracts')
+          .update({
+            item_delivery_status: 'PAWNER_CONFIRMED',
+            updated_at: new Date().toISOString()
+          })
+          .eq('contract_id', contractId);
+
+        // Send confirmation to pawner
+        const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        if (channelAccessToken && contract.pawners?.line_id) {
+          const client = new Client({ channelAccessToken });
+          await client.pushMessage(contract.pawners.line_id, {
+            type: 'text',
+            text: `✅ ยืนยันการจำนำเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n📍 ${contract.drop_points?.drop_point_name}\n📌 ${contract.drop_points?.address}\n\nภายใน 24 ชั่วโมง`
+          });
+        }
+
+        // Notify Drop Point to expect item
+        if (contract.drop_points?.line_id) {
+          const dropPointNotification = createDropPointNotificationCard(contract);
+          try {
+            await dropPointLineClient.pushMessage(contract.drop_points.line_id, dropPointNotification);
+            console.log(`Sent notification to drop point ${contract.drop_points.line_id}`);
+          } catch (dpError) {
+            console.error('Error sending to drop point:', dpError);
+          }
+        }
+
+        console.log(`Confirm pawn processed for contractId: ${contractId}`);
+      } catch (error) {
+        console.error('Error processing confirm_pawn:', error);
+      }
+    } else if (action === 'confirm_payment') {
+      // Handle confirm_payment postback - Pawner confirms receiving payment from investor
+      const contractId = params.get('contractId');
+      const paymentId = params.get('paymentId');
+
+      if (!contractId) {
+        console.error('No contractId in confirm_payment postback');
+        return;
+      }
+
+      try {
+        console.log(`Processing confirm_payment for contractId: ${contractId}`);
+        const supabase = supabaseAdmin();
+
+        // Get contract
+        const { data: contract, error: contractError } = await supabase
+          .from('contracts')
+          .select(`
+            *,
+            items:item_id (*),
+            pawners:customer_id (*),
+            investors:investor_id (*)
+          `)
+          .eq('contract_id', contractId)
+          .single();
+
+        if (contractError || !contract) {
+          console.error('Contract not found:', contractError);
+          return;
+        }
+
+        // Update contract status
+        await supabase
+          .from('contracts')
+          .update({
+            payment_status: 'COMPLETED',
+            payment_confirmed_at: new Date().toISOString(),
+            contract_status: 'ACTIVE',
+            updated_at: new Date().toISOString()
+          })
+          .eq('contract_id', contractId);
+
+        // Update payment record if paymentId provided
+        if (paymentId) {
+          await supabase
+            .from('payments')
+            .update({
+              payment_status: 'CONFIRMED',
+              confirmed_by_recipient: true,
+              confirmed_at: new Date().toISOString()
+            })
+            .eq('payment_id', paymentId);
+        }
+
+        // Send confirmation to pawner
+        const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        if (channelAccessToken && contract.pawners?.line_id) {
+          const client = new Client({ channelAccessToken });
+          await client.pushMessage(contract.pawners.line_id, {
+            type: 'text',
+            text: `✅ ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}\n\nสัญญาจำนำเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
+          });
+        }
+
+        // Notify investor
+        if (contract.investors?.line_id) {
+          try {
+            await investorLineClient.pushMessage(contract.investors.line_id, {
+              type: 'text',
+              text: `✅ ผู้จำนำยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาจำนำเริ่มต้นเรียบร้อยแล้ว`
+            });
+          } catch (invError) {
+            console.error('Error sending to investor:', invError);
+          }
+        }
+
+        console.log(`Confirm payment processed for contractId: ${contractId}`);
+      } catch (error) {
+        console.error('Error processing confirm_payment:', error);
+      }
+    } else if (action === 'reject_payment') {
+      // Handle reject_payment postback - Pawner rejects/hasn't received payment
+      const contractId = params.get('contractId');
+      const paymentId = params.get('paymentId');
+
+      if (!contractId) {
+        console.error('No contractId in reject_payment postback');
+        return;
+      }
+
+      try {
+        console.log(`Processing reject_payment for contractId: ${contractId}`);
+        const supabase = supabaseAdmin();
+
+        // Get contract
+        const { data: contract, error: contractError } = await supabase
+          .from('contracts')
+          .select(`
+            *,
+            investors:investor_id (*)
+          `)
+          .eq('contract_id', contractId)
+          .single();
+
+        if (contractError || !contract) {
+          console.error('Contract not found:', contractError);
+          return;
+        }
+
+        // Update payment record if paymentId provided
+        if (paymentId) {
+          await supabase
+            .from('payments')
+            .update({
+              payment_status: 'REJECTED',
+              confirmed_by_recipient: false
+            })
+            .eq('payment_id', paymentId);
+        }
+
+        // Notify investor to re-upload slip
+        if (contract.investors?.line_id) {
+          try {
+            await investorLineClient.pushMessage(contract.investors.line_id, {
+              type: 'text',
+              text: `❌ ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานใหม่`
+            });
+          } catch (invError) {
+            console.error('Error sending to investor:', invError);
+          }
+        }
+
+        console.log(`Reject payment processed for contractId: ${contractId}`);
+      } catch (error) {
+        console.error('Error processing reject_payment:', error);
+      }
     }
 
   } catch (error) {
     console.error('Error handling postback event:', error);
   }
+}
+
+// Helper function to create drop point notification card
+function createDropPointNotificationCard(contract: any): FlexMessage {
+  return {
+    type: 'flex',
+    altText: 'มีสินค้าใหม่รอรับ',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: '📦 มีสินค้าใหม่รอรับ',
+          weight: 'bold',
+          size: 'lg',
+          color: '#ffffff',
+          align: 'center'
+        }],
+        backgroundColor: '#1E3A8A',
+        paddingAll: 'lg'
+      },
+      hero: {
+        type: 'image',
+        url: contract.items?.image_urls?.[0] || 'https://via.placeholder.com/300x200?text=No+Image',
+        size: 'full',
+        aspectRatio: '20:13',
+        aspectMode: 'cover'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: `${contract.items?.brand} ${contract.items?.model}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'ความจุ:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: contract.items?.storage_capacity || '-', color: '#333333', size: 'sm', flex: 5 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'สี:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: contract.items?.color || '-', color: '#333333', size: 'sm', flex: 5 }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'lg',
+            contents: [
+              { type: 'text', text: 'ผู้จำนำ:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: `${contract.pawners?.firstname} ${contract.pawners?.lastname}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'เบอร์:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: contract.pawners?.phone_number || '-', color: '#333333', size: 'sm', flex: 5 }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [{
+          type: 'button',
+          action: {
+            type: 'uri',
+            label: 'ตรวจสอบสินค้า',
+            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q'}?contractId=${contract.contract_id}`
+          },
+          style: 'primary',
+          color: '#1E3A8A'
+        }]
+      }
+    }
+  };
 }
 
 async function handleMessageEvent(event: WebhookEvent) {
