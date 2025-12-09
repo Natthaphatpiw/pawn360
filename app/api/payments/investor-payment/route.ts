@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create payment record
+    // payment_status uses 'PENDING' as per database constraint
+    // The confirmation workflow is tracked via contract.payment_status = 'INVESTOR_PAID'
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert({
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
         payment_type: 'LOAN_DISBURSEMENT',
         amount: amount,
         payment_method: 'BANK_TRANSFER',
-        payment_status: 'PENDING_CONFIRMATION',
+        payment_status: 'PENDING',
         paid_by_investor_id: investor.investor_id,
         payment_slip_url: paymentSlipUrl
       })
