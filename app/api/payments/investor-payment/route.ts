@@ -56,13 +56,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create payment record
-    // payment_status uses 'PENDING' as per database constraint
-    // The confirmation workflow is tracked via contract.payment_status = 'INVESTOR_PAID'
+    // payment_type: Valid values are PRINCIPAL, INTEREST, FULL_REPAYMENT, PARTIAL_REPAYMENT, LATE_FEE, EXTENSION_FEE
+    // payment_status: Valid values are PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
+    // Using 'PRINCIPAL' for investor loan disbursement to pawner
     const { data: payment, error: paymentError } = await supabase
       .from('payments')
       .insert({
         contract_id: contractId,
-        payment_type: 'LOAN_DISBURSEMENT',
+        payment_type: 'PRINCIPAL',
         amount: amount,
         payment_method: 'BANK_TRANSFER',
         payment_status: 'PENDING',
