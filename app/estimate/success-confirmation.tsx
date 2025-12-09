@@ -18,8 +18,8 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
 
         {/* Success Icon */}
         <div className="mb-8">
-          <div className="w-32 h-32 rounded-full border-4 border-[#7CAB4A] flex items-center justify-center">
-            <Check className="w-16 h-16 text-[#7CAB4A] stroke-[3]" />
+          <div className="w-32 h-32 rounded-full border-4 border-[#c2410c] flex items-center justify-center">
+            <Check className="w-16 h-16 text-[#c2410c] stroke-[3]" />
           </div>
         </div>
 
@@ -43,10 +43,10 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
           {/* Continue Button */}
           <button
             onClick={() => {
-              console.log('🚀 Continuing with loanRequestId:', loanRequestId, 'itemId:', itemId);
+              console.log('Continuing with loanRequestId:', loanRequestId, 'itemId:', itemId);
 
               if (!loanRequestId || !itemId || loanRequestId === 'undefined' || itemId === 'undefined') {
-                console.error('❌ Invalid loanRequestId or itemId:', { loanRequestId, itemId });
+                console.error('Invalid loanRequestId or itemId:', { loanRequestId, itemId });
                 alert('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
                 return;
               }
@@ -55,13 +55,13 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
                 onContinue();
               } else {
                 // Default: navigate to contract agreement LIFF page
-                console.log('🔄 Redirecting to contract-agreement LIFF...');
+                console.log('Redirecting to contract-agreement LIFF...');
                 const contractLiffId = '2008216710-WJXR6xOM'; // LIFF ID for contract agreement
                 const liffUrl = `https://liff.line.me/${contractLiffId}/contract-agreement?loanRequestId=${loanRequestId}&itemId=${itemId}`;
                 window.location.href = liffUrl;
               }
             }}
-            className="w-full bg-[#7CAB4A] hover:bg-[#6B9B41] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
+            className="w-full bg-[#c2410c] hover:bg-[#b5370a] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
           >
             <span className="text-base font-bold">ดำเนินการต่อ</span>
             <span className="text-[10px] font-light opacity-90">Continue</span>
@@ -70,7 +70,7 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
           {/* Back to Home Button */}
           <button
             onClick={onBackToHome}
-            className="w-full bg-white border border-[#7CAB4A] hover:bg-gray-50 text-[#7CAB4A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+            className="w-full bg-white border border-[#c2410c] hover:bg-gray-50 text-[#c2410c] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
             <span className="text-base font-bold">กลับหน้าหลัก</span>
             <span className="text-[10px] font-light opacity-90">Back to Home</span>

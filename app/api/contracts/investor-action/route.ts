@@ -134,7 +134,7 @@ function createAcceptedCard(contract: any) {
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: '🎉 มีนักลงทุนสนใจ!',
+          text: 'มีนักลงทุนสนใจ',
           weight: 'bold',
           size: 'lg',
           color: '#ffffff',
@@ -147,7 +147,7 @@ function createAcceptedCard(contract: any) {
           align: 'center',
           margin: 'sm'
         }],
-        backgroundColor: '#1DB446',
+        backgroundColor: '#c2410c',
         paddingAll: 'lg'
       },
       hero: {

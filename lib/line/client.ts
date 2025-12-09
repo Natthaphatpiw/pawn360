@@ -53,7 +53,7 @@ export async function sendNegotiationMessage(
     const client = getLineClient();
     await client.pushMessage(userId, {
       type: 'flex',
-      altText: '🔄 ร้านค้าได้แก้ไขเงื่อนไขการจำนำ',
+      altText: 'การแก้ไขเงื่อนไขการจำนำ',
       contents: {
         type: 'bubble',
         header: {
@@ -62,13 +62,13 @@ export async function sendNegotiationMessage(
           contents: [
             {
               type: 'text',
-              text: '🔄 แก้ไขเงื่อนไขการจำนำ',
+              text: 'การแก้ไขเงื่อนไขการจำนำ',
               weight: 'bold',
               size: 'lg',
               color: '#ffffff',
             },
           ],
-          backgroundColor: '#FF9800',
+          backgroundColor: '#c2410c',
           paddingAll: 'lg',
         },
         body: {
@@ -213,11 +213,11 @@ export async function sendNegotiationMessage(
               type: 'button',
               action: {
                 type: 'uri',
-                label: '✅ ตกลง',
+                label: 'ยืนยันการตกลง',
                 uri: acceptUrl,
               },
               style: 'primary',
-              color: '#1DB446',
+              color: '#c2410c',
             },
             {
               type: 'text',
@@ -246,7 +246,7 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
     const client = getLineClient();
     await client.pushMessage(userId, {
       type: 'flex',
-      altText: '✅ สร้างรายการจำนำสำเร็จ - ดู QR Code',
+      altText: 'รายการจำนำสร้างเรียบร้อยแล้ว - ดู QR Code',
       contents: {
         type: 'bubble',
         hero: {
@@ -267,10 +267,10 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
           contents: [
             {
               type: 'text',
-              text: 'สร้างรายการจำนำสำเร็จ',
+              text: 'รายการจำนำสร้างเรียบร้อยแล้ว',
               weight: 'bold',
               size: 'xl',
-              color: '#1DB446',
+              color: '#c2410c',
               wrap: true,
             },
             {
@@ -293,8 +293,8 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
               contents: [
                 {
                   type: 'text',
-                  text: '📱 วิธีใช้งาน',
-                  color: '#1DB446',
+                  text: 'วิธีใช้งาน',
+                  color: '#c2410c',
                   size: 'sm',
                   weight: 'bold',
                 },
@@ -337,7 +337,7 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
                 uri: s3Url,
               },
               style: 'primary',
-              color: '#1DB446',
+              color: '#c2410c',
               height: 'sm',
             },
             {
@@ -391,7 +391,7 @@ export async function sendContractCompletionNotification(
 
     const flexMessage = {
       type: 'flex',
-      altText: `✅ สัญญาจำนำเลขที่ ${contractNumber} ได้ถูกสร้างเรียบร้อยแล้ว`,
+      altText: `สัญญาจำนำเลขที่ ${contractNumber} สร้างเรียบร้อยแล้ว`,
       contents: {
         type: 'bubble',
         header: {
@@ -403,11 +403,11 @@ export async function sendContractCompletionNotification(
               text: itemData.brand ? `${itemData.brand} ${itemData.model || ''}` : 'สินค้าจำนำ',
               weight: 'bold',
               size: 'lg',
-              color: '#0A4215',
+              color: '#ffffff',
               align: 'center'
             }
           ],
-          backgroundColor: '#E7EFE9',
+          backgroundColor: '#c2410c',
           paddingAll: 'lg'
         },
         body: {
@@ -416,9 +416,9 @@ export async function sendContractCompletionNotification(
           contents: [
             {
               type: 'text',
-              text: '✅ สัญญาจำนำได้ถูกสร้างเรียบร้อยแล้ว',
+              text: 'สัญญาจำนำสร้างเรียบร้อยแล้ว',
               size: 'md',
-              color: '#0A4215',
+              color: '#c2410c',
               weight: 'bold',
               wrap: true,
               margin: 'md'
@@ -449,7 +449,7 @@ export async function sendContractCompletionNotification(
                       type: 'text',
                       text: contractNumber,
                       wrap: true,
-                      color: '#0A4215',
+                      color: '#c2410c',
                       size: 'sm',
                       weight: 'bold',
                       flex: 0,
@@ -473,7 +473,7 @@ export async function sendContractCompletionNotification(
                       type: 'text',
                       text: `${contractData.price?.toLocaleString() || '0'} บาท`,
                       wrap: true,
-                      color: '#0A4215',
+                      color: '#c2410c',
                       size: 'sm',
                       weight: 'bold',
                       flex: 0,
@@ -545,7 +545,7 @@ export async function sendContractCompletionNotification(
                       type: 'text',
                       text: dueDateString,
                       wrap: true,
-                      color: '#0A4215',
+                      color: '#c2410c',
                       size: 'sm',
                       weight: 'bold',
                       flex: 0,
@@ -570,7 +570,7 @@ export async function sendContractCompletionNotification(
                 label: 'รายละเอียดสัญญา',
                 uri: `https://pawn360.vercel.app/contract-info/${itemId}`
               },
-              color: '#0A4215',
+              color: '#c2410c',
               flex: 1
             },
             {
@@ -649,7 +649,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
     }
 
     const headerText = isContractCreation ? 'ยืนยันการสร้างสัญญา' : (hasChanges ? 'มีการแก้ไขสัญญา' : 'ยืนยันสัญญา');
-    const altText = isContractCreation ? `🔔 การสร้างสัญญาจำนำ` : (hasChanges ? `🔔 การแก้ไขสัญญา` : `🔔 ยืนยันสัญญา`);
+    const altText = isContractCreation ? `การสร้างสัญญาจำนำ` : (hasChanges ? `การแก้ไขสัญญา` : `ยืนยันสัญญา`);
     const modificationText = isContractCreation
       ? 'การสร้างสัญญาจำนำใหม่'
       : (hasChanges && changesList.length > 0)
@@ -674,7 +674,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
               align: 'center'
             },
           ],
-          backgroundColor: '#0A4215',
+          backgroundColor: '#c2410c',
           paddingAll: 'lg'
         },
         body: {
@@ -785,7 +785,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                 label: 'ยืนยันรายการ',
                 data: `action=confirm_contract_modification&itemId=${newContract.itemId || ''}`
               },
-              color: '#0A4215'
+              color: '#c2410c'
             }
           ]
         }
@@ -816,7 +816,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
 
     const flexMessage = {
       type: 'flex',
-      altText: `✅ สัญญาจำนำสำเร็จ - ${contractData.contractNumber}`,
+      altText: `สัญญาจำนำสำเร็จ - ${contractData.contractNumber}`,
       contents: {
         type: 'bubble',
         header: {
@@ -825,14 +825,14 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
           contents: [
             {
               type: 'text',
-              text: '✅ สัญญาจำนำสำเร็จ',
+              text: 'สัญญาจำนำสำเร็จ',
               weight: 'bold',
               size: 'lg',
               color: '#ffffff',
               align: 'center'
             },
           ],
-          backgroundColor: '#0A4215',
+          backgroundColor: '#c2410c',
           paddingAll: 'lg'
         },
         body: {
@@ -841,11 +841,11 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
           contents: [
             {
               type: 'text',
-              text: 'สัญญาจำนำของคุณได้สร้างเรียบร้อยแล้ว 🎉',
+              text: 'สัญญาจำนำของคุณสร้างเรียบร้อยแล้ว',
               weight: 'bold',
               size: 'md',
               margin: 'lg',
-              color: '#0A4215'
+              color: '#c2410c'
             },
             {
               type: 'box',
@@ -895,7 +895,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
                   spacing: 'sm',
                   contents: [
                     { type: 'text', text: 'วันครบกำหนด:', color: '#666666', size: 'sm', flex: 2 },
-                    { type: 'text', text: dueDateString, wrap: true, color: '#0A4215', size: 'sm', flex: 5, weight: 'bold' }
+                    { type: 'text', text: dueDateString, wrap: true, color: '#c2410c', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 }
               ]
@@ -923,7 +923,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
                 uri: `https://pawn360.vercel.app/contracts`
               },
               style: 'primary',
-              color: '#0A4215'
+              color: '#c2410c'
             }
           ]
         }
@@ -969,7 +969,7 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
 
     const flexMessage = {
       type: 'flex',
-      altText: `📍 ที่ตั้งร้าน: ${storeData.storeName}`,
+      altText: `ที่ตั้งร้าน: ${storeData.storeName}`,
       contents: {
         type: 'bubble',
         header: {
@@ -978,14 +978,14 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
           contents: [
             {
               type: 'text',
-              text: `📍 ${storeData.storeName}`,
+              text: `${storeData.storeName}`,
               weight: 'bold',
               size: 'lg',
-              color: '#0A4215',
+              color: '#ffffff',
               align: 'center'
             }
           ],
-          backgroundColor: '#E7EFE9',
+          backgroundColor: '#c2410c',
           paddingAll: 'lg'
         },
         body: {
@@ -996,7 +996,7 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
               type: 'text',
               text: 'ที่อยู่ร้านค้า',
               size: 'md',
-              color: '#0A4215',
+              color: '#c2410c',
               weight: 'bold',
               margin: 'md'
             },
@@ -1023,7 +1023,7 @@ export async function sendStoreLocationCard(userId: string, storeData: any) {
                 uri: googleMapsUrl
               },
               style: 'primary',
-              color: '#0A4215'
+              color: '#c2410c'
             }
           ]
         }

@@ -30,7 +30,7 @@ function OfferDetailContent() {
     }
   }
 
-  console.log('📍 Extracted contractId:', contractId);
+  console.log('Extracted contractId:', contractId);
 
   useEffect(() => {
     if (contractId) {
@@ -41,12 +41,12 @@ function OfferDetailContent() {
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching contract details for:', contractId);
+      console.log('Fetching contract details for:', contractId);
       const response = await axios.get(`/api/contracts/${contractId}`);
-      console.log('✅ Contract data received:', response.data);
+      console.log('Contract data received:', response.data);
       setContract(response.data.contract);
     } catch (error: any) {
-      console.error('❌ Error fetching contract:', error);
+      console.error('Error fetching contract:', error);
       console.error('Error details:', error.response?.data);
       setError(error.response?.data?.error || 'ไม่สามารถโหลดรายละเอียดข้อเสนอได้');
     } finally {
