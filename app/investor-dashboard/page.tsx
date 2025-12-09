@@ -27,12 +27,16 @@ function InvestorDashboardContent() {
     try {
       setLoading(true);
 
+      console.log('LIFF Profile userId:', profile?.userId);
+
       // Fetch investor profile
       const investorRes = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
+      console.log('Investor response:', investorRes.data);
       setInvestor(investorRes.data.investor);
 
       // Fetch contracts for this investor
       const contractsRes = await axios.get(`/api/contracts/by-investor/${profile?.userId}`);
+      console.log('Contracts response:', contractsRes.data);
       setMyContracts(contractsRes.data.contracts || []);
 
       // Fetch market offers (pending contracts)

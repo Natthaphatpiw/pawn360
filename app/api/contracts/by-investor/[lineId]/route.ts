@@ -40,21 +40,18 @@ export async function GET(
           item_id,
           brand,
           model,
-          storage_capacity,
-          color,
+          capacity,
           image_urls,
-          condition_grade
+          item_condition
         ),
         pawners:customer_id (
           customer_id,
           firstname,
-          lastname,
-          profile_image_url
+          lastname
         ),
         drop_points:drop_point_id (
           drop_point_id,
-          drop_point_name,
-          address
+          drop_point_name
         )
       `)
       .eq('investor_id', investor.investor_id)
