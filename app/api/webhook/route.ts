@@ -551,13 +551,12 @@ async function handlePostbackEvent(event: WebhookEvent) {
           .eq('contract_id', contractId);
 
         // Update payment record if paymentId provided
+        // Valid payment_status values: PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
         if (paymentId) {
           await supabase
             .from('payments')
             .update({
-              payment_status: 'CONFIRMED',
-              confirmed_by_recipient: true,
-              confirmed_at: new Date().toISOString()
+              payment_status: 'COMPLETED'
             })
             .eq('payment_id', paymentId);
         }
@@ -618,12 +617,12 @@ async function handlePostbackEvent(event: WebhookEvent) {
         }
 
         // Update payment record if paymentId provided
+        // Valid payment_status values: PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
         if (paymentId) {
           await supabase
             .from('payments')
             .update({
-              payment_status: 'REJECTED',
-              confirmed_by_recipient: false
+              payment_status: 'FAILED'
             })
             .eq('payment_id', paymentId);
         }
