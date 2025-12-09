@@ -1,4 +1,18 @@
 -- =====================================================
+-- Migration: Add CONFIRMED status to contracts table
+-- To distinguish fully completed contracts from active ones
+-- =====================================================
+
+-- Add CONFIRMED status to contract_status check constraint
+ALTER TABLE contracts DROP CONSTRAINT IF EXISTS contracts_contract_status_check;
+ALTER TABLE contracts ADD CONSTRAINT contracts_contract_status_check CHECK (
+  contract_status IN (
+    'PENDING_SIGNATURE', 'ACTIVE', 'CONFIRMED', 'COMPLETED',
+    'DEFAULTED', 'EXTENDED', 'TERMINATED', 'LIQUIDATED'
+  )
+);
+
+-- =====================================================
 -- Migration: Add line_id column to drop_points table
 -- For LINE OA integration with Drop Points
 -- =====================================================

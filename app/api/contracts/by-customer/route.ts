@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch contracts with item details
+    // Fetch contracts with item details (only fully confirmed/completed contracts)
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('customer_id', pawner.customer_id)
+      .in('contract_status', ['CONFIRMED', 'COMPLETED'])
       .order('created_at', { ascending: false });
 
     if (contractsError) {
@@ -79,8 +80,10 @@ export async function GET(request: NextRequest) {
         displayStatus = 'ใกล้ครบกำหนด'; // Near Due
       }
 
-      // Override with contract status if not active
-      if (contract.contract_status === 'COMPLETED') {
+      // Override with contract status
+      if (contract.contract_status === 'CONFIRMED') {
+        displayStatus = 'กำลังดำเนินการ';
+      } else if (contract.contract_status === 'COMPLETED') {
         displayStatus = 'เสร็จสิ้น';
       } else if (contract.contract_status === 'DEFAULTED') {
         displayStatus = 'เกินกำหนด';

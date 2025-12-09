@@ -52,6 +52,8 @@ function InvestorDashboardContent() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'CONFIRMED':
+        return { text: 'กำลังดำเนินการ', color: 'bg-[#D1FAE5] text-[#065F46]' };
       case 'ACTIVE':
         return { text: 'ปกติ', color: 'bg-[#D1FAE5] text-[#065F46]' };
       case 'PENDING_SIGNATURE':
