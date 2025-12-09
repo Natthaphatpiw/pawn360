@@ -31,7 +31,7 @@ export async function GET(
       );
     }
 
-    // Get contracts for this investor
+    // Get contracts for this investor (only fully confirmed/completed contracts)
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -55,6 +55,7 @@ export async function GET(
         )
       `)
       .eq('investor_id', investor.investor_id)
+      .in('contract_status', ['CONFIRMED', 'COMPLETED'])
       .order('created_at', { ascending: false });
 
     if (contractsError) {
