@@ -128,7 +128,7 @@ function createPaymentConfirmationCard(contract: any, payment: any, investor: an
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: '💰 นักลงทุนโอนเงินแล้ว',
+          text: 'นักลงทุนโอนเงินแล้ว',
           weight: 'bold',
           size: 'lg',
           color: '#ffffff',
@@ -141,7 +141,7 @@ function createPaymentConfirmationCard(contract: any, payment: any, investor: an
           align: 'center',
           margin: 'sm'
         }],
-        backgroundColor: '#1DB446',
+        backgroundColor: '#c2410c',
         paddingAll: 'lg'
       },
       hero: {

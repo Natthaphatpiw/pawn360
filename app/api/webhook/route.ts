@@ -436,7 +436,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   const client = new Client({ channelAccessToken });
                   await client.pushMessage(userId, {
                     type: 'text',
-                    text: '📸 กรุณาส่งรูปภาพสลิปการโอนเงิน\n\nหลังจากโอนเงินเรียบร้อยแล้ว กรุณาถ่ายรูปหรือ screenshot สลิปการโอนเงินแล้วส่งมาที่แชทนี้'
+                    text: 'กรุณาส่งรูปภาพสลิปการโอนเงิน\n\nหลังจากโอนเงินเรียบร้อยแล้ว กรุณาถ่ายรูปหรือ screenshot สลิปการโอนเงินแล้วส่งมาที่แชทนี้'
                   });
                 }
 
@@ -489,7 +489,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `✅ ยืนยันการจำนำเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n📍 ${contract.drop_points?.drop_point_name}\n📌 ${contract.drop_points?.address}\n\nภายใน 24 ชั่วโมง`
+            text: `ยืนยันการจำนำเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายใน 24 ชั่วโมง`
           });
         }
 
@@ -567,7 +567,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `✅ ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}\n\nสัญญาจำนำเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
+            text: `ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}\n\nสัญญาจำนำเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
           });
         }
 
@@ -576,7 +576,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           try {
             await investorLineClient.pushMessage(contract.investors.line_id, {
               type: 'text',
-              text: `✅ ผู้จำนำยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาจำนำเริ่มต้นเรียบร้อยแล้ว`
+              text: `ผู้จำนำยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาจำนำเริ่มต้นเรียบร้อยแล้ว`
             });
           } catch (invError) {
             console.error('Error sending to investor:', invError);
@@ -632,7 +632,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           try {
             await investorLineClient.pushMessage(contract.investors.line_id, {
               type: 'text',
-              text: `❌ ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานใหม่`
+              text: `ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานใหม่`
             });
           } catch (invError) {
             console.error('Error sending to investor:', invError);
@@ -662,13 +662,13 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: '📦 มีสินค้าใหม่รอรับ',
+          text: 'มีสินค้าใหม่รอรับ',
           weight: 'bold',
           size: 'lg',
           color: '#ffffff',
           align: 'center'
         }],
-        backgroundColor: '#1E3A8A',
+        backgroundColor: '#365314',
         paddingAll: 'lg'
       },
       hero: {
@@ -749,7 +749,7 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
             uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q'}?contractId=${contract.contract_id}`
           },
           style: 'primary',
-          color: '#1E3A8A'
+          color: '#365314'
         }]
       }
     }

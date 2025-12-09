@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       if (contract.pawners?.line_id) {
         await pawnerLineClient.pushMessage(contract.pawners.line_id, {
           type: 'text',
-          text: `❌ สินค้าของคุณถูกปฏิเสธจาก Drop Point\n\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nกรุณาติดต่อรับสินค้าคืนที่ ${dropPoint.drop_point_name}`
+          text: `สินค้าของคุณถูกปฏิเสธจาก Drop Point\n\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nกรุณาติดต่อรับสินค้าคืนที่ ${dropPoint.drop_point_name}`
         });
       }
 
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       if (contract.investors?.line_id) {
         await investorLineClient.pushMessage(contract.investors.line_id, {
           type: 'text',
-          text: `❌ สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: สินค้าไม่ตรงตามข้อมูลที่ระบุ\n\nสัญญานี้ถูกยกเลิก`
+          text: `สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: สินค้าไม่ตรงตามข้อมูลที่ระบุ\n\nสัญญานี้ถูกยกเลิก`
         });
       }
     }
@@ -168,7 +168,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: '✅ สินค้าผ่านการตรวจสอบ',
+          text: 'สินค้าผ่านการตรวจสอบแล้ว',
           weight: 'bold',
           size: 'lg',
           color: '#ffffff',
@@ -181,7 +181,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
           align: 'center',
           margin: 'sm'
         }],
-        backgroundColor: '#1DB446',
+        backgroundColor: '#1E3A8A',
         paddingAll: 'lg'
       },
       hero: {
