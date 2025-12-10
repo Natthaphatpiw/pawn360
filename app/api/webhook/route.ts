@@ -539,13 +539,13 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
-        // Update contract status
+        // Update contract status to CONFIRMED (fully confirmed contract)
         await supabase
           .from('contracts')
           .update({
             payment_status: 'COMPLETED',
             payment_confirmed_at: new Date().toISOString(),
-            contract_status: 'ACTIVE',
+            contract_status: 'CONFIRMED',
             updated_at: new Date().toISOString()
           })
           .eq('contract_id', contractId);
