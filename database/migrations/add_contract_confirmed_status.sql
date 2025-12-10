@@ -23,7 +23,7 @@ ALTER TABLE contracts ADD CONSTRAINT contracts_contract_status_check CHECK (
 -- Update existing ACTIVE contracts that have payment_confirmed_at to CONFIRMED
 -- This will mark contracts that have already completed the full flow
 UPDATE contracts
-SET contract_status = 'CONFIRMED'
+SET contract_status = 'CONFIRMED', updated_at = NOW()
 WHERE contract_status = 'ACTIVE'
   AND payment_confirmed_at IS NOT NULL;
 
