@@ -216,25 +216,10 @@ ALTER TABLE pawners ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(50);
 ALTER TABLE pawners ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(200);
 ALTER TABLE pawners ADD COLUMN IF NOT EXISTS promptpay_number VARCHAR(20);
 
--- 5. Create company_bank_accounts table (บัญชีบริษัท)
-CREATE TABLE IF NOT EXISTS company_bank_accounts (
-  account_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  bank_name VARCHAR(100) NOT NULL,
-  bank_account_no VARCHAR(50) NOT NULL,
-  bank_account_name VARCHAR(200) NOT NULL,
-  promptpay_number VARCHAR(20),
-  is_active BOOLEAN DEFAULT TRUE,
-  is_default BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 5. Company bank accounts table already created in update_redemption_flow.sql
+-- Skip creating company_bank_accounts table
 
--- Insert default company bank account
-INSERT INTO company_bank_accounts (bank_name, bank_account_no, bank_account_name, promptpay_number, is_active, is_default)
-VALUES ('พร้อมเพย์', '0626092941', 'ณัฐภัทร ต้อยจัตุรัส', '0626092941', TRUE, TRUE)
-ON CONFLICT DO NOTHING;
-
--- 6. Create slip_verifications table (ประวัติการตรวจสอบสลิป)
+-- 5. Create slip_verifications table (ประวัติการตรวจสอบสลิป)
 CREATE TABLE IF NOT EXISTS slip_verifications (
   verification_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
@@ -270,7 +255,7 @@ CREATE TABLE IF NOT EXISTS slip_verifications (
 CREATE INDEX IF NOT EXISTS idx_slip_verifications_action_request_id ON slip_verifications(action_request_id);
 CREATE INDEX IF NOT EXISTS idx_slip_verifications_redemption_id ON slip_verifications(redemption_id);
 
--- 7. Create trigger for updated_at on contract_action_requests
+-- 6. Create trigger for updated_at on contract_action_requests
 CREATE OR REPLACE FUNCTION update_contract_action_requests_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -284,13 +269,13 @@ CREATE TRIGGER trigger_contract_action_requests_updated_at
 BEFORE UPDATE ON contract_action_requests
 FOR EACH ROW EXECUTE FUNCTION update_contract_action_requests_updated_at();
 
--- 8. Update existing contracts to set original_principal_amount
+-- 7. Update existing contracts to set original_principal_amount
 UPDATE contracts
 SET original_principal_amount = loan_principal_amount,
     current_principal_amount = loan_principal_amount
 WHERE original_principal_amount IS NULL;
 
--- 9. Create function to log contract actions
+-- 8. Create function to log contract actions
 CREATE OR REPLACE FUNCTION log_contract_action(
   p_contract_id UUID,
   p_action_type VARCHAR(50),
@@ -340,5 +325,5 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON TABLE contract_action_logs IS 'ตารางเก็บ log ทุก action ที่เกิดขึ้นกับสัญญา';
 COMMENT ON TABLE contract_action_requests IS 'ตารางเก็บคำขอ action ต่างๆ เช่น ต่อดอกเบี้ย ลดเงินต้น เพิ่มเงินต้น';
-COMMENT ON TABLE company_bank_accounts IS 'ตารางเก็บข้อมูลบัญชีธนาคารของบริษัท';
+COMMENT ON TABLE slip_verifications IS 'ตารางเก็บประวัติการตรวจสอบสลิปด้วย AI';
 COMMENT ON TABLE slip_verifications IS 'ตารางเก็บประวัติการตรวจสอบสลิปด้วย AI';

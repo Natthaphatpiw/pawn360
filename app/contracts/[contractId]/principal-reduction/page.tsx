@@ -1,10 +1,29 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, AlertTriangle, TrendingDown, Calculator } from 'lucide-react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { ChevronLeft, AlertTriangle, Info } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
+
+interface Calculation {
+  contractId: string;
+  actionType: string;
+  currentPrincipal: number;
+  interestRate: number;
+  dailyInterestRate: number;
+  daysInContract: number;
+  daysElapsed: number;
+  daysRemaining: number;
+  interestAccrued: number;
+  reductionAmount: number;
+  interestForPeriod: number;
+  totalToPay: number;
+  principalAfterReduction: number;
+  newInterestForRemaining: number;
+  interestSavings: number;
+  description: string;
+}
 
 interface CompanyBank {
   bank_name: string;
@@ -16,45 +35,47 @@ interface CompanyBank {
 export default function PrincipalReductionPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const contractId = params.contractId as string;
+  const reductionAmount = searchParams.get('amount') || '0';
   const { profile } = useLiff();
 
   const [loading, setLoading] = useState(true);
-  const [contract, setContract] = useState<any>(null);
-  const [calculation, setCalculation] = useState<any>(null);
-  const [companyBank, setCompanyBank] = useState<CompanyBank | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [reductionAmount, setReductionAmount] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [calculation, setCalculation] = useState<Calculation | null>(null);
+  const [contract, setContract] = useState<any>(null);
+  const [companyBank, setCompanyBank] = useState<CompanyBank | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [step, setStep] = useState<'info' | 'payment'>('info');
 
   useEffect(() => {
-    fetchContractDetails();
-    fetchCompanyBank();
-  }, [contractId]);
-
-  useEffect(() => {
-    if (contract && reductionAmount) {
-      calculateReduction();
+    if (contractId && reductionAmount) {
+      fetchCalculation();
+      fetchCompanyBank();
     }
-  }, [reductionAmount, contract]);
+  }, [contractId, reductionAmount]);
 
-  const fetchContractDetails = async () => {
+  const fetchCalculation = async () => {
     try {
-      setLoading(true);
-      const response = await axios.get(`/api/contracts/${contractId}`);
+      const response = await axios.post('/api/contract-actions/calculate', {
+        contractId,
+        actionType: 'PRINCIPAL_REDUCTION',
+        amount: parseFloat(reductionAmount),
+      });
+
       if (response.data.success) {
+        setCalculation(response.data.calculation);
         setContract(response.data.contract);
       }
     } catch (error) {
-      console.error('Error fetching contract:', error);
-      setError('ไม่สามารถโหลดข้อมูลสัญญาได้');
+      console.error('Error fetching calculation:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const fetchCompanyBank = async () => {
+    // Hardcoded for now, can be fetched from API
     setCompanyBank({
       bank_name: 'พร้อมเพย์',
       bank_account_no: '0626092941',
@@ -63,69 +84,58 @@ export default function PrincipalReductionPage() {
     });
   };
 
-  const calculateReduction = async () => {
-    const amount = parseFloat(reductionAmount);
-    if (!amount || amount <= 0) {
-      setCalculation(null);
-      return;
-    }
-
-    try {
-      const response = await axios.post('/api/contract-actions/calculate', {
-        contractId,
-        actionType: 'PRINCIPAL_REDUCTION',
-        reductionAmount: amount,
-      });
-
-      if (response.data.success) {
-        setCalculation(response.data.calculation);
-        setError(null);
-      }
-    } catch (error: any) {
-      console.error('Error calculating:', error);
-      setError(error.response?.data?.error || 'ไม่สามารถคำนวณได้');
-      setCalculation(null);
-    }
-  };
-
-  const handleProceed = async () => {
-    if (!termsAccepted || !calculation) {
+  const handleProceedToPayment = async () => {
+    if (!acceptedTerms) {
+      alert('กรุณายอมรับข้อตกลงและเงื่อนไข');
       return;
     }
 
     setSubmitting(true);
-    setError(null);
 
     try {
       const response = await axios.post('/api/contract-actions/create', {
         contractId,
         actionType: 'PRINCIPAL_REDUCTION',
-        reductionAmount: parseFloat(reductionAmount),
+        amount: parseFloat(reductionAmount),
         pawnerLineId: profile?.userId,
+        termsAccepted: true,
       });
 
       if (response.data.success) {
         router.push(`/contracts/${contractId}/principal-reduction/upload?requestId=${response.data.requestId}`);
-      } else {
-        throw new Error(response.data.error);
       }
     } catch (error: any) {
       console.error('Error creating request:', error);
-      setError(error.response?.data?.error || error.message || 'เกิดข้อผิดพลาด');
+      alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const DetailRow = ({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) => (
+    <div className="flex justify-between items-center py-2">
+      <span className="text-gray-600 text-sm">{label}</span>
+      <span className={`text-sm font-medium ${highlight ? 'text-[#B85C38] font-bold' : 'text-gray-800'}`}>{value}</span>
+    </div>
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex items-center justify-center">
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
       </div>
     );
   }
 
-  const currentPrincipal = contract?.current_principal_amount || contract?.principal_amount || 0;
+  if (!calculation || !contract) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-600">ไม่พบข้อมูลสัญญา</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -137,203 +147,96 @@ export default function PrincipalReductionPage() {
         />
         <div className="flex-1 text-center">
           <h1 className="font-bold text-lg text-gray-800">ลดเงินต้น</h1>
-          <p className="text-xs text-gray-400">Reduce Principal</p>
+          <p className="text-xs text-gray-400">Principal Reduction</p>
         </div>
         <div className="w-6"></div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center p-6 pb-32">
-        {error && (
-          <div className="w-full max-w-sm bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
-            <div className="flex gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
-
+      <div className="flex-1 px-4 py-6 pb-36 overflow-y-auto">
         {/* Contract Info */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-[#FFF8F5] rounded-full flex items-center justify-center">
-              <TrendingDown className="w-5 h-5 text-[#B85C38]" />
-            </div>
-            <div>
-              <h2 className="font-bold text-gray-800">สัญญาเลขที่ {contract?.contract_number}</h2>
-              <p className="text-xs text-gray-500">{contract?.items?.brand} {contract?.items?.model}</p>
-            </div>
+        <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Info className="w-4 h-4 text-[#B85C38]" />
+            <h2 className="font-bold text-gray-800 text-sm">ข้อมูลสัญญา</h2>
           </div>
+          <DetailRow label="หมายเลขสัญญา" value={contract.contract_number} />
+          <DetailRow label="สินค้า" value={`${contract.item?.brand} ${contract.item?.model}`} />
+          <DetailRow label="เงินต้นปัจจุบัน" value={`${calculation.currentPrincipal.toLocaleString()} บาท`} />
+        </div>
 
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">เงินต้นปัจจุบัน:</span>
-              <span className="font-bold">{currentPrincipal.toLocaleString()} บาท</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">อัตราดอกเบี้ย:</span>
-              <span className="font-bold">{contract?.interest_rate}% / เดือน</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">วันครบกำหนด:</span>
-              <span className="font-bold">
-                {new Date(contract?.end_date).toLocaleDateString('th-TH', {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric'
-                })}
-              </span>
+        {/* Calculation Details */}
+        <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+          <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการลดเงินต้น</h2>
+          <div className="bg-[#FFF8F5] rounded-xl p-4 mb-3">
+            <DetailRow label="จำนวนที่ต้องการลด" value={`${calculation.reductionAmount.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ยสะสม" value={`${calculation.interestForPeriod.toLocaleString()} บาท`} />
+            <div className="border-t border-[#F0D4C8] my-2"></div>
+            <DetailRow label="เงินต้นหลังลด" value={`${calculation.principalAfterReduction.toLocaleString()} บาท`} highlight />
+            <DetailRow label="ดอกเบี้ยที่ประหยัด" value={`${calculation.interestSavings.toLocaleString()} บาท`} highlight />
+          </div>
+          <div className="bg-[#B85C38] rounded-xl p-4 text-white">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">ยอดที่ต้องชำระ</span>
+              <span className="text-2xl font-bold">{calculation.totalToPay.toLocaleString()} บาท</span>
             </div>
           </div>
         </div>
-
-        {/* Reduction Amount Input */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <Calculator className="w-5 h-5 text-[#B85C38]" />
-            ระบุจำนวนเงินที่ต้องการลด
-          </h3>
-
-          <div className="mb-4">
-            <label className="block text-sm text-gray-600 mb-2">จำนวนเงินต้นที่ต้องการลด (บาท)</label>
-            <input
-              type="number"
-              value={reductionAmount}
-              onChange={(e) => setReductionAmount(e.target.value)}
-              placeholder="เช่น 5000"
-              min="1"
-              max={currentPrincipal}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B85C38] text-lg font-bold text-center"
-            />
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              สามารถลดได้สูงสุด {currentPrincipal.toLocaleString()} บาท
-            </p>
-          </div>
-
-          {/* Quick Amount Buttons */}
-          <div className="flex flex-wrap gap-2 justify-center">
-            {[1000, 2000, 5000, 10000].map((amount) => (
-              <button
-                key={amount}
-                onClick={() => setReductionAmount(Math.min(amount, currentPrincipal).toString())}
-                disabled={amount > currentPrincipal}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                  amount <= currentPrincipal
-                    ? 'bg-[#FFF8F5] text-[#B85C38] hover:bg-[#F0D4C8]'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {amount.toLocaleString()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Calculation Result */}
-        {calculation && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <h3 className="font-bold text-gray-800 mb-3">สรุปการคำนวณ</h3>
-
-            <div className="space-y-3 text-sm">
-              <div className="bg-[#FFF8F5] rounded-xl p-3">
-                <div className="flex justify-between mb-1">
-                  <span className="text-gray-600">ดอกเบี้ยสะสม ({calculation.daysElapsed} วัน):</span>
-                  <span className="font-bold">{calculation.interestAccrued?.toLocaleString()} บาท</span>
-                </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-gray-600">จำนวนเงินต้นที่ลด:</span>
-                  <span className="font-bold text-green-600">{calculation.reductionAmount?.toLocaleString()} บาท</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-[#F0D4C8]">
-                  <span className="font-bold text-gray-800">ยอดที่ต้องชำระ:</span>
-                  <span className="font-bold text-[#B85C38] text-lg">{calculation.totalToPay?.toLocaleString()} บาท</span>
-                </div>
-              </div>
-
-              <div className="bg-green-50 rounded-xl p-3">
-                <h4 className="font-bold text-green-800 mb-2">ผลลัพธ์หลังลดเงินต้น</h4>
-                <div className="flex justify-between mb-1">
-                  <span className="text-green-700">เงินต้นใหม่:</span>
-                  <span className="font-bold text-green-800">{calculation.newPrincipal?.toLocaleString()} บาท</span>
-                </div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-green-700">ดอกเบี้ยต่อเดือนใหม่:</span>
-                  <span className="font-bold text-green-800">{calculation.newMonthlyInterest?.toLocaleString()} บาท</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-green-700">ประหยัดดอกเบี้ย/เดือน:</span>
-                  <span className="font-bold text-green-600">{calculation.monthlySavings?.toLocaleString()} บาท</span>
-                </div>
-              </div>
-
-              {/* Interest Comparison */}
-              <div className="bg-blue-50 rounded-xl p-3">
-                <h4 className="font-bold text-blue-800 mb-2">เปรียบเทียบดอกเบี้ย</h4>
-                <div className="text-xs text-blue-700 space-y-1">
-                  <p>ดอกเบี้ยเดิม: {(currentPrincipal * (contract?.interest_rate || 0) / 100).toLocaleString()} บาท/เดือน</p>
-                  <p>ดอกเบี้ยใหม่: {calculation.newMonthlyInterest?.toLocaleString()} บาท/เดือน</p>
-                  <p className="font-bold text-green-600">ประหยัดได้: {calculation.monthlySavings?.toLocaleString()} บาท/เดือน</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Bank Info */}
-        {companyBank && calculation && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <h3 className="font-bold text-gray-800 mb-3">โอนเงินมาที่</h3>
-            <div className="bg-[#FFF8F5] rounded-xl p-3 border border-[#F0D4C8]">
-              <p className="text-sm"><span className="text-gray-600">ธนาคาร:</span> <span className="font-bold">{companyBank.bank_name}</span></p>
-              <p className="text-sm"><span className="text-gray-600">เลขบัญชี:</span> <span className="font-bold text-[#B85C38]">{companyBank.bank_account_no}</span></p>
-              <p className="text-sm"><span className="text-gray-600">ชื่อบัญชี:</span> <span className="font-bold">{companyBank.bank_account_name}</span></p>
+        {companyBank && (
+          <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการโอนเงิน</h2>
+            <div className="bg-[#FFF8F5] rounded-xl p-4 border border-[#F0D4C8]">
+              <DetailRow label="ธนาคาร" value={companyBank.bank_name} />
+              <DetailRow label="เลขบัญชี" value={companyBank.bank_account_no} highlight />
+              <DetailRow label="ชื่อบัญชี" value={companyBank.bank_account_name} />
+              {companyBank.promptpay_number && (
+                <DetailRow label="PromptPay" value={companyBank.promptpay_number} highlight />
+              )}
             </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              กรุณาโอนเงินจำนวน <span className="font-bold text-[#B85C38]">{calculation.totalToPay?.toLocaleString()} บาท</span>
-            </p>
           </div>
         )}
 
-        {/* Warning Section */}
-        <div className="w-full max-w-sm bg-red-50 rounded-2xl p-4 mb-4 border border-red-200">
-          <h3 className="font-bold text-red-800 mb-2 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            คำเตือน
-          </h3>
-          <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
-            <li>การลดเงินต้นไม่สามารถยกเลิกได้หลังจากยืนยัน</li>
-            <li>กรุณาตรวจสอบยอดเงินให้ถูกต้องก่อนโอน</li>
-            <li>หลังจากลดเงินต้นแล้ว วันครบกำหนดจะยังคงเดิม</li>
-            <li>ยอดชำระรวมดอกเบี้ยสะสมจนถึงวันที่ทำรายการ</li>
-          </ul>
+        {/* Warning */}
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+          <div className="flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-bold text-red-700 text-sm mb-2">ข้อควรระวัง</h3>
+              <ul className="text-xs text-red-600 space-y-1 list-disc list-inside">
+                <li>กรุณาตรวจสอบยอดเงินให้ถูกต้องก่อนโอน</li>
+                <li>หากโอนเงินเกินยอดที่กำหนด ทางเราจะไม่รับผิดชอบ</li>
+                <li>หากโอนเงินขาดไม่ตรงตามจำนวน การลดเงินต้นจะเป็นโมฆะ</li>
+                <li>ทาง Pawnly จะไม่รับผิดชอบความผิดพลาดที่เกิดจากผู้ใช้งาน</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         {/* Terms Acceptance */}
-        {calculation && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="w-5 h-5 mt-0.5 rounded border-gray-300 text-[#B85C38] focus:ring-[#B85C38]"
-              />
-              <span className="text-sm text-gray-700">
-                ข้าพเจ้าได้อ่านและยอมรับข้อตกลงและเงื่อนไขทั้งหมด
-                และยืนยันว่าจะชำระเงินจำนวน {calculation.totalToPay?.toLocaleString()} บาท
-              </span>
-            </label>
-          </div>
-        )}
+        <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-1 w-5 h-5 accent-[#B85C38] cursor-pointer"
+            />
+            <span className="text-sm text-gray-700">
+              ข้าพเจ้ารับทราบและยอมรับว่าหากโอนเงินเกินหรือขาดไม่ตรงตามจำนวน ทาง Pawnly จะไม่รับผิดชอบใดๆ ทั้งสิ้น และการดำเนินการอาจถูกยกเลิก ข้าพเจ้าได้ตรวจสอบยอดเงินและข้อมูลการโอนเงินเรียบร้อยแล้ว
+            </span>
+          </label>
+        </div>
       </div>
 
       {/* Fixed Bottom Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F2F2]">
-        <div className="max-w-sm mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F2F2] border-t border-gray-200">
+        <div className="max-w-md mx-auto">
           <button
-            onClick={handleProceed}
-            disabled={!termsAccepted || !calculation || submitting}
+            onClick={handleProceedToPayment}
+            disabled={!acceptedTerms || submitting}
             className={`w-full py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] ${
-              termsAccepted && calculation && !submitting
+              acceptedTerms && !submitting
                 ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
@@ -342,8 +245,8 @@ export default function PrincipalReductionPage() {
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             ) : (
               <>
-                <span className="text-lg font-bold">ดำเนินการต่อ</span>
-                <span className="text-xs font-light opacity-80">Proceed to Payment</span>
+                <span className="text-base font-bold">ดำเนินการต่อ</span>
+                <span className="text-xs font-light opacity-80">Proceed to payment</span>
               </>
             )}
           </button>

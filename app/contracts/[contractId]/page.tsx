@@ -247,7 +247,10 @@ export default function PawnContractDetail() {
               </p>
 
               <div className="space-y-3">
-                <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                <button
+                  onClick={() => router.push(`/contracts/${contractId}/interest-payment`)}
+                  className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                >
                   ยืนยัน
                 </button>
                 <button
@@ -291,8 +294,9 @@ export default function PawnContractDetail() {
 
                   <div className="space-y-3">
                     <button
-                      onClick={nextStep}
-                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                      onClick={() => router.push(`/contracts/${contractId}/principal-reduction?amount=${decreaseAmount}`)}
+                      disabled={!decreaseAmount || parseFloat(decreaseAmount) <= 0}
+                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       ถัดไป
                     </button>
@@ -327,7 +331,10 @@ export default function PawnContractDetail() {
                   </p>
 
                   <div className="space-y-3">
-                    <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                    <button
+                      onClick={() => router.push(`/contracts/${contractId}/principal-reduction?amount=${decreaseAmount}`)}
+                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                    >
                       ยืนยัน
                     </button>
                     <button
@@ -469,7 +476,10 @@ export default function PawnContractDetail() {
                   </p>
 
                   <div className="space-y-3">
-                    <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                    <button
+                      onClick={() => router.push(`/contracts/${contractId}/principal-increase?amount=${increaseAmount}`)}
+                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                    >
                       ยืนยัน
                     </button>
                     <button
