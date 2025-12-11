@@ -214,26 +214,26 @@ export default function RedemptionPaymentPage() {
         <div className="bg-white rounded-3xl p-6 mb-6 shadow-sm">
           <h2 className="text-base font-bold text-gray-800 mb-4">รายละเอียดการโอนเงิน</h2>
 
-          <div className="bg-[#FFF8F5] rounded-2xl p-4 border border-[#F0D4C8]">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600 text-sm">ธนาคาร:</span>
+            <div className="bg-[#FFF8F5] rounded-2xl p-4 border border-[#F0D4C8]">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 text-sm">ธนาคาร:</span>
                 <span className="font-bold text-gray-800 text-sm">พร้อมเพย์</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 text-sm">เลขบัญชี:</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 text-sm">เลขบัญชี:</span>
                 <span className="font-bold text-[#B85C38] text-sm">0626092941</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 text-sm">ชื่อบัญชี:</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 text-sm">ชื่อบัญชี:</span>
                 <span className="font-medium text-gray-800 text-sm">ณัฐภัทร ต้อยจัตุรัส</span>
-              </div>
-              <div className="flex justify-between pt-2 border-t border-[#F0D4C8]">
-                <span className="text-gray-600 text-sm">PromptPay:</span>
+                </div>
+                  <div className="flex justify-between pt-2 border-t border-[#F0D4C8]">
+                    <span className="text-gray-600 text-sm">PromptPay:</span>
                 <span className="font-bold text-[#B85C38] text-sm">0626092941</span>
               </div>
             </div>
-          </div>
+            </div>
         </div>
 
         {/* Payment Details */}

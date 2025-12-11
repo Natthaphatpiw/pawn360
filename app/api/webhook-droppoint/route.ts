@@ -206,14 +206,14 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       const investor = redemption.contract?.investors;
 
       // Update redemption status to COMPLETED
-      await supabase
-        .from('redemption_requests')
-        .update({
+    await supabase
+      .from('redemption_requests')
+      .update({
           request_status: 'COMPLETED',
-          verified_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('redemption_id', redemptionId);
+        verified_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('redemption_id', redemptionId);
 
       // Update contract status
       await supabase
@@ -260,19 +260,19 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       }
 
       // Reply to drop point
-      let deliveryInstructions = '';
-      if (redemption.delivery_method === 'SELF_PICKUP') {
-        deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
-      } else if (redemption.delivery_method === 'SELF_ARRANGE') {
-        deliveryInstructions = `ลูกค้าจะเรียกบริการขนส่งมารับของเอง\n\nกรุณาเตรียมของรอ`;
-      } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
-        deliveryInstructions = `กรุณาเรียกบริการขนส่งไปส่งที่:\n\n${redemption.delivery_address_full}\n\nเบอร์ติดต่อ: ${redemption.delivery_contact_phone}\n${redemption.delivery_notes ? `หมายเหตุ: ${redemption.delivery_notes}` : ''}`;
-      }
+    let deliveryInstructions = '';
+    if (redemption.delivery_method === 'SELF_PICKUP') {
+      deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
+    } else if (redemption.delivery_method === 'SELF_ARRANGE') {
+      deliveryInstructions = `ลูกค้าจะเรียกบริการขนส่งมารับของเอง\n\nกรุณาเตรียมของรอ`;
+    } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
+      deliveryInstructions = `กรุณาเรียกบริการขนส่งไปส่งที่:\n\n${redemption.delivery_address_full}\n\nเบอร์ติดต่อ: ${redemption.delivery_contact_phone}\n${redemption.delivery_notes ? `หมายเหตุ: ${redemption.delivery_notes}` : ''}`;
+    }
 
-      await dropPointLineClient.replyMessage(replyToken, {
-        type: 'text',
+    await dropPointLineClient.replyMessage(replyToken, {
+      type: 'text',
         text: `ยืนยันยอดถูกต้องเรียบร้อย\n\nการไถ่ถอนเสร็จสิ้น\n\n${deliveryInstructions}`
-      });
+    });
     }
 
     console.log(`Redemption ${redemptionId} amount verified by drop point`);
