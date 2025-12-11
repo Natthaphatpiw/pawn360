@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   title: 'อัปโหลดสลิปโอนเงิน - Pawn360',
@@ -15,30 +16,25 @@ export default function InvestorPrincipalIncreaseUploadLayout({
 }) {
   return (
     <html lang="th">
-      <head>
-        <script
-          src={`https://static.line-scdn.net/liff/edge/2/sdk.js`}
+      <body>
+        <Script src="https://static.line-scdn.net/liff/edge/2/sdk.js" strategy="beforeInteractive" />
+        <Script
+          id="liff-init-principal-increase-upload"
           strategy="beforeInteractive"
-        />
-        <script
           dangerouslySetInnerHTML={{
             __html: `
-              document.addEventListener('DOMContentLoaded', function() {
-                if (typeof window !== 'undefined' && window.liff) {
-                  window.liff.init({
-                    liffId: '${liffId}'
-                  }).then(() => {
-                    console.log('LIFF initialized successfully');
-                  }).catch((error) => {
-                    console.error('LIFF initialization failed', error);
-                  });
-                }
-              });
+              if (typeof window !== 'undefined') {
+                window.addEventListener('DOMContentLoaded', function () {
+                  if (window.liff) {
+                    window.liff.init({ liffId: '${liffId}' })
+                      .then(() => console.log('LIFF initialized successfully'))
+                      .catch((error) => console.error('LIFF initialization failed', error));
+                  }
+                });
+              }
             `,
           }}
         />
-      </head>
-      <body>
         <div className="min-h-screen bg-[#F0F4F8]">
           {children}
         </div>
