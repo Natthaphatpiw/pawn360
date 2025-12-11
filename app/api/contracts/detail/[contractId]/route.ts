@@ -33,7 +33,12 @@ export async function GET(
           investor_id,
           firstname,
           lastname,
-          phone_number
+          phone_number,
+          bank_name,
+          bank_account_no,
+          bank_account_name,
+          promptpay_number,
+          promptpay_name
         ),
         item:item_id (
           item_id,

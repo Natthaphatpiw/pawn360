@@ -149,6 +149,9 @@ CREATE TABLE drop_points (
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
 
+  -- LINE OA Integration
+  line_id VARCHAR(255) UNIQUE,
+
   -- Operational Info
   opening_hours JSONB, -- {"monday": "09:00-18:00", ...}
   capacity INTEGER DEFAULT 100,
@@ -170,6 +173,7 @@ CREATE TABLE drop_points (
 
 CREATE INDEX idx_drop_points_province ON drop_points(addr_province);
 CREATE INDEX idx_drop_points_active ON drop_points(is_active);
+CREATE INDEX idx_drop_points_line_id ON drop_points(line_id);
 
 -- Table: admin_users (ผู้ดูแลระบบ)
 CREATE TABLE admin_users (
@@ -305,6 +309,13 @@ CREATE TABLE items (
   -- Drop Point
   drop_point_id UUID REFERENCES drop_points(drop_point_id),
   received_at_drop_point TIMESTAMP,
+
+  -- Drop Point Verification
+  verified_by_drop_point BOOLEAN DEFAULT FALSE,
+  drop_point_verified_at TIMESTAMP,
+  drop_point_verification_notes TEXT,
+  drop_point_photos TEXT[], -- Photos taken by drop point
+  drop_point_condition_score INTEGER CHECK (drop_point_condition_score >= 0 AND drop_point_condition_score <= 100),
 
   -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
@@ -444,8 +455,8 @@ CREATE TABLE contracts (
 
   -- Contract Status
   contract_status VARCHAR(50) DEFAULT 'ACTIVE' CHECK (contract_status IN (
-    'PENDING_SIGNATURE', 'ACTIVE', 'COMPLETED', 'DEFAULTED', 'EXTENDED', 'TERMINATED', 'LIQUIDATED'
-  )),
+    'PENDING_SIGNATURE', 'ACTIVE', 'CONFIRMED', 'COMPLETED', 'DEFAULTED', 'EXTENDED', 'TERMINATED', 'LIQUIDATED'
+  )), -- CONFIRMED = Pawner confirmed payment receipt (fully completed flow)
 
   funding_status VARCHAR(50) DEFAULT 'PENDING' CHECK (funding_status IN (
     'PENDING', 'FUNDED', 'DISBURSED'
@@ -458,6 +469,15 @@ CREATE TABLE contracts (
   -- Documents
   contract_file_url TEXT,
   signed_contract_url TEXT,
+
+  -- Item Delivery Status
+  item_delivery_status VARCHAR(50) DEFAULT 'PENDING' CHECK (item_delivery_status IN (
+    'PENDING', 'PAWNER_CONFIRMED', 'IN_TRANSIT', 'RECEIVED_AT_DROP_POINT', 'VERIFIED', 'RETURNED'
+  )),
+  item_received_at TIMESTAMP,
+  item_verified_at TIMESTAMP,
+  payment_slip_url TEXT,
+  payment_confirmed_at TIMESTAMP,
 
   -- Timestamps
   funded_at TIMESTAMP,
@@ -474,6 +494,45 @@ CREATE INDEX idx_contracts_item_id ON contracts(item_id);
 CREATE INDEX idx_contracts_status ON contracts(contract_status);
 CREATE INDEX idx_contracts_end_date ON contracts(contract_end_date);
 CREATE INDEX idx_contracts_number ON contracts(contract_number);
+
+-- Table: drop_point_verifications (การตรวจสอบสินค้าโดยจุดรับฝาก)
+CREATE TABLE drop_point_verifications (
+  verification_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contract_id UUID NOT NULL REFERENCES contracts(contract_id) ON DELETE CASCADE,
+  drop_point_id UUID NOT NULL REFERENCES drop_points(drop_point_id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+
+  -- Verification checklist
+  brand_correct BOOLEAN,
+  model_correct BOOLEAN,
+  capacity_correct BOOLEAN,
+  color_match BOOLEAN,
+  functionality_ok BOOLEAN,
+  mdm_lock_status BOOLEAN, -- true = no MDM lock (correct), false = has MDM lock
+
+  -- Condition assessment
+  condition_score INTEGER CHECK (condition_score >= 0 AND condition_score <= 100),
+
+  -- Photos taken by drop point
+  verification_photos TEXT[],
+
+  -- Notes
+  notes TEXT,
+
+  -- Result
+  verification_result VARCHAR(20) CHECK (verification_result IN ('APPROVED', 'REJECTED', 'PENDING')),
+  rejection_reason TEXT,
+
+  -- Verified by
+  verified_by_line_id VARCHAR(255),
+
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_drop_point_verifications_contract_id ON drop_point_verifications(contract_id);
+CREATE INDEX idx_drop_point_verifications_drop_point_id ON drop_point_verifications(drop_point_id);
 
 -- =====================================================
 -- 6. PAYMENTS & REPAYMENTS
@@ -505,6 +564,13 @@ CREATE TABLE payments (
   transaction_ref VARCHAR(255),
   payment_slip_url TEXT,
   bank_name VARCHAR(100),
+
+  -- Payer Information
+  payer_type VARCHAR(20) CHECK (payer_type IN ('INVESTOR', 'PAWNER')),
+  payer_id UUID,
+  confirmed_by_recipient BOOLEAN DEFAULT FALSE,
+  confirmed_at TIMESTAMP,
+  confirmation_deadline TIMESTAMP,
 
   -- Verification
   verified_by UUID REFERENCES admin_users(admin_id),
@@ -648,6 +714,7 @@ CREATE TRIGGER update_items_updated_at BEFORE UPDATE ON items FOR EACH ROW EXECU
 CREATE TRIGGER update_loan_requests_updated_at BEFORE UPDATE ON loan_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_loan_offers_updated_at BEFORE UPDATE ON loan_offers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_contracts_updated_at BEFORE UPDATE ON contracts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_drop_point_verifications_updated_at BEFORE UPDATE ON drop_point_verifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- =====================================================
 -- 10. VIEWS FOR COMMON QUERIES
