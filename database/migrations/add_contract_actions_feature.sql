@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS contract_action_logs (
 
   -- References
   contract_id UUID REFERENCES contracts(contract_id),
-  customer_id UUID REFERENCES customers(customer_id),
+  customer_id UUID REFERENCES pawners(customer_id),
   investor_id UUID REFERENCES investors(investor_id),
   action_request_id UUID, -- Reference to contract_action_requests
 
@@ -210,11 +210,11 @@ ALTER TABLE contracts ADD COLUMN IF NOT EXISTS extension_count INT DEFAULT 0;
 ALTER TABLE contracts ADD COLUMN IF NOT EXISTS last_action_date TIMESTAMPTZ;
 ALTER TABLE contracts ADD COLUMN IF NOT EXISTS last_action_type VARCHAR(50);
 
--- 4. Add bank account to customers (for receiving increased principal)
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(50);
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(200);
-ALTER TABLE customers ADD COLUMN IF NOT EXISTS promptpay_number VARCHAR(20);
+-- 4. Add bank account to pawners (for receiving increased principal)
+ALTER TABLE pawners ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100);
+ALTER TABLE pawners ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(50);
+ALTER TABLE pawners ADD COLUMN IF NOT EXISTS bank_account_name VARCHAR(200);
+ALTER TABLE pawners ADD COLUMN IF NOT EXISTS promptpay_number VARCHAR(20);
 
 -- 5. Create company_bank_accounts table (บัญชีบริษัท)
 CREATE TABLE IF NOT EXISTS company_bank_accounts (
