@@ -45,12 +45,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if request is still active and available
+    if (!['AWAITING_INVESTOR_APPROVAL', 'INVESTOR_APPROVED', 'AWAITING_INVESTOR_PAYMENT'].includes(actionRequest.request_status)) {
+      return NextResponse.json(
+        { error: 'คำขอนี้ไม่สามารถดำเนินการได้ อาจถูกดำเนินการโดย investor อื่นแล้ว หรือหมดอายุแล้ว' },
+        { status: 400 }
+      );
+    }
+
     // Check attempt count (investor side)
     const attemptCount = (actionRequest.investor_slip_attempt_count || 0) + 1;
 
     if (attemptCount > 2) {
       return NextResponse.json(
-        { error: 'เกินจำนวนครั้งที่อนุญาต กรุณาติดต่อฝ่าย Support' },
+        { error: 'เกินจำนวนครั้งที่อนุญาต กรุณาติดต่อฝ่าย Support ที่เบอร์ 062-6092941' },
         { status: 400 }
       );
     }

@@ -79,9 +79,11 @@ export async function POST(request: NextRequest) {
     const contractEndDate = new Date();
     contractEndDate.setDate(contractStartDate.getDate() + loanRequest.requested_duration_days);
 
-    const interestRate = 0.03; // 3% per month
-    const interestAmount = loanRequest.requested_amount * interestRate * (loanRequest.requested_duration_days / 30);
-    const platformFeeAmount = interestAmount * 0.1; // 10% of interest
+    const interestRate = 0.02; // 2% per month (net to investor after platform fee)
+    const fullInterestRate = 0.03; // 3% per month (shown to pawner)
+    const fullInterestAmount = loanRequest.requested_amount * fullInterestRate * (loanRequest.requested_duration_days / 30);
+    const investorInterestAmount = loanRequest.requested_amount * interestRate * (loanRequest.requested_duration_days / 30);
+    const platformFeeAmount = fullInterestAmount - investorInterestAmount; // 1% platform fee
     const totalAmount = loanRequest.requested_amount + interestAmount;
 
     const contractRecord = {
@@ -96,10 +98,10 @@ export async function POST(request: NextRequest) {
       contract_end_date: contractEndDate.toISOString(),
       contract_duration_days: loanRequest.requested_duration_days,
       loan_principal_amount: loanRequest.requested_amount,
-      interest_rate: interestRate,
-      interest_amount: interestAmount,
-      total_amount: totalAmount,
-      platform_fee_rate: 0.1,
+      interest_rate: fullInterestRate, // Store full rate for pawner
+      interest_amount: fullInterestAmount, // Store full interest for pawner
+      total_amount: loanRequest.requested_amount + fullInterestAmount, // Total for pawner
+      platform_fee_rate: 0.33, // 1/3 of interest is platform fee (1% out of 3%)
       platform_fee_amount: platformFeeAmount,
       contract_status: 'PENDING_SIGNATURE',
       funding_status: 'PENDING',
@@ -235,7 +237,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 0 },
-                { type: 'text', text: `${contract.interest_amount.toLocaleString()} บาท`, color: '#666666', size: 'md', weight: 'bold', flex: 0, align: 'end' }
+                { type: 'text', text: `${investorInterestAmount.toLocaleString()} บาท`, color: '#666666', size: 'md', weight: 'bold', flex: 0, align: 'end' }
               ]
             },
             {
@@ -249,7 +251,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
               margin: 'md',
               contents: [
                 { type: 'text', text: 'ยอดสุทธิ:', color: '#666666', size: 'sm', flex: 0 },
-                { type: 'text', text: `${contract.total_amount.toLocaleString()} บาท`, color: '#E91E63', size: 'xl', weight: 'bold', flex: 0, align: 'end' }
+                { type: 'text', text: `${(loanRequest.requested_amount + investorInterestAmount).toLocaleString()} บาท`, color: '#E91E63', size: 'xl', weight: 'bold', flex: 0, align: 'end' }
               ]
             }
           ]
