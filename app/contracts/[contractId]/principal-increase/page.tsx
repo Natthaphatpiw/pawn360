@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { ChevronLeft, AlertTriangle, TrendingUp, Calculator, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
@@ -169,6 +169,7 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
 export default function PrincipalIncreasePage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const { profile } = useLiff();
 
@@ -176,7 +177,7 @@ export default function PrincipalIncreasePage() {
   const [contract, setContract] = useState<any>(null);
   const [calculation, setCalculation] = useState<any>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [increaseAmount, setIncreaseAmount] = useState<string>('');
+  const [increaseAmount, setIncreaseAmount] = useState<string>(searchParams.get('amount') || '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
