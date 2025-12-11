@@ -5,10 +5,10 @@ import { ObjectId } from 'mongodb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ itemId: string }> }
+  context: { params: Promise<{ itemId: string }> }
 ) {
   try {
-    const { itemId } = await params;
+    const { itemId } = await context.params;
     const { db } = await connectToDatabase();
     const itemsCollection = db.collection<Item>('items');
 
