@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const redemptionAmount = redemptionDetails.total;
 
     // 5. Create callback URL
-    const callbackUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/webhooks/shop-notification`;
+    const callbackUrl = `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawn360.vercel.app'}/api/webhooks/shop-notification`;
 
     // 6. Send request to Shop System
     const shopSystemUrl = process.env.SHOP_SYSTEM_URL || 'https://pawn360-ver.vercel.app';

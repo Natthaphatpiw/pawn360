@@ -170,7 +170,8 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
 async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLineId: string, replyToken: string) {
   try {
     // Use the new API endpoint for payment verification
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/redemptions/verify-payment`, {
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawn360.vercel.app';
+    const response = await fetch(`${baseUrl}/api/redemptions/verify-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -282,7 +283,8 @@ async function handlePawnerConfirmReceived(redemptionId: string, pawnerLineId: s
     }
 
     // Reply to pawner with instructions to upload receipt photos
-    const instructionsMessage = `ขอบคุณที่ยืนยันการได้รับสินค้า\n\nกรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน\n\n${process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app'}/contracts/${redemption.contract_id}/redeem/receipt?redemptionId=${redemptionId}`;
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawn360.vercel.app';
+    const instructionsMessage = `ขอบคุณที่ยืนยันการได้รับสินค้า\n\nกรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน\n\n${baseUrl}/contracts/${redemption.contract_id}/redeem/receipt?redemptionId=${redemptionId}`;
 
     await dropPointLineClient.replyMessage(replyToken, {
       type: 'text',

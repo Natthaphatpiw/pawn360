@@ -1098,7 +1098,7 @@ async function handleMessageEvent(event: WebhookEvent) {
     console.log(`Found pending notification: ${notification.shopNotificationId}, uploading slip`);
 
     // Call upload-payment-proof API
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawn360.vercel.app';
     const response = await fetch(`${baseUrl}/api/customer/upload-payment-proof`, {
       method: 'POST',
       headers: {
