@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
       null,
       {
         actionRequestId: requestId,
-        oldPrincipal: contract?.current_principal_amount || contract?.principal_amount,
-        newPrincipal,
-        increaseAmount: actionRequest.increase_amount,
+        principalBefore: contract?.current_principal_amount || contract?.principal_amount,
+        principalAfter: newPrincipal,
+        amount: actionRequest.increase_amount,
         description: `Principal increased from ${contract?.current_principal_amount || contract?.principal_amount} to ${newPrincipal}`,
       }
     );
