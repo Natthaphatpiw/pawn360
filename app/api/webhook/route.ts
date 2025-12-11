@@ -645,9 +645,320 @@ async function handlePostbackEvent(event: WebhookEvent) {
       }
     }
 
+    // ==================== REDEMPTION HANDLERS ====================
+
+    // Pawner confirms they received the item
+    if (action === 'pawner_confirm_received') {
+      const redemptionId = params.get('redemptionId');
+      if (!redemptionId) {
+        console.error('No redemptionId in pawner_confirm_received postback');
+        return;
+      }
+
+      try {
+        console.log(`Processing pawner_confirm_received for redemptionId: ${redemptionId}`);
+        const supabase = supabaseAdmin();
+
+        // Get redemption with all details
+        const { data: redemption, error: redemptionError } = await supabase
+          .from('redemption_requests')
+          .select(`
+            *,
+            contract:contract_id (
+              *,
+              items:item_id (*),
+              pawners:customer_id (*),
+              investors:investor_id (*)
+            )
+          `)
+          .eq('redemption_id', redemptionId)
+          .single();
+
+        if (redemptionError || !redemption) {
+          console.error('Redemption not found:', redemptionError);
+          return;
+        }
+
+        const contract = redemption.contract;
+        const investor = contract?.investors;
+        const item = contract?.items;
+
+        // Calculate investor earnings
+        const interestEarned = redemption.interest_amount || 0;
+        const platformFee = contract?.platform_fee_amount || 0;
+        const netProfit = interestEarned - platformFee;
+
+        // Update redemption status
+        await supabase
+          .from('redemption_requests')
+          .update({
+            request_status: 'PAWNER_CONFIRMED',
+            pawner_confirmed_at: new Date().toISOString(),
+            investor_interest_earned: interestEarned,
+            platform_fee_deducted: platformFee,
+            investor_net_profit: netProfit,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('redemption_id', redemptionId);
+
+        // Update contract status to COMPLETED
+        await supabase
+          .from('contracts')
+          .update({
+            contract_status: 'COMPLETED',
+            redemption_status: 'COMPLETED',
+            item_delivery_status: 'RETURNED',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('contract_id', redemption.contract_id);
+
+        // Update item status
+        await supabase
+          .from('items')
+          .update({
+            item_status: 'RETURNED',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('item_id', contract?.item_id);
+
+        // Send confirmation to Pawner
+        const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        if (channelAccessToken) {
+          const client = new Client({ channelAccessToken });
+          await client.pushMessage(userId, {
+            type: 'text',
+            text: `ยืนยันรับสินค้าเรียบร้อยแล้ว\n\n${item?.brand} ${item?.model}\n\nขอบคุณที่ใช้บริการ Pawnly`
+          });
+        }
+
+        // Send notification to Investor
+        if (investor?.line_id) {
+          const investorCard = createInvestorRedemptionCompleteCard(redemption, contract, netProfit);
+          try {
+            await investorLineClient.pushMessage(investor.line_id, investorCard);
+          } catch (invError) {
+            console.error('Error sending to investor:', invError);
+          }
+        }
+
+        console.log(`Pawner confirmed received for redemptionId: ${redemptionId}`);
+      } catch (error) {
+        console.error('Error processing pawner_confirm_received:', error);
+      }
+    }
+
+    // Investor confirms they received payment
+    if (action === 'investor_confirm_received') {
+      const redemptionId = params.get('redemptionId');
+      if (!redemptionId) {
+        console.error('No redemptionId in investor_confirm_received postback');
+        return;
+      }
+
+      try {
+        console.log(`Processing investor_confirm_received for redemptionId: ${redemptionId}`);
+        const supabase = supabaseAdmin();
+
+        // Get redemption
+        const { data: redemption, error } = await supabase
+          .from('redemption_requests')
+          .select('*, contract:contract_id (*)')
+          .eq('redemption_id', redemptionId)
+          .single();
+
+        if (error || !redemption) {
+          console.error('Redemption not found:', error);
+          return;
+        }
+
+        // Update redemption status
+        await supabase
+          .from('redemption_requests')
+          .update({
+            request_status: 'COMPLETED',
+            investor_confirmed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('redemption_id', redemptionId);
+
+        // Send success message to investor
+        const netProfit = redemption.investor_net_profit || 0;
+        const successMessage = `ยินดีด้วย! คุณได้รับกำไรจากสัญญานี้\n\n+${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly\n\nอย่าลืมเช็คข้อเสนอใหม่ๆ เพื่อโอกาสในการสร้างกำไรที่มากขึ้น\n\nPawnly - ลงทุนง่าย กำไรดี`;
+
+        try {
+          await investorLineClient.pushMessage(userId, {
+            type: 'text',
+            text: successMessage
+          });
+        } catch (msgError) {
+          console.error('Error sending to investor:', msgError);
+        }
+
+        console.log(`Investor confirmed received for redemptionId: ${redemptionId}`);
+      } catch (error) {
+        console.error('Error processing investor_confirm_received:', error);
+      }
+    }
+
+    // Investor reports problem
+    if (action === 'investor_report_problem') {
+      const redemptionId = params.get('redemptionId');
+
+      try {
+        await investorLineClient.pushMessage(userId, {
+          type: 'text',
+          text: `หากพบปัญหาเกี่ยวกับการรับเงิน\n\nกรุณาติดต่อฝ่าย Support:\nโทร: 062-6092941\n\nเวลาทำการ: 09:00 - 18:00 น.\nทุกวันจันทร์ - เสาร์`
+        });
+      } catch (msgError) {
+        console.error('Error sending support info:', msgError);
+      }
+    }
+
   } catch (error) {
     console.error('Error handling postback event:', error);
   }
+}
+
+// Create card for Investor when redemption is complete
+function createInvestorRedemptionCompleteCard(redemption: any, contract: any, netProfit: number): FlexMessage {
+  const item = contract?.items;
+
+  return {
+    type: 'flex',
+    altText: 'สัญญาไถ่ถอนเสร็จสิ้น',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: 'สัญญาไถ่ถอนเสร็จสิ้น',
+          weight: 'bold',
+          size: 'lg',
+          color: '#ffffff',
+          align: 'center'
+        }, {
+          type: 'text',
+          text: 'ผู้จำนำยืนยันรับของแล้ว',
+          size: 'sm',
+          color: '#ffffff',
+          align: 'center',
+          margin: 'sm'
+        }],
+        backgroundColor: '#1E3A8A',
+        paddingAll: 'lg'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: `${item?.brand || ''} ${item?.model || ''}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'สัญญา:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: contract?.contract_number || '', color: '#333333', size: 'sm', flex: 5 }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'lg',
+            contents: [
+              { type: 'text', text: 'เงินต้น:', color: '#666666', size: 'sm', flex: 3 },
+              { type: 'text', text: `${contract?.loan_principal_amount?.toLocaleString()} บาท`, color: '#333333', size: 'sm', flex: 4 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'ดอกเบี้ยรับ:', color: '#666666', size: 'sm', flex: 3 },
+              { type: 'text', text: `+${redemption.investor_interest_earned?.toLocaleString()} บาท`, color: '#1E3A8A', size: 'sm', flex: 4, weight: 'bold' }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'sm',
+            contents: [
+              { type: 'text', text: 'ค่าธรรมเนียม:', color: '#666666', size: 'sm', flex: 3 },
+              { type: 'text', text: `-${redemption.platform_fee_deducted?.toLocaleString()} บาท`, color: '#999999', size: 'sm', flex: 4 }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'lg',
+            contents: [
+              { type: 'text', text: 'กำไรสุทธิ:', color: '#1E3A8A', size: 'lg', flex: 3, weight: 'bold' },
+              { type: 'text', text: `+${netProfit.toLocaleString()} บาท`, color: '#1E3A8A', size: 'xl', flex: 4, weight: 'bold' }
+            ]
+          },
+          {
+            type: 'text',
+            text: 'ตรวจสอบยอดเงินในบัญชีของคุณได้เลย',
+            size: 'xs',
+            color: '#888888',
+            margin: 'lg',
+            wrap: true
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: 'ยืนยันได้รับเงิน',
+              data: `action=investor_confirm_received&redemptionId=${redemption.redemption_id}`
+            },
+            style: 'primary',
+            color: '#1E3A8A'
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: 'แจ้งปัญหา',
+              data: `action=investor_report_problem&redemptionId=${redemption.redemption_id}`
+            },
+            style: 'secondary'
+          }
+        ]
+      }
+    }
+  };
 }
 
 // Helper function to create drop point notification card

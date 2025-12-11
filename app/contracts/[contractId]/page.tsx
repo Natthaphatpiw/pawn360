@@ -349,38 +349,28 @@ export default function PawnContractDetail() {
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center animate-fade-in shadow-xl relative">
 
               <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                  <span className="text-4xl text-[#C0562F] font-bold">!</span>
+                <div className="w-16 h-16 rounded-full border-4 border-[#B85C38] flex items-center justify-center">
+                  <span className="text-4xl text-[#B85C38] font-bold">!</span>
                 </div>
               </div>
 
               <h3 className="text-lg font-bold text-gray-800">ยืนยันการไถ่ถอน</h3>
               <p className="text-xs text-gray-500 mb-2 font-light">Confirm redemption</p>
-              <p className="text-[#C0562F] font-bold text-sm mb-6">
+              <p className="text-[#B85C38] font-bold text-sm mb-4">
                 ยอดชำระรวม {contract.remainingAmount.toLocaleString()} Baht
               </p>
 
-              <div className="text-left mb-6">
-                <label className="text-xs font-bold text-gray-800 block mb-1">การจัดส่ง*</label>
-                <div className="relative">
-                  <select
-                    value={deliveryMethod}
-                    onChange={(e) => setDeliveryMethod(e.target.value)}
-                    className="w-full p-3 bg-white border border-gray-300 rounded-xl text-gray-800 text-xs appearance-none focus:outline-none focus:border-[#C0562F]"
-                  >
-                    <option value="delivery">บริการจัดส่ง (+40บาท)</option>
-                    <option value="pickup">รับด้วยตัวเอง</option>
-                  </select>
-                </div>
-                <p className="text-[10px] text-[#C0562F] mt-2 leading-tight font-light">
-                  *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก "รับด้วยตัวเอง"<br />
-                  แล้วเรียกบริการส่งของด้วยตัวเองได้
-                </p>
-              </div>
+              <p className="text-[10px] text-gray-500 mb-6 px-4 leading-relaxed font-light">
+                เมื่อกดยืนยันคุณจะเข้าสู่หน้ารายละเอียดการโอนเงิน<br />
+                กรุณาตรวจสอบยอดให้ถูกต้องก่อนทำรายการ
+              </p>
 
               <div className="space-y-3">
-                <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
-                  ยืนยัน
+                <button
+                  onClick={() => router.push(`/contracts/${contractId}/redeem?type=FULL_REDEMPTION`)}
+                  className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                >
+                  ดำเนินการต่อ
                 </button>
                 <button
                   onClick={closeModal}
