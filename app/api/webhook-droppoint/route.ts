@@ -159,73 +159,63 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
   if (action === 'redemption_amount_incorrect' && redemptionId) {
     await handleRedemptionAmountIncorrect(redemptionId, userId, event.replyToken);
   }
+
+  // Pawner confirms item received
+  if (action === 'pawner_confirm_received' && redemptionId) {
+    await handlePawnerConfirmReceived(redemptionId, userId, event.replyToken);
+  }
 }
 
 // Handle when Drop Point confirms the redemption amount is correct
 async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLineId: string, replyToken: string) {
-  const supabase = supabaseAdmin();
-
   try {
-    // Get redemption with all details
-    const { data: redemption, error } = await supabase
+    // Use the new API endpoint for payment verification
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/redemptions/verify-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        redemptionId,
+        action: 'amount_correct',
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to verify payment');
+      return;
+    }
+
+    // Reply to Drop Point with delivery instructions
+    const supabase = supabaseAdmin();
+    const { data: redemption } = await supabase
       .from('redemption_requests')
       .select(`
         *,
         contract:contract_id (
-          *,
-          items:item_id (*),
-          pawners:customer_id (*),
-          investors:investor_id (*),
-          drop_points:drop_point_id (*)
+          drop_points:drop_point_id (*),
+          pawners:customer_id (*)
         )
       `)
       .eq('redemption_id', redemptionId)
       .single();
 
-    if (error || !redemption) {
-      console.error('Redemption not found:', error);
-      return;
-    }
+    if (redemption) {
+      const pawner = redemption.contract?.pawners;
+      let deliveryInstructions = '';
 
-    const contract = redemption.contract;
-    const pawner = contract?.pawners;
-    const investor = contract?.investors;
-
-    // Update redemption status
-    await supabase
-      .from('redemption_requests')
-      .update({
-        request_status: 'AMOUNT_VERIFIED',
-        verified_by_line_id: dropPointLineId,
-        verified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('redemption_id', redemptionId);
-
-    // Determine delivery instructions for Drop Point
-    let deliveryInstructions = '';
-    if (redemption.delivery_method === 'SELF_PICKUP') {
-      deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
-    } else if (redemption.delivery_method === 'SELF_ARRANGE') {
-      deliveryInstructions = `ลูกค้าจะเรียกบริการขนส่งมารับของเอง\n\nกรุณาเตรียมของรอ`;
-    } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
-      deliveryInstructions = `กรุณาเรียกบริการขนส่งไปส่งที่:\n\n${redemption.delivery_address_full}\n\nเบอร์ติดต่อ: ${redemption.delivery_contact_phone}\n${redemption.delivery_notes ? `หมายเหตุ: ${redemption.delivery_notes}` : ''}`;
-    }
-
-    // Reply to Drop Point
-    await dropPointLineClient.replyMessage(replyToken, {
-      type: 'text',
-      text: `ยืนยันยอดถูกต้องเรียบร้อย\n\n${deliveryInstructions}`
-    });
-
-    // Send notification to Pawner
-    if (pawner?.line_id) {
-      const pawnerCard = createPawnerItemReadyCard(redemption);
-      try {
-        await pawnerLineClient.pushMessage(pawner.line_id, pawnerCard);
-      } catch (msgError) {
-        console.error('Error sending to pawner:', msgError);
+      if (redemption.delivery_method === 'SELF_PICKUP') {
+        deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
+      } else if (redemption.delivery_method === 'SELF_ARRANGE') {
+        deliveryInstructions = `ลูกค้าจะเรียกบริการขนส่งมารับของเอง\n\nกรุณาเตรียมของรอ`;
+      } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
+        deliveryInstructions = `กรุณาเรียกบริการขนส่งไปส่งที่:\n\n${redemption.delivery_address_full}\n\nเบอร์ติดต่อ: ${redemption.delivery_contact_phone}\n${redemption.delivery_notes ? `หมายเหตุ: ${redemption.delivery_notes}` : ''}`;
       }
+
+      await dropPointLineClient.replyMessage(replyToken, {
+        type: 'text',
+        text: `ยืนยันยอดถูกต้องเรียบร้อย\n\n${deliveryInstructions}`
+      });
     }
 
     console.log(`Redemption ${redemptionId} amount verified by drop point`);
@@ -237,20 +227,50 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 
 // Handle when Drop Point says the redemption amount is incorrect
 async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLineId: string, replyToken: string) {
+  try {
+    // Get redemption details to determine the difference
+    const supabase = supabaseAdmin();
+    const { data: redemption } = await supabase
+      .from('redemption_requests')
+      .select('*')
+      .eq('redemption_id', redemptionId)
+      .single();
+
+    if (!redemption) {
+      console.error('Redemption not found');
+      return;
+    }
+
+    // For now, we'll ask the drop point to specify the amount difference
+    // In a real implementation, you might want to have a form for this
+    const dropPointInstructions = `กรุณาระบุจำนวนเงินที่ผิด:\n\nตัวอย่าง:\n- หากขาด 500 บาท: ตอบ "ขาด 500"\n- หากเกิน 1000 บาท: ตอบ "เกิน 1000"\n\nหรือติดต่อฝ่ายสนับสนุนที่ 062-6092941 เพื่อขอความช่วยเหลือ`;
+
+    await dropPointLineClient.replyMessage(replyToken, {
+      type: 'text',
+      text: dropPointInstructions
+    });
+
+    console.log(`Redemption ${redemptionId} amount mismatch reported by drop point`);
+
+  } catch (error) {
+    console.error('Error handling redemption amount incorrect:', error);
+  }
+}
+
+// Handle when Pawner confirms item received
+async function handlePawnerConfirmReceived(redemptionId: string, pawnerLineId: string, replyToken: string) {
   const supabase = supabaseAdmin();
 
   try {
-    // Get redemption with all details
+    // Get redemption details
     const { data: redemption, error } = await supabase
       .from('redemption_requests')
       .select(`
         *,
         contract:contract_id (
-          *,
-          items:item_id (*),
-          pawners:customer_id (*),
-          investors:investor_id (*),
-          drop_points:drop_point_id (*)
+          contract_number,
+          items:item_id (brand, model),
+          pawners:customer_id (firstname, lastname)
         )
       `)
       .eq('redemption_id', redemptionId)
@@ -261,48 +281,18 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       return;
     }
 
-    const contract = redemption.contract;
-    const pawner = contract?.pawners;
-    const investor = contract?.investors;
-    const dropPoint = contract?.drop_points;
-
-    // Update redemption status
-    await supabase
-      .from('redemption_requests')
-      .update({
-        request_status: 'AMOUNT_MISMATCH',
-        verified_by_line_id: dropPointLineId,
-        verified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('redemption_id', redemptionId);
-
-    // Send instructions to Drop Point
-    const dropPointInstructions = `ยอดไม่ถูกต้อง\n\nข้อมูลสำหรับติดต่อ:\n\nผู้จำนำ:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nนักลงทุน (เจ้าของเงิน):\nชื่อ: ${investor?.firstname} ${investor?.lastname}\nบัญชี: ${investor?.bank_name} ${investor?.bank_account_no}\n\nบทพูด:\n- หากโอนขาด: "สวัสดีครับ/ค่ะ คุณลูกค้าโอนเงินมาไม่ครบจำนวน กรุณาโอนเพิ่มมาที่บัญชี ${investor?.bank_name} ${investor?.bank_account_no} ชื่อ ${investor?.bank_account_name || investor?.firstname + ' ' + investor?.lastname}"\n- หากโอนเกิน: กรุณาติดต่อนักลงทุนเพื่อขอคืนเงินส่วนเกิน`;
+    // Reply to pawner with instructions to upload receipt photos
+    const instructionsMessage = `ขอบคุณที่ยืนยันการได้รับสินค้า\n\nกรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน\n\n${process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app'}/contracts/${redemption.contract_id}/redeem/receipt?redemptionId=${redemptionId}`;
 
     await dropPointLineClient.replyMessage(replyToken, {
       type: 'text',
-      text: dropPointInstructions
+      text: instructionsMessage
     });
 
-    // Send notification to Pawner
-    if (pawner?.line_id) {
-      const pawnerMessage = `ยอดเงินที่โอนไม่ถูกต้อง\n\nยอดที่ต้องจ่าย: ${redemption.total_amount?.toLocaleString()} บาท\n\nกรุณาโอนเงินให้ครบจำนวน หรือติดต่อ Drop Point:\n${dropPoint?.drop_point_name}\nโทร: ${dropPoint?.phone_number}\n\nหากไม่ดำเนินการภายใน 24 ชั่วโมง การไถ่ถอนจะถูกยกเลิกตามข้อตกลง`;
-
-      try {
-        await pawnerLineClient.pushMessage(pawner.line_id, {
-          type: 'text',
-          text: pawnerMessage
-        });
-      } catch (msgError) {
-        console.error('Error sending to pawner:', msgError);
-      }
-    }
-
-    console.log(`Redemption ${redemptionId} amount mismatch reported by drop point`);
+    console.log(`Pawner ${pawnerLineId} confirmed receipt for redemption ${redemptionId}`);
 
   } catch (error) {
-    console.error('Error handling redemption amount incorrect:', error);
+    console.error('Error handling pawner confirm received:', error);
   }
 }
 

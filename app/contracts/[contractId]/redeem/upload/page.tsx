@@ -18,7 +18,6 @@ export default function RedemptionUploadPage() {
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [redemptionDetails, setRedemptionDetails] = useState<any>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +89,8 @@ export default function RedemptionUploadPage() {
       });
 
       if (response.data.success) {
-        setSubmitted(true);
+        // Redirect to receipt upload page instead of showing success
+        router.push(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
       }
     } catch (error: any) {
       console.error('Error uploading slip:', error);
@@ -100,37 +100,6 @@ export default function RedemptionUploadPage() {
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
-          </div>
-
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งหลักฐานสำเร็จ!</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            กรุณารอ Drop Point ตรวจสอบยอดเงิน<br />
-            เราจะแจ้งผลให้ทราบทาง LINE
-          </p>
-
-          <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6">
-            <p className="text-sm text-gray-700">
-              <span className="font-bold">หมายเลขสัญญา:</span><br />
-              {redemptionDetails?.contract?.contract_number || contractId}
-            </p>
-          </div>
-
-          <button
-            onClick={() => router.push('/contracts')}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
-          >
-            กลับหน้าสัญญา
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
