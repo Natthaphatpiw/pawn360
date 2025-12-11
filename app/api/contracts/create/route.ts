@@ -180,6 +180,9 @@ export async function POST(request: NextRequest) {
 }
 
 function createPawnOfferCard(contract: any, loanRequest: any) {
+  // Calculate investor interest (2% after platform fee)
+  const investorInterestAmount = contract.loan_principal_amount * 0.02 * (contract.contract_duration_days / 30);
+  
   const card = {
     type: 'flex' as const,
     altText: 'ข้อเสนอจำนำ',
