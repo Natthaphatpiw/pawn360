@@ -3,10 +3,10 @@ import { getQRCodePresignedUrl } from '@/lib/aws/s3';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ itemId: string }> }
+  context: { params: Promise<{ itemId: string }> }
 ) {
   try {
-    const { itemId } = await params;
+    const { itemId } = await context.params;
 
     // Generate presigned URL (valid for 1 hour)
     const presignedUrl = await getQRCodePresignedUrl(itemId, 3600);
