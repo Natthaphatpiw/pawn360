@@ -71,8 +71,9 @@ export async function POST(request: NextRequest) {
 
     switch (actionType) {
       case 'INTEREST_PAYMENT': {
-        // ต่อดอกเบี้ย: จ่ายดอกเบี้ยสะสมแล้วขยายสัญญา
-        const interestToPay = Math.round(interestAccrued * 100) / 100;
+        // ต่อดอกเบี้ย: จ่ายดอกเบี้ยเต็มงวดแล้วขยายสัญญา
+        const fullPeriodInterest = currentPrincipal * (monthlyInterestRate / 100);
+        const interestToPay = Math.round(fullPeriodInterest * 100) / 100;
 
         // New end date = current end date + contract duration days
         const newEndDate = new Date(endDate);

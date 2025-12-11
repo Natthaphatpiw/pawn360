@@ -203,8 +203,64 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 
     if (redemption) {
       const pawner = redemption.contract?.pawners;
-      let deliveryInstructions = '';
+      const investor = redemption.contract?.investors;
 
+      // Update redemption status to COMPLETED
+      await supabase
+        .from('redemption_requests')
+        .update({
+          request_status: 'COMPLETED',
+          verified_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('redemption_id', redemptionId);
+
+      // Update contract status
+      await supabase
+        .from('contracts')
+        .update({
+          contract_status: 'COMPLETED',
+          redemption_status: 'COMPLETED',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('contract_id', redemption.contract_id);
+
+      // Send message to pawner based on delivery method
+      if (pawner?.line_id) {
+        let pawnerMessage = '';
+        if (redemption.delivery_method === 'SELF_PICKUP') {
+          pawnerMessage = `✅ ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่จุดรับฝากที่ได้ติดต่อไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
+        } else {
+          pawnerMessage = `✅ ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทางเรากำลังดำเนินการส่งสินค้าให้คุณตามที่ได้แจ้งไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
+        }
+
+        try {
+          await pawnerLineClient.pushMessage(pawner.line_id, {
+            type: 'text',
+            text: pawnerMessage
+          });
+        } catch (msgError) {
+          console.error('Error sending to pawner:', msgError);
+        }
+      }
+
+      // Send message to investor about payment received
+      if (investor?.line_id) {
+        const investorMessage = `💰 รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nเงินจะเข้าบัญชีของคุณภายใน 22.00 น. ของวันนี้`;
+
+        try {
+          await investorLineClient.pushMessage(investor.line_id, {
+            type: 'text',
+            text: investorMessage
+          });
+        } catch (msgError) {
+          console.error('Error sending to investor:', msgError);
+        }
+      }
+
+      // Reply to drop point
+      let deliveryInstructions = '';
       if (redemption.delivery_method === 'SELF_PICKUP') {
         deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
       } else if (redemption.delivery_method === 'SELF_ARRANGE') {
@@ -215,7 +271,7 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 
       await dropPointLineClient.replyMessage(replyToken, {
         type: 'text',
-        text: `ยืนยันยอดถูกต้องเรียบร้อย\n\n${deliveryInstructions}`
+        text: `ยืนยันยอดถูกต้องเรียบร้อย\n\nการไถ่ถอนเสร็จสิ้น\n\n${deliveryInstructions}`
       });
     }
 
@@ -229,11 +285,16 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 // Handle when Drop Point says the redemption amount is incorrect
 async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLineId: string, replyToken: string) {
   try {
-    // Get redemption details to determine the difference
+    // Get redemption details
     const supabase = supabaseAdmin();
     const { data: redemption } = await supabase
       .from('redemption_requests')
-      .select('*')
+      .select(`
+        *,
+        contract:contract_id (
+          pawners:customer_id (*)
+        )
+      `)
       .eq('redemption_id', redemptionId)
       .single();
 
@@ -242,16 +303,41 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       return;
     }
 
-    // For now, we'll ask the drop point to specify the amount difference
-    // In a real implementation, you might want to have a form for this
-    const dropPointInstructions = `กรุณาระบุจำนวนเงินที่ผิด:\n\nตัวอย่าง:\n- หากขาด 500 บาท: ตอบ "ขาด 500"\n- หากเกิน 1000 บาท: ตอบ "เกิน 1000"\n\nหรือติดต่อฝ่ายสนับสนุนที่ 062-6092941 เพื่อขอความช่วยเหลือ`;
+    const pawner = redemption.contract?.pawners;
 
+    // Update redemption status to CANCELLED
+    await supabase
+      .from('redemption_requests')
+      .update({
+        request_status: 'CANCELLED',
+        verified_at: new Date().toISOString(),
+        voided_at: new Date().toISOString(),
+        void_reason: 'Amount verification failed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('redemption_id', redemptionId);
+
+    // Send message to pawner about cancellation
+    if (pawner?.line_id) {
+      const pawnerMessage = `❌ ยอดเงินที่โอนไม่ถูกต้อง\n\nสัญญา: ${redemption.contract?.contract_number}\n\nการไถ่ถอนถูกยกเลิกตามข้อกำหนดและข้อสัญญาของ Pawnly\n\nหากต้องการดำเนินการต่อหรือมีข้อสงสัย สามารถติดต่อฝ่ายสนับสนุนได้ที่ 062-6092941`;
+
+      try {
+        await pawnerLineClient.pushMessage(pawner.line_id, {
+          type: 'text',
+          text: pawnerMessage
+        });
+      } catch (msgError) {
+        console.error('Error sending to pawner:', msgError);
+      }
+    }
+
+    // Reply to drop point
     await dropPointLineClient.replyMessage(replyToken, {
       type: 'text',
-      text: dropPointInstructions
+      text: `การไถ่ถอนถูกยกเลิกเนื่องจากยอดเงินไม่ถูกต้อง\n\nบันทึก log เรียบร้อยแล้ว`
     });
 
-    console.log(`Redemption ${redemptionId} amount mismatch reported by drop point`);
+    console.log(`Redemption ${redemptionId} cancelled due to amount mismatch`);
 
   } catch (error) {
     console.error('Error handling redemption amount incorrect:', error);
