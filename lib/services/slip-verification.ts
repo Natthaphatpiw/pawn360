@@ -243,6 +243,7 @@ export async function logContractAction(
     description?: string;
     metadata?: any;
     errorMessage?: string;
+    rejectionReason?: string;
   }
 ) {
   const supabase = supabaseAdmin();
