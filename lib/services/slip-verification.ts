@@ -236,7 +236,7 @@ export async function logContractAction(
     contractEndDateBefore?: string;
     contractEndDateAfter?: string;
     slipUrl?: string;
-    slipAmountDetected?: number;
+    slipAmountDetected?: number | null;
     slipVerificationResult?: string;
     slipVerificationDetails?: any;
     performedByName?: string;
