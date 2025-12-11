@@ -210,38 +210,30 @@ export default function RedemptionPaymentPage() {
 
       <div className="flex-1 px-4 py-6 pb-36 overflow-y-auto">
 
-        {/* Investor Bank Details Section */}
+        {/* Company Bank Details Section */}
         <div className="bg-white rounded-3xl p-6 mb-6 shadow-sm">
           <h2 className="text-base font-bold text-gray-800 mb-4">รายละเอียดการโอนเงิน</h2>
 
-          {contract.investor?.bank_name && contract.investor?.bank_account_no ? (
-            <div className="bg-[#FFF8F5] rounded-2xl p-4 border border-[#F0D4C8]">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">ธนาคาร:</span>
-                  <span className="font-bold text-gray-800 text-sm">{contract.investor.bank_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">เลขบัญชี:</span>
-                  <span className="font-bold text-[#B85C38] text-sm">{contract.investor.bank_account_no}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">ชื่อบัญชี:</span>
-                  <span className="font-medium text-gray-800 text-sm">{contract.investor.bank_account_name || `${contract.investor.firstname} ${contract.investor.lastname}`}</span>
-                </div>
-                {contract.investor.promptpay_number && (
-                  <div className="flex justify-between pt-2 border-t border-[#F0D4C8]">
-                    <span className="text-gray-600 text-sm">PromptPay:</span>
-                    <span className="font-bold text-[#B85C38] text-sm">{contract.investor.promptpay_number}</span>
-                  </div>
-                )}
+          <div className="bg-[#FFF8F5] rounded-2xl p-4 border border-[#F0D4C8]">
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600 text-sm">ธนาคาร:</span>
+                <span className="font-bold text-gray-800 text-sm">พร้อมเพย์</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600 text-sm">เลขบัญชี:</span>
+                <span className="font-bold text-[#B85C38] text-sm">0626092941</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600 text-sm">ชื่อบัญชี:</span>
+                <span className="font-medium text-gray-800 text-sm">ณัฐภัทร ต้อยจัตุรัส</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-[#F0D4C8]">
+                <span className="text-gray-600 text-sm">PromptPay:</span>
+                <span className="font-bold text-[#B85C38] text-sm">0626092941</span>
               </div>
             </div>
-          ) : (
-            <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-200">
-              <p className="text-yellow-700 text-sm">ไม่พบข้อมูลบัญชีธนาคารของนักลงทุน กรุณาติดต่อ Support</p>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Payment Details */}

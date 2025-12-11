@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     contractEndDate.setDate(contractStartDate.getDate() + loanRequest.requested_duration_days);
 
     const interestRate = 0.03; // 3% per month
-    const interestAmount = loanRequest.requested_amount * interestRate;
+    const interestAmount = loanRequest.requested_amount * interestRate * (loanRequest.requested_duration_days / 30);
     const platformFeeAmount = interestAmount * 0.1; // 10% of interest
     const totalAmount = loanRequest.requested_amount + interestAmount;
 
