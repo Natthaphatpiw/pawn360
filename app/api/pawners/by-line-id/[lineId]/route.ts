@@ -18,13 +18,13 @@ export async function GET(
 
     const supabase = supabaseAdmin();
 
-    const { data: investor, error } = await supabase
-      .from('investors')
+    const { data: pawner, error } = await supabase
+      .from('pawners')
       .select('*')
       .eq('line_id', lineId)
       .single();
 
-    if (error || !investor) {
+    if (error || !pawner) {
       return NextResponse.json(
         { error: 'ไม่พบข้อมูลผู้ใช้' },
         { status: 404 }
@@ -33,11 +33,11 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      investor
+      pawner
     });
 
   } catch (error: any) {
-    console.error('Error fetching investor by line ID:', error);
+    console.error('Error fetching pawner by line ID:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
