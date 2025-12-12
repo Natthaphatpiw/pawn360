@@ -45,9 +45,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if already completed (idempotency)
+    if (actionRequest.request_status === 'COMPLETED') {
+      return NextResponse.json({
+        success: true,
+        message: 'ยืนยันรับเงินเรียบร้อยแล้ว',
+        alreadyCompleted: true,
+        newPrincipal: actionRequest.new_principal_amount,
+      });
+    }
+
     if (actionRequest.request_status !== 'INVESTOR_TRANSFERRED') {
+      if (actionRequest.request_status === 'AWAITING_INVESTOR_PAYMENT' || actionRequest.request_status === 'INVESTOR_APPROVED') {
+        return NextResponse.json(
+          { error: 'กรุณารอนักลงทุนโอนเงินก่อน' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: 'Invalid request status' },
+        { error: 'สถานะคำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' },
         { status: 400 }
       );
     }

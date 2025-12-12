@@ -111,6 +111,45 @@ async function handleFollowEvent(event: WebhookEvent) {
   }
 }
 
+// Track processed webhook events for idempotency (in-memory cache with TTL)
+const processedEvents = new Map<string, number>();
+const EVENT_TTL_MS = 60000; // 1 minute TTL
+
+function getEventKey(event: WebhookEvent): string {
+  if (event.type === 'postback') {
+    return `${event.source.userId}_${event.postback?.data}_${event.timestamp}`;
+  }
+  return `${event.source.userId}_${event.type}_${event.timestamp}`;
+}
+
+function isEventProcessed(eventKey: string): boolean {
+  const processedAt = processedEvents.get(eventKey);
+  if (!processedAt) return false;
+
+  // Check if event is still within TTL
+  if (Date.now() - processedAt < EVENT_TTL_MS) {
+    return true;
+  }
+
+  // Event expired, remove it
+  processedEvents.delete(eventKey);
+  return false;
+}
+
+function markEventProcessed(eventKey: string): void {
+  processedEvents.set(eventKey, Date.now());
+
+  // Clean up old entries periodically (keep map size reasonable)
+  if (processedEvents.size > 1000) {
+    const now = Date.now();
+    for (const [key, timestamp] of processedEvents) {
+      if (now - timestamp > EVENT_TTL_MS) {
+        processedEvents.delete(key);
+      }
+    }
+  }
+}
+
 async function handlePostbackEvent(event: WebhookEvent) {
   if (event.type !== 'postback') return;
 
@@ -119,6 +158,16 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
   const postbackData = event.postback?.data;
   if (!postbackData) return;
+
+  // Idempotency check - prevent duplicate processing
+  const eventKey = getEventKey(event);
+  if (isEventProcessed(eventKey)) {
+    console.log(`Duplicate postback detected, skipping: ${postbackData} from user: ${userId}`);
+    return;
+  }
+
+  // Mark as processed immediately to prevent concurrent duplicates
+  markEventProcessed(eventKey);
 
   console.log(`Postback received: ${postbackData} from user: ${userId}`);
 
@@ -474,6 +523,23 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
+        // Idempotency check at database level - check if already confirmed
+        if (contract.item_delivery_status === 'PAWNER_CONFIRMED' ||
+            contract.item_delivery_status === 'DELIVERED' ||
+            contract.item_delivery_status === 'VERIFIED') {
+          console.log(`Contract ${contractId} already confirmed (status: ${contract.item_delivery_status}), skipping`);
+          // Send a polite reminder message instead
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken && contract.pawners?.line_id) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(contract.pawners.line_id, {
+              type: 'text',
+              text: `คุณได้ยืนยันการจำนำไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}`
+            });
+          }
+          return;
+        }
+
         // Update contract status
         await supabase
           .from('contracts')
@@ -536,6 +602,21 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
         if (contractError || !contract) {
           console.error('Contract not found:', contractError);
+          return;
+        }
+
+        // Idempotency check at database level - check if already confirmed
+        if (contract.payment_status === 'COMPLETED' || contract.contract_status === 'CONFIRMED') {
+          console.log(`Contract ${contractId} payment already confirmed (status: ${contract.payment_status}), skipping`);
+          // Send a polite confirmation message instead
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken && contract.pawners?.line_id) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(contract.pawners.line_id, {
+              type: 'text',
+              text: `คุณได้ยืนยันการรับเงินไปแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}`
+            });
+          }
           return;
         }
 
@@ -679,6 +760,21 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
+        // Idempotency check - check if already confirmed
+        if (redemption.request_status === 'PAWNER_CONFIRMED' ||
+            redemption.request_status === 'COMPLETED') {
+          console.log(`Redemption ${redemptionId} already confirmed (status: ${redemption.request_status}), skipping`);
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(userId, {
+              type: 'text',
+              text: `คุณได้ยืนยันรับสินค้าไปแล้ว\n\nขอบคุณที่ใช้บริการ Pawnly`
+            });
+          }
+          return;
+        }
+
         const contract = redemption.contract;
         const investor = contract?.investors;
         const item = contract?.items;
@@ -769,6 +865,21 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
         if (error || !redemption) {
           console.error('Redemption not found:', error);
+          return;
+        }
+
+        // Idempotency check - check if already completed
+        if (redemption.request_status === 'COMPLETED') {
+          console.log(`Redemption ${redemptionId} already completed, skipping`);
+          const netProfit = redemption.investor_net_profit || 0;
+          try {
+            await investorLineClient.pushMessage(userId, {
+              type: 'text',
+              text: `คุณได้ยืนยันรับเงินไปแล้ว\n\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`
+            });
+          } catch (msgError) {
+            console.error('Error sending to investor:', msgError);
+          }
           return;
         }
 

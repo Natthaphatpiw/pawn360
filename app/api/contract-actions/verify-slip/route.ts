@@ -50,6 +50,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if request is in a valid state for slip verification
+    const validStatuses = ['AWAITING_PAYMENT', 'SLIP_REJECTED'];
+    if (!validStatuses.includes(actionRequest.request_status)) {
+      if (actionRequest.request_status === 'SLIP_VERIFIED' || actionRequest.request_status === 'COMPLETED') {
+        return NextResponse.json(
+          { error: 'คำขอนี้ได้รับการยืนยันแล้ว', alreadyVerified: true },
+          { status: 400 }
+        );
+      }
+      if (actionRequest.request_status === 'SLIP_REJECTED_FINAL' || actionRequest.request_status === 'VOIDED') {
+        return NextResponse.json(
+          { error: 'คำขอนี้ถูกยกเลิกแล้ว กรุณาติดต่อฝ่าย Support โทร 0626092941' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: 'สถานะคำขอไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' },
+        { status: 400 }
+      );
+    }
+
     // Check attempt count
     const attemptCount = (actionRequest.slip_attempt_count || 0) + 1;
 

@@ -54,21 +54,39 @@ export async function POST(request: NextRequest) {
     const pawner = contract?.pawners;
     const investor = contract?.investors;
 
+    // Check if already completed (idempotency)
+    if (actionRequest.request_status === 'COMPLETED') {
+      return NextResponse.json({
+        success: true,
+        message: 'ดำเนินการสำเร็จแล้ว',
+        alreadyCompleted: true,
+        actionType: actionRequest.request_type,
+      });
+    }
+
     // For PRINCIPAL_INCREASE, this is called after investor payment verification
     // For others, this is called after slip verification and signing
     if (actionRequest.request_type === 'PRINCIPAL_INCREASE') {
       // Check if investor has approved and paid
-      if (actionRequest.request_status !== 'INVESTOR_SLIP_VERIFIED' && actionRequest.request_status !== 'AWAITING_PAWNER_CONFIRM') {
+      const validStatuses = ['INVESTOR_SLIP_VERIFIED', 'AWAITING_PAWNER_CONFIRM', 'INVESTOR_TRANSFERRED'];
+      if (!validStatuses.includes(actionRequest.request_status)) {
         return NextResponse.json(
-          { error: 'Request is not ready for completion' },
+          { error: 'คำขอยังไม่พร้อมดำเนินการ กรุณารอการอนุมัติจากนักลงทุน' },
           { status: 400 }
         );
       }
     } else {
       // For INTEREST_PAYMENT and PRINCIPAL_REDUCTION
-      if (actionRequest.request_status !== 'SLIP_VERIFIED' && actionRequest.request_status !== 'AWAITING_SIGNATURE') {
+      const validStatuses = ['SLIP_VERIFIED', 'AWAITING_SIGNATURE'];
+      if (!validStatuses.includes(actionRequest.request_status)) {
+        if (actionRequest.request_status === 'SLIP_REJECTED' || actionRequest.request_status === 'SLIP_REJECTED_FINAL') {
+          return NextResponse.json(
+            { error: 'สลิปถูกปฏิเสธ กรุณาอัปโหลดสลิปใหม่' },
+            { status: 400 }
+          );
+        }
         return NextResponse.json(
-          { error: 'Request is not ready for completion' },
+          { error: 'คำขอยังไม่พร้อมดำเนินการ กรุณาอัปโหลดสลิปก่อน' },
           { status: 400 }
         );
       }

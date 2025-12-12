@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Upload, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Upload, X, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 
@@ -27,7 +27,6 @@ export default function PrincipalReductionUploadPage() {
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [showRetry, setShowRetry] = useState(false);
   const [showVoided, setShowVoided] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [requestDetails, setRequestDetails] = useState<any>(null);
   const [companyBank, setCompanyBank] = useState<CompanyBank | null>(null);
 
@@ -103,10 +102,9 @@ export default function PrincipalReductionUploadPage() {
       }
 
       // Verify slip with AI
-      const response = await axios.post('/api/contract-actions/investor-verify-slip', {
+      const response = await axios.post('/api/contract-actions/verify-slip', {
         requestId,
         slipUrl: uploadRes.data.url,
-        expectedAmount: requestDetails?.total_amount,
         pawnerLineId: profile?.userId,
       });
 
@@ -114,13 +112,17 @@ export default function PrincipalReductionUploadPage() {
       setVerificationResult(result);
 
       if (result.success) {
-        if (result.result === 'MATCHED' || result.result === 'OVERPAID') {
-          setShowSuccess(true);
-        } else if (result.result === 'UNDERPAID') {
-          setShowRetry(true);
-        }
-      } else {
+        // Success - redirect to sign page
+        router.push(`/contracts/${contractId}/principal-reduction/sign?requestId=${requestId}`);
+      } else if (result.result === 'VOIDED') {
         setShowVoided(true);
+      } else if (result.result === 'UNDERPAID') {
+        setShowRetry(true);
+        handleRemoveImage();
+      } else {
+        // Other errors - allow retry
+        setShowRetry(true);
+        handleRemoveImage();
       }
     } catch (error: any) {
       console.error('Error uploading slip:', error);
@@ -139,38 +141,6 @@ export default function PrincipalReductionUploadPage() {
       fileInputRef.current.value = '';
     }
   };
-
-  if (showSuccess) {
-    return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
-          </div>
-
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งหลักฐานสำเร็จ!</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            กรุณารอการตรวจสอบจากระบบ<br />
-            เราจะแจ้งผลให้ทราบทาง LINE
-          </p>
-
-          <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6">
-            <p className="text-sm text-gray-700">
-              <span className="font-bold">หมายเลขคำขอ:</span><br />
-              {requestId}
-            </p>
-          </div>
-
-          <button
-            onClick={() => router.push('/contracts')}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
-          >
-            กลับหน้าสัญญา
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (showVoided) {
     return (
