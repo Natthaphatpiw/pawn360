@@ -53,7 +53,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const maxLoanAmount = itemData.estimatedPrice;
   const loanAmountNum = parseFloat(loanAmount.replace(/,/g, '')) || 0;
   const deliveryFee = deliveryMethod === 'delivery' ? 40 : 0;
-  const interestRate = 0.04; // 4% per month
+  const interestRate = 0.03; // 3% per month (P2P legal rate)
   const durationMonths = parseInt(duration) / 30;
   const monthlyInterest = loanAmountNum * interestRate;
   const totalInterest = monthlyInterest * durationMonths;
