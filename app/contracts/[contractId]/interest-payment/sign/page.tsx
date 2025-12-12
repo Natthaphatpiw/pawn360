@@ -282,11 +282,11 @@ export default function InterestPaymentSignPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">วันหมดอายุใหม่:</span>
                   <span className="font-bold text-[#B85C38]">
-                    {new Date(requestDetails.new_end_date).toLocaleDateString('th-TH', {
+                    {requestDetails.new_end_date ? new Date(requestDetails.new_end_date).toLocaleDateString('th-TH', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
-                    })}
+                    }) : '-'}
                   </span>
                 </div>
               </div>
@@ -358,33 +358,33 @@ export default function InterestPaymentSignPage() {
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">เงินต้น:</span>
-                <span className="font-bold">{contract.principal_amount?.toLocaleString()} บาท</span>
+                <span className="font-bold">{(contract.current_principal_amount || contract.loan_principal_amount)?.toLocaleString()} บาท</span>
               </div>
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">ดอกเบี้ยที่ชำระ:</span>
-                <span className="font-bold text-[#B85C38]">{requestDetails.total_amount?.toLocaleString()} บาท</span>
+                <span className="font-bold text-[#B85C38]">{(requestDetails.interest_to_pay || requestDetails.total_amount)?.toLocaleString()} บาท</span>
               </div>
 
               <div className="border-t pt-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">วันหมดอายุเดิม:</span>
                   <span>
-                    {new Date(contract.end_date).toLocaleDateString('th-TH', {
+                    {contract.contract_end_date ? new Date(contract.contract_end_date).toLocaleDateString('th-TH', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric'
-                    })}
+                    }) : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
                   <span className="text-gray-600">วันหมดอายุใหม่:</span>
                   <span className="font-bold text-green-600">
-                    {new Date(requestDetails.new_end_date).toLocaleDateString('th-TH', {
+                    {requestDetails.new_end_date ? new Date(requestDetails.new_end_date).toLocaleDateString('th-TH', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric'
-                    })}
+                    }) : '-'}
                   </span>
                 </div>
               </div>

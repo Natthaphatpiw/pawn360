@@ -46,9 +46,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if request is still active and available
-    if (!['AWAITING_INVESTOR_APPROVAL', 'INVESTOR_APPROVED', 'AWAITING_INVESTOR_PAYMENT'].includes(actionRequest.request_status)) {
+    const validStatuses = ['AWAITING_INVESTOR_APPROVAL', 'INVESTOR_APPROVED', 'AWAITING_INVESTOR_PAYMENT', 'INVESTOR_SLIP_REJECTED', 'PENDING_INVESTOR_APPROVAL'];
+    if (!validStatuses.includes(actionRequest.request_status)) {
+      if (actionRequest.request_status === 'INVESTOR_TRANSFERRED' || actionRequest.request_status === 'COMPLETED') {
+        return NextResponse.json(
+          { error: 'คำขอนี้ได้รับการดำเนินการแล้ว', alreadyProcessed: true },
+          { status: 400 }
+        );
+      }
+      if (actionRequest.request_status === 'INVESTOR_SLIP_REJECTED_FINAL' || actionRequest.request_status === 'VOIDED') {
+        return NextResponse.json(
+          { error: 'คำขอนี้ถูกยกเลิกแล้ว กรุณาติดต่อฝ่าย Support โทร 0626092941' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
-        { error: 'คำขอนี้ไม่สามารถดำเนินการได้ อาจถูกดำเนินการโดย investor อื่นแล้ว หรือหมดอายุแล้ว' },
+        { error: 'คำขอนี้ไม่สามารถดำเนินการได้ สถานะไม่ถูกต้อง' },
         { status: 400 }
       );
     }

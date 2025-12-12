@@ -45,6 +45,7 @@ CREATE TABLE pawners (
   bank_account_no VARCHAR(50),
   bank_account_type VARCHAR(50) CHECK (bank_account_type IN ('บัญชีออมทรัพย์', 'บัญชีเงินฝากประจำ', 'บัญชีกระแสรายวัน', 'บัญชีเงินตราต่างประเทศ')),
   bank_account_name VARCHAR(200),
+  promptpay_number VARCHAR(20),
 
   -- Status & Metadata
   is_active BOOLEAN DEFAULT TRUE,
@@ -99,6 +100,8 @@ CREATE TABLE investors (
   bank_account_no VARCHAR(50),
   bank_account_type VARCHAR(50) CHECK (bank_account_type IN ('บัญชีออมทรัพย์', 'บัญชีเงินฝากประจำ', 'บัญชีกระแสรายวัน', 'บัญชีเงินตราต่างประเทศ')),
   bank_account_name VARCHAR(200),
+  promptpay_number VARCHAR(20),
+  promptpay_name VARCHAR(200),
 
   -- Investor Settings
   auto_invest_enabled BOOLEAN DEFAULT FALSE,
@@ -419,6 +422,380 @@ CREATE INDEX idx_loan_offers_status ON loan_offers(offer_status);
 -- 5. CONTRACTS & AGREEMENTS
 -- =====================================================
 
+-- Table: contract_action_logs (บันทึก log ทุก event ที่เกิดขึ้นกับสัญญา)
+CREATE TABLE contract_action_logs (
+  log_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- References
+  contract_id UUID REFERENCES contracts(contract_id),
+  customer_id UUID REFERENCES pawners(customer_id),
+  investor_id UUID REFERENCES investors(investor_id),
+  action_request_id UUID, -- Reference to contract_action_requests
+
+  -- Action Details
+  action_type VARCHAR(50) NOT NULL CHECK (action_type IN (
+    'CONTRACT_CREATED',           -- สร้างสัญญา
+    'CONTRACT_SIGNED',            -- เซ็นสัญญา
+    'CONTRACT_ACTIVATED',         -- สัญญาเริ่มใช้งาน
+    'CONTRACT_COMPLETED',         -- สัญญาเสร็จสิ้น
+    'FULL_REDEMPTION',            -- ไถ่ถอนเต็มจำนวน
+    'INTEREST_PAYMENT',           -- ต่อดอกเบี้ย
+    'PRINCIPAL_REDUCTION',        -- ลดเงินต้น
+    'PRINCIPAL_INCREASE',         -- เพิ่มเงินต้น
+    'SLIP_UPLOADED',              -- อัพโหลดสลิป
+    'SLIP_VERIFIED',              -- AI ตรวจสอบสลิปสำเร็จ
+    'SLIP_REJECTED',              -- AI ปฏิเสธสลิป
+    'PAYMENT_CONFIRMED',          -- ยืนยันการชำระเงิน
+    'PAYMENT_FAILED',             -- การชำระเงินล้มเหลว
+    'INVESTOR_APPROVED',          -- นักลงทุนอนุมัติ
+    'INVESTOR_REJECTED',          -- นักลงทุนปฏิเสธ
+    'CONTRACT_EXTENDED',          -- ขยายสัญญา
+    'CONTRACT_UPDATED',           -- อัพเดทสัญญา
+    'NOTIFICATION_SENT',          -- ส่งการแจ้งเตือน
+    'ERROR_OCCURRED'              -- เกิดข้อผิดพลาด
+  )),
+
+  -- Status
+  action_status VARCHAR(50) DEFAULT 'COMPLETED' CHECK (action_status IN (
+    'INITIATED', 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED'
+  )),
+
+  -- Financial Details
+  amount DECIMAL(12,2),
+  principal_before DECIMAL(12,2),
+  principal_after DECIMAL(12,2),
+  interest_before DECIMAL(12,2),
+  interest_after DECIMAL(12,2),
+  total_amount DECIMAL(12,2),
+
+  -- Date Changes
+  contract_end_date_before DATE,
+  contract_end_date_after DATE,
+
+  -- Slip Verification
+  slip_url TEXT,
+  slip_amount_detected DECIMAL(12,2),
+  slip_verification_result VARCHAR(50) CHECK (slip_verification_result IN (
+    'MATCHED', 'UNDERPAID', 'OVERPAID', 'UNREADABLE', 'INVALID'
+  )),
+  slip_verification_details JSONB,
+
+  -- Actor Info
+  performed_by VARCHAR(50) CHECK (performed_by IN ('PAWNER', 'INVESTOR', 'DROPPOINT', 'SYSTEM', 'ADMIN')),
+  performed_by_line_id VARCHAR(255),
+  performed_by_name VARCHAR(200),
+
+  -- Additional Info
+  description TEXT,
+  metadata JSONB,
+  error_message TEXT,
+
+  -- IP and Device Info
+  ip_address VARCHAR(50),
+  user_agent TEXT,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for logs
+CREATE INDEX idx_contract_action_logs_contract_id ON contract_action_logs(contract_id);
+CREATE INDEX idx_contract_action_logs_action_type ON contract_action_logs(action_type);
+CREATE INDEX idx_contract_action_logs_created_at ON contract_action_logs(created_at DESC);
+CREATE INDEX idx_contract_action_logs_customer_id ON contract_action_logs(customer_id);
+CREATE INDEX idx_contract_action_logs_investor_id ON contract_action_logs(investor_id);
+
+-- Table: contract_action_requests (คำขอ action ต่างๆ)
+CREATE TABLE contract_action_requests (
+  request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  contract_id UUID NOT NULL REFERENCES contracts(contract_id) ON DELETE CASCADE,
+
+  -- Request Type
+  request_type VARCHAR(50) NOT NULL CHECK (request_type IN (
+    'INTEREST_PAYMENT',           -- ต่อดอกเบี้ย
+    'PRINCIPAL_REDUCTION',        -- ลดเงินต้น
+    'PRINCIPAL_INCREASE'          -- เพิ่มเงินต้น
+  )),
+
+  -- Request Status
+  request_status VARCHAR(50) DEFAULT 'PENDING' CHECK (request_status IN (
+    'PENDING',                    -- รอดำเนินการ
+    'AWAITING_PAYMENT',           -- รอชำระเงิน
+    'SLIP_UPLOADED',              -- อัพโหลดสลิปแล้ว
+    'SLIP_VERIFIED',              -- AI ตรวจสอบสลิปผ่าน
+    'SLIP_REJECTED',              -- AI ปฏิเสธสลิป (รอบแรก)
+    'SLIP_REJECTED_FINAL',        -- AI ปฏิเสธสลิป (รอบสอง - โมฆะ)
+    'AWAITING_SIGNATURE',         -- รอเซ็นสัญญาใหม่
+    'AWAITING_INVESTOR_APPROVAL', -- รอนักลงทุนอนุมัติ (สำหรับเพิ่มเงินต้น)
+    'INVESTOR_APPROVED',          -- นักลงทุนอนุมัติแล้ว
+    'INVESTOR_REJECTED',          -- นักลงทุนปฏิเสธ
+    'AWAITING_INVESTOR_PAYMENT',  -- รอนักลงทุนโอนเงิน (สำหรับเพิ่มเงินต้น)
+    'INVESTOR_SLIP_UPLOADED',     -- นักลงทุนอัพโหลดสลิปแล้ว
+    'INVESTOR_SLIP_VERIFIED',     -- ตรวจสอบสลิปนักลงทุนผ่าน
+    'AWAITING_PAWNER_CONFIRM',    -- รอผู้จำนำยืนยันรับเงิน
+    'COMPLETED',                  -- เสร็จสิ้น
+    'CANCELLED',                  -- ยกเลิก
+    'VOIDED'                      -- เป็นโมฆะ
+  )),
+
+  -- Financial Calculations (Before Action)
+  principal_before DECIMAL(12,2) NOT NULL,
+  interest_rate DECIMAL(5,4) NOT NULL,           -- อัตราดอกเบี้ยต่อเดือน (เช่น 0.03 = 3%)
+  daily_interest_rate DECIMAL(8,6),              -- อัตราดอกเบี้ยต่อวัน
+
+  -- Days Calculation
+  contract_start_date DATE NOT NULL,
+  contract_end_date_before DATE NOT NULL,
+  days_in_contract INT NOT NULL,                 -- จำนวนวันของสัญญา
+  days_elapsed INT NOT NULL,                     -- จำนวนวันที่ผ่านไป ณ วันที่ทำรายการ
+  days_remaining INT NOT NULL,                   -- จำนวนวันที่เหลือ
+
+  -- Interest Calculation
+  interest_accrued DECIMAL(12,2) NOT NULL,       -- ดอกเบี้ยสะสมถึงวันที่ทำรายการ
+
+  -- For INTEREST_PAYMENT (ต่อดอกเบี้ย)
+  interest_to_pay DECIMAL(12,2),                 -- ดอกเบี้ยที่ต้องจ่าย
+  new_end_date DATE,                             -- วันครบกำหนดใหม่
+
+  -- For PRINCIPAL_REDUCTION (ลดเงินต้น)
+  reduction_amount DECIMAL(12,2),                -- จำนวนที่ขอลด
+  interest_for_period DECIMAL(12,2),             -- ดอกเบี้ยถึงวันที่ลด
+  total_to_pay_reduction DECIMAL(12,2),          -- ยอดรวมที่ต้องจ่าย (ลดเงินต้น + ดอกเบี้ย)
+  principal_after_reduction DECIMAL(12,2),       -- เงินต้นหลังลด
+  new_interest_for_remaining DECIMAL(12,2),      -- ดอกเบี้ยใหม่สำหรับช่วงที่เหลือ
+
+  -- For PRINCIPAL_INCREASE (เพิ่มเงินต้น)
+  increase_amount DECIMAL(12,2),                 -- จำนวนที่ขอเพิ่ม
+  principal_after_increase DECIMAL(12,2),        -- เงินต้นหลังเพิ่ม
+  new_interest_for_remaining_increase DECIMAL(12,2), -- ดอกเบี้ยใหม่สำหรับช่วงที่เหลือ
+
+  -- Total Amount to Pay/Receive
+  total_amount DECIMAL(12,2),                    -- ยอดรวมทั้งหมด
+
+  -- Payment Slip (Pawner)
+  slip_url TEXT,
+  slip_uploaded_at TIMESTAMPTZ,
+  slip_amount_detected DECIMAL(12,2),
+  slip_verification_result VARCHAR(50),
+  slip_verification_details JSONB,
+  slip_attempt_count INT DEFAULT 0,              -- จำนวนครั้งที่อัพโหลดสลิป
+
+  -- Investor Payment Slip (for PRINCIPAL_INCREASE)
+  investor_slip_url TEXT,
+  investor_slip_uploaded_at TIMESTAMPTZ,
+  investor_slip_amount_detected DECIMAL(12,2),
+  investor_slip_verification_result VARCHAR(50),
+  investor_slip_verification_details JSONB,
+  investor_slip_attempt_count INT DEFAULT 0,
+
+  -- Signature
+  signature_url TEXT,
+  signed_at TIMESTAMPTZ,
+
+  -- Investor Approval (for PRINCIPAL_INCREASE)
+  investor_approved_at TIMESTAMPTZ,
+  investor_rejected_at TIMESTAMPTZ,
+  investor_rejection_reason TEXT,
+
+  -- Pawner Confirmation (for PRINCIPAL_INCREASE)
+  pawner_confirmed_at TIMESTAMPTZ,
+  pawner_rejected_at TIMESTAMPTZ,
+
+  -- Terms Acceptance
+  terms_accepted BOOLEAN DEFAULT FALSE,
+  terms_accepted_at TIMESTAMPTZ,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  voided_at TIMESTAMPTZ,
+  void_reason TEXT
+);
+
+-- Create indexes
+CREATE INDEX idx_contract_action_requests_contract_id ON contract_action_requests(contract_id);
+CREATE INDEX idx_contract_action_requests_type ON contract_action_requests(request_type);
+CREATE INDEX idx_contract_action_requests_status ON contract_action_requests(request_status);
+CREATE INDEX idx_contract_action_requests_created_at ON contract_action_requests(created_at DESC);
+
+-- Table: redemption_requests (คำขอไถ่ถอน/ต่อดอก/ลดต้น/เพิ่มต้น)
+CREATE TABLE redemption_requests (
+  redemption_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  contract_id UUID NOT NULL REFERENCES contracts(contract_id) ON DELETE CASCADE,
+
+  -- Request Type
+  request_type VARCHAR(50) NOT NULL CHECK (request_type IN (
+    'FULL_REDEMPTION',      -- ไถ่ถอนเต็มจำนวน
+    'INTEREST_PAYMENT',     -- ต่อดอกเบี้ย (จ่ายแค่ดอก)
+    'PRINCIPAL_REDUCTION',  -- ลดเงินต้น
+    'PRINCIPAL_INCREASE'    -- เพิ่มเงินต้น (ขอกู้เพิ่ม)
+  )),
+
+  -- Amount Details
+  principal_amount DECIMAL(12,2) NOT NULL,      -- เงินต้นที่ต้องจ่าย
+  interest_amount DECIMAL(12,2) NOT NULL,       -- ดอกเบี้ยที่ต้องจ่าย
+  delivery_fee DECIMAL(12,2) DEFAULT 0,         -- ค่าจัดส่ง (ถ้ามี)
+  total_amount DECIMAL(12,2) NOT NULL,          -- ยอดรวมทั้งหมด
+
+  -- For PRINCIPAL_REDUCTION/INCREASE
+  reduction_amount DECIMAL(12,2),               -- จำนวนที่ขอลด
+  increase_amount DECIMAL(12,2),                -- จำนวนที่ขอเพิ่ม
+
+  -- Delivery Options
+  delivery_method VARCHAR(50) CHECK (delivery_method IN (
+    'SELF_PICKUP',          -- รับของเอง
+    'SELF_ARRANGE',         -- เรียกขนส่งเอง
+    'PLATFORM_ARRANGE'      -- ให้ Platform เรียกขนส่งให้
+  )),
+
+  -- Delivery Address (for SELF_ARRANGE or PLATFORM_ARRANGE)
+  delivery_address_full TEXT,
+  delivery_addr_house_no VARCHAR(50),
+  delivery_addr_village VARCHAR(100),
+  delivery_addr_street VARCHAR(100),
+  delivery_addr_sub_district VARCHAR(100),
+  delivery_addr_district VARCHAR(100),
+  delivery_addr_province VARCHAR(100),
+  delivery_addr_postcode VARCHAR(10),
+  delivery_contact_phone VARCHAR(20),
+  delivery_notes TEXT,
+
+  -- Payment Slip
+  payment_slip_url TEXT,
+  payment_slip_uploaded_at TIMESTAMPTZ,
+
+  -- Photo Receipt (Pawner)
+  pawner_receipt_photos TEXT[],
+  pawner_receipt_uploaded_at TIMESTAMPTZ,
+  pawner_receipt_verified BOOLEAN DEFAULT FALSE,
+  support_contact_used VARCHAR(20),
+
+  -- Request Status
+  request_status VARCHAR(50) DEFAULT 'PENDING' CHECK (request_status IN (
+    'PENDING',              -- รอการอัพโหลดสลิป
+    'SLIP_UPLOADED',        -- อัพโหลดสลิปแล้ว รอ Drop Point ตรวจสอบ
+    'AMOUNT_VERIFIED',      -- Drop Point ยืนยันยอดถูกต้อง
+    'AMOUNT_MISMATCH',      -- ยอดไม่ตรง
+    'PREPARING_ITEM',       -- กำลังเตรียมของ
+    'IN_TRANSIT',           -- กำลังจัดส่ง
+    'DELIVERED',            -- ส่งของแล้ว
+    'PAWNER_CONFIRMED',     -- Pawner ยืนยันรับของแล้ว
+    'INVESTOR_CONFIRMED',   -- Investor ยืนยันได้รับเงินแล้ว
+    'COMPLETED',            -- เสร็จสิ้น
+    'CANCELLED',            -- ยกเลิก
+    'REJECTED'              -- ถูกปฏิเสธ
+  )),
+
+  -- Verification by Drop Point
+  verified_by_drop_point_id UUID REFERENCES drop_points(drop_point_id),
+  verified_by_line_id VARCHAR(255),
+  verified_at TIMESTAMPTZ,
+  verification_notes TEXT,
+
+  -- Amount Mismatch Details
+  actual_amount_received DECIMAL(12,2),
+  amount_difference DECIMAL(12,2),
+  mismatch_type VARCHAR(20) CHECK (mismatch_type IN ('OVERPAID', 'UNDERPAID')),
+  mismatch_resolved BOOLEAN DEFAULT FALSE,
+  mismatch_resolved_at TIMESTAMPTZ,
+
+  -- Tracking
+  tracking_number VARCHAR(100),
+  courier_name VARCHAR(100),
+
+  -- Confirmations
+  pawner_confirmed_at TIMESTAMPTZ,
+  investor_confirmed_at TIMESTAMPTZ,
+  item_return_confirmed_at TIMESTAMPTZ,
+  final_completion_at TIMESTAMPTZ,
+
+  -- Investor Earnings (calculated on completion)
+  investor_interest_earned DECIMAL(12,2),
+  platform_fee_deducted DECIMAL(12,2),
+  investor_net_profit DECIMAL(12,2),
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes
+CREATE INDEX idx_redemption_requests_contract_id ON redemption_requests(contract_id);
+CREATE INDEX idx_redemption_requests_status ON redemption_requests(request_status);
+CREATE INDEX idx_redemption_requests_type ON redemption_requests(request_type);
+CREATE INDEX idx_redemption_requests_created_at ON redemption_requests(created_at DESC);
+
+-- Table: slip_verifications (ประวัติการตรวจสอบสลิปด้วย AI)
+CREATE TABLE slip_verifications (
+  verification_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Reference
+  action_request_id UUID REFERENCES contract_action_requests(request_id),
+  redemption_id UUID REFERENCES redemption_requests(redemption_id),
+
+  -- Slip Info
+  slip_url TEXT NOT NULL,
+  expected_amount DECIMAL(12,2) NOT NULL,
+
+  -- AI Verification Result
+  detected_amount DECIMAL(12,2),
+  amount_difference DECIMAL(12,2),
+  verification_result VARCHAR(50) CHECK (verification_result IN (
+    'MATCHED', 'UNDERPAID', 'OVERPAID', 'UNREADABLE', 'INVALID'
+  )),
+  confidence_score DECIMAL(5,2),
+
+  -- AI Response
+  ai_model VARCHAR(50) DEFAULT 'gpt-4o-mini',
+  ai_response JSONB,
+  ai_raw_response TEXT,
+
+  -- Attempt Info
+  attempt_number INT DEFAULT 1,
+  verified_by VARCHAR(50) DEFAULT 'AI',
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_slip_verifications_action_request_id ON slip_verifications(action_request_id);
+CREATE INDEX idx_slip_verifications_redemption_id ON slip_verifications(redemption_id);
+
+-- Table: company_bank_accounts (บัญชีธนาคารของบริษัท)
+CREATE TABLE company_bank_accounts (
+  account_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_name VARCHAR(200) NOT NULL,
+  account_number VARCHAR(50) NOT NULL,
+  bank_name VARCHAR(100) NOT NULL,
+  promptpay_number VARCHAR(20),
+  is_active BOOLEAN DEFAULT TRUE,
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(account_number, bank_name)
+);
+
+-- Create index
+CREATE INDEX idx_company_bank_accounts_active ON company_bank_accounts(is_active);
+CREATE INDEX idx_company_bank_accounts_default ON company_bank_accounts(is_default);
+
+-- Table: support_contacts (ข้อมูลติดต่อฝ่ายสนับสนุนลูกค้า)
+CREATE TABLE support_contacts (
+  contact_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  contact_type VARCHAR(50) NOT NULL CHECK (contact_type IN ('PHONE', 'EMAIL', 'LINE')),
+  contact_value VARCHAR(255) NOT NULL,
+  display_name VARCHAR(100) NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  priority INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create index
+CREATE INDEX idx_support_contacts_active ON support_contacts(is_active, priority);
+
 -- Table: contracts (สัญญาจำนำ)
 CREATE TABLE contracts (
   contract_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -478,6 +855,24 @@ CREATE TABLE contracts (
   item_verified_at TIMESTAMP,
   payment_slip_url TEXT,
   payment_confirmed_at TIMESTAMP,
+
+  -- Payment Status
+  payment_status VARCHAR(50),
+
+  -- Contract Modification Tracking
+  original_principal_amount DECIMAL(12,2),
+  current_principal_amount DECIMAL(12,2),
+  total_interest_paid DECIMAL(12,2) DEFAULT 0,
+  total_principal_reduced DECIMAL(12,2) DEFAULT 0,
+  total_principal_increased DECIMAL(12,2) DEFAULT 0,
+  extension_count INT DEFAULT 0,
+  last_action_date TIMESTAMPTZ,
+  last_action_type VARCHAR(50),
+
+  -- Redemption Status
+  redemption_status VARCHAR(50) CHECK (redemption_status IN (
+    'NONE', 'PENDING', 'IN_PROGRESS', 'COMPLETED'
+  )),
 
   -- Timestamps
   funded_at TIMESTAMP,
@@ -568,9 +963,13 @@ CREATE TABLE payments (
   -- Payer Information
   payer_type VARCHAR(20) CHECK (payer_type IN ('INVESTOR', 'PAWNER')),
   payer_id UUID,
+  paid_by_investor_id UUID REFERENCES investors(investor_id),
   confirmed_by_recipient BOOLEAN DEFAULT FALSE,
   confirmed_at TIMESTAMP,
   confirmation_deadline TIMESTAMP,
+
+  -- Redemption Reference
+  redemption_id UUID REFERENCES redemption_requests(redemption_id),
 
   -- Verification
   verified_by UUID REFERENCES admin_users(admin_id),
@@ -587,6 +986,7 @@ CREATE TABLE payments (
 CREATE INDEX idx_payments_contract_id ON payments(contract_id);
 CREATE INDEX idx_payments_status ON payments(payment_status);
 CREATE INDEX idx_payments_date ON payments(payment_date DESC);
+CREATE INDEX idx_payments_redemption_id ON payments(redemption_id);
 
 -- Table: repayment_schedules (ตารางการชำระเงิน)
 CREATE TABLE repayment_schedules (
@@ -715,6 +1115,58 @@ CREATE TRIGGER update_loan_requests_updated_at BEFORE UPDATE ON loan_requests FO
 CREATE TRIGGER update_loan_offers_updated_at BEFORE UPDATE ON loan_offers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_contracts_updated_at BEFORE UPDATE ON contracts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_drop_point_verifications_updated_at BEFORE UPDATE ON drop_point_verifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trigger_contract_action_requests_updated_at BEFORE UPDATE ON contract_action_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trigger_redemption_requests_updated_at BEFORE UPDATE ON redemption_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trigger_company_bank_accounts_updated_at BEFORE UPDATE ON company_bank_accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trigger_support_contacts_updated_at BEFORE UPDATE ON support_contacts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Function to log contract actions
+CREATE OR REPLACE FUNCTION log_contract_action(
+  p_contract_id UUID,
+  p_action_type VARCHAR(50),
+  p_action_status VARCHAR(50),
+  p_performed_by VARCHAR(50),
+  p_performed_by_line_id VARCHAR(255),
+  p_description TEXT DEFAULT NULL,
+  p_amount DECIMAL(12,2) DEFAULT NULL,
+  p_metadata JSONB DEFAULT NULL
+) RETURNS UUID AS $$
+DECLARE
+  v_log_id UUID;
+  v_contract RECORD;
+BEGIN
+  -- Get contract details
+  SELECT * INTO v_contract FROM contracts WHERE contract_id = p_contract_id;
+
+  INSERT INTO contract_action_logs (
+    contract_id,
+    customer_id,
+    investor_id,
+    action_type,
+    action_status,
+    amount,
+    principal_before,
+    performed_by,
+    performed_by_line_id,
+    description,
+    metadata
+  ) VALUES (
+    p_contract_id,
+    v_contract.customer_id,
+    v_contract.investor_id,
+    p_action_type,
+    p_action_status,
+    p_amount,
+    v_contract.current_principal_amount,
+    p_performed_by,
+    p_performed_by_line_id,
+    p_description,
+    p_metadata
+  ) RETURNING log_id INTO v_log_id;
+
+  RETURN v_log_id;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =====================================================
 -- 10. VIEWS FOR COMMON QUERIES
@@ -779,6 +1231,16 @@ GROUP BY i.investor_id, i.firstname, i.lastname, w.available_balance, w.committe
 -- 11. MOCK DATA INSERTS
 -- =====================================================
 
+-- Insert mock company bank account
+INSERT INTO company_bank_accounts (account_name, account_number, bank_name, promptpay_number, is_active, is_default)
+VALUES ('ณัฐภัทร ต้อยจัตุรัส', '0626092941', 'พร้อมเพย์', '0626092941', TRUE, TRUE)
+ON CONFLICT (account_number, bank_name) DO NOTHING;
+
+-- Insert mock support contact
+INSERT INTO support_contacts (contact_type, contact_value, display_name, is_active, priority)
+VALUES ('PHONE', '0626092941', 'ฝ่ายสนับสนุน', TRUE, 1)
+ON CONFLICT DO NOTHING;
+
 -- Insert mock drop points
 INSERT INTO drop_points (drop_point_id, drop_point_name, drop_point_code, phone_number, email,
                         addr_house_no, addr_street, addr_sub_district, addr_district, addr_province, addr_country, addr_postcode,
@@ -802,6 +1264,12 @@ VALUES
    'https://maps.google.com/?q=Central+Pinklao', 13.7597, 100.4771,
    '{"monday": "09:00-20:00", "tuesday": "09:00-20:00", "wednesday": "09:00-20:00", "thursday": "09:00-20:00", "friday": "09:00-20:00", "saturday": "09:00-19:00", "sunday": "10:00-19:00"}',
    100, 12, 'นายวัชรพล สดใส', '0813333333', 'U1234567890abcdef333', TRUE, TRUE);
+
+-- Update existing contracts to set original_principal_amount and current_principal_amount
+UPDATE contracts
+SET original_principal_amount = loan_principal_amount,
+    current_principal_amount = loan_principal_amount
+WHERE original_principal_amount IS NULL;
 
 -- Insert mock admin users
 INSERT INTO admin_users (admin_id, username, email, password_hash, firstname, lastname, phone_number, role, permissions, is_active)
@@ -964,7 +1432,7 @@ VALUES
    NOW() - INTERVAL '30 days', NOW() + INTERVAL '150 days', 180,
    75000.00, 0.020, 1500.00, 76500.00, 0.10, 150.00,
    0.00, 0.00, 0.00, 'PENDING_SIGNATURE', 'PENDING',
-   NULL, NULL, NOW() - INTERVAL '30 days', NOW() - INTERVAL '1 day');
+   NULL, NULL, NOW() - INTERVAL '30 days', NOW() - INTERVAL '1 day', 75000.00, 75000.00, 0, 0, 0, 0, NULL, NULL, 'NONE');
 
 -- Insert mock payments
 INSERT INTO payments (payment_id, contract_id, payment_type, amount, principal_portion, interest_portion, fee_portion, payment_method, payment_status, transaction_ref, verified_by, verified_at, payment_date, notes, created_at)
@@ -1150,6 +1618,18 @@ VALUES
   ('aa0e8400-e29b-41d4-a716-446655440023', 'PAWNER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525a7', 'ACCEPT_LOAN_OFFER', 'LOAN_OFFER', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525e3', 'Customer accepted loan offer for Sony α7 IV', '{"accepted_amount": 65000}', '192.168.1.105', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)', NOW() - INTERVAL '3 days'),
   ('aa0e8400-e29b-41d4-a716-446655440024', 'ADMIN', '660e8400-e29b-41d4-a716-446655440002', 'VERIFY_PAYMENT', 'PAYMENT', '550e8400-e29b-41d4-a716-446655440016', 'Admin verified payment for MacBook Air M3 contract', '{"payment_amount": 32704}', '10.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', NOW() - INTERVAL '15 days'),
   ('aa0e8400-e29b-41d4-a716-446655440025', 'SYSTEM', NULL, 'CONTRACT_COMPLETED', 'CONTRACT', '2fdf1fd8-92e2-4f2c-9b8f-ab13441525f2', 'Contract automatically marked as completed for MacBook Air M3', '{"completion_reason": "FULL_REPAYMENT"}', NULL, 'SYSTEM', NOW() - INTERVAL '15 days');
+
+-- =====================================================
+-- TABLE COMMENTS
+-- =====================================================
+
+COMMENT ON TABLE contract_action_logs IS 'ตารางเก็บ log ทุก action ที่เกิดขึ้นกับสัญญา';
+COMMENT ON TABLE contract_action_requests IS 'ตารางเก็บคำขอ action ต่างๆ เช่น ต่อดอกเบี้ย ลดเงินต้น เพิ่มเงินต้น';
+COMMENT ON TABLE redemption_requests IS 'ตารางเก็บคำขอไถ่ถอน ต่อดอกเบี้ย ลดเงินต้น และเพิ่มเงินต้น';
+COMMENT ON TABLE slip_verifications IS 'ตารางเก็บประวัติการตรวจสอบสลิปด้วย AI';
+COMMENT ON TABLE drop_point_verifications IS 'ตารางเก็บการตรวจสอบสินค้าโดยจุดรับฝาก';
+COMMENT ON TABLE company_bank_accounts IS 'บัญชีธนาคารของบริษัทสำหรับรับชำระเงินไถ่ถอน';
+COMMENT ON TABLE support_contacts IS 'ข้อมูลติดต่อฝ่ายสนับสนุนลูกค้า';
 
 -- =====================================================
 -- END OF SCHEMA

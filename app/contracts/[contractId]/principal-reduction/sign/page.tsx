@@ -363,7 +363,7 @@ export default function PrincipalReductionSignPage() {
 
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">เงินต้นเดิม:</span>
-                <span className="font-bold">{(contract.current_principal_amount || contract.principal_amount)?.toLocaleString()} บาท</span>
+                <span className="font-bold">{(contract.current_principal_amount || contract.loan_principal_amount)?.toLocaleString()} บาท</span>
               </div>
 
               <div className="flex justify-between text-sm">

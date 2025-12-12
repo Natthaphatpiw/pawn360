@@ -72,7 +72,9 @@ export async function POST(request: NextRequest) {
     switch (actionType) {
       case 'INTEREST_PAYMENT': {
         // ต่อดอกเบี้ย: จ่ายดอกเบี้ยเต็มงวดแล้วขยายสัญญา
-        const fullPeriodInterest = currentPrincipal * (monthlyInterestRate / 100);
+        // interest_rate is stored as percentage (e.g., 3 for 3%), NOT as decimal
+        // Full period interest = principal * (monthly rate / 100) * (contract days / 30)
+        const fullPeriodInterest = currentPrincipal * (monthlyInterestRate / 100) * (daysInContract / 30);
         const interestToPay = Math.round(fullPeriodInterest * 100) / 100;
 
         // New end date = current end date + contract duration days
@@ -143,6 +145,11 @@ export async function POST(request: NextRequest) {
         const interestForPeriod = Math.round(interestAccrued * 100) / 100;
         const principalAfterIncrease = currentPrincipal + increaseAmount;
 
+        // Calculate monthly interest (for UI display)
+        const currentMonthlyInterest = Math.round(currentPrincipal * (monthlyInterestRate / 100) * 100) / 100;
+        const newMonthlyInterest = Math.round(principalAfterIncrease * (monthlyInterestRate / 100) * 100) / 100;
+        const additionalMonthlyInterest = Math.round((newMonthlyInterest - currentMonthlyInterest) * 100) / 100;
+
         // Calculate new interest for remaining period
         const newInterestForRemaining = Math.round(principalAfterIncrease * dailyInterestRate * daysRemaining * 100) / 100;
 
@@ -155,6 +162,9 @@ export async function POST(request: NextRequest) {
           increaseAmount,
           interestForPeriod,
           principalAfterIncrease,
+          newPrincipal: principalAfterIncrease,
+          newMonthlyInterest,
+          additionalMonthlyInterest,
           newInterestForRemaining,
           interestIncrease,
           maxIncrease,
