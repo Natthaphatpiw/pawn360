@@ -29,7 +29,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Call UpPass API to create eKYC session for investors
+    // 2. Check if user already has an eKYC URL (reuse existing URL)
+    if (investor.ekyc_url && investor.kyc_status === 'PENDING') {
+      console.log('Reusing existing eKYC URL for investor:', investorId);
+      return NextResponse.json({
+        success: true,
+        url: investor.ekyc_url,
+        sessionSlug: investor.uppass_slug,
+        reused: true
+      });
+    }
+
+    // 3. Call UpPass API to create eKYC session for investors
     const lang = 'th';
     // IMPORTANT: You need to create a form named 'investor' in your UpPass dashboard, or temporarily use the same form as pawner
     const formSlug = process.env.UPPASS_FORM_SLUG_INVEST || 'pawner'; // Change 'pawner' to 'investor' after creating the form in UpPass
@@ -99,11 +110,12 @@ export async function POST(request: NextRequest) {
       throw new Error('Invalid response from UpPass');
     }
 
-    // 4. Update investor record with uppass_slug and set status to PENDING
+    // 4. Update investor record with uppass_slug, ekyc_url, and set status to PENDING
     const { error: updateError } = await supabase
       .from('investors')
       .update({
         uppass_slug: sessionSlug,
+        ekyc_url: form_url,
         kyc_status: 'PENDING',
         updated_at: new Date().toISOString()
       })
@@ -117,7 +129,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       url: form_url,
-      sessionSlug
+      sessionSlug,
+      reused: false
     });
 
   } catch (error: any) {

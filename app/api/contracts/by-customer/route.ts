@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 export async function GET(request: NextRequest) {
+  console.log('📥 [by-customer] GET request received');
   try {
     const { searchParams } = new URL(request.url);
     const lineId = searchParams.get('lineId');
+    console.log('🔍 [by-customer] lineId:', lineId);
 
     if (!lineId) {
+      console.log('❌ [by-customer] Missing lineId');
       return NextResponse.json(
         { error: 'LINE ID is required' },
         { status: 400 }
@@ -14,6 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = supabaseAdmin();
+    console.log('✅ [by-customer] Supabase client initialized');
 
     // First, get the customer_id from the pawners table
     const { data: pawner, error: pawnerError } = await supabase

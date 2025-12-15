@@ -23,6 +23,7 @@
     "@types/html2canvas": "^0.5.35",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
+    "browser-image-compression": "^2.0.2",
     "dotenv": "^17.2.3",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",

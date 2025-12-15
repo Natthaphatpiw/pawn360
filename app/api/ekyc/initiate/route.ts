@@ -29,7 +29,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Call UpPass API to create eKYC session
+    // 2. Check if user already has an eKYC URL (reuse existing URL)
+    if (pawner.ekyc_url && pawner.kyc_status === 'PENDING') {
+      console.log('Reusing existing eKYC URL for customer:', customerId);
+      return NextResponse.json({
+        success: true,
+        url: pawner.ekyc_url,
+        sessionSlug: pawner.uppass_slug,
+        reused: true
+      });
+    }
+
+    // 3. Call UpPass API to create new eKYC session
     const lang = 'th';
     const formSlug = process.env.UPPASS_FORM_SLUG;
     const uppassApiKey = process.env.UPPASS_API_KEY;
@@ -62,7 +73,7 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create verification session');
     }
 
-    // 3. Extract form_url and slug from response
+    // 4. Extract form_url and slug from response
     const { form_url, detail } = upPassData;
     const sessionSlug = detail?.slug;
 
@@ -70,11 +81,12 @@ export async function POST(request: NextRequest) {
       throw new Error('Invalid response from UpPass');
     }
 
-    // 4. Update pawner record with uppass_slug and set status to PENDING
+    // 5. Update pawner record with uppass_slug, ekyc_url, and set status to PENDING
     const { error: updateError } = await supabase
       .from('pawners')
       .update({
         uppass_slug: sessionSlug,
+        ekyc_url: form_url,
         kyc_status: 'PENDING',
         updated_at: new Date().toISOString()
       })
@@ -84,11 +96,12 @@ export async function POST(request: NextRequest) {
       throw updateError;
     }
 
-    // 5. Return the verification URL to frontend
+    // 6. Return the verification URL to frontend
     return NextResponse.json({
       success: true,
       url: form_url,
-      sessionSlug
+      sessionSlug,
+      reused: false
     });
 
   } catch (error: any) {
