@@ -6,6 +6,7 @@ import axios from 'axios';
 import Image from 'next/image';
 import { Camera, ChevronUp, ChevronDown, Search, X, Check } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
+import imageCompression from 'browser-image-compression';
 import PawnSummary from './pawn-summary';
 import SuccessConfirmation from './success-confirmation';
 import ContractAgreementStep from './contract-agreement-step';
@@ -439,12 +440,13 @@ export default function EstimatePage() {
     }
 
     // Validate by item type
+    // Note: Serial number is NOT required during estimation - only required at pawn setup
     switch (formData.itemType) {
       case 'โทรศัพท์มือถือ':
         if (!formData.brand) return 'กรุณาเลือกยี่ห้อ';
         if (!formData.model) return 'กรุณาระบุรุ่น';
         if (!formData.capacity) return 'กรุณาระบุความจุ';
-        if (!formData.serialNo) return 'กรุณาระบุหมายเลขซีเรียล';
+        // serialNo not required for estimation
         if (!formData.accessories) return 'กรุณาระบุอุปกรณ์เสริม';
         break;
 
@@ -460,7 +462,7 @@ export default function EstimatePage() {
 
       case 'Apple':
         if (!selectedAppleProduct) return 'กรุณาเลือกรุ่นสินค้า Apple';
-        if (!formData.serialNo) return 'กรุณาระบุ Serial Number / IMEI';
+        // serialNo not required for estimation
         break;
 
       case 'โน้ตบุค':
@@ -514,9 +516,32 @@ export default function EstimatePage() {
     setError(null);
 
     try {
-      // Step 1: Analyze condition with AI
-      const base64Images = await Promise.all(
+      // Step 1: Compress and analyze condition with AI
+      console.log('🗜️ Compressing images...');
+      const compressedImages = await Promise.all(
         images.map(async (file) => {
+          // Compress image to max 800KB to ensure total payload stays under 4.5MB
+          const options = {
+            maxSizeMB: 0.8, // 800KB per image
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+            fileType: 'image/jpeg' as const,
+          };
+
+          try {
+            const compressedFile = await imageCompression(file, options);
+            console.log(`📊 Original: ${(file.size / 1024).toFixed(2)}KB → Compressed: ${(compressedFile.size / 1024).toFixed(2)}KB`);
+            return compressedFile;
+          } catch (error) {
+            console.warn('⚠️ Compression failed, using original:', error);
+            return file;
+          }
+        })
+      );
+
+      // Convert compressed images to base64
+      const base64Images = await Promise.all(
+        compressedImages.map(async (file) => {
           return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -526,6 +551,7 @@ export default function EstimatePage() {
         })
       );
 
+      console.log('🔍 Analyzing condition...');
       const conditionResponse = await axios.post('/api/analyze-condition', {
         images: base64Images
       });
@@ -1437,9 +1463,35 @@ export default function EstimatePage() {
               </button>
               <button
                 onClick={() => {
+                  // Full reset for new estimation
                   setCurrentStep('form');
+                  setFormData({
+                    itemType: '',
+                    brand: '',
+                    model: '',
+                    capacity: '',
+                    serialNo: '',
+                    accessories: '',
+                    condition: 50,
+                    defects: '',
+                    note: '',
+                    lenses: ['', ''],
+                    appleSearchTerm: '',
+                    appleAccessories: {
+                      box: false,
+                      adapter: false,
+                      cable: false,
+                      receipt: false,
+                    },
+                  });
+                  setImages([]);
+                  setImageUrls([]);
+                  setUploadedImageUrls([]);
                   setEstimateResult(null);
                   setConditionResult(null);
+                  setSelectedAppleProduct(null);
+                  setSelectedStore('');
+                  setError(null);
                 }}
                 className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-gray-200 hover:bg-gray-300 text-gray-700"
               >

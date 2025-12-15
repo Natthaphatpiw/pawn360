@@ -38,6 +38,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate and normalize bank_account_type
+    const validBankAccountTypes = [
+      'บัญชีออมทรัพย์',
+      'บัญชีเงินฝากประจำ',
+      'บัญชีกระแสรายวัน',
+      'บัญชีเงินตราต่างประเทศ',
+      'พร้อมเพย์'
+    ];
+
+    // Convert empty string to null, and validate the type
+    let bankAccountType = bankInfo?.accountType?.trim() || null;
+    if (bankAccountType && !validBankAccountTypes.includes(bankAccountType)) {
+      console.warn('Invalid bank_account_type:', bankAccountType);
+      bankAccountType = null; // Reset invalid values to null
+    }
+
     // Insert new pawner
     const { data: pawner, error } = await supabase
       .from('pawners')
@@ -47,18 +63,18 @@ export async function POST(request: NextRequest) {
         lastname,
         phone_number: phoneNumber,
         national_id: nationalId,
-        addr_house_no: address?.houseNo,
-        addr_village: address?.village,
-        addr_street: address?.street,
-        addr_sub_district: address?.subDistrict,
-        addr_district: address?.district,
-        addr_province: address?.province,
+        addr_house_no: address?.houseNo || null,
+        addr_village: address?.village || null,
+        addr_street: address?.street || null,
+        addr_sub_district: address?.subDistrict || null,
+        addr_district: address?.district || null,
+        addr_province: address?.province || null,
         addr_country: address?.country || 'Thailand',
-        addr_postcode: address?.postcode,
-        bank_name: bankInfo?.bankName || null,
-        bank_account_no: bankInfo?.accountNo || null,
-        bank_account_type: bankInfo?.accountType || null,
-        bank_account_name: bankInfo?.accountName || null,
+        addr_postcode: address?.postcode || null,
+        bank_name: bankInfo?.bankName?.trim() || null,
+        bank_account_no: bankInfo?.accountNo?.trim() || null,
+        bank_account_type: bankAccountType,
+        bank_account_name: bankInfo?.accountName?.trim() || null,
         kyc_status: 'NOT_VERIFIED',
         is_active: true,
         is_blocked: false,

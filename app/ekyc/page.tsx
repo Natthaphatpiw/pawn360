@@ -36,11 +36,13 @@ export default function EKYCPage() {
           if (pawner.kyc_status === 'VERIFIED') {
             // Already verified - go to register page
             router.push('/register');
-          } else if (pawner.kyc_status === 'PENDING') {
-            // Waiting for verification - go to waiting page
-            router.push('/ekyc/waiting');
+          } else if (pawner.kyc_status === 'PENDING' && pawner.ekyc_url) {
+            // Has pending eKYC with URL - redirect directly to UpPass
+            // Don't show waiting page, let user continue their eKYC
+            window.location.href = pawner.ekyc_url;
+            return;
           }
-          // else stay on this page (NOT_VERIFIED or REJECTED)
+          // else stay on this page (NOT_VERIFIED, REJECTED, or PENDING without URL)
         } else {
           // Not registered - go to register
           router.push('/register');
