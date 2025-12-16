@@ -444,7 +444,10 @@ const PawnContractDetail = () => {
             <span className="text-sm font-bold">ที่ตั้ง Drop point</span>
           </button>
 
-          <button className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]">
+          <button
+            onClick={() => router.push(`/pawn-ticket/${contractId}`)}
+            className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
+          >
             <span className="text-sm font-bold">ดูสัญญา</span>
             <span className="text-[10px] opacity-80 font-light">See contract</span>
           </button>

@@ -167,28 +167,31 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        {/* Download PDF */}
-        <button className="w-full bg-[#E9EFF6] hover:bg-[#DCE4F0] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]">
+        {/* See Contract */}
+        <button
+          onClick={() => router.push(`/investor-pawn-ticket/${contractId}`)}
+          className="w-full bg-white border border-[#1E3A8A] hover:bg-gray-50 text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+        >
           <div className="flex items-center gap-2">
-            <Download className="w-5 h-5" />
-            <span className="text-base font-bold">ดาวน์โหลด PDF</span>
+            <FileText className="w-5 h-5" />
+            <span className="text-base font-bold">ดูสัญญา</span>
           </div>
-          <span className="text-[10px] opacity-70 font-light">Download PDF</span>
+          <span className="text-[10px] opacity-70 font-light">See contract</span>
         </button>
 
-        {/* See Contract */}
+        {/* Download PDF (if exists) */}
         {contract.signed_contract_url && (
           <a
             href={contract.signed_contract_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full bg-white border border-[#1E3A8A] hover:bg-gray-50 text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+            className="w-full bg-[#E9EFF6] hover:bg-[#DCE4F0] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              <span className="text-base font-bold">ดูสัญญา</span>
+              <Download className="w-5 h-5" />
+              <span className="text-base font-bold">ดาวน์โหลด PDF</span>
             </div>
-            <span className="text-[10px] opacity-70 font-light">See contract</span>
+            <span className="text-[10px] opacity-70 font-light">Download PDF</span>
           </a>
         )}
       </div>
