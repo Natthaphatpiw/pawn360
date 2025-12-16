@@ -133,12 +133,24 @@ WHERE c.funding_status = 'SEEKING_FUNDING'
 ORDER BY c.created_at DESC;
 
 -- =====================================================
--- 5. ADD COMMENTS FOR DOCUMENTATION
+-- 5. ADD signature_url TO pawners
+-- Store pawner signature image URL
+-- =====================================================
+
+-- Add signature_url to pawners (for pawner signature on pawn ticket)
+ALTER TABLE pawners ADD COLUMN IF NOT EXISTS signature_url TEXT;
+
+-- Note: contract_file_url already exists in contracts table for storing pawn ticket image
+
+-- =====================================================
+-- 6. ADD COMMENTS FOR DOCUMENTATION
 -- =====================================================
 
 COMMENT ON COLUMN pawners.ekyc_url IS 'UpPass eKYC URL for user to complete verification';
 COMMENT ON COLUMN investors.ekyc_url IS 'UpPass eKYC URL for user to complete verification';
 COMMENT ON COLUMN items.line_id IS 'LINE user ID for draft items before registration';
+COMMENT ON COLUMN contracts.contract_file_url IS 'AWS S3 URL of generated pawn ticket image (auto-generated when status=CONFIRMED)';
+COMMENT ON COLUMN pawners.signature_url IS 'URL of pawner signature image';
 
 -- =====================================================
 -- END OF MIGRATION
