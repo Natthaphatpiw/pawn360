@@ -4,13 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
-import { Camera, ChevronUp, ChevronDown, Search, X, Check } from 'lucide-react';
+import { Camera, ChevronUp, ChevronDown, Search, X, Check, FileText, Save } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 import imageCompression from 'browser-image-compression';
 import PawnSummary from './pawn-summary';
 import SuccessConfirmation from './success-confirmation';
 import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
+import { useRouter } from 'next/navigation';
+import { APPLE_PRODUCTS } from '@/lib/data/apple-products';
 
 const sarabun = Sarabun({
   subsets: ['latin'],
@@ -34,29 +36,7 @@ const BRANDS_BY_TYPE: Record<string, string[]> = {
   'โน้ตบุค': ['Apple', 'Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
 };
 
-// Mock Apple products data (in production, this would come from an API)
-const APPLE_PRODUCTS = [
-  { id: 1, name: 'iPhone 15 Pro Max', type: 'Mobile', specs: '256GB Titanium Natural', category: 'iPhone' },
-  { id: 2, name: 'iPhone 15 Pro', type: 'Mobile', specs: '128GB Blue Titanium', category: 'iPhone' },
-  { id: 3, name: 'iPhone 15', type: 'Mobile', specs: '128GB Black', category: 'iPhone' },
-  { id: 4, name: 'iPhone 14 Pro Max', type: 'Mobile', specs: '256GB Deep Purple', category: 'iPhone' },
-  { id: 5, name: 'iPhone 14 Pro', type: 'Mobile', specs: '128GB Space Black', category: 'iPhone' },
-  { id: 6, name: 'iPhone 14', type: 'Mobile', specs: '128GB Midnight', category: 'iPhone' },
-  { id: 7, name: 'iPhone 13 Pro Max', type: 'Mobile', specs: '256GB Sierra Blue', category: 'iPhone' },
-  { id: 8, name: 'iPhone 13', type: 'Mobile', specs: '128GB Starlight', category: 'iPhone' },
-  { id: 9, name: 'MacBook Air M1', type: 'Laptop', specs: '8GB/256GB Silver (2020)', category: 'MacBook' },
-  { id: 10, name: 'MacBook Air M2', type: 'Laptop', specs: '8GB/256GB Midnight (2022)', category: 'MacBook' },
-  { id: 11, name: 'MacBook Air M3', type: 'Laptop', specs: '8GB/256GB Space Grey (2024)', category: 'MacBook' },
-  { id: 12, name: 'MacBook Pro 14"', type: 'Laptop', specs: 'M3 Pro 18GB/512GB Space Black', category: 'MacBook' },
-  { id: 13, name: 'MacBook Pro 16"', type: 'Laptop', specs: 'M3 Max 36GB/1TB Space Black', category: 'MacBook' },
-  { id: 14, name: 'iPad Air 5', type: 'Tablet', specs: '64GB Wi-Fi Blue (M1)', category: 'iPad' },
-  { id: 15, name: 'iPad Pro 11"', type: 'Tablet', specs: '128GB Wi-Fi Space Grey (M2)', category: 'iPad' },
-  { id: 16, name: 'iPad Pro 12.9"', type: 'Tablet', specs: '256GB Wi-Fi+Cellular Silver (M2)', category: 'iPad' },
-  { id: 17, name: 'Apple Watch Series 9', type: 'Smartwatch', specs: '45mm GPS Midnight Aluminum', category: 'Watch' },
-  { id: 18, name: 'Apple Watch Ultra 2', type: 'Smartwatch', specs: '49mm GPS+Cellular Titanium', category: 'Watch' },
-  { id: 19, name: 'AirPods Pro 2', type: 'Audio', specs: 'USB-C MagSafe Case', category: 'Audio' },
-  { id: 20, name: 'AirPods Max', type: 'Audio', specs: 'Space Grey', category: 'Audio' },
-];
+// Apple products imported from /lib/data/apple-products.ts
 
 // Helper component for form labels
 const FormLabel = ({ thai, eng, required = false }: { thai: string; eng?: string; required?: boolean }) => (
@@ -143,12 +123,17 @@ type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_dis
 
 export default function EstimatePage() {
   const { profile, isLoading, error: liffError } = useLiff();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Current step
   const [currentStep, setCurrentStep] = useState<Step>('form');
+
+  // Draft management
+  const [draftCount, setDraftCount] = useState<number>(0);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
@@ -226,9 +211,23 @@ export default function EstimatePage() {
   useEffect(() => {
     if (profile?.userId) {
       checkCustomerExists();
+      fetchDraftCount();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.userId]);
+
+  // Fetch draft count
+  const fetchDraftCount = async () => {
+    if (!profile?.userId) return;
+    try {
+      const response = await axios.get(`/api/items/draft?lineId=${profile.userId}`);
+      if (response.data.success) {
+        setDraftCount(response.data.items.length);
+      }
+    } catch (error) {
+      console.error('Error fetching draft count:', error);
+    }
+  };
 
   // Fetch stores
   const fetchStores = async () => {
@@ -498,6 +497,73 @@ export default function EstimatePage() {
     return urls;
   };
 
+  // Save draft
+  const handleSaveDraft = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!profile?.userId) {
+      setError('กรุณาเข้าสู่ระบบ LINE ก่อน');
+      return;
+    }
+
+    setIsSavingDraft(true);
+    setError(null);
+
+    try {
+      // Upload images first
+      const uploadedUrls = await uploadImages();
+
+      // Prepare draft data
+      const draftData = {
+        lineId: profile.userId,
+        itemType: formData.itemType,
+        brand: formData.brand,
+        model: formData.model,
+        capacity: formData.capacity,
+        color: selectedAppleProduct?.colors?.[0] || null,
+        accessories: formData.itemType === 'Apple'
+          ? Object.entries(formData.appleAccessories || {})
+              .filter(([, value]) => value)
+              .map(([key]) => key)
+              .join(', ')
+          : formData.accessories,
+        defects: formData.defects,
+        notes: formData.note,
+        imageUrls: uploadedUrls,
+        conditionResult: {
+          score: formData.condition / 100,
+          totalScore: formData.condition
+        },
+        estimateResult: {
+          estimatedValue: 0 // Will be estimated when user continues
+        },
+        // Laptop specific
+        cpu: formData.cpu,
+        ram: formData.ram,
+        storage: formData.storage,
+        gpu: formData.gpu,
+        // Camera specific
+        lenses: formData.lenses?.filter(l => l.trim() !== '')
+      };
+
+      const response = await axios.post('/api/items/draft', draftData);
+
+      if (response.data.success) {
+        alert('บันทึกสำเร็จ! คุณสามารถกลับมาดำเนินการต่อได้ภายหลัง');
+        router.push('/drafts');
+      }
+    } catch (error: any) {
+      console.error('Error saving draft:', error);
+      setError(error.response?.data?.error || 'ไม่สามารถบันทึกได้');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   // Analyze condition with AI
   const handleAnalyzeAndEstimate = async () => {
     const validationError = validateForm();
@@ -707,6 +773,26 @@ export default function EstimatePage() {
         {/* Form Step */}
         {currentStep === 'form' && (
           <>
+            {/* Header with Draft Button */}
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">ประเมินราคาสินค้า</h1>
+                <p className="text-xs text-gray-500">AI Price Estimation</p>
+              </div>
+              <button
+                onClick={() => router.push('/drafts')}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium text-gray-700"
+              >
+                <FileText className="w-4 h-4" />
+                <span>บันทึก</span>
+                {draftCount > 0 && (
+                  <span className="bg-orange-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {draftCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Image Upload Section */}
             <div className="mb-6">
               <div className="flex justify-between items-end mb-2">
@@ -1236,22 +1322,42 @@ export default function EstimatePage() {
               </div>
             )}
 
-            {/* Submit Button */}
-            <button
-              onClick={handleAnalyzeAndEstimate}
-              disabled={isAnalyzing || isEstimating}
-              className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: (isAnalyzing || isEstimating) ? '#9ca3af' : '#c2410c',
-                color: 'white'
-              }}
-            >
-              {isAnalyzing
-                ? 'กำลังวิเคราะห์สภาพด้วย AI...'
-                : isEstimating
-                  ? 'กำลังประเมินราคา...'
-                  : 'ประเมินราคาด้วย AI'}
-            </button>
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={handleAnalyzeAndEstimate}
+                disabled={isAnalyzing || isEstimating}
+                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: (isAnalyzing || isEstimating) ? '#9ca3af' : '#c2410c',
+                  color: 'white'
+                }}
+              >
+                {isAnalyzing
+                  ? 'กำลังวิเคราะห์สภาพด้วย AI...'
+                  : isEstimating
+                    ? 'กำลังประเมินราคา...'
+                    : 'ประเมินราคาด้วย AI'}
+              </button>
+
+              <button
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft}
+                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-gray-200 hover:bg-gray-300 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSavingDraft ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
+                    กำลังบันทึก...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    บันทึกชั่วคราว
+                  </>
+                )}
+              </button>
+            </div>
           </>
         )}
 

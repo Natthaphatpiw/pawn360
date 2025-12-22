@@ -269,7 +269,8 @@ CREATE INDEX idx_wallet_transactions_created_at ON wallet_transactions(created_a
 -- Table: items (สินค้าที่นำมาจำนำ)
 CREATE TABLE items (
   item_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  customer_id UUID NOT NULL REFERENCES pawners(customer_id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES pawners(customer_id) ON DELETE CASCADE,
+  line_id VARCHAR(255), -- Allow drafts without registration
 
   -- Item Basic Info
   item_type VARCHAR(50) NOT NULL CHECK (item_type IN (
@@ -281,12 +282,18 @@ CREATE TABLE items (
   -- Item Details (Dynamic based on type)
   capacity VARCHAR(50),
   serial_number VARCHAR(255),
+  color VARCHAR(50), -- For Apple products
 
   -- Laptop specific
   cpu VARCHAR(100),
   ram VARCHAR(50),
   storage VARCHAR(50),
   gpu VARCHAR(100),
+  screen_size VARCHAR(20), -- For MacBook/iPad
+
+  -- Apple Watch specific
+  watch_size VARCHAR(20),
+  watch_connectivity VARCHAR(20), -- GPS or GPS+Cellular
 
   -- Condition & Valuation
   item_condition INTEGER CHECK (item_condition >= 0 AND item_condition <= 100),
@@ -306,7 +313,7 @@ CREATE TABLE items (
 
   -- Status
   item_status VARCHAR(50) DEFAULT 'PENDING' CHECK (item_status IN (
-    'PENDING', 'APPROVED', 'REJECTED', 'IN_CONTRACT', 'RETURNED', 'LIQUIDATED'
+    'DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'IN_CONTRACT', 'RETURNED', 'LIQUIDATED'
   )),
 
   -- Drop Point
@@ -326,6 +333,7 @@ CREATE TABLE items (
 );
 
 CREATE INDEX idx_items_customer_id ON items(customer_id);
+CREATE INDEX idx_items_line_id ON items(line_id);
 CREATE INDEX idx_items_status ON items(item_status);
 CREATE INDEX idx_items_type ON items(item_type);
 CREATE INDEX idx_items_drop_point ON items(drop_point_id);
