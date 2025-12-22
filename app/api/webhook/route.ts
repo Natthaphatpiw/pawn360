@@ -687,7 +687,8 @@ async function handlePostbackEvent(event: WebhookEvent) {
           .from('contracts')
           .select(`
             *,
-            investors:investor_id (*)
+            investors:investor_id (*),
+            pawners:customer_id (*)
           `)
           .eq('contract_id', contractId)
           .single();
@@ -697,30 +698,90 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
+        // IDEMPOTENCY CHECK - Check funding_status to prevent duplicate rejection actions
+        // Only allow reject if funding is still PENDING or payment is still being processed
+        if (contract.funding_status === 'FUNDED' || contract.funding_status === 'DISBURSED') {
+          console.log(`Contract ${contractId} already funded (status: ${contract.funding_status}), payment rejection not allowed`);
+
+          // Send message to pawner explaining the situation
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken && contract.pawners?.line_id) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(contract.pawners.line_id, {
+              type: 'text',
+              text: `การปฏิเสธการชำระเงินนี้ไม่สามารถทำได้แล้ว\n\nสัญญาได้รับการโอนเงินเรียบร้อยแล้ว\nหมายเลขสัญญา: ${contract.contract_number}\n\nหากมีปัญหากรุณาติดต่อ Support`
+            });
+          }
+          return;
+        }
+
+        // Check payment status for idempotency
+        if (contract.payment_status === 'COMPLETED') {
+          console.log(`Contract ${contractId} payment already completed, rejection not allowed`);
+
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken && contract.pawners?.line_id) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(contract.pawners.line_id, {
+              type: 'text',
+              text: `คุณได้ยืนยันรับเงินไปแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nหากมีข้อสงสัยกรุณาติดต่อ Support`
+            });
+          }
+          return;
+        }
+
         // Update payment record if paymentId provided
         // Valid payment_status values: PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
         if (paymentId) {
-          await supabase
+          const { error: paymentError } = await supabase
             .from('payments')
             .update({
-              payment_status: 'FAILED'
+              payment_status: 'FAILED',
+              updated_at: new Date().toISOString()
             })
-            .eq('payment_id', paymentId);
-        }
+            .eq('payment_id', paymentId)
+            .eq('payment_status', 'PENDING'); // Only update if still pending
 
-        // Notify investor to re-upload slip
-        if (contract.investors?.line_id) {
-          try {
-            await investorLineClient.pushMessage(contract.investors.line_id, {
-              type: 'text',
-              text: `ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานใหม่`
-            });
-          } catch (invError) {
-            console.error('Error sending to investor:', invError);
+          if (paymentError) {
+            console.error('Error updating payment status:', paymentError);
           }
         }
 
-        console.log(`Reject payment processed for contractId: ${contractId}`);
+        // Update contract status to indicate payment issue
+        await supabase
+          .from('contracts')
+          .update({
+            payment_status: 'REJECTED',
+            updated_at: new Date().toISOString()
+          })
+          .eq('contract_id', contractId);
+
+        // Send confirmation to pawner
+        const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+        if (channelAccessToken && contract.pawners?.line_id) {
+          const client = new Client({ channelAccessToken });
+          await client.pushMessage(contract.pawners.line_id, {
+            type: 'text',
+            text: `แจ้งนักลงทุนแล้วว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nนักลงทุนจะได้รับแจ้งให้ตรวจสอบและดำเนินการใหม่`
+          });
+        }
+
+        // Notify investor to re-upload slip ONLY IF funding is still pending
+        if (contract.funding_status === 'PENDING' && contract.investors?.line_id) {
+          try {
+            await investorLineClient.pushMessage(contract.investors.line_id, {
+              type: 'text',
+              text: `ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานการโอนเงินใหม่อีกครั้ง`
+            });
+            console.log(`Sent notification to investor ${contract.investors.line_id}`);
+          } catch (invError) {
+            console.error('Error sending to investor:', invError);
+          }
+        } else {
+          console.log(`Skipped sending message to investor - funding_status: ${contract.funding_status}`);
+        }
+
+        console.log(`Reject payment processed for contractId: ${contractId}, funding_status: ${contract.funding_status}`);
       } catch (error) {
         console.error('Error processing reject_payment:', error);
       }
