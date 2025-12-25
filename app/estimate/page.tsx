@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { Suspense, useState, useRef, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
@@ -126,7 +126,7 @@ interface Customer {
 
 type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'success_confirmation' | 'contract_agreement' | 'contract_success';
 
-export default function EstimatePage() {
+function EstimatePageInner() {
   const { profile, isLoading, error: liffError } = useLiff();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2292,5 +2292,22 @@ export default function EstimatePage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function EstimatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+          </div>
+        </div>
+      }
+    >
+      <EstimatePageInner />
+    </Suspense>
   );
 }
