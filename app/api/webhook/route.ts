@@ -5,17 +5,19 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
-// Drop Point LINE OA client
-const dropPointLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || ''
-});
+function getDropPointLineClient() {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT;
+  const secret = process.env.LINE_CHANNEL_SECRET_DROPPOINT;
+  if (!token) return null;
+  return new Client({ channelAccessToken: token, channelSecret: secret || '' });
+}
 
-// Investor LINE OA client
-const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
-});
+function getInvestorLineClient() {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST;
+  const secret = process.env.LINE_CHANNEL_SECRET_INVEST;
+  if (!token) return null;
+  return new Client({ channelAccessToken: token, channelSecret: secret || '' });
+}
 
 export async function GET() {
   return NextResponse.json({
@@ -563,7 +565,12 @@ async function handlePostbackEvent(event: WebhookEvent) {
         if (contract.drop_points?.line_id) {
           const dropPointNotification = createDropPointNotificationCard(contract);
           try {
-            await dropPointLineClient.pushMessage(contract.drop_points.line_id, dropPointNotification);
+            const dpClient = getDropPointLineClient();
+            if (!dpClient) {
+              console.warn('DropPoint LINE client not configured, skipping pushMessage');
+            } else {
+              await dpClient.pushMessage(contract.drop_points.line_id, dropPointNotification);
+            }
             console.log(`Sent notification to drop point ${contract.drop_points.line_id}`);
           } catch (dpError) {
             console.error('Error sending to drop point:', dpError);
@@ -655,7 +662,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
         // Notify investor
         if (contract.investors?.line_id) {
           try {
-            await investorLineClient.pushMessage(contract.investors.line_id, {
+            const invClient = getInvestorLineClient();
+            if (!invClient) throw new Error('Investor LINE client not configured');
+            await invClient.pushMessage(contract.investors.line_id, {
               type: 'text',
               text: `ผู้จำนำยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาจำนำเริ่มต้นเรียบร้อยแล้ว`
             });
@@ -800,7 +809,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
         // Notify investor to re-upload slip ONLY IF funding is still pending
         if (contract.funding_status === 'PENDING' && contract.investors?.line_id) {
           try {
-            await investorLineClient.pushMessage(contract.investors.line_id, {
+            const invClient = getInvestorLineClient();
+            if (!invClient) throw new Error('Investor LINE client not configured');
+            await invClient.pushMessage(contract.investors.line_id, {
               type: 'text',
               text: `ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานการโอนเงินใหม่อีกครั้ง`
             });
@@ -924,7 +935,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
         if (investor?.line_id) {
           const investorCard = createInvestorRedemptionCompleteCard(redemption, contract, netProfit);
           try {
-            await investorLineClient.pushMessage(investor.line_id, investorCard);
+            const invClient = getInvestorLineClient();
+            if (!invClient) throw new Error('Investor LINE client not configured');
+            await invClient.pushMessage(investor.line_id, investorCard);
           } catch (invError) {
             console.error('Error sending to investor:', invError);
           }
@@ -965,7 +978,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
           console.log(`Redemption ${redemptionId} already completed, skipping`);
           const netProfit = redemption.investor_net_profit || 0;
           try {
-            await investorLineClient.pushMessage(userId, {
+            const invClient = getInvestorLineClient();
+            if (!invClient) throw new Error('Investor LINE client not configured');
+            await invClient.pushMessage(userId, {
               type: 'text',
               text: `คุณได้ยืนยันรับเงินไปแล้ว\n\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`
             });
@@ -990,7 +1005,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
         const successMessage = `ยินดีด้วย! คุณได้รับกำไรจากสัญญานี้\n\n+${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly\n\nอย่าลืมเช็คข้อเสนอใหม่ๆ เพื่อโอกาสในการสร้างกำไรที่มากขึ้น\n\nPawnly - ลงทุนง่าย กำไรดี`;
 
         try {
-          await investorLineClient.pushMessage(userId, {
+          const invClient = getInvestorLineClient();
+          if (!invClient) throw new Error('Investor LINE client not configured');
+          await invClient.pushMessage(userId, {
             type: 'text',
             text: successMessage
           });
@@ -1009,7 +1026,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
       const redemptionId = params.get('redemptionId');
 
       try {
-        await investorLineClient.pushMessage(userId, {
+        const invClient = getInvestorLineClient();
+        if (!invClient) throw new Error('Investor LINE client not configured');
+        await invClient.pushMessage(userId, {
           type: 'text',
           text: `หากพบปัญหาเกี่ยวกับการรับเงิน\n\nกรุณาติดต่อฝ่าย Support:\nโทร: 062-6092941\n\nเวลาทำการ: 09:00 - 18:00 น.\nทุกวันจันทร์ - เสาร์`
         });

@@ -3,10 +3,12 @@ import { Client, WebhookEvent, FlexMessage, MessageEvent, TextEventMessage } fro
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 // Drop Point LINE OA credentials - Channel ID = 2008650799
-const dropPointLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || ''
-});
+function getDropPointLineClient() {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT;
+  const secret = process.env.LINE_CHANNEL_SECRET_DROPPOINT;
+  if (!token) return null;
+  return new Client({ channelAccessToken: token, channelSecret: secret || '' });
+}
 
 // Pawner LINE OA client
 const pawnerLineClient = new Client({
@@ -104,7 +106,9 @@ async function handleFollow(event: WebhookEvent & { type: 'follow' }) {
   } as FlexMessage;
 
   try {
-    await dropPointLineClient.pushMessage(userId, welcomeMessage);
+    const dpClient = getDropPointLineClient();
+    if (!dpClient) throw new Error('DropPoint LINE client not configured');
+    await dpClient.pushMessage(userId, welcomeMessage);
   } catch (error) {
     console.error('Error sending welcome message:', error);
   }
@@ -121,7 +125,9 @@ async function handleTextMessage(event: MessageEvent & { message: TextEventMessa
       type: 'text' as const,
       text: `กรุณาลงทะเบียนที่ลิงก์นี้:\nhttps://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT || '2008651088-Ajw69zLb'}`
     };
-    await dropPointLineClient.replyMessage(event.replyToken, registerMessage);
+    const dpClient = getDropPointLineClient();
+    if (!dpClient) throw new Error('DropPoint LINE client not configured');
+    await dpClient.replyMessage(event.replyToken, registerMessage);
   }
 }
 
@@ -145,7 +151,9 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
       text: `กรุณาตรวจสอบสินค้าที่ลิงก์นี้:\n${verifyLink}`
     };
 
-    await dropPointLineClient.replyMessage(event.replyToken, message);
+    const dpClient = getDropPointLineClient();
+    if (!dpClient) throw new Error('DropPoint LINE client not configured');
+    await dpClient.replyMessage(event.replyToken, message);
   }
 
   // ==================== REDEMPTION AMOUNT VERIFICATION ====================
@@ -269,9 +277,11 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       deliveryInstructions = `กรุณาเรียกบริการขนส่งไปส่งที่:\n\n${redemption.delivery_address_full}\n\nเบอร์ติดต่อ: ${redemption.delivery_contact_phone}\n${redemption.delivery_notes ? `หมายเหตุ: ${redemption.delivery_notes}` : ''}`;
     }
 
-    await dropPointLineClient.replyMessage(replyToken, {
+    const dpClient = getDropPointLineClient();
+    if (!dpClient) throw new Error('DropPoint LINE client not configured');
+    await dpClient.replyMessage(replyToken, {
       type: 'text',
-        text: `ยืนยันยอดถูกต้องเรียบร้อย\n\nการไถ่ถอนเสร็จสิ้น\n\n${deliveryInstructions}`
+      text: `ยืนยันยอดถูกต้องเรียบร้อย\n\nการไถ่ถอนเสร็จสิ้น\n\n${deliveryInstructions}`
     });
     }
 
@@ -332,7 +342,9 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
     }
 
     // Reply to drop point
-    await dropPointLineClient.replyMessage(replyToken, {
+    const dpClient = getDropPointLineClient();
+    if (!dpClient) throw new Error('DropPoint LINE client not configured');
+    await dpClient.replyMessage(replyToken, {
       type: 'text',
       text: `การไถ่ถอนถูกยกเลิกเนื่องจากยอดเงินไม่ถูกต้อง\n\nบันทึก log เรียบร้อยแล้ว`
     });
@@ -372,7 +384,9 @@ async function handlePawnerConfirmReceived(redemptionId: string, pawnerLineId: s
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawn360.vercel.app';
     const instructionsMessage = `ขอบคุณที่ยืนยันการได้รับสินค้า\n\nกรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน\n\n${baseUrl}/contracts/${redemption.contract_id}/redeem/receipt?redemptionId=${redemptionId}`;
 
-    await dropPointLineClient.replyMessage(replyToken, {
+    const dpClient = getDropPointLineClient();
+    if (!dpClient) throw new Error('DropPoint LINE client not configured');
+    await dpClient.replyMessage(replyToken, {
       type: 'text',
       text: instructionsMessage
     });
