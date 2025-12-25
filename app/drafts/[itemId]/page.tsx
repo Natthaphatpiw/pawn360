@@ -65,14 +65,11 @@ export default function DraftDetailPage() {
   const fetchDraft = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/items/draft?lineId=${profile?.userId}`);
-      if (response.data.success) {
-        const item = response.data.items.find((i: DraftItem) => i.item_id === itemId);
-        if (item) {
-          setDraft(item);
-        } else {
-          setError('ไม่พบบันทึกนี้');
-        }
+      const response = await axios.get(`/api/items/draft?lineId=${profile?.userId}&itemId=${itemId}`);
+      if (response.data.success && response.data.item) {
+        setDraft(response.data.item);
+      } else {
+        setError('ไม่พบบันทึกนี้');
       }
     } catch (error: any) {
       console.error('Error fetching draft:', error);

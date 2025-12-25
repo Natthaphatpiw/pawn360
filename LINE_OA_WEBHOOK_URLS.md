@@ -8,8 +8,8 @@
 ## 1. LINE OA: Pawner (ผู้จำนำ)
 
 ### Channel Information
-- **Channel Access Token**: `UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=`
-- **Channel Secret**: `REDACTED-ROTATED-SECRET`
+- **Channel Access Token**: `<REDACTED>`
+- **Channel Secret**: `<REDACTED>`
 
 ### LIFF IDs
 - Register: `2008216710-BEZ5XNyd`
@@ -32,7 +32,7 @@ https://pawn360.vercel.app/api/webhook
 ## 2. LINE OA: Investor (ผู้ลงทุน)
 
 ### Channel Information
-- **Channel Access Token**: `vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=`
+- **Channel Access Token**: `<REDACTED>`
 - **LINE Login Channel ID**: `2008641671`
 - **LINE Login Channel Secret**: `REDACTED-ROTATED-SECRET`
 - **LINE Channel ID**: `2008641309`
@@ -138,13 +138,13 @@ https://pawn360.vercel.app/api/webhook-droppoint
 
 ```env
 # Pawner LINE OA
-LINE_CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
-LINE_CHANNEL_SECRET=REDACTED-ROTATED-SECRET
+LINE_CHANNEL_ACCESS_TOKEN=<REDACTED>
+LINE_CHANNEL_SECRET=<REDACTED>
 
 # Investor LINE OA
-LINE_CHANNEL_ACCESS_TOKEN_INVEST=vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=
+LINE_CHANNEL_ACCESS_TOKEN_INVEST=<REDACTED>
 LINE_LOGIN_CHANNEL_ID_INVEST=2008641671
-LINE_LOGIN_CHANNEL_SECRET_INVEST=REDACTED-ROTATED-SECRET
+LINE_LOGIN_CHANNEL_SECRET_INVEST=<REDACTED>
 LINE_CHANNEL_ID_INVEST=2008641309
 
 # Drop Point LINE OA

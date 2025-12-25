@@ -66,7 +66,7 @@
    - เปิด MongoDB Compass
    - วาง Connection String:
      ```
-     mongodb+srv://natthapiw_db_user:afOJe2MrgMDsmm6k@cluster0.skadipr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+     mongodb+srv://<REDACTED>
      ```
    - คลิก "Connect"
 
@@ -108,7 +108,7 @@
 
 2. **เชื่อมต่อกับ MongoDB Atlas**
    ```bash
-   mongosh "mongodb+srv://natthapiw_db_user:afOJe2MrgMDsmm6k@cluster0.skadipr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+   mongosh "mongodb+srv://<REDACTED>"
    ```
 
 3. **สลับไปใช้ Database `pawn`**
@@ -176,7 +176,7 @@
 ```javascript
 const { MongoClient } = require('mongodb');
 
-const uri = process.env.MONGODB_URI || 'mongodb+srv://natthapiw_db_user:afOJe2MrgMDsmm6k@cluster0.skadipr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const uri = process.env.MONGODB_URI || 'mongodb+srv://<REDACTED>';
 const dbName = 'pawn';
 
 async function createIndexes() {

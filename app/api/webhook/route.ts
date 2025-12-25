@@ -7,14 +7,14 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 
 // Drop Point LINE OA client
 const dropPointLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || 'ji1K2C80ufvt/XsJZ5HiuP/vJxZaNy4th02C+/p6WdazVlWps/KdKTn3OHhH6B5fsJD5Exjio8tFjPPg80BIGS27t52Z2d9zm47/pOWxwqi3iJGOS7N8BDtJGH7Vsn78xnBOBSr3z4QAEn9n11WO5wdB04t89/1O/w1cDnyilFU=',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || '9f5767cfe8ecb9c068c6f25502eee416'
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || ''
 });
 
 // Investor LINE OA client
 const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c'
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
 export async function GET() {
@@ -698,6 +698,31 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
+        // Fetch payment record (if provided) to strengthen idempotency checks
+        let payment: any = null;
+        if (paymentId) {
+          const { data: paymentData } = await supabase
+            .from('payments')
+            .select('payment_id, payment_status, amount, paid_by_investor_id, confirmed_by_recipient, confirmed_at')
+            .eq('payment_id', paymentId)
+            .single();
+          payment = paymentData || null;
+        }
+
+        // Idempotency check - already rejected before
+        if (contract.payment_status === 'REJECTED') {
+          console.log(`Contract ${contractId} already marked as REJECTED, skipping duplicate reject_payment`);
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken && contract.pawners?.line_id) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(contract.pawners.line_id, {
+              type: 'text',
+              text: `คำขอ "ยังไม่ได้รับเงิน" ได้ถูกส่งไปแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nหากยังมีปัญหา กรุณาติดต่อ Support`
+            });
+          }
+          return;
+        }
+
         // IDEMPOTENCY CHECK - Check funding_status to prevent duplicate rejection actions
         // Only allow reject if funding is still PENDING or payment is still being processed
         if (contract.funding_status === 'FUNDED' || contract.funding_status === 'DISBURSED') {
@@ -715,9 +740,16 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
-        // Check payment status for idempotency
-        if (contract.payment_status === 'COMPLETED') {
-          console.log(`Contract ${contractId} payment already completed, rejection not allowed`);
+        // Check payment status for idempotency (contract-level + payment-level)
+        if (
+          contract.contract_status === 'CONFIRMED' ||
+          contract.payment_status === 'COMPLETED' ||
+          contract.payment_confirmed_at ||
+          payment?.payment_status === 'COMPLETED' ||
+          payment?.confirmed_by_recipient === true ||
+          payment?.confirmed_at
+        ) {
+          console.log(`Contract ${contractId} already completed/confirmed, rejection not allowed`);
 
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken && contract.pawners?.line_id) {
@@ -736,11 +768,10 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const { error: paymentError } = await supabase
             .from('payments')
             .update({
-              payment_status: 'FAILED',
-              updated_at: new Date().toISOString()
+              payment_status: 'FAILED'
             })
             .eq('payment_id', paymentId)
-            .eq('payment_status', 'PENDING'); // Only update if still pending
+            .in('payment_status', ['PENDING', 'PROCESSING']); // Only update if still pending/processing
 
           if (paymentError) {
             console.error('Error updating payment status:', paymentError);

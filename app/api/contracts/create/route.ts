@@ -4,8 +4,8 @@ import { uploadSignatureToS3 } from '@/lib/aws/s3';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c'
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
 export async function POST(request: NextRequest) {

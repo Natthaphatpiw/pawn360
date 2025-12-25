@@ -3,15 +3,16 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client } from '@line/bot-sdk';
 import crypto from 'crypto';
 
-const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c';
+const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET_INVEST;
 
 const lineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
-  channelSecret: CHANNEL_SECRET
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
+  channelSecret: CHANNEL_SECRET || ''
 });
 
 // Verify LINE signature
 function verifySignature(body: string, signature: string): boolean {
+  if (!CHANNEL_SECRET) return false;
   const hash = crypto
     .createHmac('SHA256', CHANNEL_SECRET)
     .update(body)
@@ -21,6 +22,11 @@ function verifySignature(body: string, signature: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || !CHANNEL_SECRET) {
+      console.error('LINE invest webhook is not configured (missing token/secret)');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+    }
+
     // Get signature from header
     const signature = request.headers.get('x-line-signature');
 

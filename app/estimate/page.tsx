@@ -11,7 +11,7 @@ import PawnSummary from './pawn-summary';
 import SuccessConfirmation from './success-confirmation';
 import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { APPLE_PRODUCTS } from '@/lib/data/apple-products';
 
 const sarabun = Sarabun({
@@ -58,6 +58,11 @@ interface FormData {
   model: string;
   capacity?: string;
   serialNo?: string;
+  color?: string;
+  screenSize?: string;
+  watchSize?: string;
+  watchConnectivity?: string;
+  connectivity?: string;
   accessories?: string;
   condition: number;
   defects: string;
@@ -124,6 +129,8 @@ type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_dis
 export default function EstimatePage() {
   const { profile, isLoading, error: liffError } = useLiff();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftId = searchParams.get('draftId');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -142,6 +149,11 @@ export default function EstimatePage() {
     model: '',
     capacity: '',
     serialNo: '',
+    color: '',
+    screenSize: '',
+    watchSize: '',
+    watchConnectivity: '',
+    connectivity: '',
     accessories: '',
     condition: 50,
     defects: '',
@@ -215,6 +227,68 @@ export default function EstimatePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.userId]);
+
+  // Load draft into estimate flow (continue from /drafts/[itemId])
+  useEffect(() => {
+    if (!profile?.userId || !draftId) return;
+
+    const loadDraft = async () => {
+      try {
+        const res = await axios.get(`/api/items/draft?lineId=${profile.userId}&itemId=${draftId}`);
+        if (!res.data?.success || !res.data?.item) return;
+
+        const d = res.data.item;
+        const accessoriesTokens = (d.accessories || '')
+          .split(',')
+          .map((t: string) => t.trim())
+          .filter(Boolean);
+
+        setFormData(prev => ({
+          ...prev,
+          itemType: d.item_type || '',
+          brand: d.brand || '',
+          model: d.model || '',
+          capacity: d.capacity || '',
+          serialNo: d.serial_number || '',
+          color: d.color || '',
+          screenSize: d.screen_size || '',
+          watchSize: d.watch_size || '',
+          watchConnectivity: d.watch_connectivity || '',
+          accessories: d.accessories || '',
+          defects: d.defects || '',
+          note: d.notes || '',
+          cpu: d.cpu || '',
+          ram: d.ram || '',
+          storage: d.storage || '',
+          gpu: d.gpu || '',
+          appleAccessories: {
+            box: accessoriesTokens.includes('box'),
+            adapter: accessoriesTokens.includes('adapter'),
+            cable: accessoriesTokens.includes('cable'),
+            receipt: accessoriesTokens.includes('receipt'),
+          },
+        }));
+
+        setUploadedImageUrls(d.image_urls || []);
+        setEstimateResult({
+          estimatedPrice: d.estimated_value || 0,
+          condition: d.item_condition || 0,
+          confidence: d.ai_confidence || 0,
+        });
+        setConditionResult({
+          score: typeof d.ai_condition_score === 'number' ? d.ai_condition_score : (d.item_condition || 0) / 100,
+          reason: d.ai_condition_reason || '',
+        });
+
+        // Continue to pawn summary right away (user can proceed to contract)
+        setCurrentStep('pawn_summary');
+      } catch (e) {
+        console.error('Error loading draft:', e);
+      }
+    };
+
+    loadDraft();
+  }, [profile?.userId, draftId]);
 
   // Fetch draft count
   const fetchDraftCount = async () => {
@@ -317,6 +391,11 @@ export default function EstimatePage() {
         model: '',
         capacity: '',
         serialNo: '',
+        color: '',
+        screenSize: '',
+        watchSize: '',
+        watchConnectivity: '',
+        connectivity: '',
         accessories: '',
         lenses: ['', ''],
         cpu: '',
@@ -396,18 +475,44 @@ export default function EstimatePage() {
 
   const handleSelectAppleProduct = (product: any) => {
     setSelectedAppleProduct(product);
+    const defaultColor = product?.colors?.[0] || '';
+    const defaultStorage = product?.storageOptions?.[0] || '';
+    const defaultConnectivity = product?.connectivity?.[0] || '';
+    const defaultScreenSize = product?.screenSize || '';
+    const defaultWatchSize = product?.category === 'Watch' && typeof product?.screenSize === 'string'
+      ? (product.screenSize.split('/')[0] || '').trim()
+      : '';
     setFormData(prev => ({
       ...prev,
       appleSearchTerm: `${product.name} ${product.specs}`,
-      model: `${product.name} ${product.specs}`,
+      model: product?.name || `${product.name} ${product.specs}`,
       brand: 'Apple',
+      // Apple extra fields
+      color: defaultColor,
+      capacity: product?.category === 'iPhone' || product?.category === 'iPad' ? defaultStorage : prev.capacity,
+      storage: product?.category === 'MacBook' ? defaultStorage : prev.storage,
+      screenSize: defaultScreenSize,
+      watchSize: product?.category === 'Watch' ? defaultWatchSize : prev.watchSize,
+      watchConnectivity: product?.category === 'Watch' ? defaultConnectivity : prev.watchConnectivity,
+      connectivity: product?.category === 'iPad' ? defaultConnectivity : prev.connectivity,
     }));
     setShowAppleResults(false);
   };
 
   const clearAppleSelection = () => {
     setSelectedAppleProduct(null);
-    setFormData(prev => ({ ...prev, appleSearchTerm: '', model: '', brand: '' }));
+    setFormData(prev => ({
+      ...prev,
+      appleSearchTerm: '',
+      model: '',
+      brand: '',
+      capacity: '',
+      color: '',
+      screenSize: '',
+      watchSize: '',
+      watchConnectivity: '',
+      connectivity: '',
+    }));
     setShowAppleResults(false);
   };
 
@@ -461,6 +566,21 @@ export default function EstimatePage() {
 
       case 'Apple':
         if (!selectedAppleProduct) return 'กรุณาเลือกรุ่นสินค้า Apple';
+        if (!formData.color) return 'กรุณาระบุสีของสินค้า Apple';
+        if (selectedAppleProduct?.category === 'iPhone' || selectedAppleProduct?.category === 'iPad') {
+          if (!formData.capacity) return 'กรุณาระบุความจุของสินค้า Apple';
+        }
+        if (selectedAppleProduct?.category === 'MacBook') {
+          if (!formData.storage) return 'กรุณาระบุพื้นที่จัดเก็บ (Storage) ของ MacBook';
+          if (!formData.ram) return 'กรุณาระบุ RAM ของ MacBook';
+        }
+        if (selectedAppleProduct?.category === 'iPad') {
+          if (!formData.connectivity) return 'กรุณาเลือกรูปแบบเครือข่าย (Wi‑Fi / Cellular) ของ iPad';
+        }
+        if (selectedAppleProduct?.category === 'Watch') {
+          if (!formData.watchSize) return 'กรุณาระบุขนาดตัวเรือนของ Apple Watch';
+          if (!formData.watchConnectivity) return 'กรุณาเลือกรุ่น (GPS / GPS + Cellular) ของ Apple Watch';
+        }
         // serialNo not required for estimation
         break;
 
@@ -514,48 +634,137 @@ export default function EstimatePage() {
     setError(null);
 
     try {
-      // Upload images first
+      const saveDraftWith = async (uploadedUrls: string[], cond: { score: number; reason?: string }, est: { estimatedPrice: number; confidence: number }) => {
+        const appleExtraLines = formData.itemType === 'Apple'
+          ? [
+              formData.color ? `Color: ${formData.color}` : null,
+              formData.capacity ? `Storage: ${formData.capacity}` : null,
+              formData.storage ? `Storage: ${formData.storage}` : null,
+              formData.ram ? `RAM: ${formData.ram}` : null,
+              formData.screenSize ? `Screen: ${formData.screenSize}` : null,
+              formData.connectivity ? `Connectivity: ${formData.connectivity}` : null,
+              formData.watchSize ? `Watch Size: ${formData.watchSize}` : null,
+              formData.watchConnectivity ? `Watch Connectivity: ${formData.watchConnectivity}` : null,
+            ].filter(Boolean).join('\n')
+          : '';
+
+        const draftData = {
+          lineId: profile.userId,
+          itemType: formData.itemType,
+          brand: formData.brand,
+          model: formData.model,
+          capacity: formData.capacity,
+          serialNo: formData.serialNo,
+          color: formData.color || null,
+          screenSize: formData.screenSize || null,
+          watchSize: formData.watchSize || null,
+          watchConnectivity: formData.watchConnectivity || null,
+          accessories: formData.itemType === 'Apple'
+            ? Object.entries(formData.appleAccessories || {})
+                .filter(([, value]) => value)
+                .map(([key]) => key)
+                .join(', ')
+            : formData.accessories,
+          defects: formData.defects,
+          notes: [formData.note, appleExtraLines].filter(Boolean).join('\n'),
+          imageUrls: uploadedUrls,
+          conditionResult: {
+            score: cond.score,
+            totalScore: Math.round(cond.score * 100),
+            reason: cond.reason || ''
+          },
+          estimateResult: {
+            estimatedPrice: est.estimatedPrice,
+            confidence: est.confidence
+          },
+          // Laptop specific
+          cpu: formData.cpu,
+          ram: formData.ram,
+          storage: formData.storage,
+          gpu: formData.gpu,
+          // Camera specific
+          lenses: formData.lenses?.filter(l => l.trim() !== '')
+        };
+
+        const response = await axios.post('/api/items/draft', draftData);
+        if (response.data.success) {
+          alert('บันทึกสำเร็จ! คุณสามารถกลับมาดำเนินการต่อได้ภายหลัง');
+          router.push('/drafts');
+        }
+      };
+
+      // If we already estimated in this session, save without re-running AI
+      if (estimateResult && conditionResult && uploadedImageUrls.length > 0) {
+        await saveDraftWith(uploadedImageUrls, { score: conditionResult.score, reason: conditionResult.reason }, { estimatedPrice: estimateResult.estimatedPrice, confidence: estimateResult.confidence });
+        return;
+      }
+
+      // Otherwise run the estimate pipeline, then save the draft with real estimated price
+      const compressedImages = await Promise.all(
+        images.map(async (file) => {
+          const options = {
+            maxSizeMB: 0.8,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+            fileType: 'image/jpeg' as const,
+          };
+          try {
+            return await imageCompression(file, options);
+          } catch {
+            return file;
+          }
+        })
+      );
+
+      const base64Images = await Promise.all(
+        compressedImages.map(async (file) => {
+          return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      const conditionResponse = await axios.post('/api/analyze-condition', { images: base64Images });
       const uploadedUrls = await uploadImages();
 
-      // Prepare draft data
-      const draftData = {
-        lineId: profile.userId,
+      const estimateData = {
         itemType: formData.itemType,
         brand: formData.brand,
         model: formData.model,
-        capacity: formData.capacity,
-        color: selectedAppleProduct?.colors?.[0] || null,
+        capacity: formData.itemType === 'Apple' && selectedAppleProduct?.category === 'MacBook'
+          ? formData.storage
+          : formData.capacity,
+        serialNo: formData.serialNo,
         accessories: formData.itemType === 'Apple'
           ? Object.entries(formData.appleAccessories || {})
               .filter(([, value]) => value)
               .map(([key]) => key)
               .join(', ')
           : formData.accessories,
+        condition: conditionResponse.data.score,
         defects: formData.defects,
-        notes: formData.note,
-        imageUrls: uploadedUrls,
-        conditionResult: {
-          score: formData.condition / 100,
-          totalScore: formData.condition
-        },
-        estimateResult: {
-          estimatedValue: 0 // Will be estimated when user continues
-        },
-        // Laptop specific
-        cpu: formData.cpu,
-        ram: formData.ram,
-        storage: formData.storage,
-        gpu: formData.gpu,
-        // Camera specific
-        lenses: formData.lenses?.filter(l => l.trim() !== '')
+        note: [formData.note, formData.itemType === 'Apple' ? `Color: ${formData.color}` : null].filter(Boolean).join('\n'),
+        images: uploadedUrls,
+        lineId: profile.userId,
+        ...(formData.itemType === 'กล้อง' && { lenses: formData.lenses?.filter(l => l.trim() !== '') }),
+        ...(formData.itemType === 'โน้ตบุค' && {
+          cpu: formData.cpu,
+          ram: formData.ram,
+          storage: formData.storage,
+          gpu: formData.gpu,
+        }),
       };
 
-      const response = await axios.post('/api/items/draft', draftData);
+      const estimateResponse = await axios.post('/api/estimate', estimateData);
 
-      if (response.data.success) {
-        alert('บันทึกสำเร็จ! คุณสามารถกลับมาดำเนินการต่อได้ภายหลัง');
-        router.push('/drafts');
-      }
+      await saveDraftWith(
+        uploadedUrls,
+        { score: conditionResponse.data.score, reason: conditionResponse.data.reason },
+        { estimatedPrice: estimateResponse.data.estimatedPrice, confidence: estimateResponse.data.confidence }
+      );
     } catch (error: any) {
       console.error('Error saving draft:', error);
       setError(error.response?.data?.error || 'ไม่สามารถบันทึกได้');
@@ -634,11 +843,25 @@ export default function EstimatePage() {
 
       // Step 3: Estimate price with AI
       console.log('🧠 Starting price estimation...');
+      const appleExtraLines = formData.itemType === 'Apple'
+        ? [
+            formData.color ? `Color: ${formData.color}` : null,
+            formData.capacity ? `Storage: ${formData.capacity}` : null,
+            formData.storage ? `Storage: ${formData.storage}` : null,
+            formData.ram ? `RAM: ${formData.ram}` : null,
+            formData.screenSize ? `Screen: ${formData.screenSize}` : null,
+            formData.connectivity ? `Connectivity: ${formData.connectivity}` : null,
+            formData.watchSize ? `Watch Size: ${formData.watchSize}` : null,
+            formData.watchConnectivity ? `Watch Connectivity: ${formData.watchConnectivity}` : null,
+          ].filter(Boolean).join('\n')
+        : '';
       const estimateData = {
         itemType: formData.itemType,
         brand: formData.brand,
         model: formData.model,
-        capacity: formData.capacity,
+        capacity: formData.itemType === 'Apple' && selectedAppleProduct?.category === 'MacBook'
+          ? formData.storage
+          : formData.capacity,
         serialNo: formData.serialNo,
         accessories: formData.itemType === 'Apple'
           ? Object.entries(formData.appleAccessories || {})
@@ -648,7 +871,7 @@ export default function EstimatePage() {
           : formData.accessories,
         condition: conditionResponse.data.score,
         defects: formData.defects,
-        note: formData.note,
+        note: [formData.note, appleExtraLines].filter(Boolean).join('\n'),
         images: uploadedUrls,
         lineId: profile.userId,
         // Additional fields based on item type
@@ -784,7 +1007,7 @@ export default function EstimatePage() {
                 className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium text-gray-700"
               >
                 <FileText className="w-4 h-4" />
-                <span>บันทึก</span>
+                <span>ดูบันทึกชั่วคราว</span>
                 {draftCount > 0 && (
                   <span className="bg-orange-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
                     {draftCount}
@@ -930,6 +1153,36 @@ export default function EstimatePage() {
                         ) : (
                           <div className="p-4 text-center text-gray-500 text-sm">
                             ไม่พบสินค้ารุ่นนี้
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAppleProduct({
+                                id: -1,
+                                name: formData.appleSearchTerm || 'Apple (Manual)',
+                                specs: '',
+                                category: (() => {
+                                  const t = (formData.appleSearchTerm || '').toLowerCase();
+                                  if (t.includes('mac') || t.includes('macbook')) return 'MacBook';
+                                  if (t.includes('ipad')) return 'iPad';
+                                  if (t.includes('watch')) return 'Watch';
+                                  if (t.includes('airpods') || t.includes('airpod') || t.includes('air pods') || t.includes('airpods max')) return 'Audio';
+                                  return 'iPhone';
+                                })(),
+                                type: (() => {
+                                  const t = (formData.appleSearchTerm || '').toLowerCase();
+                                  if (t.includes('mac') || t.includes('macbook')) return 'Laptop';
+                                  if (t.includes('ipad')) return 'Tablet';
+                                  if (t.includes('watch')) return 'Smartwatch';
+                                  if (t.includes('airpods') || t.includes('airpod') || t.includes('air pods') || t.includes('airpods max')) return 'Audio';
+                                  return 'Mobile';
+                                })(),
+                                year: new Date().getFullYear(),
+                                colors: [],
+                                storageOptions: [],
+                              })}
+                              className="mt-3 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium"
+                            >
+                              ใช้ชื่อรุ่นที่พิมพ์ (กรอกเอง)
+                            </button>
                           </div>
                         )}
                       </div>
@@ -948,6 +1201,186 @@ export default function EstimatePage() {
                             สเปค: {selectedAppleProduct.specs}
                           </p>
                         </div>
+                      </div>
+                    )}
+
+                    {/* Apple extra fields */}
+                    {selectedAppleProduct && (
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <FormLabel thai="สี" eng="Color" required />
+                          <input
+                            type="text"
+                            name="color"
+                            value={formData.color}
+                            onChange={handleInputChange}
+                            placeholder="เช่น Black, Silver, Starlight..."
+                            list="apple-color-options"
+                            className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                          />
+                          {Array.isArray(selectedAppleProduct.colors) && selectedAppleProduct.colors.length > 0 && (
+                            <datalist id="apple-color-options">
+                              {selectedAppleProduct.colors.map((c: string) => (
+                                <option key={c} value={c} />
+                              ))}
+                            </datalist>
+                          )}
+                        </div>
+
+                        {(selectedAppleProduct.category === 'iPhone' || selectedAppleProduct.category === 'iPad') && (
+                          <div>
+                            <FormLabel thai="ความจุ" eng="Storage/Capacity" required />
+                            <input
+                              type="text"
+                              name="capacity"
+                              value={formData.capacity}
+                              onChange={handleInputChange}
+                              placeholder="เช่น 128GB, 256GB, 1TB"
+                              list="apple-capacity-options"
+                              className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                            />
+                            {Array.isArray(selectedAppleProduct.storageOptions) && selectedAppleProduct.storageOptions.length > 0 && (
+                              <datalist id="apple-capacity-options">
+                                {selectedAppleProduct.storageOptions.map((s: string) => (
+                                  <option key={s} value={s} />
+                                ))}
+                              </datalist>
+                            )}
+                          </div>
+                        )}
+
+                        {selectedAppleProduct.category === 'MacBook' && (
+                          <>
+                            <div>
+                              <FormLabel thai="ขนาดหน้าจอ" eng="Screen size" />
+                              <input
+                                type="text"
+                                name="screenSize"
+                                value={formData.screenSize}
+                                onChange={handleInputChange}
+                                placeholder='เช่น 13.6", 14.2", 16.2"'
+                                list="apple-screen-options"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                              />
+                              {selectedAppleProduct.screenSize && (
+                                <datalist id="apple-screen-options">
+                                  <option value={selectedAppleProduct.screenSize} />
+                                </datalist>
+                              )}
+                            </div>
+                            <div>
+                              <FormLabel thai="พื้นที่จัดเก็บ" eng="Storage" required />
+                              <input
+                                type="text"
+                                name="storage"
+                                value={formData.storage}
+                                onChange={handleInputChange}
+                                placeholder="เช่น 256GB, 512GB, 1TB"
+                                list="apple-storage-options"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                              />
+                              {Array.isArray(selectedAppleProduct.storageOptions) && selectedAppleProduct.storageOptions.length > 0 && (
+                                <datalist id="apple-storage-options">
+                                  {selectedAppleProduct.storageOptions.map((s: string) => (
+                                    <option key={s} value={s} />
+                                  ))}
+                                </datalist>
+                              )}
+                            </div>
+                            <div>
+                              <FormLabel thai="แรม" eng="RAM" required />
+                              <input
+                                type="text"
+                                name="ram"
+                                value={formData.ram}
+                                onChange={handleInputChange}
+                                placeholder="เช่น 8GB, 16GB, 32GB"
+                                list="apple-ram-options"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                              />
+                              {selectedAppleProduct.ram && (
+                                <datalist id="apple-ram-options">
+                                  {String(selectedAppleProduct.ram)
+                                    .split('/')
+                                    .map((r: string) => r.trim())
+                                    .filter(Boolean)
+                                    .map((r: string) => (
+                                      <option key={r} value={r} />
+                                    ))}
+                                </datalist>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {selectedAppleProduct.category === 'iPad' && (
+                          <div>
+                            <FormLabel thai="รุ่นเครือข่าย" eng="Connectivity" required />
+                            <input
+                              type="text"
+                              name="connectivity"
+                              value={formData.connectivity}
+                              onChange={handleInputChange}
+                              placeholder="เช่น Wi‑Fi, Wi‑Fi + Cellular"
+                              list="apple-connectivity-options"
+                              className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                            />
+                            {Array.isArray(selectedAppleProduct.connectivity) && selectedAppleProduct.connectivity.length > 0 && (
+                              <datalist id="apple-connectivity-options">
+                                {selectedAppleProduct.connectivity.map((c: string) => (
+                                  <option key={c} value={c} />
+                                ))}
+                              </datalist>
+                            )}
+                          </div>
+                        )}
+
+                        {selectedAppleProduct.category === 'Watch' && (
+                          <>
+                            <div>
+                              <FormLabel thai="ขนาดตัวเรือน" eng="Watch size" required />
+                              <input
+                                type="text"
+                                name="watchSize"
+                                value={formData.watchSize}
+                                onChange={handleInputChange}
+                                placeholder="เช่น 41mm, 45mm, 49mm"
+                                list="apple-watch-size-options"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                              />
+                              {selectedAppleProduct.screenSize && (
+                                <datalist id="apple-watch-size-options">
+                                  {String(selectedAppleProduct.screenSize)
+                                    .split('/')
+                                    .map((s: string) => s.trim())
+                                    .filter(Boolean)
+                                    .map((s: string) => (
+                                      <option key={s} value={s} />
+                                    ))}
+                                </datalist>
+                              )}
+                            </div>
+                            <div>
+                              <FormLabel thai="รุ่น" eng="GPS / Cellular" required />
+                              <input
+                                type="text"
+                                name="watchConnectivity"
+                                value={formData.watchConnectivity}
+                                onChange={handleInputChange}
+                                placeholder="เช่น GPS, GPS + Cellular"
+                                list="apple-watch-connectivity-options"
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
+                              />
+                              {Array.isArray(selectedAppleProduct.connectivity) && selectedAppleProduct.connectivity.length > 0 && (
+                                <datalist id="apple-watch-connectivity-options">
+                                  {selectedAppleProduct.connectivity.map((c: string) => (
+                                    <option key={c} value={c} />
+                                  ))}
+                                </datalist>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1377,9 +1810,17 @@ export default function EstimatePage() {
               brand: formData.brand,
               model: formData.model,
               capacity: formData.capacity,
+              color: formData.color,
+              screenSize: formData.screenSize,
+              watchSize: formData.watchSize,
+              watchConnectivity: formData.watchConnectivity,
+              serialNo: formData.serialNo,
               condition: formData.condition,
+              aiConditionScore: conditionResult?.score,
+              aiConditionReason: conditionResult?.reason,
               images: uploadedImageUrls,
               estimatedPrice: estimateResult?.estimatedPrice || 0,
+              aiConfidence: estimateResult?.confidence,
               appleAccessories: formData.appleAccessories
                 ? Object.entries(formData.appleAccessories)
                     .filter(([, value]) => value)
@@ -1392,6 +1833,8 @@ export default function EstimatePage() {
               lenses: formData.lenses
                 ?.filter(l => l.trim() !== '')
                 .map(l => ({ brand: '', model: l })),
+              defects: formData.defects,
+              notes: formData.note,
             }}
             lineId={profile.userId}
             onBack={() => setCurrentStep('form')}

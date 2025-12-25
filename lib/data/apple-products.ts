@@ -25,6 +25,64 @@ export interface AppleProduct {
 export const APPLE_PRODUCTS: AppleProduct[] = [
   // ==================== IPHONE (2015-2025) ====================
 
+  // iPhone 16 Series (2024)
+  {
+    id: 1000,
+    name: 'iPhone 16 Pro Max',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2024,
+    specs: '256GB Titanium',
+    colors: ['Natural Titanium', 'Black Titanium', 'White Titanium', 'Desert Titanium'],
+    storageOptions: ['256GB', '512GB', '1TB'],
+    screenSize: '6.9"',
+    chip: 'A18 Pro',
+    originalPrice: 52900,
+    currentMarketPrice: 0
+  },
+  {
+    id: 1001,
+    name: 'iPhone 16 Pro',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2024,
+    specs: '128GB Titanium',
+    colors: ['Natural Titanium', 'Black Titanium', 'White Titanium', 'Desert Titanium'],
+    storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+    screenSize: '6.3"',
+    chip: 'A18 Pro',
+    originalPrice: 42900,
+    currentMarketPrice: 0
+  },
+  {
+    id: 1002,
+    name: 'iPhone 16 Plus',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2024,
+    specs: '128GB',
+    colors: ['Black', 'White', 'Pink', 'Teal', 'Ultramarine'],
+    storageOptions: ['128GB', '256GB', '512GB'],
+    screenSize: '6.7"',
+    chip: 'A18',
+    originalPrice: 35900,
+    currentMarketPrice: 0
+  },
+  {
+    id: 1003,
+    name: 'iPhone 16',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2024,
+    specs: '128GB',
+    colors: ['Black', 'White', 'Pink', 'Teal', 'Ultramarine'],
+    storageOptions: ['128GB', '256GB', '512GB'],
+    screenSize: '6.1"',
+    chip: 'A18',
+    originalPrice: 29900,
+    currentMarketPrice: 0
+  },
+
   // iPhone 15 Series (2023)
   {
     id: 1,
