@@ -43,8 +43,7 @@ export default function PawnTicketPage() {
 
       // Capture the ticket as canvas
       const canvas = await html2canvas(ticketRef.current, {
-        scale: 2,
-        backgroundColor: '#F2F2F2',
+        background: '#F2F2F2',
         logging: false,
         useCORS: true
       });
@@ -95,8 +94,7 @@ export default function PawnTicketPage() {
 
     try {
       const canvas = await html2canvas(ticketRef.current, {
-        scale: 2,
-        backgroundColor: '#F2F2F2',
+        background: '#F2F2F2',
         logging: false,
         useCORS: true
       });

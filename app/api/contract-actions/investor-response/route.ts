@@ -4,10 +4,10 @@ import { logContractAction } from '@/lib/services/slip-verification';
 import { Client } from '@line/bot-sdk';
 
 // Pawner LINE OA client
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+const pawnerLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN ? new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
+}) : null;
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       );
 
       // Notify pawner
-      if (pawner?.line_id) {
+      if (pawner?.line_id && pawnerLineClient) {
         try {
           await pawnerLineClient.pushMessage(pawner.line_id, {
             type: 'text',

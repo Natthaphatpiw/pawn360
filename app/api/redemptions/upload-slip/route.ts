@@ -3,10 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // Drop Point LINE OA client
-const dropPointLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || '',
+const dropPointLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT ? new Client({
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT,
   channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || ''
-});
+}) : null;
 
 export async function POST(request: NextRequest) {
   try {
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     // Send notification to Drop Point
     const dropPointLineId = redemption.contract?.drop_points?.line_id;
-    if (dropPointLineId) {
+    if (dropPointLineId && dropPointLineClient) {
       try {
         const notificationCard = createDropPointRedemptionCard(redemption, slipUrl);
         await dropPointLineClient.pushMessage(dropPointLineId, notificationCard);

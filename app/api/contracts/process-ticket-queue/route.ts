@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
           })
           .eq('id', item.id);
 
-        const contract = item.contracts;
+        const contract = item.contracts[0];
 
         // Skip if ticket already generated
         if (contract.contract_file_url) {
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
         // Send LINE messages (if LINE tokens are configured)
         const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
 
-        if (lineToken && contract.pawners?.line_id) {
+        if (lineToken && contract.pawners?.[0]?.line_id) {
           // Send message to pawner
           try {
             await fetch('https://api.line.me/v2/bot/message/push', {
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
                 'Authorization': `Bearer ${lineToken}`
               },
               body: JSON.stringify({
-                to: contract.pawners.line_id,
+                to: contract.pawners[0].line_id,
                 messages: [
                   {
                     type: 'text',
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (lineToken && contract.investors?.line_id) {
+        if (lineToken && contract.investors?.[0]?.line_id) {
           // Send message to investor
           try {
             await fetch('https://api.line.me/v2/bot/message/push', {
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
                 'Authorization': `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST}`
               },
               body: JSON.stringify({
-                to: contract.investors.line_id,
+                to: contract.investors[0].line_id,
                 messages: [
                   {
                     type: 'text',

@@ -42,8 +42,7 @@ export default function InvestorPawnTicketPage() {
       setSaving(true);
 
       const canvas = await html2canvas(ticketRef.current, {
-        scale: 2,
-        backgroundColor: '#F5F7FA',
+        background: '#F5F7FA',
         logging: false,
         useCORS: true
       });
@@ -94,8 +93,7 @@ export default function InvestorPawnTicketPage() {
 
     try {
       const canvas = await html2canvas(ticketRef.current, {
-        scale: 2,
-        backgroundColor: '#F5F7FA',
+        background: '#F5F7FA',
         logging: false,
         useCORS: true
       });
