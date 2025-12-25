@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+}) : null;
 
 interface EstimateRequest {
   itemType: string;
@@ -43,6 +43,17 @@ interface NormalizedData {
 
 // Agent 1: Normalize input data และประเมิน price range
 async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
+  if (!openai) {
+    // Return fallback values if OpenAI is not available
+    return {
+      productName: `${input.brand} ${input.model}`.trim(),
+      priceRange: {
+        min: 100,
+        max: 10000
+      }
+    };
+  }
+
   const prompt = `คุณเป็นผู้เชี่ยวชาญด้านการประเมินราคาสินค้ามือสองในประเทศไทย วิเคราะห์ข้อมูลสินค้าต่อไปนี้และทำ 2 สิ่ง:
 
 1. **Normalize ชื่อสินค้า**: สร้างชื่อสินค้าที่สะอาด กระชับ เหมาะสำหรับค้นหาราคาตลาด
@@ -107,6 +118,11 @@ async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
 
 // Agent 2: Get market price using simple prompt engineering - ใช้เฉพาะชื่อสินค้า
 async function getMarketPrice(productName: string, priceRange: { min: number; max: number }): Promise<number> {
+  if (!openai) {
+    // Return average of price range if OpenAI is not available
+    return Math.round((priceRange.min + priceRange.max) / 2);
+  }
+
   const prompt = `คุณเป็นผู้เชี่ยวชาญประเมินราคาสินค้ามือสองในประเทศไทย มีประสบการณ์มากกว่า 15 ปี
 
 **งาน**: หาราคากลาง (median price) ของสินค้ามือสองนี้ในตลาดไทยปัจจุบัน

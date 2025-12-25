@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+}) : null;
 
 // Agent 3: Analyze condition from images (moved from estimate route)
 async function analyzeConditionFromImages(images: string[]): Promise<{
@@ -40,6 +40,25 @@ async function analyzeConditionFromImages(images: string[]): Promise<{
   }
 
   try {
+    if (!openai) {
+      // Return default values if OpenAI is not available
+      return {
+        score: 0.7,
+        totalScore: 70,
+        grade: 'C',
+        reason: 'ไม่สามารถวิเคราะห์จากรูปภาพได้ ใช้ค่าประเมินเบื้องต้น',
+        detailedBreakdown: {
+          screen: { score: 25, maxScore: 35, description: 'ไม่สามารถประเมินได้' },
+          body: { score: 21, maxScore: 30, description: 'ไม่สามารถประเมินได้' },
+          buttons: { score: 14, maxScore: 20, description: 'ไม่สามารถประเมินได้' },
+          camera: { score: 7, maxScore: 10, description: 'ไม่สามารถประเมินได้' },
+          overall: { score: 3, maxScore: 5, description: 'ไม่สามารถประเมินได้' }
+        },
+        recommendation: 'OpenAI API ไม่พร้อมใช้งาน',
+        imageQuality: 'ไม่สามารถวิเคราะห์ได้'
+      };
+    }
+
     // Use OpenAI Vision API to analyze condition from base64 images
     const prompt = `# Phone Condition Assessment Prompt
 

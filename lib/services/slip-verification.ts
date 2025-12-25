@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
-const openai = new OpenAI({
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 export interface SlipVerificationResult {
   success: boolean;
@@ -22,6 +22,18 @@ export async function verifyPaymentSlip(
   tolerance: number = 0 // ยอมรับความคลาดเคลื่อน (บาท)
 ): Promise<SlipVerificationResult> {
   try {
+    if (!openai) {
+      return {
+        success: false,
+        result: 'UNREADABLE',
+        detectedAmount: null,
+        expectedAmount,
+        difference: null,
+        confidenceScore: 0,
+        message: 'OpenAI API key not configured',
+        rawResponse: { error: 'OPENAI_API_KEY not set' },
+      };
+    }
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       messages: [
