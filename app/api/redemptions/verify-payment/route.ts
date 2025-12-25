@@ -4,8 +4,8 @@ import { Client, TextMessage } from '@line/bot-sdk';
 
 // Pawner LINE OA client
 const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || 'UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || '9469acf57221ec18b48b04f82096cb2b'
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
 });
 
 export async function POST(request: NextRequest) {

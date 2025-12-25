@@ -1,22 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, max-age=0',
+  Pragma: 'no-cache',
+};
+
 // GET - Fetch draft items for a LINE user
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const lineId = searchParams.get('lineId');
+    const itemId = searchParams.get('itemId');
 
     if (!lineId) {
       return NextResponse.json(
         { error: 'LINE ID is required' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     const supabase = supabaseAdmin();
 
-    // Fetch draft items for this LINE user
+    // Fetch a single draft item (optional)
+    if (itemId) {
+      const { data: item, error } = await supabase
+        .from('items')
+        .select('*')
+        .eq('line_id', lineId)
+        .eq('item_status', 'DRAFT')
+        .eq('item_id', itemId)
+        .single();
+
+      if (error) {
+        // Not found
+        return NextResponse.json(
+          { success: false, error: 'Draft not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      return NextResponse.json(
+        { success: true, item },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Fetch all draft items for this LINE user
     const { data: items, error } = await supabase
       .from('items')
       .select('*')
@@ -24,20 +57,21 @@ export async function GET(request: NextRequest) {
       .eq('item_status', 'DRAFT')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    return NextResponse.json({
-      success: true,
-      items: items || []
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        items: items || [],
+      },
+      { headers: NO_STORE_HEADERS }
+    );
 
   } catch (error: any) {
     console.error('Error fetching draft items:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -52,6 +86,11 @@ export async function POST(request: NextRequest) {
       brand,
       model,
       capacity,
+      color,
+      serialNo,
+      screenSize,
+      watchSize,
+      watchConnectivity,
       accessories,
       defects,
       notes,
@@ -70,14 +109,14 @@ export async function POST(request: NextRequest) {
     if (!lineId) {
       return NextResponse.json(
         { error: 'LINE ID is required' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     if (!itemType || !brand || !model) {
       return NextResponse.json(
         { error: 'Item type, brand, and model are required' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -90,6 +129,30 @@ export async function POST(request: NextRequest) {
       .eq('line_id', lineId)
       .single();
 
+    const totalScore =
+      typeof conditionResult?.totalScore === 'number'
+        ? conditionResult.totalScore
+        : typeof conditionResult?.score === 'number'
+          ? Math.round(conditionResult.score * 100)
+          : null;
+
+    const aiScore =
+      typeof conditionResult?.score === 'number'
+        ? conditionResult.score
+        : typeof conditionResult?.totalScore === 'number'
+          ? conditionResult.totalScore / 100
+          : null;
+
+    const estimatedValue =
+      typeof estimateResult?.estimatedValue === 'number'
+        ? estimateResult.estimatedValue
+        : typeof estimateResult?.estimatedPrice === 'number'
+          ? estimateResult.estimatedPrice
+          : 0;
+
+    const aiConfidence =
+      typeof estimateResult?.confidence === 'number' ? estimateResult.confidence : null;
+
     // Insert draft item
     const { data: item, error } = await supabase
       .from('items')
@@ -100,15 +163,20 @@ export async function POST(request: NextRequest) {
         brand,
         model,
         capacity: capacity || null,
+        color: color || null,
+        serial_number: serialNo || null,
+        screen_size: screenSize || null,
+        watch_size: watchSize || null,
+        watch_connectivity: watchConnectivity || null,
         accessories: accessories || null,
         defects: defects || null,
         notes: notes || null,
         image_urls: imageUrls || [],
-        item_condition: conditionResult?.totalScore || null,
-        ai_condition_score: conditionResult?.score || null,
+        item_condition: totalScore,
+        ai_condition_score: aiScore,
         ai_condition_reason: conditionResult?.reason || null,
-        estimated_value: estimateResult?.estimatedValue || 0,
-        ai_confidence: estimateResult?.confidence || null,
+        estimated_value: estimatedValue,
+        ai_confidence: aiConfidence,
         item_status: 'DRAFT',
         // Laptop specific
         cpu: cpu || null,
@@ -137,16 +205,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      item
-    });
+    return NextResponse.json(
+      { success: true, item },
+      { headers: NO_STORE_HEADERS }
+    );
 
   } catch (error: any) {
     console.error('Error saving draft item:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -161,7 +229,7 @@ export async function DELETE(request: NextRequest) {
     if (!itemId || !lineId) {
       return NextResponse.json(
         { error: 'Item ID and LINE ID are required' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -179,16 +247,16 @@ export async function DELETE(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Draft item deleted'
-    });
+    return NextResponse.json(
+      { success: true, message: 'Draft item deleted' },
+      { headers: NO_STORE_HEADERS }
+    );
 
   } catch (error: any) {
     console.error('Error deleting draft item:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

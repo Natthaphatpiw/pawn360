@@ -12,12 +12,12 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_REGION=ap-southeast-2
 
 # MongoDB Configuration
-MONGODB_URI=mongodb+srv://natthapiw_db_user:afOJe2MrgMDsmm6k@cluster0.skadipr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+MONGODB_URI=<REDACTED>
 MONGODB_DB=pawn
 
 # LINE Channel Configuration (ตามที่ตั้งค่าใน Vercel)
-LINE_CHANNEL_ACCESS_TOKEN=UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=
-LINE_CHANNEL_SECRET=75202717b1787be1869ecb8ed12abef7
+LINE_CHANNEL_ACCESS_TOKEN=<REDACTED>
+LINE_CHANNEL_SECRET=<REDACTED>
 
 # LINE LIFF Configuration
 # สำหรับ estimate page

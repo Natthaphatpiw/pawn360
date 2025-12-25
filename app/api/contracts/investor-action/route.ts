@@ -3,13 +3,13 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || 'vkhbKJj/xMWX9RWJUPOfr6cfNa5N+jJhp7AX1vpK4poDpkCF4dy/3cPGy4+rmATi0KE9tD/ewmtYLd7nv+0651xY5L7Guy8LGvL1vhc9yuXWFy9wuGPvDQFGfWeva5WFPv2go4BrpP1j+ux63XjsEwdB04t89/1O/w1cDnyilFU=',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || 'ed704b15d57c8b84f09ebc3492f9339c'
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
 const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || 'UeHWta6KPHXAUZCZFxJsgpVpF04yulZP+z3w7F/PO4Uzd2U0Rxl1VhuC4wSFIcPGZGNeYXkr6xSq1Ziz36RIgaM0O8xSk8+gJcYlmPBa1ONycwtKnkXk3UTohvHUgTvvA58l/1G9SiPerwDSZs3rewdB04t89/1O/w1cDnyilFU=',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || '8937117af202d6550b7ab212fdc54291'
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
 });
 
 export async function POST(request: NextRequest) {

@@ -16,7 +16,7 @@ npm install
 
 ```env
 # MongoDB Configuration
-MONGODB_URI=mongodb+srv://natthapiw_db_user:afOJe2MrgMDsmm6k@cluster0.skadipr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+MONGODB_URI=<REDACTED>
 MONGODB_DB=pawn
 
 # LINE Configuration
