@@ -177,15 +177,35 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     try {
       const draftData = {
         lineId,
-        itemData,
-        loanAmount: loanAmountNum,
-        deliveryMethod,
-        branchId: selectedBranchId,
-        duration: parseInt(duration),
-        status: 'draft',
+        itemType: itemData.itemType,
+        brand: itemData.brand,
+        model: itemData.model,
+        capacity: itemData.capacity,
+        color: itemData.color,
+        serialNo: itemData.serialNo,
+        screenSize: itemData.screenSize,
+        watchSize: itemData.watchSize,
+        watchConnectivity: itemData.watchConnectivity,
+        accessories: itemData.appleAccessories?.join(', ') || null,
+        defects: itemData.defects,
+        notes: itemData.notes,
+        imageUrls: itemData.images,
+        conditionResult: {
+          score: itemData.aiConditionScore,
+          reason: itemData.aiConditionReason,
+        },
+        estimateResult: {
+          estimatedPrice: itemData.estimatedPrice,
+          confidence: itemData.aiConfidence,
+        },
+        cpu: itemData.processor,
+        ram: itemData.ram,
+        storage: itemData.storage,
+        gpu: itemData.gpu,
+        lenses: itemData.lenses?.map(lens => lens.model),
       };
 
-      await axios.post('/api/loan-request/save-draft', draftData);
+      await axios.post('/api/items/draft', draftData);
       alert('บันทึกข้อมูลเรียบร้อยแล้ว');
     } catch (error) {
       console.error('Error saving draft:', error);

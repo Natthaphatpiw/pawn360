@@ -12,36 +12,39 @@ export async function POST(request: NextRequest) {
     const {
       lineId,
       itemData,
-      loanAmount,
-      deliveryMethod,
       branchId,
-      duration,
     } = body;
 
-    // Get customer_id from lineId
+    // Get customer_id from lineId (optional for drafts)
     const { data: pawnerData, error: pawnerError } = await supabase
       .from('pawners')
       .select('customer_id')
       .eq('line_id', lineId)
-      .single();
+      .maybeSingle();
 
-    if (pawnerError || !pawnerData) {
+    if (pawnerError) {
+      console.error('Error fetching pawner for draft:', pawnerError);
       return NextResponse.json(
-        { error: 'Pawner not found' },
-        { status: 404 }
+        { error: 'Failed to verify pawner' },
+        { status: 500 }
       );
     }
 
-    const customerId = pawnerData.customer_id;
+    const customerId = pawnerData?.customer_id || null;
 
     // Create item record with draft status
     const itemRecord = {
       customer_id: customerId,
+      line_id: lineId,
       item_type: itemData.itemType,
       brand: itemData.brand,
       model: itemData.model,
       capacity: itemData.capacity || null,
-      serial_number: itemData.serialNumber || null,
+      serial_number: itemData.serialNumber || itemData.serialNo || null,
+      color: itemData.color || null,
+      screen_size: itemData.screenSize || null,
+      watch_size: itemData.watchSize || null,
+      watch_connectivity: itemData.watchConnectivity || null,
       cpu: itemData.processor || null,
       ram: itemData.ram || null,
       storage: itemData.storage || null,
@@ -55,7 +58,8 @@ export async function POST(request: NextRequest) {
       defects: itemData.defects || null,
       notes: itemData.notes || null,
       image_urls: itemData.images,
-      item_status: 'PENDING', // Changed from DRAFT to PENDING
+      item_status: 'DRAFT',
+      drop_point_id: branchId || null,
     };
 
     const { data: item, error: itemError } = await supabase
@@ -72,34 +76,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create draft loan request
-    const loanRequestRecord = {
-      customer_id: customerId,
-      item_id: item.item_id,
-      drop_point_id: branchId || null,
-      requested_loan_amount: loanAmount || 0,
-      loan_duration_months: duration || 1,
-      delivery_method: deliveryMethod || 'walk-in',
-      request_status: 'DRAFT',
-    };
-
-    const { data: loanRequest, error: loanRequestError } = await supabase
-      .from('loan_requests')
-      .insert(loanRequestRecord)
-      .select()
-      .single();
-
-    if (loanRequestError || !loanRequest) {
-      console.error('Error creating loan request draft:', loanRequestError);
-      return NextResponse.json(
-        { error: 'Failed to save draft' },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
-      loanRequestId: loanRequest.loan_request_id,
       itemId: item.item_id,
       message: 'Draft saved successfully',
     });
