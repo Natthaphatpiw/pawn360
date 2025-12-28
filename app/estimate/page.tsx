@@ -1833,7 +1833,6 @@ function EstimatePageInner() {
                   setUploadedImageUrls([]);
                   setEstimateResult(null);
                   setConditionResult(null);
-                  setSelectedAppleProduct(null);
                   setSelectedStore('');
                   setError(null);
                 }}
