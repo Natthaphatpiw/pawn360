@@ -408,6 +408,42 @@ function EstimatePageInner() {
   const [itemId, setItemId] = useState<string>('');
   const [contractId, setContractId] = useState<string>('');
 
+  const resetEstimateForm = () => {
+    setFormData({
+      itemType: '',
+      brand: '',
+      model: '',
+      capacity: '',
+      serialNo: '',
+      color: '',
+      screenSize: '',
+      watchSize: '',
+      watchConnectivity: '',
+      connectivity: '',
+      accessories: '',
+      condition: 50,
+      defects: '',
+      note: '',
+      lenses: ['', ''],
+      appleCategory: '',
+      appleSpecs: '',
+      appleAccessories: {
+        box: false,
+        adapter: false,
+        cable: false,
+        receipt: false,
+      },
+    });
+    setImages([]);
+    setImageUrls([]);
+    setUploadedImageUrls([]);
+    setEstimateResult(null);
+    setConditionResult(null);
+    setError(null);
+    setIsAnalyzing(false);
+    setIsEstimating(false);
+  };
+
   // Check customer exists
   const checkCustomerExists = async () => {
     if (!profile?.userId) return;
@@ -1626,7 +1662,10 @@ function EstimatePageInner() {
               ].filter(Boolean).join('\n'),
             }}
             lineId={profile.userId}
-            onBack={() => setCurrentStep('form')}
+            onBack={() => {
+              resetEstimateForm();
+              setCurrentStep('form');
+            }}
             onSuccess={(reqId, itmId) => {
               console.log('🎉 onSuccess called with:', reqId, itmId);
 
