@@ -495,6 +495,7 @@ function EstimatePageInner() {
           watchSize: d.watch_size || '',
           watchConnectivity: d.watch_connectivity || '',
           accessories: d.accessories || '',
+          condition: typeof d.item_condition === 'number' ? d.item_condition : prev.condition,
           defects: d.defects || '',
           note: d.notes || '',
           cpu: d.cpu || '',

@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { Search, Wallet, ChevronRight } from 'lucide-react';
+import { Wallet, ChevronRight } from 'lucide-react';
 
 function InvestorDashboardContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
 
   const [loading, setLoading] = useState(true);
@@ -80,7 +79,7 @@ function InvestorDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 flex flex-col relative pb-28">
+    <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 flex flex-col relative pb-6">
 
       {/* Header */}
       <div className="mb-4">
@@ -163,28 +162,6 @@ function InvestorDashboardContent() {
             );
           })
         )}
-      </div>
-
-      {/* Bottom Navigation (Fixed) */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 pb-8">
-        <div className="flex gap-3 max-w-md mx-auto">
-          {/* Offers Button */}
-          <button
-            onClick={() => router.push('/investor-offers')}
-            className="flex-1 py-3 rounded-2xl flex flex-col items-center justify-center transition-all bg-white text-gray-400 hover:bg-gray-50"
-          >
-            <Search className="w-6 h-6 mb-1" />
-            <span className="text-[10px] font-bold">ค้นหาข้อเสนอ</span>
-          </button>
-
-          {/* Portfolio Button - Active */}
-          <button
-            className="flex-1 py-3 rounded-2xl flex flex-col items-center justify-center transition-all bg-[#E9EFF6] text-[#1E3A8A]"
-          >
-            <Wallet className="w-6 h-6 mb-1" />
-            <span className="text-[10px] font-bold">พอร์ตของฉัน</span>
-          </button>
-        </div>
       </div>
 
     </div>
