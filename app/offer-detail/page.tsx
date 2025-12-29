@@ -206,10 +206,6 @@ function OfferDetailContent() {
           <p className="text-sm text-gray-500">{contract.items?.notes || 'ไม่มี'}</p>
         </div>
 
-        {/* Countdown Timer */}
-        <div className="border border-[#DE6B6B] bg-[#DE6B6B]/10 rounded-full py-2 text-center mb-2">
-          <span className="text-[#DE6B6B] text-sm font-medium">23:59:59</span>
-        </div>
       </div>
 
       {/* Action Buttons */}

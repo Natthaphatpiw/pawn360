@@ -618,6 +618,14 @@ export default function PawnContractDetail() {
             </button>
           )}
 
+          <button
+            onClick={() => router.push(`/pawn-ticket/${contractId}`)}
+            className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
+          >
+            <span className="text-sm font-bold">ดูตั๋วจำนำ</span>
+            <span className="text-[10px] opacity-80 font-light">Pawn ticket</span>
+          </button>
+
           {contract.contract_file_url && (
             <button
               onClick={() => window.open(contract.contract_file_url!, '_blank')}

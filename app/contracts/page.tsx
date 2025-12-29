@@ -203,12 +203,6 @@ export default function PawnerContractList() {
           <span className="text-base font-bold">จำนำสินค้า</span>
           <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
         </button>
-
-        {/* Contract List Button (Active State) */}
-        <button className="w-full bg-white border border-[#C08D6E] text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm">
-          <span className="text-base font-bold">รายการจำนำ</span>
-          <span className="text-[10px] opacity-80 font-light">Contract list</span>
-        </button>
       </div>
 
     </div>

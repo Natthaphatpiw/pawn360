@@ -48,7 +48,7 @@ export default function PawnTicketPage() {
         useCORS: true
       });
 
-      // Convert to base64 for upload
+      // Convert to base64 for upload and fallback download
       const imageBase64 = canvas.toDataURL('image/png');
 
       // Upload to S3
@@ -66,19 +66,36 @@ export default function PawnTicketPage() {
         // Continue with download even if upload fails
       }
 
-      // Download locally
+      const triggerDownload = (href: string) => {
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = `pawn-ticket-${ticketData.ticketNo}.png`;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+      const shouldOpenPreview = /iPad|iPhone|iPod/i.test(navigator.userAgent) || /Line/i.test(navigator.userAgent);
+
+      // Download locally with fallback for browsers that block blob downloads
       canvas.toBlob((blob) => {
         if (blob) {
           const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `pawn-ticket-${ticketData.ticketNo}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          triggerDownload(url);
+          if (shouldOpenPreview) {
+            window.open(imageBase64, '_blank', 'noopener,noreferrer');
+          }
           URL.revokeObjectURL(url);
           alert('บันทึกรูปภาพสำเร็จ');
+          return;
         }
+
+        triggerDownload(imageBase64);
+        if (shouldOpenPreview) {
+          window.open(imageBase64, '_blank', 'noopener,noreferrer');
+        }
+        alert('บันทึกรูปภาพสำเร็จ');
       }, 'image/png');
 
     } catch (error) {

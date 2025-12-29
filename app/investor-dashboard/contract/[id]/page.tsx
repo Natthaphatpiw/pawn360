@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, use } from 'react';
+import { useState, useEffect, Suspense, use, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
@@ -53,7 +53,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
     return Math.max(0, diff);
   };
 
-  const InfoRow = ({ label, value, valueColor = 'text-gray-600' }: { label: string; value: string; valueColor?: string }) => (
+  const InfoRow = ({ label, value, valueColor = 'text-gray-600' }: { label: string; value: ReactNode; valueColor?: string }) => (
     <div className="flex justify-between items-start mb-2">
       <div className="font-bold text-gray-700 w-1/3">{label}</div>
       <div className={`text-right w-2/3 ${valueColor}`}>{value}</div>
@@ -89,6 +89,12 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
 
   const badge = getStatusBadge(contract.contract_status);
   const daysRemaining = getDaysRemaining(contract.contract_end_date);
+  const totalInterest = Number(contract.interest_amount) || 0;
+  const investorReward = Math.round(totalInterest * (2 / 3) * 100) / 100;
+  const platformFee = Math.round((totalInterest - investorReward) * 100) / 100;
+  const interestRatePercent = typeof contract.interest_rate === 'number'
+    ? contract.interest_rate * 100
+    : 0;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 pb-20">
@@ -130,7 +136,20 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
           <InfoRow label="สินค้า" value={`${contract.items?.brand || ''} ${contract.items?.model || ''}`} />
           <InfoRow label="สถานะ" value={badge.text} valueColor={badge.color} />
           <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString() || 0} บาท`} />
-          <InfoRow label="ดอกเบี้ย" value={`${contract.interest_amount?.toLocaleString() || 0} บาท (${(contract.interest_rate * 100).toFixed(0)}%)`} />
+          <InfoRow
+            label="ดอกเบี้ย"
+            value={(
+              <div className="text-right">
+                <div>{`${totalInterest.toLocaleString()} บาท (${interestRatePercent.toFixed(0)}%)`}</div>
+                <div className="text-xs text-gray-500">
+                  นักลงทุน 2% {investorReward.toLocaleString()} บาท
+                </div>
+                <div className="text-xs text-gray-500">
+                  ค่าธรรมเนียมระบบ 1% {platformFee.toLocaleString()} บาท
+                </div>
+              </div>
+            )}
+          />
           <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days || 0} วัน`} />
           <InfoRow
             label="วันเริ่มต้น"
