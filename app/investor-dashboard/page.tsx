@@ -115,6 +115,11 @@ function InvestorDashboardContent() {
           myContracts.map((contract) => {
             const badge = getStatusBadge(contract.contract_status);
             const daysRemaining = getDaysRemaining(contract.contract_end_date);
+            const totalInterest = Number(contract.interest_amount) || 0;
+            const investorInterest = Math.round(totalInterest * (2 / 3) * 100) / 100;
+            const investorRate = typeof contract.interest_rate === 'number'
+              ? contract.interest_rate * (2 / 3) * 100
+              : 0;
 
             return (
               <div
@@ -141,7 +146,9 @@ function InvestorDashboardContent() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500 text-xs">ดอกเบี้ยรับ:</span>
-                    <span className="font-bold text-[#1E3A8A]">+{contract.interest_amount?.toLocaleString()} บาท</span>
+                    <span className="font-bold text-[#1E3A8A]">
+                      +{investorInterest.toLocaleString()} บาท ({investorRate.toFixed(1)}%)
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm pt-1">
                     <span className="text-gray-400 text-[10px]">ครบกำหนด:</span>

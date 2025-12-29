@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
@@ -149,7 +149,7 @@ function OfferDetailContent() {
 
   const InfoRow = ({ label, value, valueColor = 'text-gray-800', isBoldValue = false }: {
     label: string;
-    value: string;
+    value: ReactNode;
     valueColor?: string;
     isBoldValue?: boolean;
   }) => (
@@ -160,6 +160,14 @@ function OfferDetailContent() {
       </div>
     </div>
   );
+
+  const totalInterest = Number(contract.interest_amount) || 0;
+  const investorInterest = Math.round(totalInterest * (2 / 3) * 100) / 100;
+  const platformFee = Math.round((totalInterest - investorInterest) * 100) / 100;
+  const interestRatePercent = typeof contract.interest_rate === 'number'
+    ? contract.interest_rate * 100
+    : 0;
+  const investorRatePercent = interestRatePercent * (2 / 3);
 
   return (
     <div className="min-h-screen bg-white font-sans p-4 pb-10 flex flex-col items-center">
@@ -193,7 +201,20 @@ function OfferDetailContent() {
           <InfoRow label="สภาพ" value={`${contract.items?.item_condition}%`} />
           <InfoRow label="ตำหนิ" value={contract.items?.defects || 'ไม่มี'} />
           <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString()}.00`} />
-          <InfoRow label="ดอกเบี้ย" value={`${(contract.interest_rate * 100).toFixed(1)}% | ${(contract.interest_amount).toLocaleString()}`} />
+          <InfoRow
+            label="ดอกเบี้ย"
+            value={(
+              <div className="text-right">
+                <div>{`${interestRatePercent.toFixed(1)}% | ${totalInterest.toLocaleString()}`}</div>
+                <div className="text-xs text-gray-500">
+                  นักลงทุน {investorRatePercent.toFixed(1)}% {investorInterest.toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500">
+                  ค่าธรรมเนียมระบบ {(interestRatePercent - investorRatePercent).toFixed(1)}% {platformFee.toLocaleString()}
+                </div>
+              </div>
+            )}
+          />
           <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
           <InfoRow label="วันที่เสนอ" value={new Date().toLocaleDateString('th-TH')} />
         </div>
