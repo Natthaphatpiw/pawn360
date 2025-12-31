@@ -250,6 +250,14 @@ export default function InvestorRegister() {
             <span className="text-[10px] opacity-80 font-light">Adjust the credit limit</span>
           </button>
 
+          <button
+            onClick={() => router.push('/register-invest/edit')}
+            className="w-full bg-[#E9EFF6] border border-[#3B5BA5] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+          >
+            <span className="text-base font-bold">แก้ไขข้อมูล</span>
+            <span className="text-[10px] opacity-80 font-light">Edit profile</span>
+          </button>
+
           {/* Verify Identity Button - show when not VERIFIED */}
           {investorData.kyc_status !== 'VERIFIED' && (
             <button
