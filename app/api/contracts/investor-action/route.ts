@@ -126,7 +126,7 @@ function createAcceptedCard(contract: any) {
 
   const card = {
     type: 'flex',
-    altText: 'มีนักลงทุนสนใจสินค้าของคุณ!',
+    altText: 'มีนักลงทุนสนใจสินค้าของคุณ',
     contents: {
       type: 'bubble',
       header: {
@@ -147,7 +147,7 @@ function createAcceptedCard(contract: any) {
           align: 'center',
           margin: 'sm'
         }],
-        backgroundColor: '#c2410c',
+        backgroundColor: '#C0562F',
         paddingAll: 'lg'
       },
       hero: {
@@ -212,7 +212,7 @@ function createAcceptedCard(contract: any) {
               margin: 'lg',
               contents: [
                 { type: 'text', text: 'วงเงินจำนำ:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#1DB446', size: 'lg', flex: 5, weight: 'bold' }
+                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#C0562F', size: 'lg', flex: 5, weight: 'bold' }
               ]
             },
             {
@@ -230,7 +230,7 @@ function createAcceptedCard(contract: any) {
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'ยอดชำระคืน:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: `${contract.total_amount.toLocaleString()} บาท`, color: '#E91E63', size: 'md', flex: 5, weight: 'bold' }
+                { type: 'text', text: `${contract.total_amount.toLocaleString()} บาท`, color: '#9A3412', size: 'md', flex: 5, weight: 'bold' }
               ]
             }
           ]
@@ -248,7 +248,7 @@ function createAcceptedCard(contract: any) {
             data: `action=confirm_pawn&contractId=${contract.contract_id}`
           },
           style: 'primary',
-          color: '#1DB446'
+          color: '#C0562F'
         }, {
           type: 'button',
           action: {

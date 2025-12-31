@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
       const client = getLineClient();
       await client.pushMessage(lineUserId, {
         type: 'text',
-        text: '✅ อัพโหลดสลิปสำเร็จ\n\nกำลังรอพนักงานตรวจสอบ คุณจะได้รับการแจ้งเตือนเมื่อการตรวจสอบเสร็จสิ้น'
+        text: 'อัพโหลดสลิปสำเร็จ\n\nกำลังรอพนักงานตรวจสอบ คุณจะได้รับการแจ้งเตือนเมื่อการตรวจสอบเสร็จสิ้น'
       });
 
       return NextResponse.json({

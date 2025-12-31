@@ -198,7 +198,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
           size: 'lg',
           color: '#ffffff',
         }],
-        backgroundColor: '#C0562F',
+        backgroundColor: '#1E3A8A',
         paddingAll: 'lg',
       },
       body: {
@@ -222,7 +222,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'วงเงิน:', color: '#666666', size: 'sm', flex: 0 },
-                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#1DB446', size: 'md', weight: 'bold', flex: 0, align: 'end' }
+                { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#1E3A8A', size: 'md', weight: 'bold', flex: 0, align: 'end' }
               ]
             },
             {
@@ -254,7 +254,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
               margin: 'md',
               contents: [
                 { type: 'text', text: 'ยอดสุทธิ:', color: '#666666', size: 'sm', flex: 0 },
-                { type: 'text', text: `${(loanRequest.requested_amount + investorInterestAmount).toLocaleString()} บาท`, color: '#E91E63', size: 'xl', weight: 'bold', flex: 0, align: 'end' }
+                { type: 'text', text: `${(loanRequest.requested_amount + investorInterestAmount).toLocaleString()} บาท`, color: '#1E3A8A', size: 'xl', weight: 'bold', flex: 0, align: 'end' }
               ]
             }
           ]
@@ -272,7 +272,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
             uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL || 'CREATE_NEW_LIFF_APP'}?contractId=${contract.contract_id}`
           },
           style: 'primary',
-          color: '#1DB446'
+          color: '#1E3A8A'
         }, {
           type: 'button',
           action: {
@@ -281,7 +281,7 @@ function createPawnOfferCard(contract: any, loanRequest: any) {
             data: `action=decline_offer&contractId=${contract.contract_id}`
           },
           style: 'secondary',
-          color: '#E91E63'
+          color: '#E9EFF6'
         }]
       }
     }

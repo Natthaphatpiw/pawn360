@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         const client = getLineClient();
         await client.pushMessage(lineUserId, {
           type: 'text',
-          text: `✅ ส่งคำขอลดเงินต้น ${reduceAmount.toLocaleString()} บาทแล้ว\nรอพนักงานดำเนินการ`
+          text: `ส่งคำขอลดเงินต้น ${reduceAmount.toLocaleString()} บาทแล้ว\nรอพนักงานดำเนินการ`
         });
       } catch (lineError) {
         console.error('Failed to send LINE message:', lineError);

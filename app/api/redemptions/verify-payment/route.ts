@@ -82,11 +82,11 @@ export async function POST(request: NextRequest) {
         let message = '';
 
         if (redemption.delivery_method === 'SELF_PICKUP') {
-          message = `✅ ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่ ${dropPointName} พร้อมแสดงหลักฐานการโอนเงิน\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
+          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่ ${dropPointName} พร้อมแสดงหลักฐานการโอนเงิน\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
         } else if (redemption.delivery_method === 'SELF_ARRANGE') {
-          message = `✅ ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณานัดหมายกับ ${dropPointName} เพื่อมารับสินค้า\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
+          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณานัดหมายกับ ${dropPointName} เพื่อมารับสินค้า\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
         } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
-          message = `✅ ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทาง ${dropPointName} จะเตรียมสินค้าไว้ให้ พร้อมให้บริการขนส่งตามที่อยู่ที่คุณระบุ\n\nเมื่อได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
+          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทาง ${dropPointName} จะเตรียมสินค้าไว้ให้ พร้อมให้บริการขนส่งตามที่อยู่ที่คุณระบุ\n\nเมื่อได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
         }
 
         try {
@@ -118,10 +118,10 @@ export async function POST(request: NextRequest) {
 
         if (additionalAmount > 0) {
           // Overpaid
-          message = `❌ ยอดเงินที่โอนเกิน\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nยอดที่โอนเกินไป ${additionalAmount.toLocaleString()} บาท\n\nกรุณาติดต่อ ${dropPointName} ที่เบอร์ ${redemption.contract?.drop_points?.phone_number || 'ไม่ระบุ'} เพื่อรับเงินคืน หรือโทรไปยังฝ่ายสนับสนุนที่ 062-6092941`;
+          message = `ยอดเงินที่โอนเกิน\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nยอดที่โอนเกินไป ${additionalAmount.toLocaleString()} บาท\n\nกรุณาติดต่อ ${dropPointName} ที่เบอร์ ${redemption.contract?.drop_points?.phone_number || 'ไม่ระบุ'} เพื่อรับเงินคืน หรือโทรไปยังฝ่ายสนับสนุนที่ 062-6092941`;
         } else {
           // Underpaid
-          message = `❌ ยอดเงินที่โอนขาด\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nยอดที่ขาดไป ${Math.abs(additionalAmount).toLocaleString()} บาท\n\nกรุณาโอนเงินเพิ่มเติมไปยังบัญชี:\nพร้อมเพย์: 0626092941\nชื่อบัญชี: ณัฐภัทร ต้อยจัตุรัส\n\nหรือติดต่อฝ่ายสนับสนุนที่ 062-6092941 เพื่อขอรายละเอียดเพิ่มเติม`;
+          message = `ยอดเงินที่โอนขาด\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nยอดที่ขาดไป ${Math.abs(additionalAmount).toLocaleString()} บาท\n\nกรุณาโอนเงินเพิ่มเติมไปยังบัญชี:\nพร้อมเพย์: 0626092941\nชื่อบัญชี: ณัฐภัทร ต้อยจัตุรัส\n\nหรือติดต่อฝ่ายสนับสนุนที่ 062-6092941 เพื่อขอรายละเอียดเพิ่มเติม`;
         }
 
         try {

@@ -138,17 +138,17 @@ async function handleImageMessage(event: any) {
       const data = await response.json();
 
       if (data.success) {
-        await replyTextMessage(event.replyToken, '✅ อัพโหลดสลิปสำเร็จ กำลังรอพนักงานตรวจสอบ');
+        await replyTextMessage(event.replyToken, 'อัพโหลดสลิปสำเร็จ กำลังรอพนักงานตรวจสอบ');
       } else {
-        await replyTextMessage(event.replyToken, '❌ อัพโหลดสลิปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        await replyTextMessage(event.replyToken, 'อัพโหลดสลิปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
       }
     } else {
-      await replyTextMessage(event.replyToken, '❌ ไม่พบคำขอที่รอการชำระเงิน กรุณาติดต่อร้านค้า');
+      await replyTextMessage(event.replyToken, 'ไม่พบคำขอที่รอการชำระเงิน กรุณาติดต่อร้านค้า');
     }
 
   } catch (error) {
     console.error('Error handling image message:', error);
-    await replyTextMessage(event.replyToken, '❌ เกิดข้อผิดพลาดในการอัพโหลดรูปภาพ กรุณาลองใหม่อีกครั้ง');
+    await replyTextMessage(event.replyToken, 'เกิดข้อผิดพลาดในการอัพโหลดรูปภาพ กรุณาลองใหม่อีกครั้ง');
   }
 }
 
@@ -182,11 +182,11 @@ async function requestRedemption(contractId: string, lineUserId: string) {
     if (data.success) {
       await sendTextMessage(lineUserId, data.message);
     } else {
-      await sendTextMessage(lineUserId, `❌ ${data.error || 'เกิดข้อผิดพลาด'}`);
+      await sendTextMessage(lineUserId, `${data.error || 'เกิดข้อผิดพลาด'}`);
     }
   } catch (error) {
     console.error('Error requesting redemption:', error);
-    await sendTextMessage(lineUserId, '❌ เกิดข้อผิดพลาดในการส่งคำขอ');
+    await sendTextMessage(lineUserId, 'เกิดข้อผิดพลาดในการส่งคำขอ');
   }
 }
 
@@ -209,11 +209,11 @@ async function requestExtension(contractId: string, lineUserId: string) {
     if (data.success) {
       await sendTextMessage(lineUserId, data.message);
     } else {
-      await sendTextMessage(lineUserId, `❌ ${data.error || 'เกิดข้อผิดพลาด'}`);
+      await sendTextMessage(lineUserId, `${data.error || 'เกิดข้อผิดพลาด'}`);
     }
   } catch (error) {
     console.error('Error requesting extension:', error);
-    await sendTextMessage(lineUserId, '❌ เกิดข้อผิดพลาดในการส่งคำขอ');
+    await sendTextMessage(lineUserId, 'เกิดข้อผิดพลาดในการส่งคำขอ');
   }
 }
 

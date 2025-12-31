@@ -122,34 +122,34 @@ export async function POST(request: NextRequest) {
     }
 
     let actionText = '';
-    let actionColor = '#16A34A';
+    let actionColor = '#365314';
 
     switch (actionType) {
       case 'redeem':
         actionText = 'ไถ่ถอนสินค้า';
-        actionColor = '#16A34A';
+        actionColor = '#365314';
         break;
       case 'renew':
         actionText = 'ต่อดอกเบี้ย';
-        actionColor = '#2563EB';
+        actionColor = '#2F6B3B';
         break;
       case 'reduce':
         actionText = 'ลดเงินต้น';
-        actionColor = '#F59E0B';
+        actionColor = '#4D7C0F';
         break;
       case 'increase_principal':
         actionText = 'เพิ่มเงินต้น';
-        actionColor = '#8B5CF6';
+        actionColor = '#3F6212';
         break;
       default:
         actionText = actionType;
-        actionColor = '#6B7280';
+        actionColor = '#365314';
     }
 
     // Create Flex Message
     const flexMessage = {
       type: 'flex' as const,
-      altText: `🔔 ${actionText} - ${customer.fullName}`,
+      altText: `${actionText} - ${customer.fullName}`,
       contents: {
         type: 'bubble' as const,
         header: {
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
           contents: [
             {
               type: 'text' as const,
-              text: `🔔 ${actionText}`,
+              text: `${actionText}`,
               weight: 'bold' as const,
               size: 'lg' as const,
               color: '#ffffff',
@@ -377,7 +377,7 @@ export async function POST(request: NextRequest) {
           contents: [
             {
               type: 'text' as const,
-              text: '💡 กรุณาติดต่อลูกค้าภายใน 24 ชั่วโมง',
+              text: 'กรุณาติดต่อลูกค้าภายใน 24 ชั่วโมง',
               size: 'xs' as const,
               color: '#999999',
               align: 'center' as const,

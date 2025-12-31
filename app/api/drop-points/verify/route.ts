@@ -258,7 +258,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
               margin: 'lg',
               contents: [
                 { type: 'text', text: 'ยอดโอน:', color: '#666666', size: 'md', flex: 2 },
-                { type: 'text', text: `${contract.loan_principal_amount?.toLocaleString()} บาท`, color: '#1DB446', size: 'xl', flex: 5, weight: 'bold' }
+                { type: 'text', text: `${contract.loan_principal_amount?.toLocaleString()} บาท`, color: '#1E3A8A', size: 'xl', flex: 5, weight: 'bold' }
               ]
             }
           ]

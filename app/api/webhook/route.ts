@@ -1343,7 +1343,7 @@ async function handleMessageEvent(event: WebhookEvent) {
         const client = new Client({ channelAccessToken });
         await client.pushMessage(userId, {
           type: 'text',
-          text: '❌ เกิดข้อผิดพลาดในการอัพโหลดสลิป กรุณาลองใหม่อีกครั้งหรือติดต่อร้านค้า'
+          text: 'เกิดข้อผิดพลาดในการอัพโหลดสลิป กรุณาลองใหม่อีกครั้งหรือติดต่อร้านค้า'
         });
       }
       return;
