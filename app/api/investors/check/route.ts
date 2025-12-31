@@ -41,17 +41,23 @@ export async function GET(request: NextRequest) {
       .eq('investor_id', investor.investor_id);
 
     const totalContracts = contracts?.length || 0;
+    const activeStatuses = ['ACTIVE', 'PENDING_SIGNATURE', 'CONFIRMED'];
+    const endedStatuses = ['COMPLETED', 'TERMINATED'];
     const activeContracts = contracts?.filter(
-      c => c.contract_status === 'ACTIVE' || c.contract_status === 'PENDING_SIGNATURE'
+      c => activeStatuses.includes(c.contract_status)
     ).length || 0;
     const endedContracts = contracts?.filter(
-      c => c.contract_status === 'COMPLETED' || c.contract_status === 'TERMINATED'
+      c => endedStatuses.includes(c.contract_status)
     ).length || 0;
 
     // Calculate total invested amount
     const totalInvestedAmount = contracts?.reduce((sum, contract) => {
       return sum + (contract.loan_principal_amount || 0);
     }, 0) || 0;
+
+    const currentInvestedAmount = contracts
+      ?.filter(c => activeStatuses.includes(c.contract_status))
+      .reduce((sum, contract) => sum + (contract.loan_principal_amount || 0), 0) || 0;
 
     return NextResponse.json({
       exists: true,
@@ -61,7 +67,8 @@ export async function GET(request: NextRequest) {
           totalContracts,
           activeContracts,
           endedContracts,
-          totalInvestedAmount
+          totalInvestedAmount,
+          currentInvestedAmount
         }
       }
     });
