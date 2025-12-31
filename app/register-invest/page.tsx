@@ -11,11 +11,13 @@ interface InvestorData {
   firstname: string;
   lastname: string;
   kyc_status: string;
+  max_investment_amount?: number | null;
   stats: {
     totalContracts: number;
     activeContracts: number;
     endedContracts: number;
     totalInvestedAmount: number;
+    currentInvestedAmount?: number;
   };
 }
 
@@ -179,34 +181,39 @@ export default function InvestorRegister() {
 
   // If user exists, show profile page
   if (investorData) {
+    const currentLimit = investorData.stats.currentInvestedAmount ?? investorData.stats.totalInvestedAmount;
+    const maxLimit = investorData.max_investment_amount || 0;
+
     return (
       <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center">
-        {/* Credit Limit Card */}
+        {/* Current Credit Limit */}
         <div className="w-full max-w-sm bg-[#E9EFF6] rounded-2xl p-6 text-center mb-4 mt-2">
-          <h2 className="text-[#1E3A8A] text-lg font-medium mb-1">วงเงินลงทุน</h2>
-          <div className="flex items-baseline justify-center gap-1">
+          <h2 className="text-[#1E3A8A] text-lg font-medium mb-2">วงเงินปัจจุบัน</h2>
+          <div className="flex items-baseline justify-center gap-2">
             <span className="text-3xl font-bold text-gray-800">
-              {investorData.stats.totalInvestedAmount.toLocaleString()}
+              {currentLimit.toLocaleString()}
             </span>
-            <span className="text-gray-400 text-sm font-light">บาท</span>
+            <span className="text-gray-400 text-sm font-light">
+              / {maxLimit.toLocaleString()}
+            </span>
           </div>
         </div>
 
         {/* Profile & Stats Card */}
-        <div className="w-full max-w-sm bg-[#E9EFF6] rounded-3xl p-6 pt-10 pb-8 shadow-sm mb-auto relative">
+        <div className="w-full max-w-sm bg-[#E9EFF6] rounded-3xl p-6 pt-8 pb-8 shadow-sm mb-6">
           {/* Inner White Profile Card */}
-          <div className="bg-white rounded-2xl p-8 text-center shadow-sm mb-8 mx-2">
+          <div className="bg-white rounded-2xl p-6 text-center shadow-sm mb-6">
             <h1 className="text-xl font-bold text-gray-800 mb-2">
               {investorData.firstname} {investorData.lastname}
             </h1>
             <p className="text-gray-400 text-sm font-light">
-              Investor ID: {investorData.investor_id.substring(0, 8)}
+              Member ID: {investorData.investor_id.slice(0, 8)}
             </p>
           </div>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-3 gap-2 text-center divide-x divide-[#D1D9E6]">
-            <div className="px-1">
+            <div className="px-2">
               <div className="text-2xl font-bold text-gray-700 mb-1">
                 {investorData.stats.totalContracts}
               </div>
@@ -214,7 +221,7 @@ export default function InvestorRegister() {
                 สัญญาทั้งหมด
               </div>
             </div>
-            <div className="px-1">
+            <div className="px-2">
               <div className="text-2xl font-bold text-gray-700 mb-1">
                 {investorData.stats.activeContracts}
               </div>
@@ -222,7 +229,7 @@ export default function InvestorRegister() {
                 สัญญายังไม่สิ้นสุด
               </div>
             </div>
-            <div className="px-1">
+            <div className="px-2">
               <div className="text-2xl font-bold text-gray-700 mb-1">
                 {investorData.stats.endedContracts}
               </div>
@@ -233,24 +240,14 @@ export default function InvestorRegister() {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Adjust Credit Limit Button */}
         <div className="w-full max-w-sm space-y-3">
-          {/* Portfolio Button */}
           <button
-            onClick={() => router.push('/investor/portfolio')} // TODO: Create portfolio page
-            className="w-full bg-[#E9EFF6] hover:bg-[#D4E4F7] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+            onClick={() => router.push('/register-invest/credit-limit')}
+            className="w-full bg-white border border-[#3B5BA5] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
-            <span className="text-base font-bold">ดูพอร์ตการลงทุน</span>
-            <span className="text-[10px] opacity-80 font-light">View investment portfolio</span>
-          </button>
-
-          {/* Edit Profile Button */}
-          <button
-            onClick={() => router.push('/register-invest/edit')}
-            className="w-full bg-white border border-[#3B5BA5] hover:bg-gray-50 text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
-          >
-            <span className="text-base font-bold">แก้ไขข้อมูล</span>
-            <span className="text-[10px] opacity-80 font-light">Edit profile</span>
+            <span className="text-base font-bold">ปรับวงเงิน</span>
+            <span className="text-[10px] opacity-80 font-light">Adjust the credit limit</span>
           </button>
 
           {/* Verify Identity Button - show when not VERIFIED */}
