@@ -250,7 +250,7 @@ async function handlePaymentReceived(
     notification.lineUserId,
     {
       type: 'text',
-      text: '✅ ได้รับสลิปการโอนเงินเรียบร้อย\nกำลังรอพนักงานตรวจสอบ...'
+      text: 'ได้รับสลิปการโอนเงินเรียบร้อย\nกำลังรอพนักงานตรวจสอบ...'
     }
   );
 
@@ -284,7 +284,7 @@ async function handlePaymentVerified(
 
     if (notification.type === 'redemption') {
       successMessage = createSuccessCard({
-        title: '✅ ไถ่ถอนสำเร็จ',
+        title: 'ไถ่ถอนสำเร็จ',
         message: message || 'สัญญาของคุณเสร็จสิ้นแล้ว',
         contractNumber: item._id.toString()
       });
@@ -304,7 +304,7 @@ async function handlePaymentVerified(
     } else if (notification.type === 'extension') {
       // ต่อดอก - อัพเดทวันครบกำหนด (จาก Shop System)
       successMessage = createSuccessCard({
-        title: '✅ ต่อดอกเบี้ยสำเร็จ',
+        title: 'ต่อดอกเบี้ยสำเร็จ',
         message: message || 'ต่อดอกเบี้ยเรียบร้อยแล้ว',
         contractNumber: item._id.toString()
       });
@@ -326,7 +326,7 @@ async function handlePaymentVerified(
 
     } else if (notification.type === 'reduce_principal') {
       successMessage = createSuccessCard({
-        title: '✅ ลดเงินต้นสำเร็จ',
+        title: 'ลดเงินต้นสำเร็จ',
         message: `${message}\nเงินต้นใหม่: ${notification.newPrincipal?.toLocaleString()} บาท`,
         contractNumber: item._id.toString()
       });
@@ -355,7 +355,7 @@ async function handlePaymentVerified(
 
     } else if (notification.type === 'increase_principal') {
       successMessage = createSuccessCard({
-        title: '✅ เพิ่มวงเงินสำเร็จ',
+        title: 'เพิ่มวงเงินสำเร็จ',
         message: `${message}\nเงินต้นใหม่: ${notification.newPrincipal?.toLocaleString()} บาท`,
         contractNumber: item._id.toString()
       });
@@ -393,7 +393,7 @@ async function handlePaymentVerified(
       notification.lineUserId,
       {
         type: 'text',
-        text: `❌ ${message || 'การชำระเงินไม่ผ่าน กรุณาติดต่อร้าน'}`
+        text: `${message || 'การชำระเงินไม่ผ่าน กรุณาติดต่อร้าน'}`
       }
     );
   }

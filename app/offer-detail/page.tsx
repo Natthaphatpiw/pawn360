@@ -235,7 +235,7 @@ function OfferDetailContent() {
         <button
           onClick={handleAccept}
           disabled={actionLoading}
-          className="w-full bg-[#88B459] hover:bg-[#769F4A] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
+          className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
         >
           <span className="text-base font-bold">ยอมรับ</span>
           <span className="text-[10px] font-light opacity-90">Accept</span>
@@ -245,7 +245,7 @@ function OfferDetailContent() {
         <button
           onClick={handleDecline}
           disabled={actionLoading}
-          className="w-full bg-[#DE6B6B] hover:bg-[#C95A5A] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
+          className="w-full bg-white border border-[#1E3A8A] hover:bg-[#E9EFF6] text-[#1E3A8A] rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
         >
           <span className="text-base font-bold">Decline</span>
           <span className="text-[10px] font-light opacity-90">ปฏิเสธ</span>

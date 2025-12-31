@@ -20,7 +20,7 @@ export function createQRCodeFlexMessage(
       contents: [
         {
           type: 'text',
-          text: '✅ คำขอได้รับการยืนยัน',
+          text: 'คำขอได้รับการยืนยัน',
           weight: 'bold',
           color: '#ffffff',
           size: 'lg'
@@ -33,7 +33,7 @@ export function createQRCodeFlexMessage(
           margin: 'sm'
         }
       ],
-      backgroundColor: '#1DB446',
+      backgroundColor: '#C0562F',
       paddingAll: 'lg'
     },
     hero: {
@@ -80,7 +80,7 @@ export function createQRCodeFlexMessage(
                   type: 'text',
                   text: `${amount.toLocaleString()} บาท`,
                   wrap: true,
-                  color: '#E91E63',
+                  color: '#C0562F',
                   size: 'xl',
                   flex: 5,
                   weight: 'bold'
@@ -95,7 +95,7 @@ export function createQRCodeFlexMessage(
         },
         {
           type: 'text',
-          text: '📌 กรุณาสแกน QR Code เพื่อชำระเงิน',
+          text: 'กรุณาสแกน QR Code เพื่อชำระเงิน',
           size: 'sm',
           color: '#999999',
           margin: 'lg',
@@ -116,7 +116,7 @@ export function createQRCodeFlexMessage(
             displayText: 'อัพโหลดสลิปการโอน'
           },
           style: 'primary',
-          color: '#1DB446',
+          color: '#C0562F',
           height: 'sm'
         }
       ],
@@ -127,7 +127,7 @@ export function createQRCodeFlexMessage(
 
   return {
     type: 'flex',
-    altText: `✅ ${actionText} - คำขอได้รับการยืนยัน`,
+    altText: `${actionText} - คำขอได้รับการยืนยัน`,
     contents: bubble
   };
 }
@@ -149,7 +149,7 @@ export function createRejectionFlexMessage(
       contents: [
         {
           type: 'text',
-          text: '❌ คำขอไม่ได้รับการยืนยัน',
+          text: 'คำขอไม่ได้รับการยืนยัน',
           weight: 'bold',
           color: '#ffffff',
           size: 'lg'
@@ -162,7 +162,7 @@ export function createRejectionFlexMessage(
           margin: 'sm'
         }
       ],
-      backgroundColor: '#EF4444',
+      backgroundColor: '#9A3412',
       paddingAll: 'lg'
     },
     body: {
@@ -182,7 +182,7 @@ export function createRejectionFlexMessage(
         },
         {
           type: 'text',
-          text: '💡 กรุณาติดต่อร้านค้าเพื่อสอบถามข้อมูลเพิ่มเติม',
+          text: 'กรุณาติดต่อร้านค้าเพื่อสอบถามข้อมูลเพิ่มเติม',
           size: 'sm',
           color: '#999999',
           margin: 'lg',
@@ -194,7 +194,7 @@ export function createRejectionFlexMessage(
 
   return {
     type: 'flex',
-    altText: `❌ ${actionText} - คำขอไม่ได้รับการยืนยัน`,
+    altText: `${actionText} - คำขอไม่ได้รับการยืนยัน`,
     contents: bubble
   };
 }
@@ -217,13 +217,13 @@ export function createPaymentSuccessFlexMessage(
       contents: [
         {
           type: 'text',
-          text: '✅ ชำระเงินสำเร็จ',
+          text: 'ชำระเงินสำเร็จ',
           weight: 'bold',
           color: '#ffffff',
           size: 'xl'
         }
       ],
-      backgroundColor: '#1DB446',
+      backgroundColor: '#C0562F',
       paddingAll: 'lg'
     },
     body: {
@@ -286,7 +286,7 @@ export function createPaymentSuccessFlexMessage(
                   type: 'text',
                   text: actionText,
                   wrap: true,
-                  color: '#1DB446',
+                  color: '#C0562F',
                   size: 'sm',
                   flex: 5,
                   weight: 'bold'
@@ -302,8 +302,8 @@ export function createPaymentSuccessFlexMessage(
         {
           type: 'text',
           text: actionType === 'redemption'
-            ? '🎉 คุณสามารถมารับสินค้าได้ที่ร้านแล้ว'
-            : '✨ สัญญาของคุณได้รับการต่ออายุแล้ว',
+            ? 'คุณสามารถมารับสินค้าได้ที่ร้านแล้ว'
+            : 'สัญญาของคุณได้รับการต่ออายุแล้ว',
           size: 'sm',
           color: '#999999',
           margin: 'lg',
@@ -331,7 +331,7 @@ export function createPaymentSuccessFlexMessage(
 
   return {
     type: 'flex',
-    altText: '✅ ชำระเงินสำเร็จ',
+    altText: 'ชำระเงินสำเร็จ',
     contents: bubble
   };
 }
@@ -353,13 +353,13 @@ export function createPaymentFailureFlexMessage(
       contents: [
         {
           type: 'text',
-          text: '❌ การชำระเงินไม่สำเร็จ',
+          text: 'การชำระเงินไม่สำเร็จ',
           weight: 'bold',
           color: '#ffffff',
           size: 'lg'
         }
       ],
-      backgroundColor: '#EF4444',
+      backgroundColor: '#9A3412',
       paddingAll: 'lg'
     },
     body: {
@@ -379,7 +379,7 @@ export function createPaymentFailureFlexMessage(
         },
         {
           type: 'text',
-          text: '💡 กรุณาตรวจสอบสลิปการโอนเงินและลองใหม่อีกครั้ง หรือติดต่อร้านค้า',
+          text: 'กรุณาตรวจสอบสลิปการโอนเงินและลองใหม่อีกครั้ง หรือติดต่อร้านค้า',
           size: 'sm',
           color: '#999999',
           margin: 'lg',
@@ -391,7 +391,7 @@ export function createPaymentFailureFlexMessage(
 
   return {
     type: 'flex',
-    altText: '❌ การชำระเงินไม่สำเร็จ',
+    altText: 'การชำระเงินไม่สำเร็จ',
     contents: bubble
   };
 }
@@ -413,13 +413,13 @@ export function createPendingApprovalMessage(
       contents: [
         {
           type: 'text',
-          text: '⏳ รอการอนุมัติ',
+          text: 'รอการอนุมัติ',
           weight: 'bold',
           color: '#ffffff',
           size: 'lg'
         }
       ],
-      backgroundColor: '#F59E0B',
+      backgroundColor: '#B45309',
       paddingAll: 'lg'
     },
     body: {
@@ -482,7 +482,7 @@ export function createPendingApprovalMessage(
                   type: 'text',
                   text: actionText,
                   wrap: true,
-                  color: '#F59E0B',
+                  color: '#C0562F',
                   size: 'sm',
                   flex: 5,
                   weight: 'bold'
@@ -497,7 +497,7 @@ export function createPendingApprovalMessage(
         },
         {
           type: 'text',
-          text: '💡 พนักงานร้านจะดำเนินการภายใน 24 ชั่วโมง คุณจะได้รับการแจ้งเตือนเมื่อคำขอได้รับการอนุมัติ',
+          text: 'พนักงานร้านจะดำเนินการภายใน 24 ชั่วโมง คุณจะได้รับการแจ้งเตือนเมื่อคำขอได้รับการอนุมัติ',
           size: 'sm',
           color: '#999999',
           margin: 'lg',
@@ -509,7 +509,7 @@ export function createPendingApprovalMessage(
 
   return {
     type: 'flex',
-    altText: `⏳ รอการอนุมัติ - ${actionText}`,
+    altText: `รอการอนุมัติ - ${actionText}`,
     contents: bubble
   };
 }
@@ -532,7 +532,7 @@ export function createQRCodeCard(params: {
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: '✅ คำขอได้รับการยืนยัน', weight: 'bold', color: '#1DB446', size: 'lg' }
+          { type: 'text', text: 'คำขอได้รับการยืนยัน', weight: 'bold', color: '#C0562F', size: 'lg' }
         ]
       },
       hero: {
@@ -563,7 +563,7 @@ export function createQRCodeCard(params: {
               data: `action=upload_slip&notificationId=${params.notificationId}`
             },
             style: 'primary',
-            color: '#1DB446'
+            color: '#C0562F'
           }
         ]
       }
@@ -594,7 +594,7 @@ export function createReducePrincipalCard(params: {
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: '✅ ยืนยันการลดเงินต้น', weight: 'bold', color: '#1DB446', size: 'lg' }
+          { type: 'text', text: 'ยืนยันการลดเงินต้น', weight: 'bold', color: '#C0562F', size: 'lg' }
         ]
       },
       hero: {
@@ -632,7 +632,7 @@ export function createReducePrincipalCard(params: {
             layout: 'horizontal',
             contents: [
               { type: 'text', text: 'ยอดรวม', weight: 'bold', flex: 0 },
-              { type: 'text', text: `${total.toLocaleString()} บาท`, weight: 'bold', align: 'end', color: '#1DB446' }
+              { type: 'text', text: `${total.toLocaleString()} บาท`, weight: 'bold', align: 'end', color: '#C0562F' }
             ]
           }
         ]
@@ -649,7 +649,7 @@ export function createReducePrincipalCard(params: {
               data: `action=upload_slip&notificationId=${params.notificationId}`
             },
             style: 'primary',
-            color: '#1DB446'
+            color: '#C0562F'
           }
         ]
       }
@@ -674,7 +674,7 @@ export function createIncreasePrincipalCard(params: {
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: '✅ ยืนยันการเพิ่มวงเงิน', weight: 'bold', color: '#1DB446', size: 'lg' }
+          { type: 'text', text: 'ยืนยันการเพิ่มวงเงิน', weight: 'bold', color: '#C0562F', size: 'lg' }
         ]
       },
       body: {
@@ -687,7 +687,7 @@ export function createIncreasePrincipalCard(params: {
             type: 'box',
             layout: 'vertical',
             contents: [
-              { type: 'text', text: `เงินที่จะได้รับ: ${params.increaseAmount.toLocaleString()} บาท`, size: 'xl', weight: 'bold', color: '#1DB446', align: 'center' },
+              { type: 'text', text: `เงินที่จะได้รับ: ${params.increaseAmount.toLocaleString()} บาท`, size: 'xl', weight: 'bold', color: '#C0562F', align: 'center' },
               { type: 'text', text: `กรุณามารับเงินที่ ${params.storeName}`, size: 'sm', color: '#999999', align: 'center', margin: 'md' }
             ],
             margin: 'lg'
@@ -715,7 +715,7 @@ export function createSuccessCard(params: {
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: params.title, weight: 'bold', color: '#1DB446', size: 'xl' }
+          { type: 'text', text: params.title, weight: 'bold', color: '#C0562F', size: 'xl' }
         ]
       },
       body: {
@@ -742,16 +742,16 @@ export function createRejectionCard(params: {
 
   return {
     type: 'flex',
-    altText: `❌ คำขอ${actionText}ไม่ได้รับการยืนยัน`,
+    altText: `คำขอ${actionText}ไม่ได้รับการยืนยัน`,
     contents: {
       type: 'bubble',
       header: {
         type: 'box',
         layout: 'vertical',
         contents: [
-          { type: 'text', text: '❌ คำขอไม่ได้รับการยืนยัน', weight: 'bold', color: '#ffffff', size: 'lg' }
+          { type: 'text', text: 'คำขอไม่ได้รับการยืนยัน', weight: 'bold', color: '#ffffff', size: 'lg' }
         ],
-        backgroundColor: '#EF4444',
+        backgroundColor: '#9A3412',
         paddingAll: 'lg'
       },
       body: {
@@ -760,7 +760,7 @@ export function createRejectionCard(params: {
         contents: [
           { type: 'text', text: params.message, wrap: true, size: 'md', color: '#333333' },
           { type: 'separator', margin: 'lg' },
-          { type: 'text', text: '💡 กรุณาติดต่อร้านค้าเพื่อสอบถามข้อมูลเพิ่มเติม', size: 'sm', color: '#999999', margin: 'lg', wrap: true }
+          { type: 'text', text: 'กรุณาติดต่อร้านค้าเพื่อสอบถามข้อมูลเพิ่มเติม', size: 'sm', color: '#999999', margin: 'lg', wrap: true }
         ]
       }
     }

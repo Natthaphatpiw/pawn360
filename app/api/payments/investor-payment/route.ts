@@ -209,7 +209,7 @@ function createPaymentConfirmationCard(contract: any, payment: any, investor: an
           type: 'button',
           action: {
             type: 'postback',
-            label: '✅ ยืนยันรับเงินแล้ว',
+            label: 'ยืนยันรับเงินแล้ว',
             data: `action=confirm_payment&contractId=${contract.contract_id}&paymentId=${payment.payment_id}`
           },
           style: 'primary',
@@ -218,7 +218,7 @@ function createPaymentConfirmationCard(contract: any, payment: any, investor: an
           type: 'button',
           action: {
             type: 'postback',
-            label: '❌ ยังไม่ได้รับเงิน',
+            label: 'ยังไม่ได้รับเงิน',
             data: `action=reject_payment&contractId=${contract.contract_id}&paymentId=${payment.payment_id}`
           },
           style: 'secondary'
