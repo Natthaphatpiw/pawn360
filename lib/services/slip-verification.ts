@@ -5,7 +5,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null;
 
-const MODEL = 'gpt-5-mini';
+const MODEL = 'gpt-4.1-mini';
 
 function getResponseText(response: any): string {
   if (typeof response?.output_text === 'string') {
