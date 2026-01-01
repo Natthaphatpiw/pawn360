@@ -5,6 +5,25 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null;
 
+const MODEL = 'gpt-5-mini';
+
+function getResponseText(response: any): string {
+  if (typeof response?.output_text === 'string') {
+    return response.output_text;
+  }
+
+  if (!Array.isArray(response?.output)) {
+    return '';
+  }
+
+  return response.output
+    .filter((item: any) => item?.type === 'message')
+    .flatMap((item: any) => item?.content || [])
+    .filter((part: any) => part?.type === 'output_text' && typeof part?.text === 'string')
+    .map((part: any) => part.text)
+    .join('\n');
+}
+
 export interface SlipVerificationResult {
   success: boolean;
   result: 'MATCHED' | 'UNDERPAID' | 'OVERPAID' | 'UNREADABLE' | 'INVALID';
@@ -34,12 +53,7 @@ export async function verifyPaymentSlip(
         rawResponse: { error: 'OPENAI_API_KEY not set' },
       };
     }
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a Thai bank transfer slip analyzer. Your task is to:
+    const systemPrompt = `You are a Thai bank transfer slip analyzer. Your task is to:
 1. Extract the transfer amount from the slip image
 2. Verify if it matches the expected amount
 3. Return the result in JSON format
@@ -59,30 +73,83 @@ Return ONLY a JSON object with this exact structure:
   "bank_name": "<detected bank name or null>",
   "transaction_date": "<detected date or null>",
   "notes": "<any relevant notes>"
-}`
+}`;
+    const response = await openai.responses.create({
+      model: MODEL,
+      input: [
+        {
+          role: 'system',
+          content: [
+            { type: 'input_text', text: systemPrompt },
+          ],
         },
         {
           role: 'user',
           content: [
             {
-              type: 'text',
+              type: 'input_text',
               text: `Please analyze this bank transfer slip and extract the transfer amount. Expected amount is ${expectedAmount.toLocaleString()} THB.`
             },
             {
-              type: 'image_url',
-              image_url: {
-                url: slipUrl,
-                detail: 'high'
-              }
+              type: 'input_image',
+              image_url: slipUrl,
+              detail: 'high',
             }
           ]
         }
       ],
-      max_tokens: 500,
+      max_output_tokens: 500,
       temperature: 0.1,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'slip_verification',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              detected_amount: {
+                anyOf: [
+                  { type: 'number' },
+                  { type: 'null' },
+                ],
+              },
+              confidence: { type: 'number' },
+              is_valid_slip: { type: 'boolean' },
+              bank_name: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'null' },
+                ],
+              },
+              transaction_date: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'null' },
+                ],
+              },
+              notes: {
+                anyOf: [
+                  { type: 'string' },
+                  { type: 'null' },
+                ],
+              },
+            },
+            required: [
+              'detected_amount',
+              'confidence',
+              'is_valid_slip',
+              'bank_name',
+              'transaction_date',
+              'notes',
+            ],
+          },
+        },
+      },
     });
 
-    const content = response.choices[0]?.message?.content || '';
+    const content = getResponseText(response);
 
     // Parse JSON response
     let parsed: any;
@@ -217,7 +284,7 @@ export async function saveSlipVerification(
       amount_difference: result.difference,
       verification_result: result.result,
       confidence_score: result.confidenceScore,
-      ai_model: 'gpt-4.1-mini',
+      ai_model: MODEL,
       ai_response: result.rawResponse,
       attempt_number: attemptNumber,
     })
