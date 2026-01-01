@@ -5,7 +5,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null;
 
-const MODEL = 'gpt-5-mini';
+const MODEL = 'gpt-4.1-mini';
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
 const MIN_ESTIMATE_PRICE = 100;
 
