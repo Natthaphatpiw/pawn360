@@ -5,6 +5,25 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null;
 
+const MODEL = 'gpt-5-mini';
+
+function getResponseText(response: any): string {
+  if (typeof response?.output_text === 'string') {
+    return response.output_text;
+  }
+
+  if (!Array.isArray(response?.output)) {
+    return '';
+  }
+
+  return response.output
+    .filter((item: any) => item?.type === 'message')
+    .flatMap((item: any) => item?.content || [])
+    .filter((part: any) => part?.type === 'output_text' && typeof part?.text === 'string')
+    .map((part: any) => part.text)
+    .join('\n');
+}
+
 // Agent 3: Analyze condition from images (moved from estimate route)
 async function analyzeConditionFromImages(images: string[]): Promise<{
   score: number;
@@ -201,36 +220,37 @@ async function analyzeConditionFromImages(images: string[]): Promise<{
   "imageQuality": "ภาพไม่เพียงพอ - ต้องการภาพด้านหน้า, ด้านหลัง, ด้านข้าง, พอร์ตชาร์จ, ปุ่มกด"
 }`;
 
-    // Prepare messages with base64 images for Vision API
-    const messages: any[] = [
+    const input: any[] = [
       {
         role: 'user',
         content: [
-          { type: 'text', text: prompt }
-        ]
-      }
+          { type: 'input_text', text: prompt },
+        ],
+      },
     ];
 
-    // Add up to 4 images (limit for Vision API)
     const maxImages = Math.min(images.length, 4);
     for (let i = 0; i < maxImages; i++) {
-      messages[0].content.push({
-        type: 'image_url',
-        image_url: {
-          url: images[i], // This is now base64 data URL
-          detail: 'low' // Use low detail for faster processing
-        }
+      input[0].content.push({
+        type: 'input_image',
+        image_url: images[i],
+        detail: 'low',
       });
     }
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini', // Vision-capable model
-      messages: messages,
-      max_tokens: 300,
+    const response = await openai.responses.create({
+      model: MODEL,
+      input,
+      max_output_tokens: 300,
       temperature: 0.2,
+      text: {
+        format: {
+          type: 'json_object',
+        },
+      },
     });
 
-    const content = response.choices[0]?.message?.content || '';
+    const content = getResponseText(response);
 
     // Try to parse JSON response
     try {
