@@ -242,7 +242,6 @@ async function analyzeConditionFromImages(images: string[]): Promise<{
       model: MODEL,
       input,
       max_output_tokens: 300,
-      temperature: 0.2,
       text: {
         format: {
           type: 'json_object',

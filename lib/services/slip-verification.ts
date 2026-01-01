@@ -99,7 +99,6 @@ Return ONLY a JSON object with this exact structure:
         }
       ],
       max_output_tokens: 500,
-      temperature: 0.1,
       text: {
         format: {
           type: 'json_schema',

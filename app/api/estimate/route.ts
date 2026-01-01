@@ -278,7 +278,6 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
   const response = await openai.responses.create({
     model: MODEL,
     input: prompt,
-    temperature: 0.2,
     max_output_tokens: 300,
     text: {
       format: {
@@ -355,7 +354,6 @@ serpapiResults: ${serpapiPayload ? JSON.stringify(serpapiPayload) : 'null'}
   const response = await openai.responses.create({
     model: MODEL,
     input: prompt,
-    temperature: 0.2,
     max_output_tokens: 300,
     tools: [
       {
