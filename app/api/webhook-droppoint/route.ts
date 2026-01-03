@@ -177,97 +177,92 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
 // Handle when Drop Point confirms the redemption amount is correct
 async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLineId: string, replyToken: string) {
   try {
-    // Use the new API endpoint for payment verification
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawn360.vercel.app';
-    const response = await fetch(`${baseUrl}/api/redemptions/verify-payment`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        redemptionId,
-        action: 'amount_correct',
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('Failed to verify payment');
-      return;
-    }
-
-    // Reply to Drop Point with delivery instructions
     const supabase = supabaseAdmin();
     const { data: redemption } = await supabase
       .from('redemption_requests')
       .select(`
         *,
         contract:contract_id (
+          contract_id,
+          contract_number,
+          items:item_id (
+            brand,
+            model
+          ),
           drop_points:drop_point_id (*),
-          pawners:customer_id (*)
+          pawners:customer_id (*),
+          investors:investor_id (*)
         )
       `)
       .eq('redemption_id', redemptionId)
       .single();
 
-    if (redemption) {
-      const pawner = redemption.contract?.pawners;
-      const investor = redemption.contract?.investors;
+    if (!redemption) {
+      console.error('Redemption not found for verification');
+      return;
+    }
 
-      // Update redemption status to COMPLETED
+    const pawner = redemption.contract?.pawners;
+    const investor = redemption.contract?.investors;
+    const dropPoint = redemption.contract?.drop_points;
+
+    // Update redemption status to COMPLETED
     await supabase
       .from('redemption_requests')
       .update({
-          request_status: 'COMPLETED',
+        request_status: 'COMPLETED',
+        verified_by_line_id: dropPointLineId,
+        verified_by_drop_point_id: dropPoint?.drop_point_id,
         verified_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('redemption_id', redemptionId);
 
-      // Update contract status
-      await supabase
-        .from('contracts')
-        .update({
-          contract_status: 'COMPLETED',
-          redemption_status: 'COMPLETED',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('contract_id', redemption.contract_id);
+    // Update contract status
+    await supabase
+      .from('contracts')
+      .update({
+        contract_status: 'COMPLETED',
+        redemption_status: 'COMPLETED',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('contract_id', redemption.contract_id);
 
-      // Send message to pawner based on delivery method
-      if (pawner?.line_id) {
-        let pawnerMessage = '';
-        if (redemption.delivery_method === 'SELF_PICKUP') {
-          pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่จุดรับฝากที่ได้ติดต่อไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
-        } else {
-          pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทางเรากำลังดำเนินการส่งสินค้าให้คุณตามที่ได้แจ้งไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
-        }
-
-        try {
-          await pawnerLineClient.pushMessage(pawner.line_id, {
-            type: 'text',
-            text: pawnerMessage
-          });
-        } catch (msgError) {
-          console.error('Error sending to pawner:', msgError);
-        }
+    // Send message to pawner based on delivery method
+    if (pawner?.line_id) {
+      let pawnerMessage = '';
+      if (redemption.delivery_method === 'SELF_PICKUP') {
+        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่จุดรับฝากที่ได้ติดต่อไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
+      } else {
+        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทางเรากำลังดำเนินการส่งสินค้าให้คุณตามที่ได้แจ้งไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
       }
 
-      // Send message to investor about payment received
-      if (investor?.line_id) {
-        const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nเงินจะเข้าบัญชีของคุณภายใน 22.00 น. ของวันนี้`;
-
-        try {
-          await investorLineClient.pushMessage(investor.line_id, {
-            type: 'text',
-            text: investorMessage
-          });
-        } catch (msgError) {
-          console.error('Error sending to investor:', msgError);
-        }
+      try {
+        await pawnerLineClient.pushMessage(pawner.line_id, {
+          type: 'text',
+          text: pawnerMessage
+        });
+      } catch (msgError) {
+        console.error('Error sending to pawner:', msgError);
       }
+    }
 
-      // Reply to drop point
+    // Send message to investor about payment received
+    if (investor?.line_id) {
+      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nเงินจะเข้าบัญชีของคุณภายใน 22.00 น. ของวันนี้`;
+
+      try {
+        await investorLineClient.pushMessage(investor.line_id, {
+          type: 'text',
+          text: investorMessage
+        });
+      } catch (msgError) {
+        console.error('Error sending to investor:', msgError);
+      }
+    }
+
+    // Reply to drop point
     let deliveryInstructions = '';
     if (redemption.delivery_method === 'SELF_PICKUP') {
       deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
@@ -283,7 +278,6 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       type: 'text',
       text: `ยืนยันยอดถูกต้องเรียบร้อย\n\nการไถ่ถอนเสร็จสิ้น\n\n${deliveryInstructions}`
     });
-    }
 
     console.log(`Redemption ${redemptionId} amount verified by drop point`);
 
@@ -302,7 +296,8 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       .select(`
         *,
         contract:contract_id (
-          pawners:customer_id (*)
+          pawners:customer_id (*),
+          drop_points:drop_point_id (*)
         )
       `)
       .eq('redemption_id', redemptionId)
@@ -314,18 +309,34 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
     }
 
     const pawner = redemption.contract?.pawners;
+    const dropPoint = redemption.contract?.drop_points;
 
     // Update redemption status to CANCELLED
-    await supabase
+    const { error: cancelError } = await supabase
       .from('redemption_requests')
       .update({
         request_status: 'CANCELLED',
         verified_at: new Date().toISOString(),
-        voided_at: new Date().toISOString(),
-        void_reason: 'Amount verification failed',
+        verified_by_line_id: dropPointLineId,
+        verified_by_drop_point_id: dropPoint?.drop_point_id,
+        verification_notes: 'Amount verification failed',
         updated_at: new Date().toISOString(),
       })
       .eq('redemption_id', redemptionId);
+
+    if (cancelError) {
+      console.error('Error cancelling redemption:', cancelError);
+      return;
+    }
+
+    // Reset contract redemption status to allow a new request
+    await supabase
+      .from('contracts')
+      .update({
+        redemption_status: 'NONE',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('contract_id', redemption.contract_id);
 
     // Send message to pawner about cancellation
     if (pawner?.line_id) {
