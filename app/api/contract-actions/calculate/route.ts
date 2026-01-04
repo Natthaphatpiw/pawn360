@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, actionType, amount } = body;
+    const { contractId, actionType, amount, reductionAmount, increaseAmount } = body;
 
     if (!contractId || !actionType) {
       return NextResponse.json(
@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
     today.setHours(0, 0, 0, 0);
 
     const daysInContract = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const daysElapsed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const rawDaysElapsed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysElapsed = Math.max(0, Math.min(daysInContract, rawDaysElapsed));
     const daysRemaining = Math.max(0, daysInContract - daysElapsed);
 
     // Get interest rate and calculate daily rate
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
     // Calculate accrued interest until today
     const interestAccrued = currentPrincipal * dailyInterestRate * daysElapsed;
 
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+
     let calculation: any = {
       contractId,
       actionType,
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
       daysInContract,
       daysElapsed,
       daysRemaining,
-      interestAccrued: Math.round(interestAccrued * 100) / 100,
+      interestAccrued: round2(interestAccrued),
       contractStartDate: contract.contract_start_date,
       contractEndDate: contract.contract_end_date,
     };
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
         // interest_rate is stored as DECIMAL (e.g., 0.03 for 3%)
         // Full period interest = principal * monthly rate * (contract days / 30)
         const fullPeriodInterest = currentPrincipal * monthlyInterestRate * (daysInContract / 30);
-        const interestToPay = Math.round(fullPeriodInterest * 100) / 100;
+        const interestToPay = round2(fullPeriodInterest);
 
         // New end date = current end date + contract duration days
         const newEndDate = new Date(endDate);
@@ -94,74 +97,83 @@ export async function POST(request: NextRequest) {
 
       case 'PRINCIPAL_REDUCTION': {
         // ลดเงินต้น: จ่ายจำนวนที่ขอลด + ดอกเบี้ยสะสมถึงวันนี้
-        const reductionAmount = amount || 0;
+        const reductionAmountValue = Number(reductionAmount ?? amount ?? 0);
 
-        if (reductionAmount <= 0 || reductionAmount > currentPrincipal) {
+        if (reductionAmountValue <= 0 || reductionAmountValue > currentPrincipal) {
           return NextResponse.json(
             { error: 'Invalid reduction amount' },
             { status: 400 }
           );
         }
 
-        const interestForPeriod = Math.round(interestAccrued * 100) / 100;
-        const totalToPay = reductionAmount + interestForPeriod;
-        const principalAfterReduction = currentPrincipal - reductionAmount;
+        const interestForPeriod = round2(interestAccrued);
+        const principalAfterReduction = currentPrincipal - reductionAmountValue;
 
         // Calculate new interest for remaining period
-        const newInterestForRemaining = Math.round(principalAfterReduction * dailyInterestRate * daysRemaining * 100) / 100;
+        const newInterestForRemaining = round2(principalAfterReduction * dailyInterestRate * daysRemaining);
+        const interestTotalIfPayLater = round2(interestForPeriod + newInterestForRemaining);
+        const totalToPayNow = reductionAmountValue + interestForPeriod;
 
         // Calculate interest difference (savings)
         const originalRemainingInterest = currentPrincipal * dailyInterestRate * daysRemaining;
-        const interestSavings = Math.round((originalRemainingInterest - newInterestForRemaining) * 100) / 100;
+        const interestSavings = round2(originalRemainingInterest - newInterestForRemaining);
 
         calculation = {
           ...calculation,
-          reductionAmount,
+          reductionAmount: reductionAmountValue,
           interestForPeriod,
-          totalToPay,
+          interestFirstPart: interestForPeriod,
+          interestRemaining: newInterestForRemaining,
+          interestTotalIfPayLater,
+          totalToPay: totalToPayNow,
+          totalToPayNow,
           principalAfterReduction,
           newInterestForRemaining,
           interestSavings,
-          description: `ลดเงินต้น ${reductionAmount.toLocaleString()} บาท + ดอกเบี้ย ${interestForPeriod.toLocaleString()} บาท = ${totalToPay.toLocaleString()} บาท\nเงินต้นใหม่: ${principalAfterReduction.toLocaleString()} บาท\nดอกเบี้ยที่ประหยัดได้: ${interestSavings.toLocaleString()} บาท`,
+          description: `ลดเงินต้น ${reductionAmountValue.toLocaleString()} บาท\nดอกเบี้ยช่วงแรก ${interestForPeriod.toLocaleString()} บาท\nดอกเบี้ยช่วงที่เหลือ ${newInterestForRemaining.toLocaleString()} บาท`,
         };
         break;
       }
 
       case 'PRINCIPAL_INCREASE': {
         // เพิ่มเงินต้น: รับเงินเพิ่มจาก investor
-        const increaseAmount = amount || 0;
+        const increaseAmountValue = Number(increaseAmount ?? amount ?? 0);
 
         // Check max increase (based on item value)
         const itemValue = contract.items?.estimated_value || 0;
-        const maxIncrease = itemValue - currentPrincipal;
+        const maxIncrease = Math.max(0, itemValue - currentPrincipal);
 
-        if (increaseAmount <= 0 || increaseAmount > maxIncrease) {
+        if (increaseAmountValue <= 0 || increaseAmountValue > maxIncrease) {
           return NextResponse.json(
             { error: `Invalid increase amount. Maximum allowed: ${maxIncrease.toLocaleString()} บาท` },
             { status: 400 }
           );
         }
 
-        const interestForPeriod = Math.round(interestAccrued * 100) / 100;
-        const principalAfterIncrease = currentPrincipal + increaseAmount;
+        const interestForPeriod = round2(interestAccrued);
+        const principalAfterIncrease = currentPrincipal + increaseAmountValue;
 
         // Calculate monthly interest (for UI display)
         // interest_rate is already a decimal (e.g., 0.03 for 3%)
-        const currentMonthlyInterest = Math.round(currentPrincipal * monthlyInterestRate * 100) / 100;
-        const newMonthlyInterest = Math.round(principalAfterIncrease * monthlyInterestRate * 100) / 100;
-        const additionalMonthlyInterest = Math.round((newMonthlyInterest - currentMonthlyInterest) * 100) / 100;
+        const currentMonthlyInterest = round2(currentPrincipal * monthlyInterestRate);
+        const newMonthlyInterest = round2(principalAfterIncrease * monthlyInterestRate);
+        const additionalMonthlyInterest = round2(newMonthlyInterest - currentMonthlyInterest);
 
         // Calculate new interest for remaining period
-        const newInterestForRemaining = Math.round(principalAfterIncrease * dailyInterestRate * daysRemaining * 100) / 100;
+        const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysRemaining);
+        const interestTotalIfPayLater = round2(interestForPeriod + newInterestForRemaining);
 
         // Calculate interest increase
         const originalRemainingInterest = currentPrincipal * dailyInterestRate * daysRemaining;
-        const interestIncrease = Math.round((newInterestForRemaining - originalRemainingInterest) * 100) / 100;
+        const interestIncrease = round2(newInterestForRemaining - originalRemainingInterest);
 
         calculation = {
           ...calculation,
-          increaseAmount,
+          increaseAmount: increaseAmountValue,
           interestForPeriod,
+          interestFirstPart: interestForPeriod,
+          interestRemaining: newInterestForRemaining,
+          interestTotalIfPayLater,
           principalAfterIncrease,
           newPrincipal: principalAfterIncrease,
           newMonthlyInterest,
@@ -169,8 +181,8 @@ export async function POST(request: NextRequest) {
           newInterestForRemaining,
           interestIncrease,
           maxIncrease,
-          amountToReceive: increaseAmount, // จำนวนที่ pawner จะได้รับจาก investor
-          description: `เพิ่มเงินต้น ${increaseAmount.toLocaleString()} บาท\nเงินต้นใหม่: ${principalAfterIncrease.toLocaleString()} บาท\nดอกเบี้ยที่เพิ่มขึ้น: ${interestIncrease.toLocaleString()} บาท`,
+          amountToReceive: increaseAmountValue, // จำนวนที่ pawner จะได้รับจาก investor
+          description: `เพิ่มเงินต้น ${increaseAmountValue.toLocaleString()} บาท\nดอกเบี้ยช่วงแรก ${interestForPeriod.toLocaleString()} บาท\nดอกเบี้ยช่วงที่เหลือ ${newInterestForRemaining.toLocaleString()} บาท`,
         };
         break;
       }

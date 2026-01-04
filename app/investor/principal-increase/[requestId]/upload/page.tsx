@@ -128,6 +128,8 @@ export default function InvestorPrincipalIncreaseUploadPage() {
     );
   }
 
+  const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.increase_amount;
+
   // Show voided state
   if (showVoided) {
     return (
@@ -232,12 +234,12 @@ export default function InvestorPrincipalIncreaseUploadPage() {
               <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
               <div>
                 <h3 className="font-bold text-red-700 text-sm mb-1">ยอดไม่ตรง</h3>
-                <p className="text-xs text-red-600 mb-2">{verificationResult.message}</p>
-                {verificationResult.shortAmount && (
-                  <p className="text-sm text-red-700 font-bold">
-                    กรุณาโอนเพิ่ม {verificationResult.shortAmount.toLocaleString()} บาท
-                  </p>
-                )}
+                <p className="text-xs text-red-600 mb-2">
+                  กรุณาโอนใหม่เต็มจำนวน {requiredAmount?.toLocaleString()} บาท
+                </p>
+                <p className="text-xs text-red-600">
+                  หากมีปัญหา กรุณาติดต่อฝ่าย Support โทร 0626092941
+                </p>
                 <p className="text-xs text-red-500 mt-2">
                   เหลือโอกาสอีก {verificationResult.remainingAttempts} ครั้ง
                 </p>

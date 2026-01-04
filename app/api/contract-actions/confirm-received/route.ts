@@ -9,6 +9,69 @@ const investorLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+const buildContractNumber = () => (
+  `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+);
+
+const buildRenewedContractRecord = (params: {
+  contract: any;
+  principalAmount: number;
+  interestAmount: number;
+  contractStartDate: Date;
+  contractEndDate: Date;
+  durationDays: number;
+  signedContractUrl?: string | null;
+}) => {
+  const platformFeeRate = params.contract.platform_fee_rate ?? 0.10;
+  const platformFeeAmount = round2(params.interestAmount * platformFeeRate);
+  const originalContractId = params.contract.original_contract_id || params.contract.contract_id;
+
+  return {
+    contract_number: buildContractNumber(),
+    customer_id: params.contract.customer_id,
+    investor_id: params.contract.investor_id,
+    drop_point_id: params.contract.drop_point_id,
+    item_id: params.contract.item_id,
+    loan_request_id: params.contract.loan_request_id,
+    loan_offer_id: params.contract.loan_offer_id,
+    contract_start_date: params.contractStartDate.toISOString(),
+    contract_end_date: params.contractEndDate.toISOString(),
+    contract_duration_days: params.durationDays,
+    loan_principal_amount: params.principalAmount,
+    interest_rate: params.contract.interest_rate,
+    interest_amount: params.interestAmount,
+    total_amount: round2(params.principalAmount + params.interestAmount),
+    platform_fee_rate: platformFeeRate,
+    platform_fee_amount: platformFeeAmount,
+    amount_paid: 0,
+    interest_paid: 0,
+    principal_paid: 0,
+    contract_status: 'CONFIRMED',
+    funding_status: params.contract.funding_status || 'FUNDED',
+    parent_contract_id: params.contract.contract_id,
+    original_contract_id: originalContractId,
+    contract_file_url: params.contract.contract_file_url,
+    signed_contract_url: params.signedContractUrl || params.contract.signed_contract_url,
+    item_delivery_status: params.contract.item_delivery_status,
+    item_received_at: params.contract.item_received_at,
+    item_verified_at: params.contract.item_verified_at,
+    payment_slip_url: params.contract.payment_slip_url,
+    payment_confirmed_at: params.contract.payment_confirmed_at,
+    payment_status: params.contract.payment_status,
+    original_principal_amount: params.principalAmount,
+    current_principal_amount: params.principalAmount,
+    total_interest_paid: 0,
+    total_principal_reduced: 0,
+    total_principal_increased: 0,
+    extension_count: 0,
+    redemption_status: 'NONE',
+    funded_at: params.contract.funded_at,
+    disbursed_at: params.contract.disbursed_at,
+  };
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -70,15 +133,52 @@ export async function POST(request: NextRequest) {
 
     const contract = actionRequest.contract;
     const investor = contract?.investors;
-    const newPrincipal = actionRequest.new_principal_amount;
+    const now = new Date();
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const actionCreatedAt = actionRequest.created_at ? new Date(actionRequest.created_at) : now;
+    const contractEndDate = new Date(contract.contract_end_date);
+    const principalAmount = Number(actionRequest.new_principal_amount || actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
+    const interestFirstPart = Number(actionRequest.interest_for_period || actionRequest.interest_accrued || 0);
+    let interestRemaining = Number(actionRequest.new_interest_for_remaining_increase || 0);
+    if (!interestRemaining && actionRequest.daily_interest_rate && actionRequest.days_remaining) {
+      interestRemaining = round2(principalAmount * Number(actionRequest.daily_interest_rate) * Number(actionRequest.days_remaining));
+    }
+    const totalPaidNow = Number(actionRequest.total_amount || 0);
+    const paidInterestNow = totalPaidNow > 0;
+    const interestAmount = paidInterestNow ? interestRemaining : round2(interestFirstPart + interestRemaining);
+    const durationDays = Number(actionRequest.days_remaining || Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay)));
 
-    // Update contract principal
+    const { data: newContract, error: newContractError } = await supabase
+      .from('contracts')
+      .insert(buildRenewedContractRecord({
+        contract,
+        principalAmount,
+        interestAmount,
+        contractStartDate: actionCreatedAt,
+        contractEndDate,
+        durationDays,
+        signedContractUrl: actionRequest.pawner_signature_url || contract.signed_contract_url,
+      }))
+      .select()
+      .single();
+
+    if (newContractError || !newContract) {
+      console.error('Error creating renewed contract:', newContractError);
+      return NextResponse.json(
+        { error: 'Failed to create renewed contract' },
+        { status: 500 }
+      );
+    }
+
+    // Close old contract
     await supabase
       .from('contracts')
       .update({
-        current_principal_amount: newPrincipal,
-        principal_amount: newPrincipal,
-        updated_at: new Date().toISOString(),
+        contract_status: 'COMPLETED',
+        completed_at: now.toISOString(),
+        last_action_date: now.toISOString(),
+        last_action_type: actionRequest.request_type,
+        updated_at: now.toISOString(),
       })
       .eq('contract_id', actionRequest.contract_id);
 
@@ -87,8 +187,8 @@ export async function POST(request: NextRequest) {
       .from('contract_action_requests')
       .update({
         request_status: 'COMPLETED',
-        completed_at: new Date().toISOString(),
-        pawner_confirmed_at: new Date().toISOString(),
+        completed_at: now.toISOString(),
+        pawner_confirmed_at: now.toISOString(),
       })
       .eq('request_id', requestId);
 
@@ -102,9 +202,13 @@ export async function POST(request: NextRequest) {
       {
         actionRequestId: requestId,
         principalBefore: contract?.current_principal_amount || contract?.principal_amount,
-        principalAfter: newPrincipal,
+        principalAfter: principalAmount,
         amount: actionRequest.increase_amount,
-        description: `Principal increased from ${contract?.current_principal_amount || contract?.principal_amount} to ${newPrincipal}`,
+        description: `Principal increased from ${contract?.current_principal_amount || contract?.principal_amount} to ${principalAmount}`,
+        metadata: {
+          newContractId: newContract.contract_id,
+          newContractNumber: newContract.contract_number,
+        },
       }
     );
 
@@ -113,7 +217,7 @@ export async function POST(request: NextRequest) {
       try {
         await investorLineClient.pushMessage(investor.line_id, {
           type: 'text',
-          text: `ผู้จำนำยืนยันรับเงินแล้ว\n\nสัญญาเลขที่: ${contract?.contract_number}\nเงินต้นใหม่: ${newPrincipal?.toLocaleString()} บาท\nเพิ่มขึ้น: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nดอกเบี้ยจะคำนวณตามเงินต้นใหม่ตั้งแต่วันนี้`
+          text: `ผู้จำนำยืนยันรับเงินแล้ว\n\nสัญญาเดิม: ${contract?.contract_number}\nสัญญาใหม่: ${newContract.contract_number}\nเงินต้นใหม่: ${principalAmount?.toLocaleString()} บาท\nเพิ่มขึ้น: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`
         });
       } catch (err) {
         console.error('Error sending message to investor:', err);
@@ -123,7 +227,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Principal increase completed',
-      newPrincipal,
+      newContract,
     });
 
   } catch (error: any) {

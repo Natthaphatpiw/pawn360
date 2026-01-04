@@ -111,41 +111,47 @@ export async function GET(
 
     // Format amount to Thai text
     const numberToThaiText = (num: number): string => {
-      const ones = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
-      const teens = ['สิบ', 'สิบเอ็ด', 'สิบสอง', 'สิบสาม', 'สิบสี่', 'สิบห้า', 'สิบหก', 'สิบเจ็ด', 'สิบแปด', 'สิบเก้า'];
-      const tens = ['', 'สิบ', 'ยี่สิบ', 'สามสิบ', 'สี่สิบ', 'ห้าสิบ', 'หกสิบ', 'เจ็ดสิบ', 'แปดสิบ', 'เก้าสิบ'];
-      const scales = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
+      const digits = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+      const units = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
 
-      if (num === 0) return 'ศูนย์บาทถ้วน';
-
-      const intPart = Math.floor(num);
-      let result = '';
-
-      if (intPart >= 1000000) {
-        const millions = Math.floor(intPart / 1000000);
-        result += numberToThaiText(millions).replace('บาทถ้วน', '') + 'ล้าน';
-      }
-
-      const remainder = intPart % 1000000;
-      if (remainder > 0) {
-        const digits = remainder.toString().split('').reverse();
-        for (let i = 0; i < digits.length; i++) {
-          const digit = parseInt(digits[i]);
-          if (digit !== 0) {
-            if (i === 1 && digit === 2) {
-              result += 'ยี่สิบ';
-            } else if (i === 1 && digit === 1) {
-              result += 'สิบ';
-            } else if (i === 0 && digit === 1 && digits.length > 1) {
-              result += 'เอ็ด';
-            } else {
-              result += ones[digit] + scales[i];
-            }
-          }
+      const readNumber = (value: number): string => {
+        if (value === 0) return '';
+        let result = '';
+        if (value >= 1000000) {
+          const millions = Math.floor(value / 1000000);
+          result += readNumber(millions) + 'ล้าน';
+          value = value % 1000000;
         }
-      }
 
-      return `(-${result}บาทถ้วน-)`;
+        const valueDigits = value.toString().split('').map(Number);
+        const len = valueDigits.length;
+        valueDigits.forEach((digit, index) => {
+          const pos = len - index - 1;
+          if (digit === 0) return;
+
+          if (pos === 0) {
+            result += digit === 1 && len > 1 ? 'เอ็ด' : digits[digit];
+            return;
+          }
+          if (pos === 1) {
+            if (digit === 1) {
+              result += 'สิบ';
+            } else if (digit === 2) {
+              result += 'ยี่สิบ';
+            } else {
+              result += digits[digit] + 'สิบ';
+            }
+            return;
+          }
+          result += digits[digit] + units[pos];
+        });
+        return result;
+      };
+
+      if (!num || num <= 0) return 'ศูนย์บาทถ้วน';
+      const intPart = Math.floor(num);
+      const text = readNumber(intPart) || 'ศูนย์';
+      return `(-${text}บาทถ้วน-)`;
     };
 
     // Format item description

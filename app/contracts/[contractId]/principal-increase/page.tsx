@@ -182,6 +182,7 @@ export default function PrincipalIncreasePage() {
   const [submitting, setSubmitting] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [interestPaymentOption, setInterestPaymentOption] = useState<'PAY_NOW' | 'PAY_LATER'>('PAY_LATER');
 
   // Bank account info
   const [bankName, setBankName] = useState('');
@@ -277,7 +278,9 @@ export default function PrincipalIncreasePage() {
         contractId,
         actionType: 'PRINCIPAL_INCREASE',
         increaseAmount: parseFloat(increaseAmount),
+        interestPaymentOption,
         pawnerLineId: profile?.userId,
+        termsAccepted: true,
         pawnerSignatureUrl: uploadRes.data.url,
         pawnerBankAccount: {
           bank_name: bankName,
@@ -310,6 +313,11 @@ export default function PrincipalIncreasePage() {
   const currentPrincipal = contract?.current_principal_amount || contract?.principal_amount || 0;
   const itemValue = contract?.items?.estimated_value || contract?.principal_amount * 1.5 || 0;
   const maxIncrease = Math.max(0, itemValue - currentPrincipal);
+  const interestFirstPart = calculation?.interestFirstPart ?? calculation?.interestForPeriod ?? 0;
+  const interestRemaining = calculation?.interestRemaining ?? calculation?.newInterestForRemaining ?? 0;
+  const interestTotalIfPayLater = calculation?.interestTotalIfPayLater ?? (interestFirstPart + interestRemaining);
+  const payTodayAmount = interestPaymentOption === 'PAY_NOW' ? interestFirstPart : 0;
+  const payEndAmount = interestPaymentOption === 'PAY_NOW' ? interestRemaining : interestTotalIfPayLater;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -436,20 +444,56 @@ export default function PrincipalIncreasePage() {
               </div>
 
               <div className="bg-blue-50 rounded-xl p-3">
-                <h4 className="font-bold text-blue-800 mb-2">ดอกเบี้ยใหม่</h4>
+                <h4 className="font-bold text-blue-800 mb-2">ดอกเบี้ยตามช่วงเวลา</h4>
                 <div className="flex justify-between mb-1">
-                  <span className="text-blue-700">ดอกเบี้ยต่อเดือนใหม่:</span>
-                  <span className="font-bold text-blue-800">{calculation.newMonthlyInterest?.toLocaleString()} บาท</span>
+                  <span className="text-blue-700">ดอกเบี้ยช่วงแรก (ถึงวันนี้):</span>
+                  <span className="font-bold text-blue-800">{interestFirstPart.toLocaleString()} บาท</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-blue-700">เพิ่มขึ้น/เดือน:</span>
-                  <span className="font-bold text-blue-800">+ {calculation.additionalMonthlyInterest?.toLocaleString()} บาท</span>
+                  <span className="text-blue-700">ดอกเบี้ยช่วงที่เหลือ:</span>
+                  <span className="font-bold text-blue-800">{interestRemaining.toLocaleString()} บาท</span>
                 </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-xl p-3">
+                <h4 className="font-bold text-amber-800 mb-2">ตัวเลือกการชำระดอกเบี้ย</h4>
+                <label className="flex items-start gap-2 mb-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="interestPaymentOption"
+                    value="PAY_NOW"
+                    checked={interestPaymentOption === 'PAY_NOW'}
+                    onChange={() => setInterestPaymentOption('PAY_NOW')}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-amber-800">
+                    จ่ายวันนี้ {interestFirstPart.toLocaleString()} บาท และจ่ายวันครบกำหนด {interestRemaining.toLocaleString()} บาท
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="interestPaymentOption"
+                    value="PAY_LATER"
+                    checked={interestPaymentOption === 'PAY_LATER'}
+                    onChange={() => setInterestPaymentOption('PAY_LATER')}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-amber-800">
+                    จ่ายวันครบกำหนดทีเดียว {interestTotalIfPayLater.toLocaleString()} บาท
+                  </span>
+                </label>
+                <p className="text-[11px] text-amber-700 mt-2">
+                  ยอดที่ต้องชำระวันนี้: {payTodayAmount.toLocaleString()} บาท
+                </p>
               </div>
 
               <div className="bg-amber-50 rounded-xl p-3">
                 <p className="text-xs text-amber-800">
                   <span className="font-bold">หมายเหตุ:</span> นักลงทุนจะโอนเงินจำนวน {calculation.increaseAmount?.toLocaleString()} บาท เข้าบัญชีของคุณหลังจากอนุมัติ
+                </p>
+                <p className="text-xs text-amber-800 mt-1">
+                  ยอดดอกเบี้ยที่บันทึกในสัญญาใหม่: {payEndAmount.toLocaleString()} บาท
                 </p>
               </div>
             </div>

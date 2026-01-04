@@ -142,6 +142,8 @@ export default function PrincipalReductionUploadPage() {
     }
   };
 
+  const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.total_amount;
+
   if (showVoided) {
     return (
       <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
@@ -206,10 +208,10 @@ export default function PrincipalReductionUploadPage() {
               <div>
                 <h3 className="font-bold text-red-700 text-sm mb-1">ยอดเงินไม่ครบ!</h3>
                 <p className="text-red-600 text-xs mb-2">
-                  ยอดที่โอนขาดไป {verificationResult?.difference?.toLocaleString()} บาท
+                  กรุณาโอนใหม่เต็มจำนวน {requiredAmount?.toLocaleString()} บาท
                 </p>
                 <p className="text-red-600 text-xs">
-                  กรุณาโอนเงินเพิ่มเติมหรืออัปโหลดสลิปใหม่
+                  หากมีปัญหา กรุณาติดต่อฝ่าย Support โทร 0626092941
                 </p>
               </div>
             </div>

@@ -14,6 +14,69 @@ const investorLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+const buildContractNumber = () => (
+  `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+);
+
+const buildRenewedContractRecord = (params: {
+  contract: any;
+  principalAmount: number;
+  interestAmount: number;
+  contractStartDate: Date;
+  contractEndDate: Date;
+  durationDays: number;
+  signedContractUrl?: string | null;
+}) => {
+  const platformFeeRate = params.contract.platform_fee_rate ?? 0.10;
+  const platformFeeAmount = round2(params.interestAmount * platformFeeRate);
+  const originalContractId = params.contract.original_contract_id || params.contract.contract_id;
+
+  return {
+    contract_number: buildContractNumber(),
+    customer_id: params.contract.customer_id,
+    investor_id: params.contract.investor_id,
+    drop_point_id: params.contract.drop_point_id,
+    item_id: params.contract.item_id,
+    loan_request_id: params.contract.loan_request_id,
+    loan_offer_id: params.contract.loan_offer_id,
+    contract_start_date: params.contractStartDate.toISOString(),
+    contract_end_date: params.contractEndDate.toISOString(),
+    contract_duration_days: params.durationDays,
+    loan_principal_amount: params.principalAmount,
+    interest_rate: params.contract.interest_rate,
+    interest_amount: params.interestAmount,
+    total_amount: round2(params.principalAmount + params.interestAmount),
+    platform_fee_rate: platformFeeRate,
+    platform_fee_amount: platformFeeAmount,
+    amount_paid: 0,
+    interest_paid: 0,
+    principal_paid: 0,
+    contract_status: 'CONFIRMED',
+    funding_status: params.contract.funding_status || 'FUNDED',
+    parent_contract_id: params.contract.contract_id,
+    original_contract_id: originalContractId,
+    contract_file_url: params.contract.contract_file_url,
+    signed_contract_url: params.signedContractUrl || params.contract.signed_contract_url,
+    item_delivery_status: params.contract.item_delivery_status,
+    item_received_at: params.contract.item_received_at,
+    item_verified_at: params.contract.item_verified_at,
+    payment_slip_url: params.contract.payment_slip_url,
+    payment_confirmed_at: params.contract.payment_confirmed_at,
+    payment_status: params.contract.payment_status,
+    original_principal_amount: params.principalAmount,
+    current_principal_amount: params.principalAmount,
+    total_interest_paid: 0,
+    total_principal_reduced: 0,
+    total_principal_increased: 0,
+    extension_count: 0,
+    redemption_status: 'NONE',
+    funded_at: params.contract.funded_at,
+    disbursed_at: params.contract.disbursed_at,
+  };
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -103,68 +166,127 @@ export async function POST(request: NextRequest) {
         .eq('request_id', requestId);
     }
 
-    // Update contract based on action type
-    let contractUpdate: any = {
-      last_action_date: new Date().toISOString(),
-      last_action_type: actionRequest.request_type,
-      updated_at: new Date().toISOString(),
-    };
-
+    const now = new Date();
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const actionCreatedAt = actionRequest.created_at ? new Date(actionRequest.created_at) : now;
+    const contractEndDate = new Date(contract.contract_end_date);
+    let newContractPayload: {
+      principalAmount: number;
+      interestAmount: number;
+      contractStartDate: Date;
+      contractEndDate: Date;
+      durationDays: number;
+      signedContractUrl?: string | null;
+    } | null = null;
     let notificationMessage = '';
 
     switch (actionRequest.request_type) {
       case 'INTEREST_PAYMENT': {
-        // ต่อดอกเบี้ย - ขยายวันครบกำหนด
-        contractUpdate.contract_end_date = actionRequest.new_end_date;
-        contractUpdate.extension_count = (contract.extension_count || 0) + 1;
-        contractUpdate.total_interest_paid = (contract.total_interest_paid || 0) + actionRequest.interest_to_pay;
+        const principalAmount = Number(contract.current_principal_amount || contract.loan_principal_amount || 0);
+        const interestAmount = Number(contract.interest_amount || actionRequest.interest_to_pay || 0);
+        const contractStartDate = new Date(contract.contract_end_date);
+        const durationDays = Number(contract.contract_duration_days || 0);
+        const contractEndDateNew = new Date(contractStartDate);
+        contractEndDateNew.setDate(contractEndDateNew.getDate() + durationDays);
 
-        notificationMessage = `สัญญาหมายเลข ${contract.contract_number} ได้รับการต่อดอกเบี้ยเรียบร้อยแล้ว\n\nสินค้า: ${contract.items?.brand} ${contract.items?.model}\nดอกเบี้ยที่ชำระ: ${actionRequest.interest_to_pay?.toLocaleString()} บาท\nขยายสัญญาถึง: ${new Date(actionRequest.new_end_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}`;
+        newContractPayload = {
+          principalAmount,
+          interestAmount,
+          contractStartDate,
+          contractEndDate: contractEndDateNew,
+          durationDays,
+          signedContractUrl: signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
+        };
+
+        notificationMessage = `ต่อดอกเบี้ยเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nดอกเบี้ยที่ชำระ: ${Number(actionRequest.interest_to_pay || 0).toLocaleString()} บาท\nเริ่มสัญญาใหม่: ${contractStartDate.toLocaleDateString('th-TH')}\nครบกำหนดใหม่: ${contractEndDateNew.toLocaleDateString('th-TH')}`;
         break;
       }
 
       case 'PRINCIPAL_REDUCTION': {
-        // ลดเงินต้น
-        const principalBefore = contract.current_principal_amount || contract.loan_principal_amount;
-        const principalAfter = actionRequest.principal_after_reduction;
+        const principalAmount = Number(actionRequest.principal_after_reduction || contract.current_principal_amount || contract.loan_principal_amount || 0);
+        const interestFirstPart = Number(actionRequest.interest_for_period || actionRequest.interest_accrued || 0);
+        let interestRemaining = Number(actionRequest.new_interest_for_remaining || 0);
+        if (!interestRemaining && actionRequest.daily_interest_rate && actionRequest.days_remaining) {
+          interestRemaining = round2(principalAmount * Number(actionRequest.daily_interest_rate) * Number(actionRequest.days_remaining));
+        }
+        const reductionAmount = Number(actionRequest.reduction_amount || 0);
+        const totalPaidNow = Number(actionRequest.total_amount || 0);
+        const paidInterestNow = totalPaidNow > reductionAmount;
+        const interestAmount = paidInterestNow ? interestRemaining : round2(interestFirstPart + interestRemaining);
+        const durationDays = Number(actionRequest.days_remaining || Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay)));
 
-        contractUpdate.current_principal_amount = principalAfter;
-        contractUpdate.loan_principal_amount = principalAfter;
-        contractUpdate.total_principal_reduced = (contract.total_principal_reduced || 0) + actionRequest.reduction_amount;
-        contractUpdate.total_interest_paid = (contract.total_interest_paid || 0) + actionRequest.interest_for_period;
+        newContractPayload = {
+          principalAmount,
+          interestAmount,
+          contractStartDate: actionCreatedAt,
+          contractEndDate,
+          durationDays,
+          signedContractUrl: signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
+        };
 
-        // Recalculate interest amount for remaining period
-        const dailyRate = actionRequest.daily_interest_rate;
-        const daysRemaining = actionRequest.days_remaining;
-        contractUpdate.interest_amount = Math.round(principalAfter * dailyRate * daysRemaining * 100) / 100;
-
-        notificationMessage = `สัญญาหมายเลข ${contract.contract_number} ได้ลดเงินต้นเรียบร้อยแล้ว\n\nสินค้า: ${contract.items?.brand} ${contract.items?.model}\nเงินต้นเดิม: ${principalBefore.toLocaleString()} บาท\nลดเงินต้น: ${actionRequest.reduction_amount?.toLocaleString()} บาท\nเงินต้นใหม่: ${principalAfter.toLocaleString()} บาท\nดอกเบี้ยที่ชำระ: ${actionRequest.interest_for_period?.toLocaleString()} บาท`;
+        notificationMessage = `ลดเงินต้นเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nเงินต้นใหม่: ${principalAmount.toLocaleString()} บาท\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`;
         break;
       }
 
       case 'PRINCIPAL_INCREASE': {
-        // เพิ่มเงินต้น
-        const principalBefore = contract.current_principal_amount || contract.loan_principal_amount;
-        const principalAfter = actionRequest.principal_after_increase;
+        const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
+        const interestFirstPart = Number(actionRequest.interest_for_period || actionRequest.interest_accrued || 0);
+        let interestRemaining = Number(actionRequest.new_interest_for_remaining_increase || 0);
+        if (!interestRemaining && actionRequest.daily_interest_rate && actionRequest.days_remaining) {
+          interestRemaining = round2(principalAmount * Number(actionRequest.daily_interest_rate) * Number(actionRequest.days_remaining));
+        }
+        const totalPaidNow = Number(actionRequest.total_amount || 0);
+        const paidInterestNow = totalPaidNow > 0;
+        const interestAmount = paidInterestNow ? interestRemaining : round2(interestFirstPart + interestRemaining);
+        const durationDays = Number(actionRequest.days_remaining || Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay)));
 
-        contractUpdate.current_principal_amount = principalAfter;
-        contractUpdate.loan_principal_amount = principalAfter;
-        contractUpdate.total_principal_increased = (contract.total_principal_increased || 0) + actionRequest.increase_amount;
+        newContractPayload = {
+          principalAmount,
+          interestAmount,
+          contractStartDate: actionCreatedAt,
+          contractEndDate,
+          durationDays,
+          signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || contract.signed_contract_url,
+        };
 
-        // Recalculate interest amount for remaining period
-        const dailyRate = actionRequest.daily_interest_rate;
-        const daysRemaining = actionRequest.days_remaining;
-        contractUpdate.interest_amount = Math.round(principalAfter * dailyRate * daysRemaining * 100) / 100;
-
-        notificationMessage = `สัญญาหมายเลข ${contract.contract_number} ได้เพิ่มเงินต้นเรียบร้อยแล้ว\n\nสินค้า: ${contract.items?.brand} ${contract.items?.model}\nเงินต้นเดิม: ${principalBefore.toLocaleString()} บาท\nเพิ่มเงินต้น: ${actionRequest.increase_amount?.toLocaleString()} บาท\nเงินต้นใหม่: ${principalAfter.toLocaleString()} บาท`;
+        notificationMessage = `เพิ่มเงินต้นเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nเงินต้นใหม่: ${principalAmount.toLocaleString()} บาท\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`;
         break;
       }
     }
 
-    // Update contract
+    if (!newContractPayload) {
+      return NextResponse.json(
+        { error: 'Invalid action type' },
+        { status: 400 }
+      );
+    }
+
+    const { data: newContract, error: newContractError } = await supabase
+      .from('contracts')
+      .insert(buildRenewedContractRecord({ contract, ...newContractPayload }))
+      .select()
+      .single();
+
+    if (newContractError || !newContract) {
+      console.error('Error creating renewed contract:', newContractError);
+      return NextResponse.json(
+        { error: 'Failed to create renewed contract' },
+        { status: 500 }
+      );
+    }
+
+    const resolvedMessage = notificationMessage.replace('(กำลังสร้าง)', newContract.contract_number);
+
+    // Close old contract
     await supabase
       .from('contracts')
-      .update(contractUpdate)
+      .update({
+        contract_status: 'COMPLETED',
+        completed_at: now.toISOString(),
+        last_action_date: now.toISOString(),
+        last_action_type: actionRequest.request_type,
+        updated_at: now.toISOString(),
+      })
       .eq('contract_id', actionRequest.contract_id);
 
     // Mark request as completed
@@ -172,7 +294,7 @@ export async function POST(request: NextRequest) {
       .from('contract_action_requests')
       .update({
         request_status: 'COMPLETED',
-        completed_at: new Date().toISOString(),
+        completed_at: now.toISOString(),
       })
       .eq('request_id', requestId);
 
@@ -187,10 +309,14 @@ export async function POST(request: NextRequest) {
         actionRequestId: requestId,
         amount: actionRequest.total_amount,
         principalBefore: contract.current_principal_amount || contract.loan_principal_amount,
-        principalAfter: contractUpdate.current_principal_amount,
+        principalAfter: newContractPayload.principalAmount,
         contractEndDateBefore: contract.contract_end_date,
-        contractEndDateAfter: contractUpdate.contract_end_date,
+        contractEndDateAfter: newContractPayload.contractEndDate.toISOString(),
         description: `${actionRequest.request_type} completed successfully`,
+        metadata: {
+          newContractId: newContract.contract_id,
+          newContractNumber: newContract.contract_number,
+        },
       }
     );
 
@@ -200,7 +326,7 @@ export async function POST(request: NextRequest) {
       try {
         await pawnerLineClient.pushMessage(pawner.line_id, {
           type: 'text',
-          text: notificationMessage
+          text: resolvedMessage
         });
       } catch (err) {
         console.error('Error sending to pawner:', err);
@@ -212,7 +338,7 @@ export async function POST(request: NextRequest) {
       try {
         await investorLineClient.pushMessage(investor.line_id, {
           type: 'text',
-          text: notificationMessage
+          text: resolvedMessage
         });
       } catch (err) {
         console.error('Error sending to investor:', err);
@@ -223,7 +349,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'ดำเนินการสำเร็จ',
       actionType: actionRequest.request_type,
-      contractUpdate,
+      newContract,
     });
 
   } catch (error: any) {
