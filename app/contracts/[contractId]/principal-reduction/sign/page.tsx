@@ -282,7 +282,7 @@ export default function PrincipalReductionSignPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">เงินต้นใหม่:</span>
                   <span className="font-bold text-[#B85C38]">
-                    {requestDetails.new_principal_amount?.toLocaleString()} บาท
+                    {(requestDetails.principal_after_reduction || requestDetails.new_principal_amount)?.toLocaleString()} บาท
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -375,7 +375,7 @@ export default function PrincipalReductionSignPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">เงินต้นใหม่:</span>
                   <span className="font-bold text-[#B85C38] text-lg">
-                    {requestDetails.new_principal_amount?.toLocaleString()} บาท
+                    {(requestDetails.principal_after_reduction || requestDetails.new_principal_amount)?.toLocaleString()} บาท
                   </span>
                 </div>
               </div>

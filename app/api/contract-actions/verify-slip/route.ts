@@ -315,7 +315,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
   const item = contract?.items;
   const pawner = contract?.pawners;
   const increaseAmount = actionRequest.increase_amount;
-  const newPrincipal = actionRequest.new_principal_amount;
+  const newPrincipal = actionRequest.principal_after_increase;
   const interestRate = contract?.interest_rate || 0;
   const additionalMonthlyInterest = Math.round(increaseAmount * interestRate / 100);
 

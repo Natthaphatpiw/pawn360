@@ -140,7 +140,9 @@ export async function POST(request: NextRequest) {
         const increaseAmountValue = Number(increaseAmount ?? amount ?? 0);
 
         // Check max increase (based on item value)
-        const itemValue = contract.items?.estimated_value || 0;
+        const rawItemValue = Number(contract.items?.estimated_value ?? 0);
+        const fallbackItemValue = currentPrincipal > 0 ? currentPrincipal * 1.5 : 0;
+        const itemValue = Number.isFinite(rawItemValue) && rawItemValue > 0 ? rawItemValue : fallbackItemValue;
         const maxIncrease = Math.max(0, itemValue - currentPrincipal);
 
         if (increaseAmountValue <= 0 || increaseAmountValue > maxIncrease) {
