@@ -174,17 +174,15 @@ export async function POST(request: NextRequest) {
         .update(updateData)
         .eq('request_id', requestId);
 
-      const shortAmount = Math.abs(verificationResult.difference || 0);
-
       return NextResponse.json({
         success: false,
         result: 'UNDERPAID',
-        message: `ยอดโอนเงินไม่ตรงกับยอดที่ต้องโอน\n\nกรุณาโอนเพิ่มจำนวน ${shortAmount.toLocaleString()} บาท`,
-        shortAmount,
+        message: `ยอดโอนเงินไม่ตรงกับยอดที่ต้องโอน\n\nกรุณาโอนใหม่เต็มจำนวน ${expectedAmount.toLocaleString()} บาท\n\nหากมีปัญหา กรุณาติดต่อฝ่าย Support โทร 0626092941`,
         detectedAmount: verificationResult.detectedAmount,
         expectedAmount,
         attemptCount,
         remainingAttempts: 2 - attemptCount,
+        supportPhone: '0626092941',
       });
 
     } else {

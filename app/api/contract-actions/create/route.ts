@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
       amount,
       reductionAmount,
       increaseAmount,
+      interestPaymentOption,
       pawnerLineId,
       termsAccepted,
       pawnerSignatureUrl,
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
     const dailyInterestRate = monthlyInterestRate / 30;
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
     const interestAccrued = Math.round(currentPrincipal * dailyInterestRate * daysElapsed * 100) / 100;
+    const round2 = (value: number) => Math.round(value * 100) / 100;
 
     let requestData: any = {
       contract_id: contractId,
@@ -136,7 +138,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'PRINCIPAL_REDUCTION': {
-        const reductionAmt = reductionAmount || amount || 0;
+        const reductionAmt = Number(reductionAmount ?? amount ?? 0);
+        const payInterestNow = interestPaymentOption !== 'PAY_LATER';
 
         if (reductionAmt <= 0 || reductionAmt > currentPrincipal) {
           return NextResponse.json(
@@ -145,10 +148,10 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const interestForPeriod = interestAccrued;
-        const totalToPay = reductionAmt + interestForPeriod;
+        const interestForPeriod = round2(interestAccrued);
+        const totalToPay = reductionAmt + (payInterestNow ? interestForPeriod : 0);
         const principalAfterReduction = currentPrincipal - reductionAmt;
-        const newInterestForRemaining = Math.round(principalAfterReduction * dailyInterestRate * daysRemaining * 100) / 100;
+        const newInterestForRemaining = round2(principalAfterReduction * dailyInterestRate * daysRemaining);
 
         requestData = {
           ...requestData,
@@ -164,7 +167,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'PRINCIPAL_INCREASE': {
-        const increaseAmt = increaseAmount || amount || 0;
+        const increaseAmt = Number(increaseAmount ?? amount ?? 0);
+        const payInterestNow = interestPaymentOption === 'PAY_NOW';
         const itemValue = contract.items?.estimated_value || currentPrincipal * 1.5;
         const maxIncrease = Math.max(0, itemValue - currentPrincipal);
 
@@ -189,17 +193,20 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const interestForPeriod = round2(interestAccrued);
         const principalAfterIncrease = currentPrincipal + increaseAmt;
-        const newInterestForRemaining = Math.round(principalAfterIncrease * dailyInterestRate * daysRemaining * 100) / 100;
+        const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysRemaining);
+        const totalToPayNow = payInterestNow ? interestForPeriod : 0;
 
         requestData = {
           ...requestData,
           request_status: 'PENDING_INVESTOR_APPROVAL',
           increase_amount: increaseAmt,
+          interest_for_period: interestForPeriod,
           principal_after_increase: principalAfterIncrease,
           new_principal_amount: principalAfterIncrease,
           new_interest_for_remaining_increase: newInterestForRemaining,
-          total_amount: increaseAmt,
+          total_amount: totalToPayNow,
           pawner_signature_url: pawnerSignatureUrl,
           pawner_bank_name: pawnerBankAccount.bank_name,
           pawner_bank_account_no: pawnerBankAccount.bank_account_no,
