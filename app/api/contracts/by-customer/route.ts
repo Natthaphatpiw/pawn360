@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch contracts with item details (only fully confirmed/completed contracts)
+    // Fetch contracts with item details (include active/pending contracts)
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('customer_id', pawner.customer_id)
-      .in('contract_status', ['CONFIRMED', 'COMPLETED'])
+      .in('contract_status', ['PENDING', 'PENDING_SIGNATURE', 'ACTIVE', 'CONFIRMED', 'COMPLETED', 'DEFAULTED', 'LIQUIDATED', 'TERMINATED'])
       .order('created_at', { ascending: false });
 
     if (contractsError) {
@@ -85,7 +85,9 @@ export async function GET(request: NextRequest) {
       }
 
       // Override with contract status
-      if (contract.contract_status === 'CONFIRMED') {
+      if (contract.contract_status === 'PENDING' || contract.contract_status === 'PENDING_SIGNATURE') {
+        displayStatus = 'รอการดำเนินการ';
+      } else if (contract.contract_status === 'CONFIRMED') {
         displayStatus = 'กำลังดำเนินการ';
       } else if (contract.contract_status === 'COMPLETED') {
         displayStatus = 'เสร็จสิ้น';
@@ -93,6 +95,8 @@ export async function GET(request: NextRequest) {
         displayStatus = 'เกินกำหนด';
       } else if (contract.contract_status === 'LIQUIDATED') {
         displayStatus = 'ชำระหนี้แล้ว';
+      } else if (contract.contract_status === 'TERMINATED') {
+        displayStatus = 'ยกเลิก';
       }
 
       return {
