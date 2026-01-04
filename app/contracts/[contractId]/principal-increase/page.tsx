@@ -314,8 +314,9 @@ export default function PrincipalIncreasePage() {
     );
   }
 
-  const currentPrincipal = contract?.current_principal_amount || contract?.principal_amount || 0;
-  const itemValue = contract?.items?.estimated_value || contract?.principal_amount * 1.5 || 0;
+  const basePrincipal = contract?.loan_principal_amount || contract?.original_principal_amount || 0;
+  const currentPrincipal = contract?.current_principal_amount || basePrincipal;
+  const itemValue = contract?.items?.estimated_value || basePrincipal * 1.5 || 0;
   const maxIncrease = Math.max(0, itemValue - currentPrincipal);
   const interestFirstPart = calculation?.interestFirstPart ?? calculation?.interestForPeriod ?? 0;
   const interestRemaining = calculation?.interestRemaining ?? calculation?.newInterestForRemaining ?? 0;

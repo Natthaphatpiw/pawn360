@@ -130,7 +130,7 @@ export default function PrincipalIncreaseWaitingPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">เงินต้นใหม่:</span>
                   <span className="font-bold text-[#B85C38]">
-                    {requestDetails.new_principal_amount?.toLocaleString()} บาท
+                    {(requestDetails.principal_after_increase || requestDetails.new_principal_amount)?.toLocaleString()} บาท
                   </span>
                 </div>
                 <div className="flex justify-between">

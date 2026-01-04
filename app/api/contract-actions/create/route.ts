@@ -160,7 +160,6 @@ export async function POST(request: NextRequest) {
           total_to_pay_reduction: totalToPay,
           total_amount: totalToPay,
           principal_after_reduction: principalAfterReduction,
-          new_principal_amount: principalAfterReduction,
           new_interest_for_remaining: newInterestForRemaining,
         };
         break;
@@ -205,7 +204,6 @@ export async function POST(request: NextRequest) {
           increase_amount: increaseAmt,
           interest_for_period: interestForPeriod,
           principal_after_increase: principalAfterIncrease,
-          new_principal_amount: principalAfterIncrease,
           new_interest_for_remaining_increase: newInterestForRemaining,
           total_amount: totalToPayNow,
           pawner_signature_url: pawnerSignatureUrl,
@@ -287,7 +285,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
   const item = contract?.items;
   const pawner = contract?.pawners;
   const increaseAmount = actionRequest.increase_amount;
-  const newPrincipal = actionRequest.new_principal_amount;
+  const newPrincipal = actionRequest.principal_after_increase;
   const interestRate = contract?.interest_rate || 0;
   const additionalMonthlyInterest = Math.round(increaseAmount * interestRate / 100);
 

@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'ยืนยันรับเงินเรียบร้อยแล้ว',
         alreadyCompleted: true,
-        newPrincipal: actionRequest.new_principal_amount,
+        newPrincipal: actionRequest.principal_after_increase,
       });
     }
 
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const msPerDay = 1000 * 60 * 60 * 24;
     const actionCreatedAt = actionRequest.created_at ? new Date(actionRequest.created_at) : now;
     const contractEndDate = new Date(contract.contract_end_date);
-    const principalAmount = Number(actionRequest.new_principal_amount || actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
+    const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
     const interestFirstPart = Number(actionRequest.interest_for_period || actionRequest.interest_accrued || 0);
     let interestRemaining = Number(actionRequest.new_interest_for_remaining_increase || 0);
     if (!interestRemaining && actionRequest.daily_interest_rate && actionRequest.days_remaining) {

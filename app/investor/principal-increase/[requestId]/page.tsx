@@ -219,7 +219,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">เงินต้นปัจจุบัน:</span>
-              <span className="font-bold">{(contract?.current_principal_amount || contract?.principal_amount)?.toLocaleString()} บาท</span>
+              <span className="font-bold">{(contract?.current_principal_amount || contract?.loan_principal_amount || contract?.original_principal_amount)?.toLocaleString()} บาท</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">จำนวนที่ขอเพิ่ม:</span>
@@ -227,7 +227,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             </div>
             <div className="flex justify-between pt-2 border-t">
               <span className="font-bold text-gray-800">เงินต้นใหม่:</span>
-              <span className="font-bold text-[#1E3A8A] text-lg">{requestDetails?.new_principal_amount?.toLocaleString()} บาท</span>
+              <span className="font-bold text-[#1E3A8A] text-lg">{(requestDetails?.principal_after_increase || requestDetails?.new_principal_amount)?.toLocaleString()} บาท</span>
             </div>
           </div>
         </div>
@@ -302,7 +302,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
               <div className="flex justify-between">
                 <span className="text-gray-600">ดอกเบี้ยใหม่/เดือน:</span>
                 <span className="font-bold text-green-700">
-                  {Math.round((requestDetails?.new_principal_amount || 0) * (contract?.interest_rate || 0) / 100).toLocaleString()} บาท
+                  {Math.round((requestDetails?.principal_after_increase || requestDetails?.new_principal_amount || 0) * (contract?.interest_rate || 0) / 100).toLocaleString()} บาท
                 </span>
               </div>
               <div className="flex justify-between">

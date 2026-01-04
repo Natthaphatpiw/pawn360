@@ -62,6 +62,35 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'accept') {
+      if (contract.investor_id) {
+        if (contract.investor_id === investorId) {
+          return NextResponse.json({
+            success: true,
+            message: 'Offer already accepted by this investor',
+            alreadyAccepted: true
+          });
+        }
+        return NextResponse.json(
+          { error: 'Contract already assigned to another investor' },
+          { status: 409 }
+        );
+      }
+
+      if (contract.funding_status && contract.funding_status !== 'PENDING') {
+        return NextResponse.json(
+          { error: 'Contract is no longer available for funding' },
+          { status: 409 }
+        );
+      }
+
+      const allowedStatuses = ['PENDING', 'PENDING_SIGNATURE'];
+      if (!allowedStatuses.includes(contract.contract_status)) {
+        return NextResponse.json(
+          { error: 'Contract is not available for acceptance' },
+          { status: 409 }
+        );
+      }
+
       // Update contract with investor
       await supabase
         .from('contracts')
