@@ -25,6 +25,12 @@ export default function PrincipalIncreaseWaitingPage() {
     }
   }, [requestId]);
 
+  useEffect(() => {
+    if ((status === 'AWAITING_PAYMENT' || status === 'SLIP_REJECTED') && requestId) {
+      router.replace(`/contracts/${contractId}/principal-increase/upload?requestId=${requestId}`);
+    }
+  }, [status, requestId, contractId, router]);
+
   const fetchRequestDetails = async () => {
     try {
       const response = await axios.get(`/api/contract-actions/${requestId}`);
