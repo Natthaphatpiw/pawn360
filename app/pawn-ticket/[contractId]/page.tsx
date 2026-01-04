@@ -286,10 +286,22 @@ export default function PawnTicketPage() {
           </div>
 
           {/* Amount Section */}
-          <div className="mb-6 text-center bg-[#F2E8E3] rounded-xl p-4 border border-[#B85C38]/20">
-            <div className="text-xs text-gray-600 mb-1">จำนวนเงินที่รับจำนำ (Amount)</div>
-            <div className="text-3xl font-bold text-[#B85C38] mb-1">{ticketData.amount}</div>
-            <div className="text-sm font-medium text-gray-700">{ticketData.amountText}</div>
+          <div className="mb-6 bg-[#F2E8E3] rounded-xl p-4 border border-[#B85C38]/20">
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div className="text-center">
+                <div className="text-xs text-gray-600 mb-1">เงินต้น</div>
+                <div className="text-xl font-bold text-[#B85C38]">{ticketData.amount}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-gray-600 mb-1">ดอกเบี้ย</div>
+                <div className="text-xl font-bold text-[#B85C38]">{ticketData.interestAmount}</div>
+              </div>
+            </div>
+            <div className="text-center pt-3 border-t border-[#B85C38]/20">
+              <div className="text-xs text-gray-600 mb-1">รวมยอดชำระคืน</div>
+              <div className="text-2xl font-bold text-[#B85C38]">{ticketData.totalAmount}</div>
+              <div className="text-sm font-medium text-gray-700 mt-1">{ticketData.amountText}</div>
+            </div>
           </div>
 
           {/* Terms & Conditions */}

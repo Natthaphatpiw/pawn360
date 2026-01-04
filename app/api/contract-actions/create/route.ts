@@ -197,10 +197,11 @@ export async function POST(request: NextRequest) {
         const principalAfterIncrease = currentPrincipal + increaseAmt;
         const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysRemaining);
         const totalToPayNow = payInterestNow ? interestForPeriod : 0;
+        const nextStatus = payInterestNow ? 'AWAITING_PAYMENT' : 'PENDING_INVESTOR_APPROVAL';
 
         requestData = {
           ...requestData,
-          request_status: 'PENDING_INVESTOR_APPROVAL',
+          request_status: nextStatus,
           increase_amount: increaseAmt,
           interest_for_period: interestForPeriod,
           principal_after_increase: principalAfterIncrease,
@@ -249,11 +250,14 @@ export async function POST(request: NextRequest) {
         amount: requestData.total_amount,
         principalBefore: currentPrincipal,
         description: `Pawner initiated ${actionType}`,
+        metadata: {
+          interestPaymentOption: interestPaymentOption || 'PAY_LATER',
+        },
       }
     );
 
     // Send notification to investor for PRINCIPAL_INCREASE
-    if (actionType === 'PRINCIPAL_INCREASE' && contract.investors?.line_id) {
+    if (actionType === 'PRINCIPAL_INCREASE' && contract.investors?.line_id && requestData.request_status === 'PENDING_INVESTOR_APPROVAL') {
       try {
         const approvalCard = createInvestorApprovalCard(actionRequest, contract);
         await investorLineClient.pushMessage(contract.investors.line_id, approvalCard);

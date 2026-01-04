@@ -290,7 +290,11 @@ export default function PrincipalIncreasePage() {
       });
 
       if (response.data.success) {
-        router.push(`/contracts/${contractId}/principal-increase/waiting?requestId=${response.data.requestId}`);
+        if (interestPaymentOption === 'PAY_NOW') {
+          router.push(`/contracts/${contractId}/principal-increase/upload?requestId=${response.data.requestId}`);
+        } else {
+          router.push(`/contracts/${contractId}/principal-increase/waiting?requestId=${response.data.requestId}`);
+        }
       } else {
         throw new Error(response.data.error);
       }

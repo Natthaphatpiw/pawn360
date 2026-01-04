@@ -204,6 +204,37 @@ export default function PrincipalIncreaseWaitingPage() {
     );
   }
 
+  if (status === 'AWAITING_PAYMENT' || status === 'SLIP_REJECTED') {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
+          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-10 h-10 text-amber-500" />
+          </div>
+
+          <h1 className="text-xl font-bold text-gray-800 mb-2">รออัปโหลดสลิปดอกเบี้ย</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            กรุณาอัปโหลดสลิปการชำระดอกเบี้ยเพื่อให้ระบบส่งคำขอไปยังนักลงทุน
+          </p>
+
+          <button
+            onClick={() => router.push(`/contracts/${contractId}/principal-increase/upload?requestId=${requestId}`)}
+            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors mb-3"
+          >
+            อัปโหลดสลิป
+          </button>
+
+          <button
+            onClick={handleGoToContracts}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl py-3 font-medium transition-colors"
+          >
+            กลับหน้าสัญญา
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Default: Waiting for investor approval
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">

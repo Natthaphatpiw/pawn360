@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       // Log rejection
       await logContractAction(
         actionRequest.contract_id,
-        'PRINCIPAL_INCREASE_REJECTED',
+        'INVESTOR_REJECTED',
         'COMPLETED',
         'INVESTOR',
         investorLineId,
@@ -70,6 +70,9 @@ export async function POST(request: NextRequest) {
           actionRequestId: requestId,
           rejectionReason: reason,
           description: `Investor rejected principal increase request. Reason: ${reason}`,
+          metadata: {
+            actionType: 'PRINCIPAL_INCREASE',
+          },
         }
       );
 

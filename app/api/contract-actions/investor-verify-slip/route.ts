@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       // Log success
       await logContractAction(
         actionRequest.contract_id,
-        'INVESTOR_SLIP_VERIFIED',
+        'SLIP_VERIFIED',
         'COMPLETED',
         'INVESTOR',
         investorLineId,

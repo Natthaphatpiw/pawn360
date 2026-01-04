@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
     // Handle verification result
     if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
       // Success - proceed to next step
-      updateData.request_status = 'SLIP_VERIFIED';
+      const isPrincipalIncrease = actionRequest.request_type === 'PRINCIPAL_INCREASE';
+      updateData.request_status = isPrincipalIncrease ? 'PENDING_INVESTOR_APPROVAL' : 'SLIP_VERIFIED';
 
       // Log success
       await logContractAction(
@@ -135,11 +136,34 @@ export async function POST(request: NextRequest) {
         .update(updateData)
         .eq('request_id', requestId);
 
+      if (isPrincipalIncrease && investor?.line_id) {
+        try {
+          const approvalCard = createInvestorApprovalCard(actionRequest, contract);
+          await investorLineClient.pushMessage(investor.line_id, approvalCard);
+          await logContractAction(
+            actionRequest.contract_id,
+            'NOTIFICATION_SENT',
+            'COMPLETED',
+            'SYSTEM',
+            null,
+            {
+              actionRequestId: requestId,
+              description: 'Sent investor approval notification after interest payment slip verified',
+              metadata: {
+                requestStatus: updateData.request_status,
+              },
+            }
+          );
+        } catch (err) {
+          console.error('Error sending message to investor:', err);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         result: verificationResult.result,
         message: 'ตรวจสอบสลิปสำเร็จ',
-        nextStep: 'SIGN_CONTRACT',
+        nextStep: isPrincipalIncrease ? 'WAIT_INVESTOR_APPROVAL' : 'SIGN_CONTRACT',
         detectedAmount: verificationResult.detectedAmount,
       });
 
@@ -285,4 +309,129 @@ function getActionTypeName(type: string): string {
     'PRINCIPAL_INCREASE': 'เพิ่มเงินต้น',
   };
   return names[type] || type;
+}
+
+function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMessage {
+  const item = contract?.items;
+  const pawner = contract?.pawners;
+  const increaseAmount = actionRequest.increase_amount;
+  const newPrincipal = actionRequest.new_principal_amount;
+  const interestRate = contract?.interest_rate || 0;
+  const additionalMonthlyInterest = Math.round(increaseAmount * interestRate / 100);
+
+  const investorLiffId = process.env.NEXT_PUBLIC_LIFF_ID_INVEST_PRINCIPAL_INCREASE || '2008641671-ejsAmBXx';
+
+  return {
+    type: 'flex',
+    altText: 'คำขอเพิ่มเงินต้น - รอการอนุมัติ',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: 'คำขอเพิ่มเงินต้น',
+          weight: 'bold',
+          size: 'lg',
+          color: '#ffffff',
+          align: 'center'
+        }, {
+          type: 'text',
+          text: 'Principal Increase Request',
+          size: 'xs',
+          color: '#ffffff',
+          align: 'center',
+          margin: 'sm'
+        }],
+        backgroundColor: '#1E3A8A',
+        paddingAll: 'lg'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: `สัญญาเลขที่ ${contract?.contract_number}`,
+            weight: 'bold',
+            size: 'md',
+            color: '#333333'
+          },
+          {
+            type: 'text',
+            text: `${item?.brand || ''} ${item?.model || ''}`,
+            size: 'sm',
+            color: '#666666',
+            margin: 'sm'
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'lg',
+            contents: [
+              {
+                type: 'box',
+                layout: 'baseline',
+                spacing: 'sm',
+                contents: [
+                  { type: 'text', text: 'ผู้จำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                  { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'baseline',
+                spacing: 'sm',
+                margin: 'md',
+                contents: [
+                  { type: 'text', text: 'ขอเพิ่ม:', color: '#666666', size: 'sm', flex: 2 },
+                  { type: 'text', text: `${increaseAmount?.toLocaleString()} บาท`, color: '#22C55E', size: 'lg', flex: 3, weight: 'bold' }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'baseline',
+                spacing: 'sm',
+                margin: 'md',
+                contents: [
+                  { type: 'text', text: 'เงินต้นใหม่:', color: '#666666', size: 'sm', flex: 2 },
+                  { type: 'text', text: `${newPrincipal?.toLocaleString()} บาท`, color: '#1E3A8A', size: 'sm', flex: 3, weight: 'bold' }
+                ]
+              },
+              {
+                type: 'box',
+                layout: 'baseline',
+                spacing: 'sm',
+                margin: 'md',
+                contents: [
+                  { type: 'text', text: 'ดอกเบี้ยเพิ่ม/เดือน:', color: '#666666', size: 'sm', flex: 2 },
+                  { type: 'text', text: `+${additionalMonthlyInterest?.toLocaleString()} บาท`, color: '#22C55E', size: 'sm', flex: 3, weight: 'bold' }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [{
+          type: 'button',
+          action: {
+            type: 'uri',
+            label: 'ดูรายละเอียดและอนุมัติ',
+            uri: `https://liff.line.me/${investorLiffId}?requestId=${actionRequest.request_id}`
+          },
+          style: 'primary',
+          color: '#1E3A8A'
+        }]
+      }
+    }
+  };
 }

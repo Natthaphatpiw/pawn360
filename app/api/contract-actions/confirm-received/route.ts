@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
     // Log completion
     await logContractAction(
       actionRequest.contract_id,
-      'PRINCIPAL_INCREASE_COMPLETED',
+      'PRINCIPAL_INCREASE',
       'COMPLETED',
       'PAWNER',
       null,
@@ -208,6 +208,7 @@ export async function POST(request: NextRequest) {
         metadata: {
           newContractId: newContract.contract_id,
           newContractNumber: newContract.contract_number,
+          completionSource: 'PAWNER_CONFIRM_RECEIVED',
         },
       }
     );
