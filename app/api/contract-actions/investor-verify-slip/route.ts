@@ -1,13 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { verifyPaymentSlip, saveSlipVerification, logContractAction } from '@/lib/services/slip-verification';
-import { Client, FlexMessage } from '@line/bot-sdk';
+import { Client } from '@line/bot-sdk';
 
 // Pawner LINE OA client
 const pawnerLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
   channelSecret: process.env.LINE_CHANNEL_SECRET || ''
 });
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+const buildContractNumber = () => (
+  `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+);
+
+const buildRenewedContractRecord = (params: {
+  contract: any;
+  principalAmount: number;
+  interestAmount: number;
+  contractStartDate: Date;
+  contractEndDate: Date;
+  durationDays: number;
+  signedContractUrl?: string | null;
+}) => {
+  const platformFeeRate = params.contract.platform_fee_rate ?? 0.10;
+  const platformFeeAmount = round2(params.interestAmount * platformFeeRate);
+  const originalContractId = params.contract.original_contract_id || params.contract.contract_id;
+
+  return {
+    contract_number: buildContractNumber(),
+    customer_id: params.contract.customer_id,
+    investor_id: params.contract.investor_id,
+    drop_point_id: params.contract.drop_point_id,
+    item_id: params.contract.item_id,
+    loan_request_id: params.contract.loan_request_id,
+    loan_offer_id: params.contract.loan_offer_id,
+    contract_start_date: params.contractStartDate.toISOString(),
+    contract_end_date: params.contractEndDate.toISOString(),
+    contract_duration_days: params.durationDays,
+    loan_principal_amount: params.principalAmount,
+    interest_rate: params.contract.interest_rate,
+    interest_amount: params.interestAmount,
+    total_amount: round2(params.principalAmount + params.interestAmount),
+    platform_fee_rate: platformFeeRate,
+    platform_fee_amount: platformFeeAmount,
+    amount_paid: 0,
+    interest_paid: 0,
+    principal_paid: 0,
+    contract_status: 'CONFIRMED',
+    funding_status: params.contract.funding_status || 'FUNDED',
+    parent_contract_id: params.contract.contract_id,
+    original_contract_id: originalContractId,
+    contract_file_url: params.contract.contract_file_url,
+    signed_contract_url: params.signedContractUrl || params.contract.signed_contract_url,
+    item_delivery_status: params.contract.item_delivery_status,
+    item_received_at: params.contract.item_received_at,
+    item_verified_at: params.contract.item_verified_at,
+    payment_slip_url: params.contract.payment_slip_url,
+    payment_confirmed_at: params.contract.payment_confirmed_at,
+    payment_status: params.contract.payment_status,
+    original_principal_amount: params.principalAmount,
+    current_principal_amount: params.principalAmount,
+    total_interest_paid: 0,
+    total_principal_reduced: 0,
+    total_principal_increased: 0,
+    extension_count: 0,
+    redemption_status: 'NONE',
+    funded_at: params.contract.funded_at,
+    disbursed_at: params.contract.disbursed_at,
+  };
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -104,9 +167,57 @@ export async function POST(request: NextRequest) {
 
     // Handle verification result
     if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
-      // Success - notify pawner to confirm
-      updateData.request_status = 'INVESTOR_TRANSFERRED';
-      updateData.investor_transferred_at = new Date().toISOString();
+      const now = new Date();
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const actionCreatedAt = actionRequest.created_at ? new Date(actionRequest.created_at) : now;
+      const contractEndDate = new Date(contract.contract_end_date);
+
+      const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
+      const interestFirstPart = Number(actionRequest.interest_for_period || actionRequest.interest_accrued || 0);
+      let interestRemaining = Number(actionRequest.new_interest_for_remaining_increase || 0);
+      if (!interestRemaining && actionRequest.daily_interest_rate && actionRequest.days_remaining) {
+        interestRemaining = round2(principalAmount * Number(actionRequest.daily_interest_rate) * Number(actionRequest.days_remaining));
+      }
+      const totalPaidNow = Number(actionRequest.total_amount || 0);
+      const paidInterestNow = totalPaidNow > 0;
+      const interestAmount = paidInterestNow ? interestRemaining : round2(interestFirstPart + interestRemaining);
+      const durationDays = Number(actionRequest.days_remaining || Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay)));
+
+      const { data: newContract, error: newContractError } = await supabase
+        .from('contracts')
+        .insert(buildRenewedContractRecord({
+          contract,
+          principalAmount,
+          interestAmount,
+          contractStartDate: actionCreatedAt,
+          contractEndDate,
+          durationDays,
+          signedContractUrl: actionRequest.pawner_signature_url || contract.signed_contract_url,
+        }))
+        .select()
+        .single();
+
+      if (newContractError || !newContract) {
+        console.error('Error creating renewed contract:', newContractError);
+        return NextResponse.json(
+          { error: 'Failed to create renewed contract' },
+          { status: 500 }
+        );
+      }
+
+      await supabase
+        .from('contracts')
+        .update({
+          contract_status: 'COMPLETED',
+          completed_at: now.toISOString(),
+          last_action_date: now.toISOString(),
+          last_action_type: actionRequest.request_type,
+        })
+        .eq('contract_id', contract.contract_id);
+
+      updateData.request_status = 'COMPLETED';
+      updateData.completed_at = now.toISOString();
+      updateData.updated_at = now.toISOString();
 
       await supabase
         .from('contract_action_requests')
@@ -128,11 +239,46 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      // Notify pawner to confirm receipt
+      await logContractAction(
+        actionRequest.contract_id,
+        actionRequest.request_type,
+        'COMPLETED',
+        'SYSTEM',
+        null,
+        {
+          actionRequestId: requestId,
+          amount: totalPaidNow,
+          principalBefore: contract.current_principal_amount || contract.loan_principal_amount,
+          principalAfter: principalAmount,
+          contractEndDateBefore: contract.contract_end_date,
+          contractEndDateAfter: contractEndDate.toISOString(),
+          description: 'Principal increase completed after investor transfer',
+          metadata: {
+            newContractId: newContract.contract_id,
+            newContractNumber: newContract.contract_number,
+          },
+        }
+      );
+
       if (pawner?.line_id) {
+        const bankName = actionRequest.pawner_bank_name || pawner.bank_name || '';
+        const bankAccountNo = actionRequest.pawner_bank_account_no || pawner.bank_account_no || '';
+        const bankAccountName = actionRequest.pawner_bank_account_name || pawner.bank_account_name || '';
+        const increaseAmount = Number(actionRequest.increase_amount || 0);
+        const requestTime = actionRequest.created_at ? new Date(actionRequest.created_at) : now;
+        const requestTimeText = requestTime.toLocaleString('th-TH');
+
+        const messageLines = [
+          `คำขอเพิ่มเงินต้นเมื่อ ${requestTimeText} ได้รับการอนุมัติแล้ว`,
+          `นักลงทุนโอนเงิน ${increaseAmount.toLocaleString()} บาท ไปที่บัญชี ${bankName} ${bankAccountNo} ${bankAccountName} ของคุณแล้ว`,
+          `สัญญาเดิม ${contract.contract_number} ถูกปิด และสร้างสัญญาใหม่เลขที่ ${newContract.contract_number}`,
+        ];
+
         try {
-          const confirmCard = createPawnerConfirmCard(actionRequest);
-          await pawnerLineClient.pushMessage(pawner.line_id, confirmCard);
+          await pawnerLineClient.pushMessage(pawner.line_id, {
+            type: 'text',
+            text: messageLines.join('\n\n')
+          });
         } catch (err) {
           console.error('Error sending message to pawner:', err);
         }
@@ -141,8 +287,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         result: verificationResult.result,
-        message: 'ตรวจสอบสลิปสำเร็จ รอผู้จำนำยืนยันการรับเงิน',
+        message: 'ตรวจสอบสลิปสำเร็จ และสร้างสัญญาใหม่เรียบร้อยแล้ว',
         detectedAmount: verificationResult.detectedAmount,
+        newContractId: newContract.contract_id,
       });
 
     } else if (verificationResult.result === 'UNDERPAID') {
@@ -228,87 +375,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function createPawnerConfirmCard(actionRequest: any): FlexMessage {
-  const contract = actionRequest.contract;
-  const item = contract?.items;
-
-  return {
-    type: 'flex',
-    altText: 'ยืนยันการรับเงินเพิ่มเงินต้น',
-    contents: {
-      type: 'bubble',
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [{
-          type: 'text',
-          text: 'นักลงทุนโอนเงินแล้ว',
-          weight: 'bold',
-          size: 'lg',
-          color: '#ffffff',
-          align: 'center'
-        }],
-        backgroundColor: '#B85C38',
-        paddingAll: 'lg'
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          {
-            type: 'text',
-            text: `${item?.brand || ''} ${item?.model || ''}`,
-            weight: 'bold',
-            size: 'md',
-            color: '#333333'
-          },
-          {
-            type: 'box',
-            layout: 'baseline',
-            spacing: 'sm',
-            margin: 'lg',
-            contents: [
-              { type: 'text', text: 'จำนวนเงิน:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${actionRequest.increase_amount?.toLocaleString()} บาท`, color: '#B85C38', size: 'lg', flex: 3, weight: 'bold' }
-            ]
-          },
-          {
-            type: 'box',
-            layout: 'baseline',
-            spacing: 'sm',
-            margin: 'md',
-            contents: [
-              { type: 'text', text: 'โอนเข้าบัญชี:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: actionRequest.pawner_bank_name || actionRequest.contract?.pawners?.bank_name || '', color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
-            ]
-          },
-          {
-            type: 'text',
-            text: 'กรุณาตรวจสอบบัญชีของคุณและยืนยันการรับเงิน',
-            wrap: true,
-            color: '#666666',
-            size: 'xs',
-            margin: 'lg'
-          }
-        ]
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [{
-          type: 'button',
-          action: {
-            type: 'uri',
-            label: 'ยืนยันได้รับเงิน',
-            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID}/contracts/${actionRequest.contract_id}/principal-increase/waiting?requestId=${actionRequest.request_id}`
-          },
-          style: 'primary',
-          color: '#B85C38'
-        }]
-      }
-    }
-  };
 }
