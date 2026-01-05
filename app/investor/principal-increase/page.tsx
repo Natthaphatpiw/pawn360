@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function InvestorPrincipalIncreaseEntry() {
+// Force dynamic rendering to avoid SSR issues with useSearchParams
+export const dynamic = 'force-dynamic';
+
+function InvestorPrincipalIncreaseEntryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [requestId, setRequestId] = useState<string | null>(null);
@@ -54,5 +57,20 @@ export default function InvestorPrincipalIncreaseEntry() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function InvestorPrincipalIncreaseEntry() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
+          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    }>
+      <InvestorPrincipalIncreaseEntryInner />
+    </Suspense>
   );
 }
