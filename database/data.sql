@@ -117,6 +117,7 @@ CREATE TABLE public.contract_action_requests (
   pawner_bank_name character varying,
   pawner_bank_account_no character varying,
   pawner_bank_account_name character varying,
+  pawner_signature_url text,
   signature_url text,
   signed_at timestamp with time zone,
   investor_approved_at timestamp with time zone,
