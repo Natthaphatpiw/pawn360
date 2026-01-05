@@ -225,6 +225,9 @@ export async function POST(request: NextRequest) {
           new_interest_for_remaining_increase: newInterestForRemaining,
           total_amount: totalToPayNow,
           pawner_signature_url: pawnerSignatureUrl,
+          pawner_bank_name: pawnerBankAccount.bank_name,
+          pawner_bank_account_no: pawnerBankAccount.bank_account_no,
+          pawner_bank_account_name: pawnerBankAccount.bank_account_name,
         };
         break;
       }
