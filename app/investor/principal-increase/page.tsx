@@ -1,40 +1,58 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-function InvestorPrincipalIncreaseRedirect() {
+export default function InvestorPrincipalIncreaseEntry() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestId = searchParams.get('requestId');
+  const [requestId, setRequestId] = useState<string | null>(null);
+
+  const resolvedRequestId = useMemo(() => {
+    const direct = searchParams.get('requestId');
+    if (direct) return direct;
+
+    const liffState = searchParams.get('liff.state');
+    if (!liffState) return null;
+
+    const decoded = decodeURIComponent(liffState);
+    const match = decoded.match(/requestId=([^&]+)/);
+    if (match) return match[1];
+    return null;
+  }, [searchParams]);
 
   useEffect(() => {
-    if (requestId) {
-      // Redirect to dynamic route
-      router.replace(`/investor/principal-increase/${requestId}`);
-    } else {
-      // No requestId provided
-      router.replace('/investor/contracts');
+    if (resolvedRequestId) {
+      setRequestId(resolvedRequestId);
+      router.replace(`/investor/principal-increase/${resolvedRequestId}`);
     }
-  }, [requestId, router]);
+  }, [resolvedRequestId, router]);
 
-  return (
-    <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]"></div>
-    </div>
-  );
-}
-
-export default function InvestorPrincipalIncreasePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]"></div>
+  if (requestId) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
+          <p className="mt-4 text-gray-600">กำลังเปิดรายละเอียด...</p>
         </div>
-      }
-    >
-      <InvestorPrincipalIncreaseRedirect />
-    </Suspense>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="w-full max-w-md text-center">
+        <div className="text-red-600 mb-4">ไม่พบคำขอเพิ่มเงินต้น</div>
+        <div className="text-sm text-gray-500 mb-4">
+          กรุณาเปิดลิงก์จากข้อความ LINE อีกครั้ง
+        </div>
+        <button
+          onClick={() => router.back()}
+          className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+        >
+          กลับ
+        </button>
+      </div>
+    </div>
   );
 }
