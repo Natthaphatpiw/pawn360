@@ -60,19 +60,33 @@ function OfferDetailContent() {
       return;
     }
 
+    const canAccept = contract &&
+      !contract.investor_id &&
+      contract.funding_status === 'PENDING' &&
+      ['PENDING', 'PENDING_SIGNATURE'].includes(contract.contract_status);
+
+    if (!canAccept) {
+      alert('ข้อเสนอนี้ไม่พร้อมรับการลงทุนแล้ว');
+      return;
+    }
+
     try {
       setActionLoading(true);
-      await axios.post('/api/contracts/investor-action', {
+      const response = await axios.post('/api/contracts/investor-action', {
         action: 'accept',
         contractId,
         lineId: profile.userId
       });
 
-      alert('ยอมรับข้อเสนอเรียบร้อยแล้ว');
+      if (response.data?.alreadyAccepted) {
+        alert('ข้อเสนอนี้ถูกยอมรับไปแล้ว');
+      } else {
+        alert('ยอมรับข้อเสนอเรียบร้อยแล้ว');
+      }
       router.push('/register-invest'); // Go back to investor profile
     } catch (error: any) {
       console.error('Error accepting offer:', error);
-      alert('เกิดข้อผิดพลาดในการยอมรับข้อเสนอ');
+      alert(error.response?.data?.error || 'เกิดข้อผิดพลาดในการยอมรับข้อเสนอ');
     } finally {
       setActionLoading(false);
     }

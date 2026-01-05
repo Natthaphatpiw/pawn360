@@ -281,7 +281,7 @@ function createPawnerConfirmCard(actionRequest: any): FlexMessage {
             margin: 'md',
             contents: [
               { type: 'text', text: 'โอนเข้าบัญชี:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: actionRequest.pawner_bank_name || '', color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
+              { type: 'text', text: actionRequest.contract?.pawners?.bank_name || '', color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
             ]
           },
           {

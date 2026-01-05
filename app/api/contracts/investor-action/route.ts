@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Update contract with investor
-      await supabase
+      // Update contract with investor (guard against stale/closed contracts)
+      const { data: updatedContracts, error: updateError } = await supabase
         .from('contracts')
         .update({
           investor_id: investorId,
@@ -100,13 +100,36 @@ export async function POST(request: NextRequest) {
           funding_status: 'FUNDED',
           funded_at: new Date().toISOString()
         })
-        .eq('contract_id', contractId);
+        .eq('contract_id', contractId)
+        .is('investor_id', null)
+        .in('contract_status', ['PENDING', 'PENDING_SIGNATURE'])
+        .eq('funding_status', 'PENDING')
+        .select('contract_id');
+
+      if (updateError) {
+        console.error('Error updating contract:', updateError);
+        return NextResponse.json(
+          { error: 'Failed to accept offer' },
+          { status: 500 }
+        );
+      }
+
+      if (!updatedContracts || updatedContracts.length === 0) {
+        return NextResponse.json(
+          { error: 'Contract is no longer available for acceptance' },
+          { status: 409 }
+        );
+      }
 
       // Update loan request
-      await supabase
+      const { error: loanRequestError } = await supabase
         .from('loan_requests')
         .update({ request_status: 'FUNDED' })
         .eq('request_id', contract.loan_request_id);
+
+      if (loanRequestError) {
+        console.error('Error updating loan request:', loanRequestError);
+      }
 
       // Send confirmation message to pawner
       const confirmationCard = createAcceptedCard(contract);

@@ -192,6 +192,24 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const { error: bankUpdateError } = await supabase
+          .from('pawners')
+          .update({
+            bank_name: pawnerBankAccount.bank_name,
+            bank_account_no: pawnerBankAccount.bank_account_no,
+            bank_account_name: pawnerBankAccount.bank_account_name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('customer_id', contract.customer_id);
+
+        if (bankUpdateError) {
+          console.error('Error updating pawner bank info:', bankUpdateError);
+          return NextResponse.json(
+            { error: 'ไม่สามารถบันทึกบัญชีธนาคารได้' },
+            { status: 500 }
+          );
+        }
+
         const interestForPeriod = round2(interestAccrued);
         const principalAfterIncrease = currentPrincipal + increaseAmt;
         const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysRemaining);
@@ -207,9 +225,6 @@ export async function POST(request: NextRequest) {
           new_interest_for_remaining_increase: newInterestForRemaining,
           total_amount: totalToPayNow,
           pawner_signature_url: pawnerSignatureUrl,
-          pawner_bank_name: pawnerBankAccount.bank_name,
-          pawner_bank_account_no: pawnerBankAccount.bank_account_no,
-          pawner_bank_account_name: pawnerBankAccount.bank_account_name,
         };
         break;
       }
