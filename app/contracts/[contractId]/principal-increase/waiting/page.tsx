@@ -179,13 +179,13 @@ export default function PrincipalIncreaseWaitingPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">โอนเข้าบัญชี:</span>
                   <span className="font-bold">
-                    {requestDetails.pawner_bank_name}
+                    {requestDetails.contract?.pawners?.bank_name || ''}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">เลขบัญชี:</span>
                   <span className="font-bold">
-                    {requestDetails.pawner_bank_account_no}
+                    {requestDetails.contract?.pawners?.bank_account_no || ''}
                   </span>
                 </div>
               </div>

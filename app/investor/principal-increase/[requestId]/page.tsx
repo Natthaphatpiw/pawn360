@@ -275,15 +275,15 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">ธนาคาร:</span>
-                <span className="font-bold">{requestDetails?.pawner_bank_name}</span>
+                <span className="font-bold">{requestDetails?.contract?.pawners?.bank_name || ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">เลขบัญชี:</span>
-                <span className="font-bold text-[#1E3A8A]">{requestDetails?.pawner_bank_account_no}</span>
+                <span className="font-bold text-[#1E3A8A]">{requestDetails?.contract?.pawners?.bank_account_no || ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">ชื่อบัญชี:</span>
-                <span className="font-bold">{requestDetails?.pawner_bank_account_name}</span>
+                <span className="font-bold">{requestDetails?.contract?.pawners?.bank_account_name || ''}</span>
               </div>
             </div>
           </div>
