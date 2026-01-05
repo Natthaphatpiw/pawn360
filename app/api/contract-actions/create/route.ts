@@ -302,12 +302,17 @@ export async function POST(request: NextRequest) {
 function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMessage {
   const item = contract?.items;
   const pawner = contract?.pawners;
-  const increaseAmount = actionRequest.increase_amount;
+  const increaseAmount = Number(actionRequest.increase_amount || 0);
   const newPrincipal = actionRequest.principal_after_increase;
-  const interestRate = contract?.interest_rate || 0;
-  const additionalMonthlyInterest = Math.round(increaseAmount * interestRate / 100);
+  const rawInterestRate = Number(contract?.interest_rate || 0);
+  const normalizedInterestRate = rawInterestRate > 1 ? rawInterestRate / 100 : rawInterestRate;
+  const additionalMonthlyInterest = Math.round(increaseAmount * normalizedInterestRate * 100) / 100;
+  const formatAmount = (value: number) => (
+    value % 1
+      ? value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : value.toLocaleString('th-TH')
+  );
 
-  // Investor LIFF ID: 2008641671-ejsAmBXx
   const investorLiffId = process.env.NEXT_PUBLIC_LIFF_ID_INVEST_PRINCIPAL_INCREASE || '2008641671-ejsAmBXx';
 
   return {
@@ -399,7 +404,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
                 margin: 'md',
                 contents: [
                   { type: 'text', text: 'ดอกเบี้ยเพิ่ม/เดือน:', color: '#666666', size: 'sm', flex: 2 },
-                  { type: 'text', text: `+${additionalMonthlyInterest?.toLocaleString()} บาท`, color: '#22C55E', size: 'sm', flex: 3, weight: 'bold' }
+                  { type: 'text', text: `+${formatAmount(additionalMonthlyInterest)} บาท`, color: '#22C55E', size: 'sm', flex: 3, weight: 'bold' }
                 ]
               }
             ]
@@ -415,7 +420,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
           action: {
             type: 'uri',
             label: 'ดูรายละเอียดและอนุมัติ',
-            uri: `https://liff.line.me/2008641671-ejsAmBXx?requestId=${actionRequest.request_id}`
+            uri: `https://liff.line.me/${investorLiffId}?requestId=${actionRequest.request_id}`
           },
           style: 'primary',
           color: '#1E3A8A'

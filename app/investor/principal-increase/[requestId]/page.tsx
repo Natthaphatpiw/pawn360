@@ -151,6 +151,16 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
     );
   }
 
+  const rawInterestRate = Number(contract?.interest_rate || 0);
+  const normalizedInterestRate = rawInterestRate > 1 ? rawInterestRate / 100 : rawInterestRate;
+  const newMonthlyInterest = Math.round(((requestDetails?.principal_after_increase || requestDetails?.new_principal_amount || 0) * normalizedInterestRate) * 100) / 100;
+  const increaseMonthlyInterest = Math.round(((requestDetails?.increase_amount || 0) * normalizedInterestRate) * 100) / 100;
+  const formatAmount = (value: number) => (
+    value % 1
+      ? value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : value.toLocaleString('th-TH')
+  );
+
   return (
     <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col">
       {/* Reject Modal */}
@@ -302,13 +312,13 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
               <div className="flex justify-between">
                 <span className="text-gray-600">ดอกเบี้ยใหม่/เดือน:</span>
                 <span className="font-bold text-green-700">
-                  {Math.round((requestDetails?.principal_after_increase || requestDetails?.new_principal_amount || 0) * (contract?.interest_rate || 0) / 100).toLocaleString()} บาท
+                  {formatAmount(newMonthlyInterest)} บาท
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">เพิ่มขึ้น/เดือน:</span>
                 <span className="font-bold text-green-700">
-                  + {Math.round((requestDetails?.increase_amount || 0) * (contract?.interest_rate || 0) / 100).toLocaleString()} บาท
+                  + {formatAmount(increaseMonthlyInterest)} บาท
                 </span>
               </div>
             </div>
