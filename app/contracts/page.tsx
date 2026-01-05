@@ -195,6 +195,13 @@ export default function PawnerContractList() {
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-transparent p-4 flex flex-col gap-3 max-w-md mx-auto w-full">
+        <button
+          onClick={() => router.push('/contracts/actions')}
+          className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+        >
+          <span className="text-base font-bold">สถานะคำขอทั้งหมด</span>
+          <span className="text-[10px] opacity-70 font-light">Action status</span>
+        </button>
         {/* Pawn Entry Button */}
         <button
           onClick={() => router.push('/estimate')}
