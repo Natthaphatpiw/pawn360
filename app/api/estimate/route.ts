@@ -8,6 +8,8 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 const MODEL = 'gpt-4.1-mini';
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
 const MIN_ESTIMATE_PRICE = 100;
+const OPENAI_RESPONSE_SEED = Number(process.env.OPENAI_RESPONSE_SEED);
+const DETERMINISTIC_SEED = Number.isFinite(OPENAI_RESPONSE_SEED) ? OPENAI_RESPONSE_SEED : undefined;
 
 interface EstimateRequest {
   itemType: string;
@@ -279,6 +281,8 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
     model: MODEL,
     input: prompt,
     max_output_tokens: 300,
+    temperature: 0,
+    ...(DETERMINISTIC_SEED !== undefined ? { seed: DETERMINISTIC_SEED } : {}),
     text: {
       format: {
         type: 'json_schema',
@@ -355,6 +359,8 @@ serpapiResults: ${serpapiPayload ? JSON.stringify(serpapiPayload) : 'null'}
     model: MODEL,
     input: prompt,
     max_output_tokens: 300,
+    temperature: 0,
+    ...(DETERMINISTIC_SEED !== undefined ? { seed: DETERMINISTIC_SEED } : {}),
     tools: [
       {
         type: 'web_search',
