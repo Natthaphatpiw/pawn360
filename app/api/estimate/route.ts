@@ -8,8 +8,8 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 const MODEL = 'gpt-4.1-mini';
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
 const MIN_ESTIMATE_PRICE = 100;
-const OPENAI_RESPONSE_SEED = Number(process.env.OPENAI_RESPONSE_SEED);
-const DETERMINISTIC_SEED = Number.isFinite(OPENAI_RESPONSE_SEED) ? OPENAI_RESPONSE_SEED : undefined;
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 interface EstimateRequest {
   itemType: string;
@@ -238,7 +238,6 @@ async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
   const conditionPercent = input.condition <= 1 ? Math.round(input.condition * 100) : Math.round(input.condition);
   const extraLines = [
     input.capacity ? `- ความจุ: ${input.capacity}` : null,
-    input.color ? `- สี: ${input.color}` : null,
     input.screenSize ? `- ขนาดจอ: ${input.screenSize}` : null,
     input.watchSize ? `- ขนาดนาฬิกา: ${input.watchSize}` : null,
     input.watchConnectivity ? `- การเชื่อมต่อ: ${input.watchConnectivity}` : null,
@@ -256,7 +255,8 @@ async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
 2) สร้าง price range ที่ "กว้างพอสมควร" เพื่อกันราคาเวอร์/ผิดพลาด (ไม่ต้องแคบ)
 
 ข้อกำหนด:
-- ชื่อสินค้า (productName) ต้องรวม Brand + Model + รายละเอียดสำคัญที่ช่วยค้นหา (เช่น ความจุ/สี/สเปค/ปี)
+- ชื่อสินค้า (productName) ต้องรวม Brand + Model + รายละเอียดสำคัญที่ช่วยค้นหา (เช่น ความจุ/สเปค/ปี)
+- ห้ามใส่ "สี" ในชื่อสินค้า และไม่ต้องใช้สีในการประเมินราคา
 - ห้ามใส่ Serial Number ในชื่อสินค้า
 - Price range เป็น THB และควรกว้างพอสำหรับตลาดมือสองในไทย
 
@@ -282,7 +282,6 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
     input: prompt,
     max_output_tokens: 300,
     temperature: 0,
-    ...(DETERMINISTIC_SEED !== undefined ? { seed: DETERMINISTIC_SEED } : {}),
     text: {
       format: {
         type: 'json_schema',
@@ -314,8 +313,19 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
   const fallbackName = `${input.brand} ${input.model}`.trim();
   const priceRange = normalizeRange(parsed?.priceRange);
 
+  let productName = parsed?.productName?.trim() || fallbackName;
+  if (input.color) {
+    const colorToken = input.color.trim();
+    if (colorToken) {
+      productName = productName
+        .replace(new RegExp(escapeRegExp(colorToken), 'ig'), '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
+
   return {
-    productName: parsed?.productName?.trim() || fallbackName,
+    productName,
     priceRange,
   };
 }
@@ -360,7 +370,6 @@ serpapiResults: ${serpapiPayload ? JSON.stringify(serpapiPayload) : 'null'}
     input: prompt,
     max_output_tokens: 300,
     temperature: 0,
-    ...(DETERMINISTIC_SEED !== undefined ? { seed: DETERMINISTIC_SEED } : {}),
     tools: [
       {
         type: 'web_search',
