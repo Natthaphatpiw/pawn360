@@ -8,7 +8,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
-const PRECHECK_MODEL = 'gpt-5.2';
+const PRECHECK_MODEL = 'gpt-4.1-mini';
 const GEMINI_MODEL = 'gemini-3-pro-preview';
 const MAX_IMAGE_COUNT = 6;
 
