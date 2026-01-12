@@ -400,6 +400,13 @@ function EstimatePageInner() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<{
+    percent: number;
+    title: string;
+    detail: string;
+  } | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const appleModels = formData.appleCategory ? (APPLE_MODELS_BY_CATEGORY[formData.appleCategory] || []) : [];
 
@@ -442,6 +449,35 @@ function EstimatePageInner() {
     setError(null);
     setIsAnalyzing(false);
     setIsEstimating(false);
+    setProcessingStatus(null);
+    setIsCanceling(false);
+    abortControllerRef.current = null;
+  };
+
+  const isProcessing = isAnalyzing || isEstimating;
+
+  const updateProcessingStatus = (percent: number, title: string, detail: string) => {
+    setProcessingStatus({
+      percent: Math.max(0, Math.min(100, Math.round(percent))),
+      title,
+      detail,
+    });
+  };
+
+  const ensureNotCanceled = (signal?: AbortSignal) => {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+  };
+
+  const handleCancelProcessing = () => {
+    setIsCanceling(true);
+    setProcessingStatus((prev) => ({
+      percent: prev?.percent ?? 0,
+      title: 'กำลังยกเลิกการประเมิน',
+      detail: 'กำลังหยุดการประมวลผล',
+    }));
+    abortControllerRef.current?.abort();
   };
 
   // Check customer exists
@@ -764,7 +800,6 @@ function EstimatePageInner() {
         if (!formData.appleCategory) return 'กรุณาเลือกประเภทสินค้า Apple';
         if (!formData.model) return 'กรุณาเลือกรุ่นสินค้า Apple';
         if (!formData.capacity) return 'กรุณาระบุความจุของสินค้า Apple';
-        if (!formData.appleSpecs) return 'กรุณาระบุสเปคเพิ่มเติมของสินค้า Apple';
         if (!formData.color) return 'กรุณาระบุสีของสินค้า Apple';
         // serialNo not required for estimation
         break;
@@ -782,10 +817,12 @@ function EstimatePageInner() {
   };
 
   // Upload images
-  const uploadImages = async (): Promise<string[]> => {
+  const uploadImages = async (signal?: AbortSignal): Promise<string[]> => {
     if (images.length === 0) return [];
+    ensureNotCanceled(signal);
 
     const uploadPromises = images.map(async (file) => {
+      ensureNotCanceled(signal);
       const formDataUpload = new FormData();
       formDataUpload.append('file', file);
 
@@ -793,6 +830,7 @@ function EstimatePageInner() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        signal,
       });
 
       return response.data.url;
@@ -818,6 +856,13 @@ function EstimatePageInner() {
     setIsAnalyzing(true);
     setIsEstimating(true);
     setError(null);
+    setIsCanceling(false);
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const { signal } = abortController;
+
+    updateProcessingStatus(5, 'เตรียมรูปภาพ', 'กำลังบีบอัดและเตรียมรูปภาพ');
 
     try {
       // Step 1: Compress and analyze condition with AI
@@ -842,6 +887,8 @@ function EstimatePageInner() {
           }
         })
       );
+      ensureNotCanceled(signal);
+      updateProcessingStatus(20, 'เตรียมรูปภาพ', 'กำลังแปลงรูปภาพสำหรับตรวจสอบ');
 
       // Convert compressed images to base64
       const base64Images = await Promise.all(
@@ -854,6 +901,8 @@ function EstimatePageInner() {
           });
         })
       );
+      ensureNotCanceled(signal);
+      updateProcessingStatus(35, 'ตรวจสอบรูปภาพ', 'กำลังตรวจสอบประเภทสินค้าและความสอดคล้องของรูปภาพ');
 
       console.log('🔍 Analyzing condition...');
       const conditionResponse = await axios.post('/api/analyze-condition', {
@@ -862,17 +911,21 @@ function EstimatePageInner() {
         brand: formData.brand,
         model: formData.model,
         appleCategory: formData.appleCategory,
-      });
+      }, { signal });
 
       setConditionResult(conditionResponse.data);
       setIsAnalyzing(false);
       console.log('✅ Condition analysis completed');
+      ensureNotCanceled(signal);
+      updateProcessingStatus(60, 'อัปโหลดรูปภาพ', 'กำลังอัปโหลดรูปภาพเพื่อประเมินราคา');
 
       // Step 2: Upload images
       console.log('📤 Starting image upload...');
-      const uploadedUrls = await uploadImages();
+      const uploadedUrls = await uploadImages(signal);
       setUploadedImageUrls(uploadedUrls);
       console.log('✅ Image upload completed:', uploadedUrls);
+      ensureNotCanceled(signal);
+      updateProcessingStatus(80, 'ประเมินราคา', 'กำลังคำนวณราคาประเมิน');
 
       // Step 3: Estimate price with AI
       console.log('🧠 Starting price estimation...');
@@ -889,7 +942,6 @@ function EstimatePageInner() {
         brand: formData.brand,
         model: formData.model,
         capacity: formData.capacity,
-        serialNo: formData.serialNo,
         accessories: formData.itemType === 'Apple'
           ? Object.entries(formData.appleAccessories || {})
               .filter(([, value]) => value)
@@ -911,10 +963,11 @@ function EstimatePageInner() {
         }),
       };
 
-      const estimateResponse = await axios.post('/api/estimate', estimateData);
+      const estimateResponse = await axios.post('/api/estimate', estimateData, { signal });
       console.log('✅ Price estimation completed:', estimateResponse.data);
       setEstimateResult(estimateResponse.data);
       setDesiredPrice(estimateResponse.data.estimatedPrice.toString());
+      updateProcessingStatus(100, 'สรุปผล', 'กำลังจัดเตรียมผลการประเมิน');
 
       // Update form data with condition from AI
       setFormData(prev => ({
@@ -928,10 +981,17 @@ function EstimatePageInner() {
 
     } catch (error: any) {
       console.error('Error during analysis and estimation:', error);
+      if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError') {
+        setError('ยกเลิกการประเมินแล้ว');
+        return;
+      }
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการประเมินราคา');
     } finally {
       setIsAnalyzing(false);
       setIsEstimating(false);
+      setProcessingStatus(null);
+      setIsCanceling(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -1019,6 +1079,43 @@ function EstimatePageInner() {
   return (
     <div className={`min-h-screen bg-gray-50 flex justify-center py-4 px-2 md:px-0 ${sarabun.className}`}>
       <div className="w-full max-w-md bg-white rounded-lg shadow-sm p-4 md:p-6 pb-20">
+        {isProcessing && processingStatus && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full border-4 border-orange-200 border-t-orange-500 animate-spin" />
+                <div>
+                  <p className="text-xs text-gray-500">กำลังดำเนินการ</p>
+                  <p className="text-base font-semibold text-gray-800">{processingStatus.title}</p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-sm text-gray-600">{processingStatus.detail}</p>
+
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>ความคืบหน้า</span>
+                  <span>{processingStatus.percent}%</span>
+                </div>
+                <div className="mt-2 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full bg-orange-500 transition-all duration-500"
+                    style={{ width: `${processingStatus.percent}%` }}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleCancelProcessing}
+                disabled={isCanceling}
+                className="mt-5 w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCanceling ? 'กำลังยกเลิก...' : 'ยกเลิกการประเมิน'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Form Step */}
         {currentStep === 'form' && (
@@ -1186,7 +1283,7 @@ function EstimatePageInner() {
                     </div>
 
                     <div>
-                      <FormLabel thai="สเปคเพิ่มเติม" eng="Additional specs" required />
+                      <FormLabel thai="สเปคเพิ่มเติม" eng="Additional specs" />
                       <input
                         type="text"
                         name="appleSpecs"
@@ -1263,25 +1360,6 @@ function EstimatePageInner() {
                       />
                     </div>
                   </>
-                )}
-
-                {/* Serial Number (for all except mobile accessory) */}
-                {formData.itemType !== 'อุปกรณ์เสริมโทรศัพท์' && (
-                  <div className="mb-4">
-                    <FormLabel
-                      thai={formData.itemType === 'Apple' ? 'Serial Number / IMEI' : 'หมายเลขซีเรียล'}
-                      eng="Serial no."
-                      required={formData.itemType === 'โทรศัพท์มือถือ' || formData.itemType === 'Apple'}
-                    />
-                    <input
-                      type="text"
-                      name="serialNo"
-                      value={formData.serialNo}
-                      onChange={handleInputChange}
-                      placeholder={formData.itemType === 'Apple' ? 'ระบุหมายเลขเครื่อง' : 'หมายเลขซีเรียล'}
-                      className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
-                    />
-                  </div>
                 )}
 
                 {/* Camera Specific - Lens Model */}
@@ -1584,18 +1662,14 @@ function EstimatePageInner() {
             <div className="space-y-3">
               <button
                 onClick={handleAnalyzeAndEstimate}
-                disabled={isAnalyzing || isEstimating}
+                disabled={isProcessing}
                 className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: (isAnalyzing || isEstimating) ? '#9ca3af' : '#c2410c',
+                  backgroundColor: isProcessing ? '#9ca3af' : '#c2410c',
                   color: 'white'
                 }}
               >
-                {isAnalyzing
-                  ? 'กำลังวิเคราะห์สภาพด้วย AI...'
-                  : isEstimating
-                    ? 'กำลังประเมินราคา...'
-                    : 'ประเมินราคาด้วย AI'}
+                {isProcessing ? 'กำลังประมวลผล...' : 'ประเมินราคาด้วย AI'}
               </button>
 
               <button
@@ -1830,12 +1904,6 @@ function EstimatePageInner() {
                   <span className="text-gray-600">รุ่น:</span>
                   <span className="font-medium">{formData.model}</span>
                 </div>
-                {formData.serialNo && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Serial No.:</span>
-                    <span className="font-medium">{formData.serialNo}</span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1893,6 +1961,25 @@ function EstimatePageInner() {
           <div className="space-y-6">
             <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการจำนำ</h1>
 
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <FormLabel
+                thai={formData.itemType === 'Apple' ? 'Serial Number / IMEI' : 'หมายเลขซีเรียล'}
+                eng="Serial no."
+                required={formData.itemType === 'โทรศัพท์มือถือ' || formData.itemType === 'Apple'}
+              />
+              <input
+                type="text"
+                name="serialNo"
+                value={formData.serialNo}
+                onChange={handleInputChange}
+                placeholder={formData.itemType === 'Apple' ? 'ระบุหมายเลขเครื่อง' : 'ระบุหมายเลขซีเรียล'}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                แนะนำให้กรอกเลขเครื่อง/Serial เพื่อความถูกต้องของสัญญา
+              </p>
+            </div>
+
             {/* Store Selection */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="font-semibold mb-3">เลือกร้านจำนำ</h3>
@@ -1940,12 +2027,12 @@ function EstimatePageInner() {
                     <div className="flex justify-between items-center">
                       <span>ราคาที่ต้องการจำนำ:</span>
                       <div className="flex items-center gap-2">
-                        <input
+                          <input
                           type="number"
                           value={desiredPrice}
                           onChange={(e) => setDesiredPrice(e.target.value)}
                           placeholder={estimateResult.estimatedPrice.toString()}
-                          className="w-24 p-1 border border-gray-300 rounded text-right text-sm"
+                          className="w-24 p-1 border border-gray-300 rounded text-right text-sm placeholder:text-gray-300"
                           min="1"
                           max={estimateResult.estimatedPrice}
                         />

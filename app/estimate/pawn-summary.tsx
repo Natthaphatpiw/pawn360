@@ -51,6 +51,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   console.log('🎯 PawnSummary component rendered with:', { itemData, lineId });
 
   const [loanAmount, setLoanAmount] = useState<string>('');
+  const [serialNo, setSerialNo] = useState<string>(itemData.serialNo || '');
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('pickup');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [duration, setDuration] = useState<string>('30');
@@ -132,6 +133,12 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
 
   const handleSubmit = async () => {
     console.log('🚀 handleSubmit called in pawn-summary');
+    const normalizedSerial = serialNo.trim();
+    const isSerialRequired = itemData.itemType === 'โทรศัพท์มือถือ' || itemData.itemType === 'Apple';
+    if (isSerialRequired && !normalizedSerial) {
+      alert('กรุณาระบุหมายเลขเครื่อง/Serial ก่อนดำเนินการ');
+      return;
+    }
     if (!isRegistered || loanAmountNum === 0) {
       console.log('❌ Validation failed:', { isRegistered, loanAmountNum });
       return;
@@ -141,7 +148,10 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
       setIsSubmitting(true);
       const submissionData = {
         lineId,
-        itemData,
+        itemData: {
+          ...itemData,
+          serialNo: normalizedSerial || undefined,
+        },
         loanAmount: loanAmountNum,
         deliveryMethod,
         deliveryFee,
@@ -175,6 +185,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
 
   const handleSaveDraft = async () => {
     try {
+      const normalizedSerial = serialNo.trim();
       const draftData = {
         lineId,
         itemType: itemData.itemType,
@@ -182,7 +193,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         model: itemData.model,
         capacity: itemData.capacity,
         color: itemData.color,
-        serialNo: itemData.serialNo,
+        serialNo: normalizedSerial || undefined,
         screenSize: itemData.screenSize,
         watchSize: itemData.watchSize,
         watchConnectivity: itemData.watchConnectivity,
@@ -257,6 +268,23 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           </div>
         </div>
 
+        {/* 2.1 Serial Number */}
+        <div className="mb-6">
+          <label className="block font-bold text-gray-800 mb-2">
+            {itemData.itemType === 'Apple' ? 'Serial Number / IMEI' : 'หมายเลขซีเรียล'}
+          </label>
+          <input
+            type="text"
+            value={serialNo}
+            onChange={(e) => setSerialNo(e.target.value)}
+            placeholder={itemData.itemType === 'Apple' ? 'ระบุหมายเลขเครื่อง' : 'ระบุหมายเลขซีเรียล'}
+            className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 placeholder:text-gray-300"
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            สำหรับโทรศัพท์มือถือ/Apple กรุณากรอก IMEI หรือ Serial ให้ครบถ้วน
+          </p>
+        </div>
+
         {/* 3. AI Estimated Price Card */}
         <div className="bg-[#EBCDBF] rounded-2xl p-6 text-center mb-8 shadow-sm relative overflow-hidden">
           {/* Decorative background circle */}
@@ -281,7 +309,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
               value={loanAmount ? parseInt(loanAmount).toLocaleString('en-US') : ''}
               onChange={handleLoanAmountChange}
               placeholder={maxLoanAmount.toLocaleString('en-US')}
-              className="w-full p-4 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 font-bold"
+              className="w-full p-4 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 font-bold placeholder:text-gray-300"
             />
             <span className="absolute right-4 top-4.5 text-gray-400 text-sm">THB</span>
           </div>
@@ -302,13 +330,13 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
               className="w-full p-4 pr-10 bg-white border border-gray-300 rounded-xl text-gray-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#C0562F]"
             >
               <option value="delivery">บริการจัดส่ง (+40บาท)</option>
-              <option value="pickup">รับด้วยตัวเอง (Walk-in)</option>
+              <option value="pickup">ดำเนินการด้วยตัวเอง (Walk-in)</option>
             </select>
             <ChevronDown className="absolute right-4 top-4.5 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
 
           <p className="text-[10px] text-gray-500 mt-2 leading-tight">
-            *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &quot;รับด้วยตัวเอง&quot;<br/>
+            *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &quot;ดำเนินการด้วยตัวเอง&quot;<br/>
             แล้วเรียกบริการส่งของด้วยตัวเองได้ หรือติดต่อ &quot;ช่วยเหลือ/Support&quot;
           </p>
         </div>

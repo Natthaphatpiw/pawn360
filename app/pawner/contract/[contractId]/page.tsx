@@ -249,12 +249,12 @@ const PawnContractDetail = () => {
                 <div className="relative">
                   <select className="w-full p-3 pr-10 bg-white border border-gray-300 rounded-xl text-gray-800 text-xs appearance-none focus:outline-none focus:border-[#C0562F]">
                     <option>บริการจัดส่ง (+40บาท)</option>
-                    <option>รับด้วยตัวเอง</option>
+                    <option>ดำเนินการด้วยตัวเอง</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
                 <p className="text-[10px] text-[#C0562F] mt-2 leading-tight font-light">
-                  *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &ldquo;รับด้วยตัวเอง&rdquo;<br/>
+                  *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &ldquo;ดำเนินการด้วยตัวเอง&rdquo;<br/>
                   แล้วเรียกบริการส่งของด้วยตัวเองได้
                 </p>
               </div>

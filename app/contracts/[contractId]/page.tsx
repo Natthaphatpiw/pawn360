@@ -93,9 +93,6 @@ export default function PawnContractDetail() {
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [modalStep, setModalStep] = useState(1);
   const [decreaseAmount, setDecreaseAmount] = useState('');
-  const [increaseAmount, setIncreaseAmount] = useState('');
-  const [payInterestSeparately, setPayInterestSeparately] = useState(false);
-  const [deliveryMethod, setDeliveryMethod] = useState('delivery');
 
   useEffect(() => {
     if (contractId) {
@@ -148,13 +145,6 @@ export default function PawnContractDetail() {
     setActiveModal(null);
     setModalStep(1);
     setDecreaseAmount('');
-    setIncreaseAmount('');
-    setPayInterestSeparately(false);
-    setDeliveryMethod('delivery');
-  };
-
-  const nextStep = () => {
-    setModalStep(2);
   };
 
   const InfoRow = ({ label, value, valueColor = 'text-gray-600', isBoldValue = false }: {
@@ -394,103 +384,34 @@ export default function PawnContractDetail() {
         {activeModal === 'increase' && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 animate-fade-in shadow-xl relative">
+              <div className="flex items-center gap-2 mb-4 text-left">
+                <h3 className="text-lg font-bold text-gray-800">เพิ่มเงินต้น</h3>
+                <span className="bg-gray-200 text-gray-500 text-[10px] px-2 py-0.5 rounded-md font-medium">Increase loan</span>
+              </div>
 
-              {modalStep === 1 && (
-                <>
-                  <div className="flex items-center gap-2 mb-6 text-left">
-                    <h3 className="text-lg font-bold text-gray-800">เพิ่มเงินต้น</h3>
-                    <span className="bg-gray-200 text-gray-500 text-[10px] px-2 py-0.5 rounded-md font-medium">Increase loan</span>
-                  </div>
+              <p className="text-sm text-gray-600 mb-4">
+                คุณจะระบุจำนวนเงินที่ต้องการเพิ่มในขั้นตอนถัดไป
+                และต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ทันที
+              </p>
 
-                  <div className="mb-4 text-left">
-                    <label className="text-xs font-bold text-gray-800 block mb-2">
-                      ระบุจำนวนเงินต้นที่ต้องการเพิ่ม(บาท)
-                    </label>
-                    <input
-                      type="text"
-                      value={increaseAmount}
-                      onChange={(e) => setIncreaseAmount(e.target.value)}
-                      placeholder="0"
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800 font-medium text-sm"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1 font-light">
-                      ยอดสูงสุดไม่เกิน {(contract.item.estimated_value - contract.loan_principal_amount).toLocaleString()} บาท
-                    </p>
-                  </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 mb-5">
+                ดอกเบี้ยที่ค้างถึงวันนี้จะถูกเรียกเก็บก่อนส่งคำขอให้นักลงทุนพิจารณา
+              </div>
 
-                  <div className="flex items-center gap-2 mb-6 text-left">
-                    <input
-                      type="checkbox"
-                      id="pay-interest"
-                      checked={payInterestSeparately}
-                      onChange={(e) => setPayInterestSeparately(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 accent-[#C0562F] cursor-pointer"
-                    />
-                    <label htmlFor="pay-interest" className="text-xs text-gray-600 cursor-pointer">
-                      ต้องการชำระดอกเบี้ยแยกต่างหาก
-                    </label>
-                  </div>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={nextStep}
-                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
-                    >
-                      ถัดไป
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="w-full bg-white border border-[#C0562F] text-[#C0562F] rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      ยกเลิก
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {modalStep === 2 && (
-                <div className="text-center">
-                  <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                      <span className="text-4xl text-[#C0562F] font-bold">!</span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-bold text-gray-800">ยืนยันการเพิ่มเงินต้น</h3>
-                  <p className="text-xs text-gray-500 mb-2 font-light">Confirm principal increase</p>
-
-                  <div className="my-4">
-                    <p className="text-gray-700 text-sm font-medium">
-                      ยอดที่ขอเพิ่มไป {(parseFloat(increaseAmount.replace(/,/g, '')) || 0).toLocaleString()} Baht
-                    </p>
-                    {payInterestSeparately && (
-                      <p className="text-[#C0562F] font-bold text-sm">
-                        ยอดชำระดอกเบี้ย {contract.remainingInterest.toLocaleString()} Baht
-                      </p>
-                    )}
-                  </div>
-
-                  <p className="text-[10px] text-red-500 mb-6 px-4 leading-relaxed font-light">
-                    เมื่อกดยืนยันแล้วกรุณารอการร้านยืนยัน<br />
-                    เมื่อร้านยืนยันแล้วโปรดเข้าไปทำรายการต่อที่หน้าร้าน
-                  </p>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => router.push(`/contracts/${contractId}/principal-increase?amount=${increaseAmount}`)}
-                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
-                    >
-                      ยืนยัน
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      ยกเลิก
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="space-y-3">
+                <button
+                  onClick={() => router.push(`/contracts/${contractId}/principal-increase`)}
+                  className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                >
+                  ดำเนินการต่อ
+                </button>
+                <button
+                  onClick={closeModal}
+                  className="w-full bg-white border border-[#C0562F] text-[#C0562F] rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+              </div>
             </div>
           </div>
         )}
