@@ -49,6 +49,10 @@ export type RepresentativePriceResult = {
   };
 };
 
+type RepresentativePriceConfigResolved =
+  Required<Omit<RepresentativePriceConfig, 'weights'>> &
+  Pick<RepresentativePriceConfig, 'weights'>;
+
 export function computeRepresentativeUsedPriceTHB(
   items: Array<number | PriceItem>,
   cfg: RepresentativePriceConfig = {}
@@ -168,7 +172,7 @@ export function computeRepresentativeUsedPriceTHB(
   };
 }
 
-function withDefaults(cfg: RepresentativePriceConfig): Required<RepresentativePriceConfig> {
+function withDefaults(cfg: RepresentativePriceConfig): RepresentativePriceConfigResolved {
   return {
     winsorizeLowPct: cfg.winsorizeLowPct ?? 10,
     winsorizeHighPct: cfg.winsorizeHighPct ?? 90,
@@ -187,7 +191,7 @@ function withDefaults(cfg: RepresentativePriceConfig): Required<RepresentativePr
     hiDispClampHighPct: cfg.hiDispClampHighPct ?? 50,
     loDispClampLowPct: cfg.loDispClampLowPct ?? 25,
     loDispClampHighPct: cfg.loDispClampHighPct ?? 55,
-    weights: cfg.weights ?? undefined,
+    weights: cfg.weights,
     includeDebug: cfg.includeDebug ?? false,
   };
 }
