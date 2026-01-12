@@ -235,6 +235,7 @@ export async function POST(request: NextRequest) {
         }
       );
 
+      const totalPaidNow = Number(verificationResult.detectedAmount || expectedAmount || 0);
       await logContractAction(
         actionRequest.contract_id,
         actionRequest.request_type,
