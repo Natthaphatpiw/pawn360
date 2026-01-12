@@ -7,7 +7,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({
 }) : null;
 
 const MODEL = 'gpt-4.1-mini';
-const PRICE_SEARCH_MODEL = 'gpt-5.2';
+const PRICE_SEARCH_MODEL = 'gpt-4.1';
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
 const MIN_ESTIMATE_PRICE = 100;
 const WEB_SEARCH_MIN_ITEMS = 4;
@@ -63,10 +63,6 @@ interface EstimateResponse {
 
 interface NormalizedData {
   productName: string;
-  priceRange: {
-    min: number;
-    max: number;
-  };
 }
 
 interface SerpapiShoppingItem {
@@ -134,34 +130,6 @@ function parseJsonFromText<T>(text: string): T | null {
       return null;
     }
   }
-}
-
-function normalizeRange(range?: { min?: number; max?: number }): { min: number; max: number } {
-  const rawMin = Number(range?.min);
-  const rawMax = Number(range?.max);
-
-  const safeMin = Number.isFinite(rawMin) && rawMin > 0 ? rawMin : MIN_ESTIMATE_PRICE;
-  const safeMax = Number.isFinite(rawMax) && rawMax > 0 ? rawMax : Math.max(safeMin * 2, safeMin + 1000);
-
-  const min = Math.min(safeMin, safeMax);
-  const max = Math.max(safeMin, safeMax);
-
-  return {
-    min: Math.round(Math.max(MIN_ESTIMATE_PRICE, min)),
-    max: Math.round(Math.max(MIN_ESTIMATE_PRICE, max)),
-  };
-}
-
-function clampToRange(value: number, range: { min: number; max: number }): number {
-  if (!Number.isFinite(value)) {
-    return Math.round((range.min + range.max) / 2);
-  }
-
-  if (value < range.min || value > range.max) {
-    return Math.round((range.min + range.max) / 2);
-  }
-
-  return Math.round(value);
 }
 
 function isSerpapiEnabled(): boolean {
@@ -458,15 +426,11 @@ Return JSON only with:
   }
 }
 
-// Agent 1: Normalize input data และประเมิน price range
+// Agent 1: Normalize input data only
 async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
   if (!openai) {
     return {
       productName: `${input.brand} ${input.model}`.trim(),
-      priceRange: {
-        min: MIN_ESTIMATE_PRICE,
-        max: 10000,
-      },
     };
   }
 
@@ -485,15 +449,13 @@ async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
     input.lenses && input.lenses.length > 0 ? `- เลนส์: ${input.lenses.join(', ')}` : null,
   ].filter(Boolean).join('\n');
 
-  const prompt = `คุณเป็นผู้เชี่ยวชาญประเมินราคาสินค้ามือสองในประเทศไทย ทำ 2 งาน:
+  const prompt = `คุณเป็นผู้เชี่ยวชาญประเมินราคาสินค้ามือสองในประเทศไทย ทำ 1 งาน:
 1) Normalize ชื่อสินค้าให้ชัดเจนและใช้ค้นหาแล้วเจอสินค้าจริง
-2) สร้าง price range ที่ "กว้างพอสมควร" เพื่อกันราคาเวอร์/ผิดพลาด (ไม่ต้องแคบ)
 
 ข้อกำหนด:
 - ชื่อสินค้า (productName) ต้องรวม Brand + Model + รายละเอียดสำคัญที่ช่วยค้นหา (เช่น ความจุ/สเปค/ปี)
 - ห้ามใส่ "สี" ในชื่อสินค้า และไม่ต้องใช้สีในการประเมินราคา
 - ห้ามใส่ Serial Number ในชื่อสินค้า
-- Price range เป็น THB และควรกว้างพอสำหรับตลาดมือสองในไทย
 
 ข้อมูลสินค้า:
 - ประเภท: ${input.itemType}
@@ -508,8 +470,7 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
 
 ตอบกลับเป็น JSON เท่านั้น:
 {
-  "productName": "ชื่อสินค้า",
-  "priceRange": { "min": 0, "max": 0 }
+  "productName": "ชื่อสินค้า"
 }`;
 
   const response = await openai.responses.create({
@@ -527,17 +488,8 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
           additionalProperties: false,
           properties: {
             productName: { type: 'string' },
-            priceRange: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                min: { type: 'number' },
-                max: { type: 'number' },
-              },
-              required: ['min', 'max'],
-            },
           },
-          required: ['productName', 'priceRange'],
+          required: ['productName'],
         },
       },
     },
@@ -546,7 +498,6 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
   const content = getResponseText(response);
   const parsed = parseJsonFromText<NormalizedData>(content);
   const fallbackName = `${input.brand} ${input.model}`.trim();
-  const priceRange = normalizeRange(parsed?.priceRange);
 
   let productName = parsed?.productName?.trim() || fallbackName;
   if (input.color) {
@@ -561,7 +512,6 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
 
   return {
     productName,
-    priceRange,
   };
 }
 
@@ -602,10 +552,9 @@ type RepresentativeMarketResult = {
 // Agent 2: Web search + SerpAPI -> merge -> representative price
 async function getRepresentativeMarketPrice(
   input: EstimateRequest,
-  normalizedData: NormalizedData
+  productName: string
 ): Promise<RepresentativeMarketResult> {
-  const normalizedRange = normalizeRange(normalizedData.priceRange);
-  const fallbackPrice = Math.round((normalizedRange.min + normalizedRange.max) / 2);
+  const fallbackPrice = MIN_ESTIMATE_PRICE;
 
   if (!openai) {
     return {
@@ -617,8 +566,8 @@ async function getRepresentativeMarketPrice(
   }
 
   const [webResults, serpapiResults] = await Promise.all([
-    fetchWebSearchPrices(normalizedData.productName),
-    fetchSerpapiShoppingResults(input, normalizedData.productName),
+    fetchWebSearchPrices(productName),
+    fetchSerpapiShoppingResults(input, productName),
   ]);
 
   const webItems = (webResults?.items || [])
@@ -642,8 +591,7 @@ async function getRepresentativeMarketPrice(
 
   try {
     const analysis = computeRepresentativeUsedPriceTHB(combinedItems, { weights });
-    const clamped = clampToRange(analysis.representativePrice, normalizedRange);
-    const marketPrice = Math.max(clamped, MIN_ESTIMATE_PRICE);
+    const marketPrice = Math.max(analysis.representativePrice, MIN_ESTIMATE_PRICE);
     return {
       marketPrice,
       analysis,
@@ -679,13 +627,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
       );
     }
 
-    console.log('🔄 Agent 1: Normalizing input and estimating price range...');
+    console.log('🔄 Agent 1: Normalizing input...');
     const normalizedData = await normalizeInput(body);
     console.log('✅ Normalized product name:', normalizedData.productName);
-    console.log('✅ Estimated price range:', normalizedData.priceRange);
 
     console.log('🔄 Agent 2: Fetching web search + SerpAPI prices...');
-    const representative = await getRepresentativeMarketPrice(body, normalizedData);
+    const representative = await getRepresentativeMarketPrice(body, normalizedData.productName);
     console.log('🔍 Web search items:', representative.sourceCounts.web);
     console.log('🔍 SerpAPI items (filtered):', representative.sourceCounts.serpapi);
     if (representative.analysis) {
@@ -721,8 +668,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
       normalizedInput: normalizedData,
       calculation: {
         marketPrice: representative.analysis
-          ? `ราคาตัวแทน (low-but-fair) จาก web_search ${representative.sourceCounts.web} รายการ${representative.sourceCounts.serpapi > 0 ? ` + SerpAPI ${representative.sourceCounts.serpapi} รายการ` : ''}${representative.usedWeights ? ' | ให้น้ำหนักตลาดไทย' : ''} (ช่วง ${normalizedData.priceRange.min.toLocaleString()}-${normalizedData.priceRange.max.toLocaleString()} บาท)`
-          : `ราคากลางจากช่วง ${normalizedData.priceRange.min.toLocaleString()}-${normalizedData.priceRange.max.toLocaleString()} บาท (ข้อมูลตลาดไม่เพียงพอ)`,
+          ? `ราคาตัวแทน (low-but-fair) จาก web_search ${representative.sourceCounts.web} รายการ${representative.sourceCounts.serpapi > 0 ? ` + SerpAPI ${representative.sourceCounts.serpapi} รายการ` : ''}${representative.usedWeights ? ' | ให้น้ำหนักตลาดไทย' : ''}`
+          : 'ราคาตัวแทนจากข้อมูลตลาดไม่เพียงพอ',
         pawnPrice: `ราคาจำนำ = ${marketPrice.toLocaleString()} × 0.6 = ${pawnPrice.toLocaleString()} บาท`,
         finalPrice: `ราคาประเมิน = ${pawnPrice.toLocaleString()} × สภาพ ${(normalizedCondition * 100).toFixed(0)}% = ${finalPrice.toLocaleString()} บาท`,
       },
