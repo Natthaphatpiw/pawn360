@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null;
 
-const MODEL = 'gpt-4.1-mini';
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
+const PRECHECK_MODEL = 'gpt-5.2';
+const GEMINI_MODEL = 'gemini-3-pro-preview';
+const MAX_IMAGE_COUNT = 6;
 
 function getResponseText(response: any): string {
   if (typeof response?.output_text === 'string') {
@@ -24,8 +29,21 @@ function getResponseText(response: any): string {
     .join('\n');
 }
 
-// Agent 3: Analyze condition from images (moved from estimate route)
-async function analyzeConditionFromImages(images: string[]): Promise<{
+function parseJsonFromText<T>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]) as T;
+    } catch {
+      return null;
+    }
+  }
+}
+
+type ConditionResult = {
   score: number;
   totalScore: number;
   grade: string;
@@ -39,47 +57,23 @@ async function analyzeConditionFromImages(images: string[]): Promise<{
   };
   recommendation: string;
   imageQuality: string;
-}> {
-  if (!images || images.length === 0) {
-    return {
-      score: 0.5,
-      totalScore: 50,
-      grade: 'F',
-      reason: 'ไม่พบรูปภาพประกอบ ใช้ค่าประเมินเบื้องต้น',
-      detailedBreakdown: {
-        screen: { score: 0, maxScore: 35, description: 'ไม่สามารถประเมินได้' },
-        body: { score: 0, maxScore: 30, description: 'ไม่สามารถประเมินได้' },
-        buttons: { score: 0, maxScore: 20, description: 'ไม่สามารถประเมินได้' },
-        camera: { score: 0, maxScore: 10, description: 'ไม่สามารถประเมินได้' },
-        overall: { score: 0, maxScore: 5, description: 'ไม่สามารถประเมินได้' }
-      },
-      recommendation: 'ต้องการภาพเพิ่มเติม',
-      imageQuality: 'ไม่พบรูปภาพ'
-    };
-  }
+};
 
-  try {
-    if (!openai) {
-      // Return default values if OpenAI is not available
-      return {
-        score: 0.7,
-        totalScore: 70,
-        grade: 'C',
-        reason: 'ไม่สามารถวิเคราะห์จากรูปภาพได้ ใช้ค่าประเมินเบื้องต้น',
-        detailedBreakdown: {
-          screen: { score: 25, maxScore: 35, description: 'ไม่สามารถประเมินได้' },
-          body: { score: 21, maxScore: 30, description: 'ไม่สามารถประเมินได้' },
-          buttons: { score: 14, maxScore: 20, description: 'ไม่สามารถประเมินได้' },
-          camera: { score: 7, maxScore: 10, description: 'ไม่สามารถประเมินได้' },
-          overall: { score: 3, maxScore: 5, description: 'ไม่สามารถประเมินได้' }
-        },
-        recommendation: 'OpenAI API ไม่พร้อมใช้งาน',
-        imageQuality: 'ไม่สามารถวิเคราะห์ได้'
-      };
-    }
+type ImagePrecheckResult = {
+  pass: boolean;
+  reason: string;
+  expectedType: string;
+  consistentItem: boolean;
+  imageChecks: Array<{
+    index: number;
+    detectedType: string;
+    matchesExpected: boolean;
+    note: string;
+  }>;
+  recommendation: string;
+};
 
-    // Use OpenAI Vision API to analyze condition from base64 images
-    const prompt = `# Phone Condition Assessment Prompt
+const CONDITION_PROMPT = `# Phone Condition Assessment Prompt
 
 ## บทบาทและหน้าที่
 คุณคือผู้เชี่ยวชาญด้านการประเมินสภาพโทรศัพท์มือถือสำหรับธุรกิจจำนำ มีประสบการณ์ในการตรวจสอบอุปกรณ์อิเล็กทรอนิกส์มากกว่า 10 ปี คุณต้องวิเคราะห์รูปภาพโทรศัพท์ที่ได้รับอย่างละเอียดและให้คะแนนสภาพที่แม่นยำ เป็นกลาง และสามารถอธิบายเหตุผลได้อย่างชัดเจน
@@ -220,127 +214,234 @@ async function analyzeConditionFromImages(images: string[]): Promise<{
   "imageQuality": "ภาพไม่เพียงพอ - ต้องการภาพด้านหน้า, ด้านหลัง, ด้านข้าง, พอร์ตชาร์จ, ปุ่มกด"
 }`;
 
-    const input: any[] = [
-      {
-        role: 'user',
-        content: [
-          { type: 'input_text', text: prompt },
-        ],
-      },
-    ];
-
-    const maxImages = Math.min(images.length, 4);
-    for (let i = 0; i < maxImages; i++) {
-      input[0].content.push({
-        type: 'input_image',
-        image_url: images[i],
-        detail: 'low',
-      });
-    }
-
-    const response = await openai.responses.create({
-      model: MODEL,
-      input,
-      max_output_tokens: 300,
-      text: {
-        format: {
-          type: 'json_object',
+const toGeminiImagePart = (value: string) => {
+  if (typeof value === 'string' && value.startsWith('data:')) {
+    const match = value.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      return {
+        inlineData: {
+          data: match[2],
+          mimeType: match[1],
         },
-      },
+      };
+    }
+  }
+
+  return {
+    inlineData: {
+      data: value,
+      mimeType: 'image/jpeg',
+    },
+  };
+};
+
+const buildExpectedTypeLabel = (itemType: string, appleCategory?: string) => {
+  if (itemType === 'Apple') {
+    if (appleCategory) {
+      return `Apple ${appleCategory}`;
+    }
+    return 'Apple product (iPhone/iPad/MacBook/Apple Watch/AirPods/iMac/Mac mini/Mac Studio/Mac Pro)';
+  }
+  return itemType;
+};
+
+// Agent 1: Image precheck with OpenAI (type match + consistency)
+async function precheckImages(options: {
+  images: string[];
+  itemType: string;
+  brand?: string;
+  model?: string;
+  appleCategory?: string;
+}): Promise<ImagePrecheckResult> {
+  if (!openai) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+
+  const expectedType = buildExpectedTypeLabel(options.itemType, options.appleCategory);
+  const prompt = `คุณเป็นระบบตรวจสอบความถูกต้องของรูปภาพก่อนประเมินสภาพสินค้า
+เป้าหมาย: ตรวจว่ารูปที่อัปโหลด "ตรงกับประเภทสินค้า" และ "เป็นสินค้าเดียวกันทุกภาพ"
+
+ข้อมูลที่ผู้ใช้เลือก:
+- itemType: ${options.itemType}
+- brand: ${options.brand || '-'}
+- model: ${options.model || '-'}
+- appleCategory: ${options.appleCategory || '-'}
+
+กติกา:
+1) ถ้ารูปไม่ตรงกับประเภทสินค้า ให้ fail
+2) ถ้ารูปเป็นคนละสินค้า/คนละประเภทกัน ให้ fail
+3) ถ้าคลุมเครือหรือมองไม่ชัด ให้ fail และแนะนำถ่ายใหม่
+4) ให้ระบุประเภทที่เห็นในแต่ละรูป (เช่น โทรศัพท์, กล้อง, โน้ตบุค, อุปกรณ์เสริม, หูฟัง, นาฬิกา, แท็บเล็ต, อื่นๆ)
+
+expectedType: ${expectedType}
+
+ตอบกลับ JSON เท่านั้น:
+{
+  "pass": boolean,
+  "reason": "สรุปสั้นๆ",
+  "expectedType": "${expectedType}",
+  "consistentItem": boolean,
+  "imageChecks": [
+    { "index": 1, "detectedType": "string", "matchesExpected": boolean, "note": "string" }
+  ],
+  "recommendation": "คำแนะนำให้ผู้ใช้ถ่ายภาพใหม่หรือเพิ่มเติม"
+}`;
+
+  const input: any[] = [
+    {
+      role: 'user',
+      content: [
+        { type: 'input_text', text: prompt },
+      ],
+    },
+  ];
+
+  const maxImages = Math.min(options.images.length, MAX_IMAGE_COUNT);
+  for (let i = 0; i < maxImages; i++) {
+    input[0].content.push({
+      type: 'input_image',
+      image_url: options.images[i],
+      detail: 'low',
     });
+  }
 
-    const content = getResponseText(response);
-
-    // Try to parse JSON response
-    try {
-      const parsed = JSON.parse(content);
-
-      // Validate and provide defaults for the new structure
-      const totalScore = Math.max(0, Math.min(100, parsed.totalScore || 50));
-      const score = Math.max(0, Math.min(1, totalScore / 100)); // Convert to 0-1 scale
-
-      return {
-        score: score,
-        totalScore: totalScore,
-        grade: parsed.grade || 'F',
-        reason: parsed.reason || 'วิเคราะห์จากรูปภาพแล้ว',
-        detailedBreakdown: {
-          screen: {
-            score: parsed.detailedBreakdown?.screen?.score || 0,
-            maxScore: 35,
-            description: parsed.detailedBreakdown?.screen?.description || 'ไม่สามารถประเมินได้'
+  const response = await openai.responses.create({
+    model: PRECHECK_MODEL,
+    input,
+    max_output_tokens: 400,
+    temperature: 0,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'image_precheck',
+        strict: true,
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            pass: { type: 'boolean' },
+            reason: { type: 'string' },
+            expectedType: { type: 'string' },
+            consistentItem: { type: 'boolean' },
+            imageChecks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  index: { type: 'number' },
+                  detectedType: { type: 'string' },
+                  matchesExpected: { type: 'boolean' },
+                  note: { type: 'string' },
+                },
+                required: ['index', 'detectedType', 'matchesExpected', 'note'],
+              },
+            },
+            recommendation: { type: 'string' },
           },
-          body: {
-            score: parsed.detailedBreakdown?.body?.score || 0,
-            maxScore: 30,
-            description: parsed.detailedBreakdown?.body?.description || 'ไม่สามารถประเมินได้'
-          },
-          buttons: {
-            score: parsed.detailedBreakdown?.buttons?.score || 0,
-            maxScore: 20,
-            description: parsed.detailedBreakdown?.buttons?.description || 'ไม่สามารถประเมินได้'
-          },
-          camera: {
-            score: parsed.detailedBreakdown?.camera?.score || 0,
-            maxScore: 10,
-            description: parsed.detailedBreakdown?.camera?.description || 'ไม่สามารถประเมินได้'
-          },
-          overall: {
-            score: parsed.detailedBreakdown?.overall?.score || 0,
-            maxScore: 5,
-            description: parsed.detailedBreakdown?.overall?.description || 'ไม่สามารถประเมินได้'
-          }
+          required: ['pass', 'reason', 'expectedType', 'consistentItem', 'imageChecks', 'recommendation'],
         },
-        recommendation: parsed.recommendation || 'ปานกลาง',
-        imageQuality: parsed.imageQuality || 'พอใช้'
-      };
-    } catch {
-      // If JSON parsing fails, try to extract basic information and provide defaults
-      const scoreMatch = content.match(/score["\s:]+([0-9.]+)/i);
-      const totalScoreMatch = content.match(/totalScore["\s:]+(\d+)/i);
-      const reasonMatch = content.match(/reason["\s:]+["']([^"']+)["']/i);
-
-      const totalScore = totalScoreMatch ? parseInt(totalScoreMatch[1]) : 50;
-      const score = scoreMatch ? parseFloat(scoreMatch[1]) : totalScore / 100;
-      const reason = reasonMatch ? reasonMatch[1] : content.replace(/score["\s:]+[0-9.]+/i, '').trim() || 'วิเคราะห์จากรูปภาพแล้ว';
-
-      return {
-        score: Math.max(0, Math.min(1, score)),
-        totalScore: Math.max(0, Math.min(100, totalScore)),
-        grade: 'F', // Default grade when parsing fails
-        reason: reason,
-        detailedBreakdown: {
-          screen: { score: 0, maxScore: 35, description: 'ไม่สามารถประเมินได้' },
-          body: { score: 0, maxScore: 30, description: 'ไม่สามารถประเมินได้' },
-          buttons: { score: 0, maxScore: 20, description: 'ไม่สามารถประเมินได้' },
-          camera: { score: 0, maxScore: 10, description: 'ไม่สามารถประเมินได้' },
-          overall: { score: 0, maxScore: 5, description: 'ไม่สามารถประเมินได้' }
-        },
-        recommendation: 'ต้องการภาพเพิ่มเติม',
-        imageQuality: 'ไม่สามารถประเมินได้'
-      };
-    }
-  } catch (error) {
-    console.error('Error analyzing condition with Vision API:', error);
-    // Fallback analysis
-    return {
-      score: 0.5,
-      totalScore: 50,
-      grade: 'F',
-      reason: 'ไม่สามารถวิเคราะห์สภาพจากรูปภาพได้ ใช้ค่าประเมินเบื้องต้น',
-      detailedBreakdown: {
-        screen: { score: 0, maxScore: 35, description: 'เกิดข้อผิดพลาดในการวิเคราะห์' },
-        body: { score: 0, maxScore: 30, description: 'เกิดข้อผิดพลาดในการวิเคราะห์' },
-        buttons: { score: 0, maxScore: 20, description: 'เกิดข้อผิดพลาดในการวิเคราะห์' },
-        camera: { score: 0, maxScore: 10, description: 'เกิดข้อผิดพลาดในการวิเคราะห์' },
-        overall: { score: 0, maxScore: 5, description: 'เกิดข้อผิดพลาดในการวิเคราะห์' }
       },
-      recommendation: 'ต้องการภาพเพิ่มเติม',
-      imageQuality: 'เกิดข้อผิดพลาดในการวิเคราะห์'
+    },
+  });
+
+  const content = getResponseText(response);
+  const parsed = parseJsonFromText<ImagePrecheckResult>(content);
+
+  if (!parsed) {
+    return {
+      pass: false,
+      reason: 'ไม่สามารถตรวจสอบรูปภาพได้',
+      expectedType,
+      consistentItem: false,
+      imageChecks: [],
+      recommendation: 'กรุณาถ่ายรูปใหม่ให้ชัดเจน และถ่ายเฉพาะสินค้าที่เลือก',
     };
   }
+
+  const allMatch = parsed.imageChecks.length > 0 && parsed.imageChecks.every((check) => check.matchesExpected);
+  const pass = Boolean(parsed.pass && parsed.consistentItem && allMatch);
+
+  return {
+    ...parsed,
+    pass,
+    expectedType: parsed.expectedType || expectedType,
+  };
 }
 
+// Agent 2: Analyze condition with Gemini
+async function analyzeConditionWithGemini(images: string[]): Promise<ConditionResult> {
+  if (!genAI) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
+  const model = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
+  });
+
+  const parts: any[] = [{ text: CONDITION_PROMPT }];
+  const maxImages = Math.min(images.length, MAX_IMAGE_COUNT);
+  for (let i = 0; i < maxImages; i++) {
+    parts.push(toGeminiImagePart(images[i]));
+  }
+
+  const result = await model.generateContent(parts);
+  const response = await result.response;
+  const content = response.text();
+  const parsed = parseJsonFromText<ConditionResult>(content);
+
+  if (!parsed) {
+    throw new Error('Failed to parse Gemini response');
+  }
+
+  const totalScore = Math.max(0, Math.min(100, Number(parsed.totalScore) || 50));
+  const rawScore = Number.isFinite(parsed.score) ? parsed.score : totalScore / 100;
+  const score = Math.max(0, Math.min(1, rawScore));
+
+  return {
+    score,
+    totalScore,
+    grade: parsed.grade || 'F',
+    reason: parsed.reason || 'วิเคราะห์จากรูปภาพแล้ว',
+    detailedBreakdown: {
+      screen: {
+        score: parsed.detailedBreakdown?.screen?.score ?? 0,
+        maxScore: 35,
+        description: parsed.detailedBreakdown?.screen?.description || 'ไม่สามารถประเมินได้',
+      },
+      body: {
+        score: parsed.detailedBreakdown?.body?.score ?? 0,
+        maxScore: 30,
+        description: parsed.detailedBreakdown?.body?.description || 'ไม่สามารถประเมินได้',
+      },
+      buttons: {
+        score: parsed.detailedBreakdown?.buttons?.score ?? 0,
+        maxScore: 20,
+        description: parsed.detailedBreakdown?.buttons?.description || 'ไม่สามารถประเมินได้',
+      },
+      camera: {
+        score: parsed.detailedBreakdown?.camera?.score ?? 0,
+        maxScore: 10,
+        description: parsed.detailedBreakdown?.camera?.description || 'ไม่สามารถประเมินได้',
+      },
+      overall: {
+        score: parsed.detailedBreakdown?.overall?.score ?? 0,
+        maxScore: 5,
+        description: parsed.detailedBreakdown?.overall?.description || 'ไม่สามารถประเมินได้',
+      },
+    },
+    recommendation: parsed.recommendation || 'ปานกลาง',
+    imageQuality: parsed.imageQuality || 'พอใช้',
+  };
+}
+
+function isAssessmentInsufficient(result: ConditionResult): boolean {
+  const combined = `${result.reason} ${result.recommendation} ${result.imageQuality}`.toLowerCase();
+  return /ไม่เพียงพอ|ไม่สามารถประเมิน|ต้องการภาพเพิ่มเติม|ภาพไม่ชัด|ไม่ครบ|insufficient|unable to assess|cannot assess/.test(combined);
+}
 // Helper function to estimate base64 image size in bytes
 function estimateBase64Size(base64String: string): number {
   // Remove data URL prefix if present
@@ -364,9 +465,12 @@ function reduceImageQuality(base64Image: string, targetSizeKB: number = 500): st
 
   // Truncate base64 data
   const newLength = Math.floor(base64Data.length * ratio);
-  const reducedData = base64Data.substring(0, newLength);
+  const safeLength = newLength - (newLength % 4);
+  const reducedData = base64Data.substring(0, safeLength);
+  const padding = '='.repeat((4 - (reducedData.length % 4)) % 4);
+  const payload = `${reducedData}${padding}`;
 
-  return prefix ? `${prefix},${reducedData}` : reducedData;
+  return prefix ? `${prefix},${payload}` : payload;
 }
 
 // Configure route to accept larger payloads
@@ -381,12 +485,21 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json(
+        { error: 'Gemini API key not configured' },
+        { status: 500 }
+      );
+    }
 
     const body = await request.json();
-    const { images } = body;
+    const { images, itemType, brand, model, appleCategory } = body;
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json({ error: 'กรุณาอัพโหลดรูปภาพอย่างน้อย 1 รูป' }, { status: 400 });
+    }
+    if (!itemType || typeof itemType !== 'string') {
+      return NextResponse.json({ error: 'กรุณาเลือกประเภทสินค้าให้ถูกต้อง' }, { status: 400 });
     }
 
     // 🔥 Check if images are too large and need compression
@@ -416,9 +529,36 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Processed size: ${totalSizeMB.toFixed(2)}MB${imagesWereCompressed ? ' (compressed)' : ''}`);
 
-    console.log('🔄 Analyzing condition from images...');
-    const conditionResult = await analyzeConditionFromImages(processedImages);
+    console.log('🔍 Prechecking images with OpenAI...');
+    const precheck = await precheckImages({
+      images: processedImages,
+      itemType,
+      brand,
+      model,
+      appleCategory,
+    });
+
+    if (!precheck.pass) {
+      const recommendation = precheck.recommendation ? `คำแนะนำ: ${precheck.recommendation}` : '';
+      const errorMessage = `รูปภาพไม่ผ่านการตรวจสอบ: ${precheck.reason}${recommendation ? `\n${recommendation}` : ''}`;
+      return NextResponse.json(
+        { error: errorMessage, details: precheck },
+        { status: 400 }
+      );
+    }
+
+    console.log('🔄 Analyzing condition with Gemini...');
+    const conditionResult = await analyzeConditionWithGemini(processedImages);
     console.log('✅ Condition analysis complete:', conditionResult);
+
+    if (isAssessmentInsufficient(conditionResult)) {
+      const recommendation = conditionResult.recommendation ? `คำแนะนำ: ${conditionResult.recommendation}` : '';
+      const errorMessage = `ไม่สามารถประเมินสภาพได้: ${conditionResult.reason}${recommendation ? `\n${recommendation}` : ''}`;
+      return NextResponse.json(
+        { error: errorMessage, details: conditionResult },
+        { status: 400 }
+      );
+    }
 
     // Add warning message if images were compressed
     const result: any = {

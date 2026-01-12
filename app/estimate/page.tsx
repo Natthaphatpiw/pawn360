@@ -857,7 +857,11 @@ function EstimatePageInner() {
 
       console.log('🔍 Analyzing condition...');
       const conditionResponse = await axios.post('/api/analyze-condition', {
-        images: base64Images
+        images: base64Images,
+        itemType: formData.itemType,
+        brand: formData.brand,
+        model: formData.model,
+        appleCategory: formData.appleCategory,
       });
 
       setConditionResult(conditionResponse.data);
