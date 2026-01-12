@@ -47,7 +47,7 @@ type CombinedItem = {
   title: string;
   price_thb: number;
   source: string;
-  url: string | null;
+  url?: string;
   origin: 'web_search' | 'serpapi';
   price_usd?: number;
 };
@@ -66,7 +66,7 @@ const toCombinedItemFromWeb = (item: WebSearchItem): CombinedItem | null => {
     title: item.title,
     price_thb: item.price_thb,
     source: item.source ?? 'Unknown',
-    url: item.url ?? null,
+    url: item.url,
     origin: 'web_search',
   };
 };
@@ -77,7 +77,7 @@ const toCombinedItemFromSerpapi = (item: SerpapiItem): CombinedItem | null => {
     title: item.title,
     price_thb: item.price_thb,
     source: item.source ?? 'Unknown',
-    url: item.url ?? null,
+    url: item.url ?? undefined,
     origin: 'serpapi',
     price_usd: item.price_usd,
   };
