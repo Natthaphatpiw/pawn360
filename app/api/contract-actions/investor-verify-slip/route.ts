@@ -173,15 +173,11 @@ export async function POST(request: NextRequest) {
       const contractEndDate = new Date(contract.contract_end_date);
 
       const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
-      const interestFirstPart = Number(actionRequest.interest_for_period || actionRequest.interest_accrued || 0);
-      let interestRemaining = Number(actionRequest.new_interest_for_remaining_increase || 0);
-      if (!interestRemaining && actionRequest.daily_interest_rate && actionRequest.days_remaining) {
-        interestRemaining = round2(principalAmount * Number(actionRequest.daily_interest_rate) * Number(actionRequest.days_remaining));
-      }
-      const totalPaidNow = Number(actionRequest.total_amount || 0);
-      const paidInterestNow = totalPaidNow > 0;
-      const interestAmount = paidInterestNow ? interestRemaining : round2(interestFirstPart + interestRemaining);
-      const durationDays = Number(actionRequest.days_remaining || Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay)));
+      const dailyRate = Number(actionRequest.daily_interest_rate || 0) || Number(contract.interest_rate || 0) / 30;
+      const remainingDays = Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay));
+      const interestRemaining = round2(principalAmount * dailyRate * remainingDays);
+      const interestAmount = interestRemaining;
+      const durationDays = remainingDays;
 
       const { data: newContract, error: newContractError } = await supabase
         .from('contracts')

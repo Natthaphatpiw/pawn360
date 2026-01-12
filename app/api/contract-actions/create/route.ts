@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
       amount,
       reductionAmount,
       increaseAmount,
-      interestPaymentOption,
       pawnerLineId,
       termsAccepted,
       pawnerSignatureUrl,
@@ -139,7 +138,6 @@ export async function POST(request: NextRequest) {
 
       case 'PRINCIPAL_REDUCTION': {
         const reductionAmt = Number(reductionAmount ?? amount ?? 0);
-        const payInterestNow = interestPaymentOption !== 'PAY_LATER';
 
         if (reductionAmt <= 0 || reductionAmt > currentPrincipal) {
           return NextResponse.json(
@@ -149,7 +147,7 @@ export async function POST(request: NextRequest) {
         }
 
         const interestForPeriod = round2(interestAccrued);
-        const totalToPay = reductionAmt + (payInterestNow ? interestForPeriod : 0);
+        const totalToPay = reductionAmt + interestForPeriod;
         const principalAfterReduction = currentPrincipal - reductionAmt;
         const newInterestForRemaining = round2(principalAfterReduction * dailyInterestRate * daysRemaining);
 
@@ -167,7 +165,6 @@ export async function POST(request: NextRequest) {
 
       case 'PRINCIPAL_INCREASE': {
         const increaseAmt = Number(increaseAmount ?? amount ?? 0);
-        const payInterestNow = interestPaymentOption === 'PAY_NOW';
         const itemValue = contract.items?.estimated_value || currentPrincipal * 1.5;
         const maxIncrease = Math.max(0, itemValue - currentPrincipal);
 
@@ -213,8 +210,8 @@ export async function POST(request: NextRequest) {
         const interestForPeriod = round2(interestAccrued);
         const principalAfterIncrease = currentPrincipal + increaseAmt;
         const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysRemaining);
-        const totalToPayNow = payInterestNow ? interestForPeriod : 0;
-        const nextStatus = payInterestNow ? 'AWAITING_PAYMENT' : 'PENDING_INVESTOR_APPROVAL';
+        const totalToPayNow = interestForPeriod;
+        const nextStatus = 'AWAITING_PAYMENT';
 
         requestData = {
           ...requestData,
@@ -267,7 +264,7 @@ export async function POST(request: NextRequest) {
         principalBefore: currentPrincipal,
         description: `Pawner initiated ${actionType}`,
         metadata: {
-          interestPaymentOption: interestPaymentOption || 'PAY_LATER',
+          interestPaymentOption: 'PAY_NOW',
         },
       }
     );

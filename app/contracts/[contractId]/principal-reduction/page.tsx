@@ -49,8 +49,6 @@ export default function PrincipalReductionPage() {
   const [contract, setContract] = useState<any>(null);
   const [companyBank, setCompanyBank] = useState<CompanyBank | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [step, setStep] = useState<'info' | 'payment'>('info');
-  const [interestPaymentOption, setInterestPaymentOption] = useState<'PAY_NOW' | 'PAY_LATER'>('PAY_NOW');
 
   useEffect(() => {
     if (contractId && reductionAmount) {
@@ -101,7 +99,6 @@ export default function PrincipalReductionPage() {
         contractId,
         actionType: 'PRINCIPAL_REDUCTION',
         amount: parseFloat(reductionAmount),
-        interestPaymentOption,
         pawnerLineId: profile?.userId,
         termsAccepted: true,
       });
@@ -144,8 +141,7 @@ export default function PrincipalReductionPage() {
 
   const interestFirstPart = calculation.interestFirstPart ?? calculation.interestForPeriod ?? 0;
   const interestRemaining = calculation.interestRemaining ?? calculation.newInterestForRemaining ?? 0;
-  const interestTotalIfPayLater = calculation.interestTotalIfPayLater ?? (interestFirstPart + interestRemaining);
-  const totalToPayNow = calculation.reductionAmount + (interestPaymentOption === 'PAY_NOW' ? interestFirstPart : 0);
+  const totalToPayNow = calculation.reductionAmount + interestFirstPart;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -177,6 +173,10 @@ export default function PrincipalReductionPage() {
         {/* Calculation Details */}
         <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
           <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการลดเงินต้น</h2>
+          <p className="text-xs text-gray-600 mb-3">
+            การลดเงินต้นคือการชำระเงินต้นบางส่วน เพื่อให้ดอกเบี้ยที่เหลือลดลง
+            โดยสัญญาจะยังคงวันสิ้นสุดเดิม
+          </p>
           <div className="bg-[#FFF8F5] rounded-xl p-4 mb-3">
             <DetailRow label="จำนวนที่ต้องการลด" value={`${calculation.reductionAmount.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยช่วงแรก (ถึงวันนี้)" value={`${interestFirstPart.toLocaleString()} บาท`} />
@@ -186,33 +186,11 @@ export default function PrincipalReductionPage() {
             <DetailRow label="ดอกเบี้ยที่ประหยัด" value={`${calculation.interestSavings.toLocaleString()} บาท`} highlight />
           </div>
           <div className="bg-amber-50 rounded-xl p-3 mb-3">
-            <h3 className="font-bold text-amber-800 text-sm mb-2">ตัวเลือกการชำระดอกเบี้ย</h3>
-            <label className="flex items-start gap-2 mb-2 cursor-pointer">
-              <input
-                type="radio"
-                name="interestPaymentOption"
-                value="PAY_NOW"
-                checked={interestPaymentOption === 'PAY_NOW'}
-                onChange={() => setInterestPaymentOption('PAY_NOW')}
-                className="mt-1"
-              />
-              <span className="text-xs text-amber-800">
-                จ่ายวันนี้ {interestFirstPart.toLocaleString()} บาท และจ่ายวันครบกำหนด {interestRemaining.toLocaleString()} บาท
-              </span>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="interestPaymentOption"
-                value="PAY_LATER"
-                checked={interestPaymentOption === 'PAY_LATER'}
-                onChange={() => setInterestPaymentOption('PAY_LATER')}
-                className="mt-1"
-              />
-              <span className="text-xs text-amber-800">
-                จ่ายวันครบกำหนดทีเดียว {interestTotalIfPayLater.toLocaleString()} บาท
-              </span>
-            </label>
+            <h3 className="font-bold text-amber-800 text-sm mb-2">การชำระดอกเบี้ย</h3>
+            <p className="text-xs text-amber-800">
+              ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ทันที
+              และระบบจะคำนวณดอกเบี้ยที่เหลือใหม่ตามเงินต้นหลังลด
+            </p>
           </div>
           <div className="bg-[#B85C38] rounded-xl p-4 text-white">
             <div className="flex justify-between items-center">

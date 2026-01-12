@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch contracts with item details (include active/pending contracts)
+    const activeStatuses = ['PENDING', 'PENDING_SIGNATURE', 'ACTIVE', 'CONFIRMED', 'EXTENDED'];
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('customer_id', pawner.customer_id)
-      .in('contract_status', ['PENDING', 'PENDING_SIGNATURE', 'ACTIVE', 'CONFIRMED', 'COMPLETED', 'DEFAULTED', 'LIQUIDATED', 'TERMINATED'])
+      .in('contract_status', activeStatuses)
       .order('created_at', { ascending: false });
 
     if (contractsError) {
