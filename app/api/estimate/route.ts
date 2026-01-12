@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null;
 
 const MODEL = 'gpt-4.1-mini';
+const PRICE_SEARCH_MODEL = 'gpt-5.2';
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
 const MIN_ESTIMATE_PRICE = 100;
+const WEB_SEARCH_MIN_ITEMS = 4;
+const WEB_SEARCH_MAX_ITEMS = 8;
+const WEB_SEARCH_MAX_OUTPUT_TOKENS = 1200;
+const SERPAPI_MAX_ITEMS = 40;
+const SERPAPI_FILTER_MAX_OUTPUT_TOKENS = 600;
+const USE_TH_WEIGHTS = false;
+const TH_WEIGHT = 2;
+const NON_TH_WEIGHT = 1;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -62,16 +72,37 @@ interface NormalizedData {
 interface SerpapiShoppingItem {
   title: string | null;
   source: string | null;
+  url: string | null;
+  price_usd: number;
   price_thb: number;
 }
 
 interface SerpapiShoppingResults {
   query: string;
   exchange_rate_thb_per_usd: number;
-  currency_from: 'USD';
-  currency_to: 'THB';
   fetched_at: string;
   items: SerpapiShoppingItem[];
+}
+
+interface WebSearchItem {
+  title: string;
+  price_thb: number;
+  source: string;
+  url: string;
+}
+
+interface WebSearchResult {
+  query: string;
+  items: WebSearchItem[];
+}
+
+interface CombinedItem {
+  title: string;
+  price_thb: number;
+  source: string;
+  url: string | null;
+  origin: 'web_search' | 'serpapi';
+  price_usd?: number;
 }
 
 function getResponseText(response: any): string {
@@ -151,6 +182,11 @@ function buildSerpapiQuery(productName: string): string {
   return hasThai ? `${productName} มือสอง` : `${productName} second-hand`;
 }
 
+function buildWebSearchQuery(productName: string): string {
+  const hasThai = /[ก-๙]/.test(productName);
+  return hasThai ? `${productName} ราคา มือสอง` : `${productName} used price Thailand`;
+}
+
 function extractUsdPrice(item: any): number | null {
   if (typeof item?.extracted_price === 'number' && Number.isFinite(item.extracted_price)) {
     return item.extracted_price;
@@ -167,8 +203,109 @@ function usdToThb(usd: number, exchangeRate: number): number {
   return Math.round(usd * exchangeRate * 100) / 100;
 }
 
-async function fetchSerpapiShoppingResults(productName: string): Promise<SerpapiShoppingResults | null> {
+async function fetchWebSearchPrices(productName: string): Promise<WebSearchResult | null> {
+  if (!openai) {
+    return null;
+  }
+
+  const query = buildWebSearchQuery(productName);
+  const exchangeRate = getExchangeRate();
+  const prompt = `You are a pricing analyst. Use web_search at least once with this query: "${query}".
+Return ONLY JSON with this shape:
+{
+  "query": "${query}",
+  "items": [
+    { "title": "string", "price_thb": number, "source": "string", "url": "string" }
+  ]
+}
+Rules:
+- Use only relevant items for the exact model and capacity.
+- If price is not in THB, convert to THB using 1 USD = ${exchangeRate} THB.
+- Keep ${WEB_SEARCH_MIN_ITEMS}-${WEB_SEARCH_MAX_ITEMS} items.
+- Use canonical product URLs and remove tracking parameters when possible.`;
+
+  const runSearch = (maxTokens: number) => openai.responses.create({
+    model: PRICE_SEARCH_MODEL,
+    input: prompt,
+    max_output_tokens: maxTokens,
+    temperature: 0,
+    tools: [
+      {
+        type: 'web_search',
+        search_context_size: 'medium',
+        user_location: {
+          type: 'approximate',
+          country: 'TH',
+          city: 'Bangkok',
+          timezone: 'Asia/Bangkok',
+        },
+      },
+    ],
+    tool_choice: 'required',
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'web_search_prices',
+        strict: true,
+        schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            query: { type: 'string' },
+            items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  title: { type: 'string' },
+                  price_thb: { type: 'number' },
+                  source: { type: 'string' },
+                  url: { type: 'string' },
+                },
+                required: ['title', 'price_thb', 'source', 'url'],
+              },
+            },
+          },
+          required: ['query', 'items'],
+        },
+      },
+    },
+  });
+
+  let response = await runSearch(WEB_SEARCH_MAX_OUTPUT_TOKENS);
+  if (response?.status === 'incomplete' && response?.incomplete_details?.reason === 'max_output_tokens') {
+    response = await runSearch(WEB_SEARCH_MAX_OUTPUT_TOKENS * 2);
+  }
+
+  const content = getResponseText(response);
+  const parsed = parseJsonFromText<WebSearchResult>(content);
+
+  if (!parsed || !Array.isArray(parsed.items)) {
+    console.warn('⚠️ Failed to parse web_search prices');
+    return null;
+  }
+
+  const items = parsed.items
+    .filter((item) => item && item.title && Number.isFinite(item.price_thb) && item.price_thb > 0)
+    .slice(0, WEB_SEARCH_MAX_ITEMS);
+
+  return {
+    query,
+    items,
+  };
+}
+
+async function fetchSerpapiShoppingResults(
+  input: EstimateRequest,
+  productName: string
+): Promise<SerpapiShoppingResults | null> {
   if (!isSerpapiEnabled()) {
+    return null;
+  }
+
+  if (!openai) {
+    console.warn('⚠️ OPENAI_API_KEY not configured, skipping SerpAPI filtering');
     return null;
   }
 
@@ -195,26 +332,124 @@ async function fetchSerpapiShoppingResults(productName: string): Promise<Serpapi
     const json = await response.json();
     const shoppingResults = Array.isArray(json.shopping_results) ? json.shopping_results : [];
     const exchangeRate = getExchangeRate();
+    const fetchedAt = new Date().toISOString();
 
-    const items = shoppingResults
-      .map((result: any) => {
+    type SerpapiCandidateItem = SerpapiShoppingItem & {
+      id: string;
+      condition?: string | null;
+      snippet?: string | null;
+    };
+
+    const candidateItems = shoppingResults
+      .map((result: any, index: number) => {
+        if (!result?.title) return null;
         const usd = extractUsdPrice(result);
         if (usd === null) return null;
+        const rawSnippet = result.snippet ?? result.description ?? null;
+        const snippet = typeof rawSnippet === 'string' ? rawSnippet.slice(0, 200) : null;
         return {
+          id: `item_${index + 1}`,
           title: result.title ?? null,
-          source: result.source ?? result.store ?? result.seller ?? null,
+          source: result.source ?? result.store ?? result.seller ?? 'Unknown',
+          url: result.link ?? result.product_link ?? null,
+          price_usd: usd,
           price_thb: usdToThb(usd, exchangeRate),
+          condition: result.condition ?? result.product_condition ?? null,
+          snippet,
         };
       })
       .filter(Boolean)
-      .slice(0, 12) as SerpapiShoppingItem[];
+      .slice(0, SERPAPI_MAX_ITEMS) as SerpapiCandidateItem[];
+
+    if (candidateItems.length === 0) {
+      return {
+        query,
+        exchange_rate_thb_per_usd: exchangeRate,
+        fetched_at: fetchedAt,
+        items: [],
+      };
+    }
+
+    const llmInput = {
+      query,
+      exchange_rate_thb_per_usd: exchangeRate,
+      fetched_at: fetchedAt,
+      items: candidateItems,
+    };
+
+    const prompt = `You are a pricing analyst. Filter SerpAPI Google Shopping results to keep only listings that truly match the exact product.
+Product spec:
+- productName: ${productName}
+- brand: ${input.brand}
+- model: ${input.model}
+- capacity: ${input.capacity || '(none)'}
+- storage: ${input.storage || '(none)'}
+Rules:
+- Keep only items that match the exact model and storage/capacity. Exclude other generations, other storage sizes, other product lines (Pro), accessories, bundles, parts, or services.
+- Exclude listings with non-comparable conditions: for parts/repair, broken, bad display, read description, grade C, scratch and dent, fair/poor condition, as-is, or similar disclaimers.
+- Used/Pre-owned/Good/Excellent are OK if not flagged as non-comparable.
+- If unsure, exclude.
+- Do not change prices or add new items. Only filter by returning IDs.
+Input JSON (some item fields like condition/snippet are provided to help filtering):
+${JSON.stringify(llmInput, null, 2)}
+Return JSON only with:
+{
+  "query": "${query}",
+  "exchange_rate_thb_per_usd": ${exchangeRate},
+  "fetched_at": "${fetchedAt}",
+  "keep_item_ids": ["item_1", "item_7"]
+}`;
+
+    const llmResponse = await openai.responses.create({
+      model: PRICE_SEARCH_MODEL,
+      input: prompt,
+      max_output_tokens: SERPAPI_FILTER_MAX_OUTPUT_TOKENS,
+      temperature: 0,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'serpapi_cleaned_prices',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              query: { type: 'string' },
+              exchange_rate_thb_per_usd: { type: 'number' },
+              fetched_at: { type: 'string' },
+              keep_item_ids: {
+                type: 'array',
+                items: { type: 'string' },
+              },
+            },
+            required: ['query', 'exchange_rate_thb_per_usd', 'fetched_at', 'keep_item_ids'],
+          },
+        },
+      },
+    });
+
+    const content = getResponseText(llmResponse);
+    const parsed = parseJsonFromText<{ keep_item_ids: string[] }>(content);
+
+    if (!parsed || !Array.isArray(parsed.keep_item_ids)) {
+      console.warn('⚠️ Failed to parse SerpAPI LLM filter response');
+      return {
+        query,
+        exchange_rate_thb_per_usd: exchangeRate,
+        fetched_at: fetchedAt,
+        items: [],
+      };
+    }
+
+    const keepIds = new Set(parsed.keep_item_ids);
+    const items = candidateItems
+      .filter((item) => keepIds.has(item.id))
+      .map(({ id, condition, snippet, ...rest }) => rest);
 
     return {
       query,
       exchange_rate_thb_per_usd: exchangeRate,
-      currency_from: 'USD',
-      currency_to: 'THB',
-      fetched_at: new Date().toISOString(),
+      fetched_at: fetchedAt,
       items,
     };
   } catch (error) {
@@ -330,82 +565,100 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
   };
 }
 
-// Agent 2: Get market price using web search + optional SerpAPI
-async function getMarketPrice(
-  productName: string,
-  priceRange: { min: number; max: number },
-  serpapiResults: SerpapiShoppingResults | null
-): Promise<number> {
-  const normalizedRange = normalizeRange(priceRange);
+const toCombinedItemFromWeb = (item: WebSearchItem): CombinedItem | null => {
+  if (!item?.title || !Number.isFinite(item.price_thb)) return null;
+  return {
+    title: item.title,
+    price_thb: item.price_thb,
+    source: item.source ?? 'Unknown',
+    url: item.url ?? null,
+    origin: 'web_search',
+  };
+};
+
+const toCombinedItemFromSerpapi = (item: SerpapiShoppingItem): CombinedItem | null => {
+  if (!item?.title || !Number.isFinite(item.price_thb)) return null;
+  return {
+    title: item.title ?? 'Unknown',
+    price_thb: item.price_thb,
+    source: item.source ?? 'Unknown',
+    url: item.url ?? null,
+    origin: 'serpapi',
+    price_usd: item.price_usd,
+  };
+};
+
+const buildWeights = (items: CombinedItem[]): number[] => (
+  items.map((item) => (item.origin === 'web_search' ? TH_WEIGHT : NON_TH_WEIGHT))
+);
+
+type RepresentativeMarketResult = {
+  marketPrice: number;
+  analysis: ReturnType<typeof computeRepresentativeUsedPriceTHB> | null;
+  sourceCounts: { web: number; serpapi: number };
+  usedWeights: boolean;
+};
+
+// Agent 2: Web search + SerpAPI -> merge -> representative price
+async function getRepresentativeMarketPrice(
+  input: EstimateRequest,
+  normalizedData: NormalizedData
+): Promise<RepresentativeMarketResult> {
+  const normalizedRange = normalizeRange(normalizedData.priceRange);
+  const fallbackPrice = Math.round((normalizedRange.min + normalizedRange.max) / 2);
 
   if (!openai) {
-    return Math.round((normalizedRange.min + normalizedRange.max) / 2);
+    return {
+      marketPrice: fallbackPrice,
+      analysis: null,
+      sourceCounts: { web: 0, serpapi: 0 },
+      usedWeights: USE_TH_WEIGHTS,
+    };
   }
 
-  const searchQuery = `${productName} มือสอง`;
-  const serpapiPayload = serpapiResults && serpapiResults.items.length > 0 ? serpapiResults : null;
-  const exchangeRate = getExchangeRate();
+  const [webResults, serpapiResults] = await Promise.all([
+    fetchWebSearchPrices(normalizedData.productName),
+    fetchSerpapiShoppingResults(input, normalizedData.productName),
+  ]);
 
-  const prompt = `คุณเป็นผู้เชี่ยวชาญประเมินราคาสินค้ามือสองในไทย
+  const webItems = (webResults?.items || [])
+    .map(toCombinedItemFromWeb)
+    .filter(Boolean) as CombinedItem[];
+  const serpItems = (serpapiResults?.items || [])
+    .map(toCombinedItemFromSerpapi)
+    .filter(Boolean) as CombinedItem[];
 
-อินพุต:
-productName: ${productName}
-priceRangeTHB: ${normalizedRange.min} - ${normalizedRange.max}
-serpapiResults: ${serpapiPayload ? JSON.stringify(serpapiPayload) : 'null'}
+  const combinedItems = [...webItems, ...serpItems];
+  const weights = USE_TH_WEIGHTS ? buildWeights(combinedItems) : undefined;
 
-งานที่ต้องทำ:
-1) ต้องเรียก web_search อย่างน้อย 1 ครั้ง โดยใช้ query: "${searchQuery}"
-2) โฟกัสตลาดไทยก่อน หากข้อมูลน้อยให้ขยายไปต่างประเทศ
-3) ใช้ข้อมูลไม่เกิน 7 ปี และตัดผลลัพธ์ที่ไม่เกี่ยวข้องกับสินค้าออก
-4) คัดกรองรายการจาก serpapiResults ให้เกี่ยวข้องจริง (ตรวจชื่อสินค้า/รุ่น)
-5) รวมราคาจาก web search + serpapi ที่คัดแล้ว และคำนวณ "ราคาตลาดกลาง" (median) เป็น THB
-6) ถ้าต้องแปลงสกุลเงิน ให้ใช้อัตรา 1 USD = ${exchangeRate} THB
-7) ราคาสุดท้ายต้องอยู่ใน priceRangeTHB (ถ้าเกินให้ปรับเข้ากลางช่วง)
+  if (combinedItems.length === 0) {
+    return {
+      marketPrice: fallbackPrice,
+      analysis: null,
+      sourceCounts: { web: webItems.length, serpapi: serpItems.length },
+      usedWeights: USE_TH_WEIGHTS,
+    };
+  }
 
-ตอบกลับเป็น JSON เท่านั้น:
-{ "marketPrice": 0 }`;
-
-  const response = await openai.responses.create({
-    model: MODEL,
-    input: prompt,
-    max_output_tokens: 300,
-    temperature: 0,
-    tools: [
-      {
-        type: 'web_search',
-        search_context_size: 'medium',
-        user_location: {
-          type: 'approximate',
-          country: 'TH',
-          city: 'Bangkok',
-          timezone: 'Asia/Bangkok',
-        },
-      },
-    ],
-    tool_choice: 'required',
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'market_price',
-        strict: true,
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            marketPrice: { type: 'number' },
-          },
-          required: ['marketPrice'],
-        },
-      },
-    },
-  });
-
-  const content = getResponseText(response);
-  const parsed = parseJsonFromText<{ marketPrice: number }>(content);
-  const marketPrice = Number(parsed?.marketPrice);
-  const clamped = clampToRange(marketPrice, normalizedRange);
-
-  return Math.max(clamped, MIN_ESTIMATE_PRICE);
+  try {
+    const analysis = computeRepresentativeUsedPriceTHB(combinedItems, { weights });
+    const clamped = clampToRange(analysis.representativePrice, normalizedRange);
+    const marketPrice = Math.max(clamped, MIN_ESTIMATE_PRICE);
+    return {
+      marketPrice,
+      analysis,
+      sourceCounts: { web: webItems.length, serpapi: serpItems.length },
+      usedWeights: USE_TH_WEIGHTS,
+    };
+  } catch (error) {
+    console.warn('⚠️ Representative price calculation failed:', error);
+    return {
+      marketPrice: fallbackPrice,
+      analysis: null,
+      sourceCounts: { web: webItems.length, serpapi: serpItems.length },
+      usedWeights: USE_TH_WEIGHTS,
+    };
+  }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<EstimateResponse | { error: string }>> {
@@ -431,16 +684,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
     console.log('✅ Normalized product name:', normalizedData.productName);
     console.log('✅ Estimated price range:', normalizedData.priceRange);
 
-    const serpapiResults = await fetchSerpapiShoppingResults(normalizedData.productName);
-    if (serpapiResults) {
-      console.log('🔍 SerpAPI items fetched:', serpapiResults.items.length);
+    console.log('🔄 Agent 2: Fetching web search + SerpAPI prices...');
+    const representative = await getRepresentativeMarketPrice(body, normalizedData);
+    console.log('🔍 Web search items:', representative.sourceCounts.web);
+    console.log('🔍 SerpAPI items (filtered):', representative.sourceCounts.serpapi);
+    if (representative.analysis) {
+      console.log(
+        `✅ Representative price: ${representative.analysis.representativePrice} (${representative.analysis.mode}, D=${representative.analysis.dispersionScore.toFixed(2)})`
+      );
     } else {
-      console.log('ℹ️ SerpAPI disabled or unavailable');
+      console.log('⚠️ Representative price unavailable, using range midpoint');
     }
-
-    console.log('🔄 Agent 2: Getting median market price via web search...');
-    const marketPrice = await getMarketPrice(normalizedData.productName, normalizedData.priceRange, serpapiResults);
-    console.log('✅ Market price (median):', marketPrice);
+    const marketPrice = representative.marketPrice;
+    console.log('✅ Market price (low-but-fair):', marketPrice);
 
     const pawnPrice = Math.round(marketPrice * 0.6);
     console.log('🏦 Pawn price (60% of market):', pawnPrice);
@@ -464,7 +720,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
       confidence: 0.85,
       normalizedInput: normalizedData,
       calculation: {
-        marketPrice: `ราคาตลาดกลางจาก web search ${serpapiResults ? '+ SerpAPI' : ''} (ช่วง ${normalizedData.priceRange.min.toLocaleString()}-${normalizedData.priceRange.max.toLocaleString()} บาท)`,
+        marketPrice: representative.analysis
+          ? `ราคาตัวแทน (low-but-fair) จาก web_search ${representative.sourceCounts.web} รายการ${representative.sourceCounts.serpapi > 0 ? ` + SerpAPI ${representative.sourceCounts.serpapi} รายการ` : ''}${representative.usedWeights ? ' | ให้น้ำหนักตลาดไทย' : ''} (ช่วง ${normalizedData.priceRange.min.toLocaleString()}-${normalizedData.priceRange.max.toLocaleString()} บาท)`
+          : `ราคากลางจากช่วง ${normalizedData.priceRange.min.toLocaleString()}-${normalizedData.priceRange.max.toLocaleString()} บาท (ข้อมูลตลาดไม่เพียงพอ)`,
         pawnPrice: `ราคาจำนำ = ${marketPrice.toLocaleString()} × 0.6 = ${pawnPrice.toLocaleString()} บาท`,
         finalPrice: `ราคาประเมิน = ${pawnPrice.toLocaleString()} × สภาพ ${(normalizedCondition * 100).toFixed(0)}% = ${finalPrice.toLocaleString()} บาท`,
       },
