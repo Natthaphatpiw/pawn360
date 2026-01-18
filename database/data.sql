@@ -151,7 +151,7 @@ CREATE TABLE public.contracts (
   interest_rate numeric NOT NULL,
   interest_amount numeric NOT NULL,
   total_amount numeric NOT NULL,
-  platform_fee_rate numeric NOT NULL DEFAULT 0.10,
+  platform_fee_rate numeric NOT NULL DEFAULT 0.50,
   platform_fee_amount numeric NOT NULL,
   amount_paid numeric DEFAULT 0,
   interest_paid numeric DEFAULT 0,

@@ -830,7 +830,7 @@ CREATE TABLE contracts (
   interest_amount DECIMAL(12,2) NOT NULL,
   total_amount DECIMAL(12,2) NOT NULL, -- principal + interest
 
-  platform_fee_rate DECIMAL(5,4) NOT NULL DEFAULT 0.10, -- 10% of interest
+  platform_fee_rate DECIMAL(5,4) NOT NULL DEFAULT 0.50, -- 50% of interest (1.5% out of 3%)
   platform_fee_amount DECIMAL(12,2) NOT NULL,
 
   -- Payment Status

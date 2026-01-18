@@ -153,8 +153,13 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
 
   const rawInterestRate = Number(contract?.interest_rate || 0);
   const normalizedInterestRate = rawInterestRate > 1 ? rawInterestRate / 100 : rawInterestRate;
-  const newMonthlyInterest = Math.round(((requestDetails?.principal_after_increase || requestDetails?.new_principal_amount || 0) * normalizedInterestRate) * 100) / 100;
-  const increaseMonthlyInterest = Math.round(((requestDetails?.increase_amount || 0) * normalizedInterestRate) * 100) / 100;
+  const platformFeeRate = typeof contract?.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.5;
+  const investorShare = Math.max(0, 1 - platformFeeRate);
+  const investorRatePercent = normalizedInterestRate * investorShare * 100;
+  const newMonthlyInterest = Math.round(((requestDetails?.principal_after_increase || requestDetails?.new_principal_amount || 0) * normalizedInterestRate * investorShare) * 100) / 100;
+  const increaseMonthlyInterest = Math.round(((requestDetails?.increase_amount || 0) * normalizedInterestRate * investorShare) * 100) / 100;
   const formatAmount = (value: number) => (
     value % 1
       ? value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -306,8 +311,8 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
           <div className="bg-green-50 rounded-xl p-3">
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-600">อัตราดอกเบี้ย:</span>
-                <span className="font-bold">{contract?.interest_rate}% / เดือน</span>
+                <span className="text-gray-600">อัตราดอกเบี้ยสุทธิ (นักลงทุน):</span>
+                <span className="font-bold">{investorRatePercent.toFixed(2)}% / เดือน</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">ดอกเบี้ยใหม่/เดือน:</span>

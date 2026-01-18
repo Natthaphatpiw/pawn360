@@ -116,9 +116,13 @@ function InvestorDashboardContent() {
             const badge = getStatusBadge(contract.contract_status);
             const daysRemaining = getDaysRemaining(contract.contract_end_date);
             const totalInterest = Number(contract.interest_amount) || 0;
-            const investorInterest = Math.round(totalInterest * (2 / 3) * 100) / 100;
+            const platformFeeRate = typeof contract.platform_fee_rate === 'number'
+              ? contract.platform_fee_rate
+              : 0.5;
+            const investorShare = Math.max(0, 1 - platformFeeRate);
+            const investorInterest = Math.round(totalInterest * investorShare * 100) / 100;
             const investorRate = typeof contract.interest_rate === 'number'
-              ? contract.interest_rate * (2 / 3) * 100
+              ? contract.interest_rate * investorShare * 100
               : 0;
 
             return (

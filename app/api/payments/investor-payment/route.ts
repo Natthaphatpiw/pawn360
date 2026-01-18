@@ -55,6 +55,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isConfirmed = contract.contract_status === 'CONFIRMED' || Boolean(contract.payment_confirmed_at);
+    if (contract.payment_status === 'INVESTOR_PAID' || contract.payment_status === 'COMPLETED' || isConfirmed) {
+      return NextResponse.json(
+        { error: 'Payment already submitted for this contract' },
+        { status: 409 }
+      );
+    }
+
+    if (contract.funding_status && contract.funding_status !== 'PENDING') {
+      return NextResponse.json(
+        { error: 'Contract is not eligible for payment submission' },
+        { status: 409 }
+      );
+    }
+
+    const { data: existingPayments, error: existingPaymentsError } = await supabase
+      .from('payments')
+      .select('payment_id, payment_status')
+      .eq('contract_id', contractId)
+      .eq('payment_type', 'PRINCIPAL')
+      .in('payment_status', ['PENDING', 'PROCESSING', 'COMPLETED'])
+      .limit(1);
+
+    if (existingPaymentsError) {
+      console.error('Error checking existing payments:', existingPaymentsError);
+      return NextResponse.json(
+        { error: 'Failed to verify payment status' },
+        { status: 500 }
+      );
+    }
+
+    if (existingPayments && existingPayments.length > 0) {
+      return NextResponse.json(
+        { error: 'Payment already submitted for this contract' },
+        { status: 409 }
+      );
+    }
+
     // Create payment record
     // payment_type: Valid values are PRINCIPAL, INTEREST, FULL_REPAYMENT, PARTIAL_REPAYMENT, LATE_FEE, EXTENSION_FEE
     // payment_status: Valid values are PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED

@@ -79,11 +79,11 @@ export async function POST(request: NextRequest) {
     const contractEndDate = new Date();
     contractEndDate.setDate(contractStartDate.getDate() + loanRequest.requested_duration_days);
 
-    const interestRate = 0.02; // 2% per month (net to investor after platform fee)
     const fullInterestRate = 0.03; // 3% per month (shown to pawner)
+    const platformFeeRate = 0.5; // 50% of interest (1.5% out of 3%)
     const fullInterestAmount = loanRequest.requested_amount * fullInterestRate * (loanRequest.requested_duration_days / 30);
-    const investorInterestAmount = loanRequest.requested_amount * interestRate * (loanRequest.requested_duration_days / 30);
-    const platformFeeAmount = fullInterestAmount - investorInterestAmount; // 1% platform fee
+    const investorInterestAmount = fullInterestAmount * (1 - platformFeeRate);
+    const platformFeeAmount = fullInterestAmount - investorInterestAmount; // 1.5% platform fee
     const totalAmount = loanRequest.requested_amount + fullInterestAmount;
 
     const contractRecord = {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       interest_rate: fullInterestRate, // Store full rate for pawner
       interest_amount: fullInterestAmount, // Store full interest for pawner
       total_amount: loanRequest.requested_amount + fullInterestAmount, // Total for pawner
-      platform_fee_rate: 0.33, // 1/3 of interest is platform fee (1% out of 3%)
+      platform_fee_rate: platformFeeRate, // 50% of interest is platform fee (1.5% out of 3%)
       platform_fee_amount: platformFeeAmount,
       contract_status: 'PENDING_SIGNATURE',
       funding_status: 'PENDING',
@@ -180,8 +180,13 @@ export async function POST(request: NextRequest) {
 }
 
 function createPawnOfferCard(contract: any, loanRequest: any) {
-  // Calculate investor interest (2% after platform fee)
-  const investorInterestAmount = contract.loan_principal_amount * 0.02 * (contract.contract_duration_days / 30);
+  // Calculate investor interest (1.5% after platform fee)
+  const platformFeeRate = typeof contract.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.5;
+  const investorShare = Math.max(0, 1 - platformFeeRate);
+  const interestRate = Number(contract.interest_rate || 0.03);
+  const investorInterestAmount = contract.loan_principal_amount * interestRate * investorShare * (contract.contract_duration_days / 30);
   
   const card = {
     type: 'flex' as const,

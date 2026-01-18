@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
           loan_principal_amount,
           interest_amount,
           total_amount,
+          platform_fee_rate,
           investor_id,
           items:item_id (
             brand,
@@ -81,10 +82,13 @@ export async function POST(request: NextRequest) {
       })
       .eq('contract_id', redemption.contract_id);
 
-    // Calculate investor earnings (2% per month after platform fee)
-    const totalInterest = redemption.interest_amount;
-    const platformFee = totalInterest * 0.1; // 10% platform fee
-    const investorNetProfit = totalInterest - platformFee; // Investor gets 2% per month
+    // Calculate investor earnings (1.5% per month after platform fee)
+    const totalInterest = redemption.interest_amount || 0;
+    const platformFeeRate = typeof redemption.contract?.platform_fee_rate === 'number'
+      ? redemption.contract.platform_fee_rate
+      : 0.5;
+    const platformFee = totalInterest * platformFeeRate;
+    const investorNetProfit = totalInterest - platformFee; // Investor gets 1.5% per month
 
     // Update redemption with earnings info
     await supabase

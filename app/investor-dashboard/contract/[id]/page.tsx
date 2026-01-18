@@ -90,11 +90,17 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const badge = getStatusBadge(contract.contract_status);
   const daysRemaining = getDaysRemaining(contract.contract_end_date);
   const totalInterest = Number(contract.interest_amount) || 0;
-  const investorReward = Math.round(totalInterest * (2 / 3) * 100) / 100;
-  const platformFee = Math.round((totalInterest - investorReward) * 100) / 100;
+  const platformFeeRate = typeof contract.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.5;
+  const investorShare = Math.max(0, 1 - platformFeeRate);
+  const investorReward = Math.round(totalInterest * investorShare * 100) / 100;
+  const platformFee = Math.round(totalInterest * platformFeeRate * 100) / 100;
   const interestRatePercent = typeof contract.interest_rate === 'number'
     ? contract.interest_rate * 100
     : 0;
+  const investorRatePercent = interestRatePercent * investorShare;
+  const platformRatePercent = interestRatePercent * platformFeeRate;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 pb-20">
@@ -142,10 +148,10 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
               <div className="text-right">
                 <div>{`${totalInterest.toLocaleString()} บาท (${interestRatePercent.toFixed(0)}%)`}</div>
                 <div className="text-xs text-gray-500">
-                  นักลงทุน 2% {investorReward.toLocaleString()} บาท
+                  นักลงทุน {investorRatePercent.toFixed(1)}% {investorReward.toLocaleString()} บาท
                 </div>
                 <div className="text-xs text-gray-500">
-                  ค่าธรรมเนียมระบบ 1% {platformFee.toLocaleString()} บาท
+                  ค่าธรรมเนียมระบบ {platformRatePercent.toFixed(1)}% {platformFee.toLocaleString()} บาท
                 </div>
               </div>
             )}
