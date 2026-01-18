@@ -151,6 +151,46 @@ function InvestorPaymentContent() {
     );
   }
 
+  const paymentStatus = contract.payment_status as string | undefined;
+  const fundingStatus = contract.funding_status as string | undefined;
+  const hasSlip = Boolean(contract.payment_slip_url);
+  const isRejected = paymentStatus === 'REJECTED';
+  const isPaid = paymentStatus === 'INVESTOR_PAID' || paymentStatus === 'COMPLETED';
+  const isConfirmed = contract.contract_status === 'CONFIRMED' || Boolean(contract.payment_confirmed_at);
+  const isFundingClosed = Boolean(fundingStatus && fundingStatus !== 'PENDING');
+  const canSubmit = !isPaid && !isConfirmed && !isFundingClosed && (!hasSlip || isRejected);
+
+  if (!canSubmit) {
+    let blockedMessage = 'สัญญานี้อยู่ในสถานะที่ไม่สามารถส่งสลิปได้';
+    if (isPaid || hasSlip) {
+      blockedMessage = 'คุณได้ส่งหลักฐานการชำระเงินแล้ว กรุณารอผู้จำนำยืนยัน';
+    } else if (isConfirmed) {
+      blockedMessage = 'รายการนี้ได้รับการยืนยันแล้ว';
+    } else if (isFundingClosed) {
+      blockedMessage = 'สัญญานี้อยู่ในสถานะที่ไม่สามารถส่งสลิปได้';
+    }
+
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <p className="text-gray-700 mb-4">{blockedMessage}</p>
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined' && window.liff) {
+                window.liff.closeWindow();
+              } else {
+                window.history.back();
+              }
+            }}
+            className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+          >
+            ปิด
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center p-4 relative pb-24">
 
@@ -159,6 +199,12 @@ function InvestorPaymentContent() {
         <h1 className="text-lg font-bold text-gray-800 mb-1">ส่งหลักฐานการชำระเงิน</h1>
         <p className="text-gray-500 text-sm font-light">อัปโหลดสลิปการโอนเงิน</p>
       </div>
+
+      {isRejected && (
+        <div className="w-full max-w-sm bg-[#FFF4E5] text-[#B45309] border border-[#FCD34D] rounded-2xl p-4 mb-4 text-sm">
+          ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน กรุณาตรวจสอบและส่งสลิปใหม่อีกครั้ง
+        </div>
+      )}
 
       {/* Contract Info */}
       <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">

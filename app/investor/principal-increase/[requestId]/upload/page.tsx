@@ -129,6 +129,14 @@ export default function InvestorPrincipalIncreaseUploadPage() {
   }
 
   const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.increase_amount;
+  const requestStatus = requestDetails?.request_status;
+  const allowedStatuses = [
+    'AWAITING_INVESTOR_APPROVAL',
+    'INVESTOR_APPROVED',
+    'AWAITING_INVESTOR_PAYMENT',
+    'INVESTOR_SLIP_REJECTED',
+    'PENDING_INVESTOR_APPROVAL',
+  ];
 
   // Show voided state
   if (showVoided) {
@@ -196,6 +204,34 @@ export default function InvestorPrincipalIncreaseUploadPage() {
               </div>
             </div>
           )}
+
+          <button
+            onClick={handleGoToContracts}
+            className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
+          >
+            กลับหน้าสัญญา
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (requestDetails && !allowedStatuses.includes(requestStatus)) {
+    const statusMessage = requestStatus === 'COMPLETED' || requestStatus === 'INVESTOR_TRANSFERRED'
+      ? 'คำขอนี้ดำเนินการเสร็จแล้ว'
+      : requestStatus === 'INVESTOR_SLIP_REJECTED_FINAL' || requestStatus === 'VOIDED'
+        ? 'คำขอนี้ถูกยกเลิกแล้ว'
+        : 'คำขอนี้อยู่ในสถานะที่ไม่สามารถส่งสลิปได้';
+
+    return (
+      <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-10 h-10 text-gray-500" />
+          </div>
+
+          <h1 className="text-xl font-bold text-gray-800 mb-2">ไม่สามารถส่งสลิปได้</h1>
+          <p className="text-gray-500 text-sm mb-6">{statusMessage}</p>
 
           <button
             onClick={handleGoToContracts}

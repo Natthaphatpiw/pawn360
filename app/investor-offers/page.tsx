@@ -85,53 +85,63 @@ function InvestorOffersContent() {
             <p>ไม่มีข้อเสนอใหม่ในขณะนี้</p>
           </div>
         ) : (
-          marketOffers.map((offer) => (
-            <div
-              key={offer.contract_id}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 active:scale-[0.99] transition-transform"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#E9EFF6] flex items-center justify-center text-[#1E3A8A]">
-                    <Search className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800 text-base leading-tight">
-                      {offer.items?.brand} {offer.items?.model}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
-                        {offer.items?.item_condition}%
-                      </span>
-                      <span className="text-[10px] text-gray-400">{offer.contract_duration_days} วัน</span>
+          marketOffers.map((offer) => {
+            const platformFeeRate = typeof offer.platform_fee_rate === 'number'
+              ? offer.platform_fee_rate
+              : 0.5;
+            const investorShare = Math.max(0, 1 - platformFeeRate);
+            const interestRatePercent = (offer.interest_rate || 0) * 100;
+            const investorRatePercent = interestRatePercent * investorShare;
+            const investorInterestAmount = (offer.interest_amount || 0) * investorShare;
+
+            return (
+              <div
+                key={offer.contract_id}
+                className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 active:scale-[0.99] transition-transform"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#E9EFF6] flex items-center justify-center text-[#1E3A8A]">
+                      <Search className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-base leading-tight">
+                        {offer.items?.brand} {offer.items?.model}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                          {offer.items?.item_condition}%
+                        </span>
+                        <span className="text-[10px] text-gray-400">{offer.contract_duration_days} วัน</span>
+                      </div>
                     </div>
                   </div>
+                  <div className="text-right">
+                    <div className="text-[#1E3A8A] font-bold text-lg">{offer.loan_principal_amount?.toLocaleString()}</div>
+                    <div className="text-[10px] text-gray-400">บาท</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[#1E3A8A] font-bold text-lg">{offer.loan_principal_amount?.toLocaleString()}</div>
-                  <div className="text-[10px] text-gray-400">บาท</div>
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2 mt-2 bg-[#F8FAFC] p-3 rounded-xl">
-                <div>
-                  <div className="text-[10px] text-gray-400">ดอกเบี้ย/เดือน</div>
-                  <div className="text-sm font-bold text-gray-700">{(offer.interest_rate * 100).toFixed(1)}%</div>
+                <div className="grid grid-cols-2 gap-2 mt-2 bg-[#F8FAFC] p-3 rounded-xl">
+                  <div>
+                    <div className="text-[10px] text-gray-400">ดอกเบี้ย/เดือน</div>
+                    <div className="text-sm font-bold text-gray-700">{investorRatePercent.toFixed(1)}%</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-gray-400">ดอกเบี้ยที่ได้รับ</div>
+                    <div className="text-sm font-bold text-[#1E3A8A]">{investorInterestAmount.toLocaleString()} บาท</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[10px] text-gray-400">ดอกเบี้ยที่ได้รับ</div>
-                  <div className="text-sm font-bold text-[#1E3A8A]">{offer.interest_amount?.toLocaleString()} บาท</div>
-                </div>
-              </div>
 
-              <button
-                onClick={() => router.push(`/offer-detail?contractId=${offer.contract_id}`)}
-                className="w-full mt-3 py-2 rounded-lg border border-[#1E3A8A] text-[#1E3A8A] text-sm font-bold hover:bg-[#1E3A8A] hover:text-white transition-colors"
-              >
-                ดูรายละเอียด
-              </button>
-            </div>
-          ))
+                <button
+                  onClick={() => router.push(`/offer-detail?contractId=${offer.contract_id}`)}
+                  className="w-full mt-3 py-2 rounded-lg border border-[#1E3A8A] text-[#1E3A8A] text-sm font-bold hover:bg-[#1E3A8A] hover:text-white transition-colors"
+                >
+                  ดูรายละเอียด
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

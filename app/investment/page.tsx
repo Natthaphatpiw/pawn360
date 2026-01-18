@@ -19,6 +19,7 @@ type Contract = {
   contract_duration_days?: number;
   loan_principal_amount?: number;
   interest_amount?: number;
+  platform_fee_rate?: number;
   items?: ContractItem;
 };
 
@@ -124,7 +125,11 @@ export default function InvestmentDashboard() {
           Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
         );
         const interest = Number(contract.interest_amount) || 0;
-        unrealized = Math.round((interest * (elapsedDays / totalDays)) * 100) / 100;
+        const platformFeeRate = typeof contract.platform_fee_rate === 'number'
+          ? contract.platform_fee_rate
+          : 0.5;
+        const investorInterest = interest * (1 - platformFeeRate);
+        unrealized = Math.round((investorInterest * (elapsedDays / totalDays)) * 100) / 100;
       }
 
       return {
@@ -147,10 +152,14 @@ export default function InvestmentDashboard() {
       }
 
       const interestAmount = Number(contract.interest_amount) || 0;
+      const platformFeeRate = typeof contract.platform_fee_rate === 'number'
+        ? contract.platform_fee_rate
+        : 0.5;
+      const investorInterest = interestAmount * (1 - platformFeeRate);
       if (isEnded) {
-        accumulatedProfit += interestAmount;
+        accumulatedProfit += investorInterest;
       } else {
-        currentProfit += interestAmount;
+        currentProfit += investorInterest;
       }
     });
 

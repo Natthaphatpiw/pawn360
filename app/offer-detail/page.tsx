@@ -176,12 +176,17 @@ function OfferDetailContent() {
   );
 
   const totalInterest = Number(contract.interest_amount) || 0;
-  const investorInterest = Math.round(totalInterest * (2 / 3) * 100) / 100;
-  const platformFee = Math.round((totalInterest - investorInterest) * 100) / 100;
+  const platformFeeRate = typeof contract.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.5;
+  const investorShare = Math.max(0, 1 - platformFeeRate);
+  const investorInterest = Math.round(totalInterest * investorShare * 100) / 100;
+  const platformFee = Math.round(totalInterest * platformFeeRate * 100) / 100;
   const interestRatePercent = typeof contract.interest_rate === 'number'
     ? contract.interest_rate * 100
     : 0;
-  const investorRatePercent = interestRatePercent * (2 / 3);
+  const investorRatePercent = interestRatePercent * investorShare;
+  const platformRatePercent = interestRatePercent * platformFeeRate;
 
   return (
     <div className="min-h-screen bg-white font-sans p-4 pb-10 flex flex-col items-center">
@@ -224,7 +229,7 @@ function OfferDetailContent() {
                   นักลงทุน {investorRatePercent.toFixed(1)}% {investorInterest.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-500">
-                  ค่าธรรมเนียมระบบ {(interestRatePercent - investorRatePercent).toFixed(1)}% {platformFee.toLocaleString()}
+                  ค่าธรรมเนียมระบบ {platformRatePercent.toFixed(1)}% {platformFee.toLocaleString()}
                 </div>
               </div>
             )}
