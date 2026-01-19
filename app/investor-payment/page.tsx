@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { X, Upload } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 
 function InvestorPaymentContent() {
   const router = useRouter();
@@ -61,9 +62,20 @@ function InvestorPaymentContent() {
 
     try {
       setUploadingSlip(true);
+      let uploadFile = file;
+      try {
+        uploadFile = await imageCompression(file, {
+          maxSizeMB: 0.8,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+          fileType: 'image/jpeg',
+        });
+      } catch (compressionError) {
+        console.warn('Compression failed, using original file:', compressionError);
+      }
 
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadFile);
       formData.append('folder', 'payment-slips');
 
       const response = await axios.post('/api/upload/image', formData, {
