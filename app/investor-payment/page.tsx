@@ -32,20 +32,23 @@ function InvestorPaymentContent() {
   const [uploadingSlip, setUploadingSlip] = useState(false);
 
   useEffect(() => {
-    if (contractId) {
-      fetchContractDetails();
-    }
-  }, [contractId]);
+    if (liffLoading || !profile?.userId || !contractId) return;
+    fetchContractDetails();
+  }, [liffLoading, profile?.userId, contractId]);
 
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&includeBank=true`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&includeBank=true&lineId=${profile?.userId}`);
       setContract(response.data.contract);
       // Pre-fill amount
       setAmount(response.data.contract.loan_principal_amount?.toLocaleString() || '');
     } catch (error: any) {
       console.error('Error fetching contract:', error);
+      if (error.response?.data?.kycRequired) {
+        router.replace('/ekyc-invest');
+        return;
+      }
       setError(error.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
     } finally {
       setLoading(false);

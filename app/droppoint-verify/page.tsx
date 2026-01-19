@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { Camera, Check, X, Upload } from 'lucide-react';
+import ImageCarousel from '@/components/ImageCarousel';
 
 function DropPointVerifyContent() {
   const router = useRouter();
@@ -91,6 +92,12 @@ function DropPointVerifyContent() {
     } finally {
       setUploadingPhoto(false);
     }
+  };
+
+  const getPhotoLabel = (index: number) => {
+    if (index === 0) return 'front';
+    if (index === 1) return 'back';
+    return `photo ${index + 1}`;
   };
 
   const removePhoto = (index: number) => {
@@ -251,21 +258,26 @@ function DropPointVerifyContent() {
         {/* Customer Photos */}
         <div className="mb-6">
           <label className="font-bold text-gray-700 text-sm mb-2 block">รูปถ่ายโดยลูกค้า</label>
-          <div className="grid grid-cols-2 gap-3">
-            {contract.items?.image_urls?.slice(0, 2).map((url: string, index: number) => (
-              <div key={index} className="aspect-square relative rounded-xl overflow-hidden bg-gray-100">
+          <ImageCarousel
+            images={contract.items?.image_urls}
+            className="no-scrollbar"
+            itemClassName="w-32 aspect-square relative rounded-xl overflow-hidden bg-gray-100"
+            emptyLabel="No Image"
+            emptyClassName="w-full text-center text-gray-400 text-xs"
+            renderItem={(url, index) => (
+              <>
                 <img
                   src={url}
                   alt={`Photo ${index + 1}`}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute top-2 right-2 text-white text-[10px] drop-shadow-md text-right leading-tight">
-                  <span className="text-lg font-bold block">{index === 0 ? 'front' : 'back'}</span>
+                  <span className="text-lg font-bold block">{getPhotoLabel(index)}</span>
                   from pawner
                 </div>
-              </div>
-            ))}
-          </div>
+              </>
+            )}
+          />
         </div>
 
         {/* Verification Checklist */}

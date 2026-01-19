@@ -5,6 +5,7 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { ChevronLeft, Package, Clock } from 'lucide-react';
+import ImageCarousel from '@/components/ImageCarousel';
 
 type DropPoint = {
   drop_point_id: string;
@@ -204,13 +205,13 @@ function DropPointContent() {
 
         <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">
           <h2 className="text-sm font-bold text-gray-800 mb-3">รูปถ่ายสินค้า</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {contractDetail.items?.image_urls?.slice(0, 2).map((url, index) => (
-              <div key={url} className="aspect-square rounded-2xl overflow-hidden bg-gray-100">
-                <img src={url} alt={`Item ${index + 1}`} className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
+          <ImageCarousel
+            images={contractDetail.items?.image_urls}
+            className="no-scrollbar"
+            itemClassName="w-36 aspect-square rounded-2xl overflow-hidden bg-gray-100"
+            emptyLabel="No Image"
+            emptyClassName="w-full text-center text-gray-400 text-xs"
+          />
         </div>
 
         {contractDetail.item_delivery_status !== 'VERIFIED' && (

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Get investor ID from LINE ID
     const { data: investor, error: investorError } = await supabase
       .from('investors')
-      .select('investor_id')
+      .select('investor_id, kyc_status')
       .eq('line_id', lineId)
       .single();
 
@@ -62,6 +62,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'accept') {
+      if (investor.kyc_status !== 'VERIFIED') {
+        return NextResponse.json(
+          {
+            error: 'ต้องยืนยันตัวตน (eKYC) ก่อนจึงจะรับข้อเสนอได้',
+            kycRequired: true,
+            kycStatus: investor.kyc_status,
+            redirectTo: '/ekyc-invest'
+          },
+          { status: 403 }
+        );
+      }
+
       if (contract.investor_id) {
         if (contract.investor_id === investorId) {
           return NextResponse.json({
