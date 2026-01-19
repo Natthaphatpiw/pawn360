@@ -100,7 +100,7 @@ export default function ContractAgreementStep({
           <h3 className="font-bold mb-2">เงื่อนไขการจำนำ:</h3>
           <ul className="list-disc list-inside space-y-1 mb-4">
             <li>อัตราดอกเบี้ยคำนวณแบบรายวัน</li>
-            <li>ค่าธรรมเนียมการจำนำ 10% ของดอกเบี้ย</li>
+            <li>ค่าธรรมเนียมการจำนำ 1% ของวงเงิน (คำนวณจากวงเงินเริ่มต้นของสัญญา)</li>
             <li>ระยะเวลาในการไถ่ถอนสินค้าตามที่กำหนด</li>
             <li>การผิดนัดชำระจะมีค่าปรับเพิ่มเติม</li>
           </ul>

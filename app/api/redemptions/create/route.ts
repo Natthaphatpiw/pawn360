@@ -9,10 +9,7 @@ export async function POST(request: NextRequest) {
       requestType,
       deliveryMethod,
       deliveryAddress,
-      principalAmount,
-      interestAmount,
       deliveryFee,
-      totalAmount,
       pawnerLineId,
     } = body;
 
@@ -90,15 +87,45 @@ export async function POST(request: NextRequest) {
       deliveryAddressFull = parts.join(' ');
     }
 
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const startDate = new Date(contract.contract_start_date);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(contract.contract_end_date);
+    endDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const rawDurationDays = Number(contract.contract_duration_days || 0)
+      || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
+    const daysInContract = Math.max(1, rawDurationDays);
+    const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+    const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
+
+    const rawRate = Number(contract.interest_rate || 0);
+    const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
+    const feeRate = 0.01;
+    const interestRateForAccrual = Math.max(0, monthlyInterestRate - feeRate);
+    const dailyInterestRate = interestRateForAccrual / 30;
+
+    const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
+    const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;
+    const feeAmount = Math.round(feeBase * feeRate * (daysInContract / 30) * 100) / 100;
+    const interestAccrued = Math.round(currentPrincipal * dailyInterestRate * daysElapsed * 100) / 100;
+    const interestDue = Math.max(0, interestAccrued + feeAmount - (contract.interest_paid || 0));
+
+    const basePrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
+    const deliveryFeeAmount = deliveryFee || 0;
+    const totalAmount = basePrincipal + interestDue + deliveryFeeAmount;
+
     // Create redemption request
     const { data: redemption, error: redemptionError } = await supabase
       .from('redemption_requests')
       .insert({
         contract_id: contractId,
         request_type: requestType,
-        principal_amount: principalAmount,
-        interest_amount: interestAmount,
-        delivery_fee: deliveryFee || 0,
+        principal_amount: basePrincipal,
+        interest_amount: interestDue,
+        delivery_fee: deliveryFeeAmount,
         total_amount: totalAmount,
         delivery_method: deliveryMethod,
         delivery_address_full: deliveryAddressFull,

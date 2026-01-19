@@ -169,15 +169,19 @@ export async function POST(request: NextRequest) {
     if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
       const now = new Date();
       const msPerDay = 1000 * 60 * 60 * 24;
-      const actionCreatedAt = actionRequest.created_at ? new Date(actionRequest.created_at) : now;
       const contractEndDate = new Date(contract.contract_end_date);
+      const contractStartDateOriginal = new Date(contract.contract_start_date);
+      const rawRate = Number(contract.interest_rate || 0);
+      const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
+      const rawDurationDays = Number(contract.contract_duration_days || 0)
+        || Math.ceil((contractEndDate.getTime() - contractStartDateOriginal.getTime()) / msPerDay);
+      const durationDays = Math.max(1, rawDurationDays);
 
       const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
-      const dailyRate = Number(actionRequest.daily_interest_rate || 0) || Number(contract.interest_rate || 0) / 30;
-      const remainingDays = Math.max(0, Math.ceil((contractEndDate.getTime() - actionCreatedAt.getTime()) / msPerDay));
-      const interestRemaining = round2(principalAmount * dailyRate * remainingDays);
-      const interestAmount = interestRemaining;
-      const durationDays = remainingDays;
+      const contractStartDate = now;
+      const contractEndDateNew = new Date(contractStartDate);
+      contractEndDateNew.setDate(contractEndDateNew.getDate() + durationDays);
+      const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
 
       const { data: newContract, error: newContractError } = await supabase
         .from('contracts')
@@ -185,8 +189,8 @@ export async function POST(request: NextRequest) {
           contract,
           principalAmount,
           interestAmount,
-          contractStartDate: actionCreatedAt,
-          contractEndDate,
+          contractStartDate,
+          contractEndDate: contractEndDateNew,
           durationDays,
           signedContractUrl: actionRequest.pawner_signature_url || contract.signed_contract_url,
         }))
@@ -248,7 +252,7 @@ export async function POST(request: NextRequest) {
           principalBefore: contract.current_principal_amount || contract.loan_principal_amount,
           principalAfter: principalAmount,
           contractEndDateBefore: contract.contract_end_date,
-          contractEndDateAfter: contractEndDate.toISOString(),
+          contractEndDateAfter: contractEndDateNew.toISOString(),
           description: 'Principal increase completed after investor transfer',
           metadata: {
             newContractId: newContract.contract_id,

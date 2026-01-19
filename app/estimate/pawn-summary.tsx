@@ -64,10 +64,13 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const maxLoanAmount = itemData.estimatedPrice;
   const loanAmountNum = parseFloat(loanAmount.replace(/,/g, '')) || 0;
   const deliveryFee = deliveryMethod === 'delivery' ? 40 : 0;
-  const interestRate = 0.03; // 3% per month (P2P legal rate)
+  const interestRateTotal = 0.03; // total 3% per month
+  const interestRatePawner = 0.02; // interest portion 2%
+  const feeRate = 0.01; // fee portion 1%
   const durationMonths = parseInt(duration) / 30;
-  const monthlyInterest = loanAmountNum * interestRate;
-  const totalInterest = monthlyInterest * durationMonths;
+  const interestAmount = loanAmountNum * interestRatePawner * durationMonths;
+  const feeAmount = loanAmountNum * feeRate * durationMonths;
+  const totalInterest = interestAmount + feeAmount;
   const totalRepayment = loanAmountNum + totalInterest + deliveryFee;
 
   const currentBranch = branches.find(b => b.branch_id === selectedBranchId);
@@ -157,7 +160,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         deliveryFee,
         branchId: selectedBranchId,
         duration: parseInt(duration),
-        interestRate,
+        interestRate: interestRateTotal,
         totalInterest,
         totalRepayment,
       };
@@ -431,8 +434,18 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
             className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 focus:outline-none font-medium"
           />
         </div>
+        <div className="text-[11px] text-gray-500 mb-4 space-y-1">
+          <div className="flex justify-between">
+            <span>ดอกเบี้ย (2%)</span>
+            <span>{formatNumber(interestAmount)} บาท</span>
+          </div>
+          <div className="flex justify-between">
+            <span>ค่าธรรมเนียม (1%)</span>
+            <span>{formatNumber(feeAmount)} บาท</span>
+          </div>
+        </div>
         <p className="text-[10px] text-gray-400 mb-8">
-          *จำนวนดอกเบี้ยคำนวณจากวงเงินและระยะเวลาที่เลือก
+          *ดอกเบี้ยคิดตามระยะเวลาที่เลือก ส่วนค่าธรรมเนียมคงที่ตามวงเงินเริ่มต้นของสัญญา
         </p>
 
         {/* 8. Action Buttons */}

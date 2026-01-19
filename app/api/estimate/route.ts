@@ -656,7 +656,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
     const estimatedPrice = Math.round(pawnPrice * normalizedCondition);
     console.log('💰 Final estimated price:', estimatedPrice);
 
-    const finalPrice = Math.max(estimatedPrice, MIN_ESTIMATE_PRICE);
+    const clampPrice = Math.max(estimatedPrice, MIN_ESTIMATE_PRICE);
+    const remainder = clampPrice % 1000;
+    const finalPrice = clampPrice - remainder + (remainder >= 500 ? 500 : 0);
 
     return NextResponse.json({
       success: true,

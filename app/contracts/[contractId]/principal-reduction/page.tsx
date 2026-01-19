@@ -16,6 +16,8 @@ interface Calculation {
   daysElapsed: number;
   daysRemaining: number;
   interestAccrued: number;
+  feeAmount?: number;
+  interestAccruedWithFee?: number;
   reductionAmount: number;
   interestForPeriod: number;
   interestFirstPart?: number;
@@ -142,12 +144,12 @@ export default function PrincipalReductionPage() {
 
   const interestFirstPart = calculation.interestFirstPart ?? calculation.interestForPeriod ?? 0;
   const interestRemaining = calculation.interestRemaining ?? calculation.newInterestForRemaining ?? 0;
+  const feeAmount = calculation.feeAmount ?? 0;
   const round2 = (value: number) => Math.round(value * 100) / 100;
-  const originalRemainingInterest = calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysRemaining;
-  const originalTotalInterest = round2(interestFirstPart + originalRemainingInterest);
-  const totalInterestAfterAction = round2(
-    calculation.interestTotalIfPayLater ?? (interestFirstPart + interestRemaining)
+  const originalTotalInterest = round2(
+    calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysInContract + feeAmount
   );
+  const totalInterestAfterAction = round2(interestFirstPart + interestRemaining);
   const totalToPayNow = calculation.reductionAmount + interestFirstPart;
 
   return (
@@ -178,7 +180,7 @@ export default function PrincipalReductionPage() {
             <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการลดเงินต้น</h2>
             <p className="text-sm text-gray-600 mb-4 leading-relaxed">
               การลดเงินต้นคือการชำระเงินต้นบางส่วนทันที ดอกเบี้ยที่ค้างถึงวันนี้ต้องชำระพร้อมกัน
-              และระบบจะคำนวณดอกเบี้ยช่วงที่เหลือใหม่ตามเงินต้นหลังลด โดยวันครบกำหนดสัญญายังคงเดิม
+              และระบบจะสร้างสัญญาใหม่ตามเงินต้นหลังลด โดยเริ่มนับระยะเวลาใหม่ตามสัญญาเดิม
             </p>
             <button
               type="button"
@@ -208,12 +210,13 @@ export default function PrincipalReductionPage() {
           <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการลดเงินต้น</h2>
           <p className="text-xs text-gray-600 mb-3">
             การลดเงินต้นคือการชำระเงินต้นบางส่วน เพื่อให้ดอกเบี้ยที่เหลือลดลง
-            โดยสัญญาจะยังคงวันสิ้นสุดเดิม
+            โดยสัญญาใหม่จะเริ่มนับระยะเวลาใหม่ตามสัญญาเดิม
           </p>
           <div className="bg-[#FFF8F5] rounded-xl p-4 mb-3">
             <DetailRow label="จำนวนที่ต้องการลด" value={`${calculation.reductionAmount.toLocaleString()} บาท`} />
-            <DetailRow label="ดอกเบี้ยช่วงแรก (ถึงวันนี้)" value={`${interestFirstPart.toLocaleString()} บาท`} />
-            <DetailRow label="ดอกเบี้ยช่วงที่เหลือ" value={`${interestRemaining.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ยถึงวันนี้ (รวมค่าธรรมเนียม)" value={`${interestFirstPart.toLocaleString()} บาท`} />
+            <DetailRow label="ค่าธรรมเนียมคงที่" value={`${feeAmount.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ยในสัญญาใหม่" value={`${interestRemaining.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยตามสัญญาเดิม" value={`${originalTotalInterest.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยรวมหลังทำรายการ" value={`${totalInterestAfterAction.toLocaleString()} บาท`} />
             <div className="border-t border-[#F0D4C8] my-2"></div>
@@ -223,8 +226,8 @@ export default function PrincipalReductionPage() {
           <div className="bg-amber-50 rounded-xl p-3 mb-3">
             <h3 className="font-bold text-amber-800 text-sm mb-2">การชำระดอกเบี้ย</h3>
             <p className="text-xs text-amber-800">
-              ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ทันที
-              และระบบจะคำนวณดอกเบี้ยที่เหลือใหม่ตามเงินต้นหลังลด
+              ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ (รวมค่าธรรมเนียม) ทันที
+              และระบบจะเริ่มสัญญาใหม่ตามเงินต้นหลังลด
             </p>
           </div>
           <div className="bg-[#B85C38] rounded-xl p-4 text-white">

@@ -281,7 +281,10 @@ export default function PawnTicketPage() {
               </div>
               <div className="text-center">
                 <div className="text-xs text-gray-600 mb-1">ดอกเบี้ย</div>
-                <div className="text-xl font-bold text-[#B85C38]">{ticketData.interestAmount}</div>
+                <div className="text-xl font-bold text-[#B85C38]">{ticketData.interestAmountInterest || ticketData.interestAmount}</div>
+                {ticketData.interestAmountFee && (
+                  <div className="text-[10px] text-gray-500">ค่าธรรมเนียม {ticketData.interestAmountFee}</div>
+                )}
               </div>
             </div>
             <div className="text-center pt-3 border-t border-[#B85C38]/20">

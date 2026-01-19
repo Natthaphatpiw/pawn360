@@ -58,6 +58,8 @@ interface ContractDetail {
   contract_end_date: string;
   contract_duration_days: number;
   loan_principal_amount: number;
+  original_principal_amount?: number | null;
+  current_principal_amount?: number | null;
   interest_rate: number;
   interest_amount: number;
   total_amount: number;
@@ -149,7 +151,7 @@ export default function PawnContractDetail() {
 
   const InfoRow = ({ label, value, valueColor = 'text-gray-600', isBoldValue = false }: {
     label: string;
-    value: string | number;
+    value: React.ReactNode;
     valueColor?: string;
     isBoldValue?: boolean;
   }) => (
@@ -184,6 +186,15 @@ export default function PawnContractDetail() {
     }
     return `${contract.item.brand} ${contract.item.model}`;
   };
+
+  const rawRate = Number(contract.interest_rate || 0);
+  const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
+  const feeRate = 0.01;
+  const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
+  const durationMonths = (contract.contract_duration_days || 0) / 30;
+  const feeBase = contract.original_principal_amount || contract.loan_principal_amount;
+  const interestAmount = Math.round(feeBase * interestRatePawner * durationMonths * 100) / 100;
+  const feeAmount = Math.round(feeBase * feeRate * durationMonths * 100) / 100;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans relative flex flex-col">
@@ -453,7 +464,14 @@ export default function PawnContractDetail() {
             <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount.toLocaleString()} บาท`} />
             <InfoRow
               label="ดอกเบี้ย"
-              value={`${contract.interest_amount.toLocaleString()} บาท (${(contract.interest_rate * 100).toFixed(2)}%)`}
+              value={(
+                <div className="text-right">
+                  <div>{interestAmount.toLocaleString()} บาท ({(interestRatePawner * 100).toFixed(2)}%)</div>
+                  <div className="text-xs text-gray-500">
+                    ค่าธรรมเนียม {feeAmount.toLocaleString()} บาท ({(feeRate * 100).toFixed(2)}%)
+                  </div>
+                </div>
+              )}
             />
             <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
             <InfoRow label="วันเริ่มต้น" value={formatDate(contract.contract_start_date)} />

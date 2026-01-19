@@ -315,18 +315,20 @@ export default function PrincipalIncreasePage() {
   const maxIncrease = Math.max(0, itemValue - currentPrincipal);
   const interestFirstPart = calculation?.interestFirstPart ?? calculation?.interestForPeriod ?? 0;
   const interestRemaining = calculation?.interestRemaining ?? calculation?.newInterestForRemaining ?? 0;
+  const feeAmount = calculation?.feeAmount ?? 0;
   const round2 = (value: number) => Math.round(value * 100) / 100;
-  const originalRemainingInterest = calculation
-    ? calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysRemaining
-    : 0;
   const originalTotalInterest = calculation
-    ? round2(interestFirstPart + originalRemainingInterest)
+    ? round2(calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysInContract + feeAmount)
     : 0;
   const totalInterestAfterAction = calculation
-    ? round2(calculation.interestTotalIfPayLater ?? (interestFirstPart + interestRemaining))
+    ? round2(interestFirstPart + interestRemaining)
     : 0;
   const payTodayAmount = interestFirstPart;
   const payEndAmount = interestRemaining;
+  const rawRate = Number(contract?.interest_rate || 0);
+  const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
+  const feeRate = 0.01;
+  const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -364,7 +366,7 @@ export default function PrincipalIncreasePage() {
             <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการเพิ่มเงินต้น</h2>
             <p className="text-sm text-gray-600 mb-4 leading-relaxed">
               การเพิ่มเงินต้นคือการขอวงเงินเพิ่มในสัญญาเดิม ต้องชำระดอกเบี้ยที่ค้างถึงวันนี้ทันที
-              และดอกเบี้ยช่วงที่เหลือจะคำนวณใหม่ตามเงินต้นใหม่ นักลงทุนมีสิทธิ์อนุมัติหรือปฏิเสธ
+              และระบบจะสร้างสัญญาใหม่ตามเงินต้นใหม่ นักลงทุนมีสิทธิ์อนุมัติหรือปฏิเสธ
               เมื่ออนุมัติแล้วจะโอนเงินเพิ่มให้ตามยอดที่ร้องขอ
             </p>
             <button
@@ -411,14 +413,16 @@ export default function PrincipalIncreasePage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">อัตราดอกเบี้ย:</span>
-              <span className="font-bold">{contract?.interest_rate}% / เดือน</span>
+              <span className="font-bold">
+                {(interestRatePawner * 100).toFixed(2)}% + {(feeRate * 100).toFixed(2)}% / เดือน
+              </span>
             </div>
           </div>
         </div>
 
         <div className="w-full max-w-sm bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-4 text-xs text-amber-800">
           การเพิ่มเงินต้นคือการขอวงเงินเพิ่มในสัญญาเดิม
-          ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ทันที และรออนุมัติจากนักลงทุนก่อนรับเงินเพิ่ม
+          ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ (รวมค่าธรรมเนียม) ทันที และรออนุมัติจากนักลงทุนก่อนรับเงินเพิ่ม
         </div>
 
         {/* Increase Amount Input */}
@@ -487,11 +491,15 @@ export default function PrincipalIncreasePage() {
               <div className="bg-blue-50 rounded-xl p-3">
                 <h4 className="font-bold text-blue-800 mb-2">ดอกเบี้ยตามช่วงเวลา</h4>
                 <div className="flex justify-between mb-1">
-                  <span className="text-blue-700">ดอกเบี้ยช่วงแรก (ถึงวันนี้):</span>
+                  <span className="text-blue-700">ดอกเบี้ยถึงวันนี้ (รวมค่าธรรมเนียม):</span>
                   <span className="font-bold text-blue-800">{interestFirstPart.toLocaleString()} บาท</span>
                 </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-blue-700">ค่าธรรมเนียมคงที่:</span>
+                  <span className="font-bold text-blue-800">{feeAmount.toLocaleString()} บาท</span>
+                </div>
                 <div className="flex justify-between">
-                  <span className="text-blue-700">ดอกเบี้ยช่วงที่เหลือ:</span>
+                  <span className="text-blue-700">ดอกเบี้ยในสัญญาใหม่:</span>
                   <span className="font-bold text-blue-800">{interestRemaining.toLocaleString()} บาท</span>
                 </div>
                 <div className="flex justify-between mt-2">
@@ -507,7 +515,7 @@ export default function PrincipalIncreasePage() {
               <div className="bg-amber-50 rounded-xl p-3">
                 <h4 className="font-bold text-amber-800 mb-2">การชำระดอกเบี้ย</h4>
                 <p className="text-xs text-amber-800">
-                  ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ทันที เพื่อปรับยอดเงินต้นใหม่
+                  ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ (รวมค่าธรรมเนียม) ทันที เพื่อปรับยอดเงินต้นใหม่
                 </p>
                 <p className="text-[11px] text-amber-700 mt-2">
                   ยอดดอกเบี้ยที่ต้องชำระวันนี้: {payTodayAmount.toLocaleString()} บาท
