@@ -36,6 +36,7 @@ export default function ImageCarousel({
     startY: 0,
     startScrollLeft: 0,
     moved: false,
+    pointerType: 'mouse' as React.PointerEvent['pointerType'],
   });
   const resetTimer = useRef<number | null>(null);
 
@@ -63,6 +64,7 @@ export default function ImageCarousel({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     const el = scrollRef.current;
     if (!el) return;
     if (resetTimer.current) {
@@ -71,17 +73,19 @@ export default function ImageCarousel({
     }
 
     dragState.current.isDragging = true;
+    dragState.current.pointerType = event.pointerType || 'mouse';
     dragState.current.startX = event.clientX;
     dragState.current.startY = event.clientY;
     dragState.current.startScrollLeft = el.scrollLeft;
     dragState.current.moved = false;
 
-    if (el.setPointerCapture) {
+    if (dragState.current.pointerType === 'mouse' && el.setPointerCapture) {
       el.setPointerCapture(event.pointerId);
     }
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') return;
     const state = dragState.current;
     const el = scrollRef.current;
     if (!el || !state.isDragging) return;
@@ -93,14 +97,19 @@ export default function ImageCarousel({
       state.moved = true;
     }
 
-    if (Math.abs(dx) > Math.abs(dy)) {
+    if (dragState.current.pointerType === 'mouse' && Math.abs(dx) > Math.abs(dy)) {
       el.scrollLeft = state.startScrollLeft - dx;
     }
   };
 
   const endDrag = (event?: React.PointerEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
-    if (el && event?.pointerId != null && el.releasePointerCapture) {
+    if (
+      el &&
+      event?.pointerId != null &&
+      dragState.current.pointerType === 'mouse' &&
+      el.releasePointerCapture
+    ) {
       try {
         if (el.hasPointerCapture?.(event.pointerId)) {
           el.releasePointerCapture(event.pointerId);
@@ -127,6 +136,52 @@ export default function ImageCarousel({
     }
   };
 
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (resetTimer.current) {
+      window.clearTimeout(resetTimer.current);
+      resetTimer.current = null;
+    }
+
+    const touch = event.touches[0];
+    dragState.current.isDragging = true;
+    dragState.current.pointerType = 'touch';
+    dragState.current.startX = touch.clientX;
+    dragState.current.startY = touch.clientY;
+    dragState.current.startScrollLeft = el.scrollLeft;
+    dragState.current.moved = false;
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const state = dragState.current;
+    const el = scrollRef.current;
+    if (!el || !state.isDragging) return;
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - state.startX;
+    const dy = touch.clientY - state.startY;
+
+    if (!state.moved && Math.abs(dx) > 6) {
+      state.moved = true;
+    }
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      event.preventDefault();
+      el.scrollLeft = state.startScrollLeft - dx;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    dragState.current.isDragging = false;
+    if (dragState.current.moved && !resetTimer.current) {
+      resetTimer.current = window.setTimeout(() => {
+        dragState.current.moved = false;
+        resetTimer.current = null;
+      }, 200);
+    }
+  };
+
   if (!images || images.length === 0) {
     return (
       <div className={emptyClassName || 'flex items-center justify-center text-gray-400 text-xs'}>
@@ -139,13 +194,17 @@ export default function ImageCarousel({
     <div className={`relative ${wrapperClassName}`}>
       <div
         ref={scrollRef}
-        className={`flex gap-3 overflow-x-auto snap-x snap-mandatory select-none touch-pan-y ${className}`}
+        className={`flex gap-3 overflow-x-auto snap-x snap-mandatory select-none ${className}`}
+        style={{ WebkitOverflowScrolling: 'touch' }}
         onScroll={handleScroll}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onPointerLeave={endDrag}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onClickCapture={handleClickCapture}
       >
         {images.map((url, index) => (
