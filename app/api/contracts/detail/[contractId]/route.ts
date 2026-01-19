@@ -29,17 +29,6 @@ export async function GET(
           phone_number,
           national_id
         ),
-        investor:investor_id (
-          investor_id,
-          firstname,
-          lastname,
-          phone_number,
-          bank_name,
-          bank_account_no,
-          bank_account_name,
-          promptpay_number,
-          promptpay_name
-        ),
         item:item_id (
           item_id,
           item_type,

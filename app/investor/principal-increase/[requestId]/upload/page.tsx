@@ -33,7 +33,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
   const fetchRequestDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contract-actions/${requestId}`);
+      const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`);
       if (response.data.success) {
         setRequestDetails(response.data.request);
       }
@@ -245,7 +245,6 @@ export default function InvestorPrincipalIncreaseUploadPage() {
   }
 
   const contract = requestDetails?.contract;
-  const pawner = contract?.pawners;
 
   return (
     <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col">

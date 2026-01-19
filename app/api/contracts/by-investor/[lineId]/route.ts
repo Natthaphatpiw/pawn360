@@ -44,11 +44,6 @@ export async function GET(
           image_urls,
           item_condition
         ),
-        pawners:customer_id (
-          customer_id,
-          firstname,
-          lastname
-        ),
         drop_points:drop_point_id (
           drop_point_id,
           drop_point_name

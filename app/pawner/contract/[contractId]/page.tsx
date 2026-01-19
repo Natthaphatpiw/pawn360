@@ -372,7 +372,7 @@ const PawnContractDetail = () => {
             <InfoRow label="ระยะเวลา" value={contract.details.duration} />
             <InfoRow label="วันเริ่มต้น" value={contract.details.startDate} />
             <InfoRow label="วันสิ้นสุด" value={contract.details.endDate} />
-            <InfoRow label="ชื่อคู่สัญญา:" value={contract.details.partnerName} />
+            <InfoRow label="ผู้ให้ทุน" value={contract.details.partnerName} />
           </div>
           <div className="h-px bg-gray-200 my-4"></div>
         </div>

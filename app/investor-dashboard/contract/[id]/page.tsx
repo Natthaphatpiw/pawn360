@@ -23,7 +23,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contracts/${contractId}`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor`);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);
@@ -114,22 +114,11 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
         <span className="text-sm font-medium">กลับ</span>
       </button>
 
-      {/* Pawner Info Section */}
+      {/* Privacy Notice */}
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-3">ข้อมูลผู้จำนำ</h2>
-        <div className="space-y-1 text-sm">
-          <InfoRow
-            label="ชื่อ"
-            value={`${contract.pawners?.firstname || ''} ${contract.pawners?.lastname || ''}`}
-          />
-          <InfoRow
-            label="เลขบัตรประชาชน"
-            value={contract.pawners?.national_id ? `X-XXXX-XXXXX-${contract.pawners.national_id.slice(-2)}-X` : '-'}
-          />
-          <InfoRow
-            label="เบอร์มือถือ"
-            value={contract.pawners?.phone_number || '-'}
-          />
+        <h2 className="text-lg font-bold text-gray-800 mb-2">ข้อมูลผู้จำนำ</h2>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
+          ข้อมูลส่วนบุคคลของผู้จำนำถูกปกปิดตามนโยบายความเป็นส่วนตัว
         </div>
         <div className="h-px bg-gray-300 my-4 opacity-50"></div>
       </div>

@@ -7,6 +7,8 @@ export async function GET(
 ) {
   try {
     const { contractId } = await context.params;
+    const { searchParams } = new URL(request.url);
+    const viewer = searchParams.get('viewer') || 'public';
 
     if (!contractId) {
       return NextResponse.json(
@@ -202,6 +204,51 @@ export async function GET(
     };
 
     // Prepare ticket data
+    const pawnerFull = {
+      name: `${contract.pawner?.firstname || ''} ${contract.pawner?.lastname || ''}`,
+      idCard: formatNationalId(contract.pawner?.national_id || ''),
+      address: formatAddress(contract.pawner || {}),
+      phone: contract.pawner?.phone_number || '',
+      signatureUrl: contract.pawner?.signature_url || null
+    };
+
+    const investorFull = {
+      name: `${contract.investor?.firstname || ''} ${contract.investor?.lastname || ''}`,
+      idCard: formatNationalId(contract.investor?.national_id || ''),
+      address: formatAddress(contract.investor || {}),
+      phone: contract.investor?.phone_number || '',
+      bankName: contract.investor?.bank_name || '',
+      bankAccountNo: contract.investor?.bank_account_no || '',
+      bankAccountName: contract.investor?.bank_account_name || ''
+    };
+
+    const redactedPerson = {
+      name: 'ไม่เปิดเผย',
+      idCard: '-',
+      address: '-',
+      phone: '',
+      signatureUrl: null
+    };
+
+    const redactedInvestor = {
+      ...redactedPerson,
+      bankName: '',
+      bankAccountNo: '',
+      bankAccountName: ''
+    };
+
+    const pawnerData = viewer === 'investor'
+      ? redactedPerson
+      : viewer === 'pawner'
+        ? pawnerFull
+        : redactedPerson;
+
+    const investorData = viewer === 'pawner'
+      ? redactedInvestor
+      : viewer === 'investor'
+        ? investorFull
+        : redactedInvestor;
+
     const ticketData = {
       shopName: 'Pawnly',
       branch: contract.drop_points?.drop_point_name || 'สำนักงานใหญ่',
@@ -209,22 +256,8 @@ export async function GET(
       bookNo: contract.contract_id.substring(0, 2).toUpperCase(),
       date: formatThaiDate(contract.contract_start_date),
       dueDate: formatThaiDate(contract.contract_end_date),
-      pawner: {
-        name: `${contract.pawner?.firstname || ''} ${contract.pawner?.lastname || ''}`,
-        idCard: formatNationalId(contract.pawner?.national_id || ''),
-        address: formatAddress(contract.pawner || {}),
-        phone: contract.pawner?.phone_number || '',
-        signatureUrl: contract.pawner?.signature_url || null
-      },
-      investor: {
-        name: `${contract.investor?.firstname || ''} ${contract.investor?.lastname || ''}`,
-        idCard: formatNationalId(contract.investor?.national_id || ''),
-        address: formatAddress(contract.investor || {}),
-        phone: contract.investor?.phone_number || '',
-        bankName: contract.investor?.bank_name || '',
-        bankAccountNo: contract.investor?.bank_account_no || '',
-        bankAccountName: contract.investor?.bank_account_name || ''
-      },
+      pawner: pawnerData,
+      investor: investorData,
       items: contract.items ? [
         {
           seq: 1,

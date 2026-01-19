@@ -28,7 +28,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   const fetchRequestDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contract-actions/${requestId}`);
+      const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`);
       if (response.data.success) {
         setRequestDetails(response.data.request);
       }
@@ -103,7 +103,6 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
 
   const contract = requestDetails?.contract;
   const item = contract?.items;
-  const pawner = contract?.pawners;
   const status = requestDetails?.request_status;
 
   // Show different states based on status
@@ -247,36 +246,15 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
           </div>
         </div>
 
-        {/* Pawner Info */}
+        {/* Pawner Info (Redacted) */}
         <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
           <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
             <User className="w-5 h-5 text-[#1E3A8A]" />
             ข้อมูลผู้จำนำ
           </h3>
-
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">ชื่อ:</span>
-              <span className="font-bold">{pawner?.firstname} {pawner?.lastname}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">เบอร์โทร:</span>
-              <span className="font-bold">{pawner?.phone_number}</span>
-            </div>
+          <div className="text-sm text-gray-600">
+            ข้อมูลส่วนบุคคลของผู้จำนำถูกปกปิดตามนโยบายความเป็นส่วนตัว
           </div>
-
-          {requestDetails?.pawner_signature_url && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-xs text-gray-500 mb-2">ลายเซ็นผู้จำนำ:</p>
-              <div className="border border-gray-200 rounded-xl p-2 bg-gray-50">
-                <img
-                  src={requestDetails.pawner_signature_url}
-                  alt="Pawner Signature"
-                  className="w-full h-20 object-contain"
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Pawner Bank Account */}

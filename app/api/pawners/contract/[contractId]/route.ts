@@ -44,10 +44,6 @@ export async function GET(
           lastname,
           national_id,
           phone_number
-        ),
-        investors!inner (
-          firstname,
-          lastname
         )
       `)
       .eq('contract_id', contractId)
@@ -92,9 +88,7 @@ export async function GET(
         duration: `${contractData.contract_duration_days} วัน`,
         startDate: new Date(contractData.contract_start_date).toLocaleDateString('th-TH'),
         endDate: new Date(contractData.contract_end_date).toLocaleDateString('th-TH'),
-        partnerName: contractData.investors && contractData.investors.length > 0
-          ? `${contractData.investors[0].firstname} ${contractData.investors[0].lastname}`
-          : 'ระบบ'
+        partnerName: 'Pawnly'
       },
       remark: 'ไม่มี',
       remainingDays: remainingDays

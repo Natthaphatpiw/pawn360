@@ -40,7 +40,7 @@ function InvestorPaymentContent() {
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contracts/${contractId}`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&includeBank=true`);
       setContract(response.data.contract);
       // Pre-fill amount
       setAmount(response.data.contract.loan_principal_amount?.toLocaleString() || '');
@@ -235,7 +235,7 @@ function InvestorPaymentContent() {
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">ชื่อบัญชี</span>
-            <span className="font-medium">{contract.pawners?.bank_account_name || `${contract.pawners?.firstname} ${contract.pawners?.lastname}`}</span>
+            <span className="font-medium">{contract.pawners?.bank_account_name || 'ไม่ระบุ'}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-gray-500">เลขบัญชี</span>
