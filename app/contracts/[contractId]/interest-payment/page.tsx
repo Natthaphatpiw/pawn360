@@ -38,6 +38,7 @@ export default function InterestPaymentPage() {
   const [companyBank, setCompanyBank] = useState<CompanyBank | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [step, setStep] = useState<'info' | 'payment'>('info');
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     if (contractId) {
@@ -138,8 +139,34 @@ export default function InterestPaymentPage() {
           <h1 className="font-bold text-lg text-gray-800">ต่อดอกเบี้ย</h1>
           <p className="text-xs text-gray-400">Interest Payment</p>
         </div>
-        <div className="w-6"></div>
+        <button
+          type="button"
+          onClick={() => setShowInfoModal(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          aria-label="ข้อมูลการต่อดอกเบี้ย"
+        >
+          <Info className="w-5 h-5 text-[#B85C38]" />
+        </button>
       </div>
+
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการต่อดอกเบี้ย</h2>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+              การต่อดอกเบี้ยคือการชำระดอกเบี้ยครบงวด เพื่อขยายวันครบกำหนดสัญญาออกไปตามระยะสัญญาเดิม
+              เงินต้นยังคงเดิม และต้องโอนยอดดอกเบี้ยให้ครบตามที่ระบบคำนวณ
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowInfoModal(false)}
+              className="w-full bg-[#B85C38] text-white rounded-xl py-3 font-bold hover:bg-[#A04D2D] transition-colors"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 px-4 py-6 pb-36 overflow-y-auto">
         {/* Contract Info */}
