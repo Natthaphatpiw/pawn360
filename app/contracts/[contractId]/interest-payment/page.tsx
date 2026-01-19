@@ -16,6 +16,9 @@ interface Calculation {
   daysElapsed: number;
   daysRemaining: number;
   contractEndDate: string;
+  feeAmount?: number;
+  interestAccrued?: number;
+  interestAccruedWithFee?: number;
 }
 
 interface CompanyBank {
@@ -154,8 +157,8 @@ export default function InterestPaymentPage() {
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
             <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการต่อดอกเบี้ย</h2>
             <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-              การต่อดอกเบี้ยคือการชำระดอกเบี้ยครบงวด เพื่อขยายวันครบกำหนดสัญญาออกไปตามระยะสัญญาเดิม
-              เงินต้นยังคงเดิม และต้องโอนยอดดอกเบี้ยให้ครบตามที่ระบบคำนวณ
+              การต่อดอกเบี้ยคือการชำระดอกเบี้ยตามจำนวนวันที่ผ่านไปจริง พร้อมค่าธรรมเนียมคงที่ตามวงเงินเริ่มต้นของสัญญา
+              เมื่อชำระแล้วระบบจะขยายวันครบกำหนดออกไปตามระยะสัญญาเดิม
             </p>
             <button
               type="button"
@@ -185,7 +188,13 @@ export default function InterestPaymentPage() {
         <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
           <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการต่อดอกเบี้ย</h2>
           <div className="bg-[#FFF8F5] rounded-xl p-4 mb-3">
-            <DetailRow label="ดอกเบี้ยสะสม" value={`${calculation.interestToPay.toLocaleString()} บาท`} />
+            <DetailRow
+              label="ดอกเบี้ยสะสม (รวมค่าธรรมเนียม)"
+              value={`${calculation.interestToPay.toLocaleString()} บาท`}
+            />
+            {typeof calculation.feeAmount === 'number' && (
+              <DetailRow label="ค่าธรรมเนียม" value={`${calculation.feeAmount.toLocaleString()} บาท`} />
+            )}
             <DetailRow label="ขยายสัญญาเพิ่ม" value={`${calculation.extensionDays} วัน`} />
             <div className="border-t border-[#F0D4C8] my-2"></div>
             <DetailRow label="วันครบกำหนดใหม่" value={new Date(calculation.newEndDate).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })} highlight />

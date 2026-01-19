@@ -69,11 +69,16 @@ export async function GET(
       );
     }
 
+    const msPerDay = 1000 * 60 * 60 * 24;
+
     // Calculate remaining days
     const endDate = new Date(contract.contract_end_date);
+    const startDate = new Date(contract.contract_start_date);
+    startDate.setHours(0, 0, 0, 0);
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const diffTime = endDate.getTime() - today.getTime();
-    const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const remainingDays = Math.ceil(diffTime / msPerDay);
 
     // Calculate status
     let displayStatus = 'ปกติ';
@@ -97,10 +102,28 @@ export async function GET(
       displayStatus = 'ยกเลิก';
     }
 
-    // Calculate remaining payment
-    const remainingAmount = contract.total_amount - contract.amount_paid;
-    const remainingPrincipal = contract.loan_principal_amount - contract.principal_paid;
-    const remainingInterest = contract.interest_amount - contract.interest_paid;
+    const rawDurationDays = Number(contract.contract_duration_days || 0)
+      || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
+    const daysInContract = Math.max(1, rawDurationDays);
+    const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+    const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
+
+    const rawRate = Number(contract.interest_rate || 0);
+    const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
+    const feeRate = 0.01;
+    const interestRateForAccrual = Math.max(0, monthlyInterestRate - feeRate);
+    const dailyInterestRate = interestRateForAccrual / 30;
+
+    const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
+    const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;
+    const feeAmount = Math.round(feeBase * feeRate * (daysInContract / 30) * 100) / 100;
+    const interestAccrued = Math.round(currentPrincipal * dailyInterestRate * daysElapsed * 100) / 100;
+    const interestDue = Math.max(0, interestAccrued + feeAmount - (contract.interest_paid || 0));
+
+    // Calculate remaining payment (use accrued interest + fixed fee)
+    const remainingPrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
+    const remainingInterest = Math.max(0, interestDue);
+    const remainingAmount = Math.max(0, remainingPrincipal + remainingInterest);
 
     return NextResponse.json({
       success: true,

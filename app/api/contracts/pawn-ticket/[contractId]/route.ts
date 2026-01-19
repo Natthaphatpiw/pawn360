@@ -249,6 +249,16 @@ export async function GET(
         ? investorFull
         : redactedInvestor;
 
+    const rawRate = Number(contract.interest_rate || 0);
+    const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
+    const feeRate = 0.01;
+    const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
+    const durationMonths = (contract.contract_duration_days || 0) / 30;
+    const principalBase = contract.original_principal_amount || contract.loan_principal_amount || 0;
+    const interestOnly = Math.round(principalBase * interestRatePawner * durationMonths * 100) / 100;
+    const feeAmount = Math.round(principalBase * feeRate * durationMonths * 100) / 100;
+    const totalInterest = interestOnly + feeAmount;
+
     const ticketData = {
       shopName: 'Pawnly',
       branch: contract.drop_points?.drop_point_name || 'สำนักงานใหญ่',
@@ -267,9 +277,11 @@ export async function GET(
       ] : [],
       amount: contract.loan_principal_amount?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
       amountText: numberToThaiText(contract.loan_principal_amount || 0),
-      interestRate: `${((contract.interest_rate || 0) * 100).toFixed(2)}% ต่อเดือน`,
-      totalAmount: (contract.loan_principal_amount + contract.interest_amount)?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
-      interestAmount: contract.interest_amount?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
+      interestRate: `${(interestRatePawner * 100).toFixed(2)}% + ${(feeRate * 100).toFixed(2)}% ต่อเดือน`,
+      totalAmount: (principalBase + totalInterest)?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
+      interestAmount: totalInterest?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
+      interestAmountInterest: interestOnly?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
+      interestAmountFee: feeAmount?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
       contractDuration: contract.contract_duration_days || 0,
       contractStatus: contract.contract_status,
       pawnTicketUrl: contract.pawn_ticket_url || null

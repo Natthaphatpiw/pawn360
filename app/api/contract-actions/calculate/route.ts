@@ -35,28 +35,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate dates
+    const round2 = (value: number) => Math.round(value * 100) / 100;
+    const msPerDay = 1000 * 60 * 60 * 24;
+
+    // Calculate dates (count start date as day 1)
     const startDate = new Date(contract.contract_start_date);
+    startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(contract.contract_end_date);
+    endDate.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const daysInContract = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const rawDaysElapsed = Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const daysElapsed = Math.max(0, Math.min(daysInContract, rawDaysElapsed));
+    const rawDaysInContract = Number(contract.contract_duration_days || 0)
+      || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
+    const daysInContract = Math.max(1, rawDaysInContract);
+    const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+    const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
     const daysRemaining = Math.max(0, daysInContract - daysElapsed);
 
-    // Get interest rate and calculate daily rate
-    const monthlyInterestRate = contract.interest_rate; // e.g., 0.03 for 3%
-    const dailyInterestRate = monthlyInterestRate / 30;
+    // Rates: split interest (2%) + fee (1%) while keeping total rate from contract
+    const rawRate = Number(contract.interest_rate || 0);
+    const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate; // total rate (e.g., 0.03)
+    const feeRate = 0.01;
+    const interestRateForAccrual = Math.max(0, monthlyInterestRate - feeRate);
+    const dailyInterestRate = interestRateForAccrual / 30;
 
     // Current principal
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
+    const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;
 
-    // Calculate accrued interest until today
-    const interestAccrued = currentPrincipal * dailyInterestRate * daysElapsed;
-
-    const round2 = (value: number) => Math.round(value * 100) / 100;
+    // Calculate accrued interest until today (interest only) + fixed fee
+    const interestAccrued = round2(currentPrincipal * dailyInterestRate * daysElapsed);
+    const feeAmount = round2(feeBase * feeRate * (daysInContract / 30));
+    const interestAccruedWithFee = round2(interestAccrued + feeAmount);
 
     let calculation: any = {
       contractId,
@@ -67,7 +78,9 @@ export async function POST(request: NextRequest) {
       daysInContract,
       daysElapsed,
       daysRemaining,
-      interestAccrued: round2(interestAccrued),
+      interestAccrued,
+      feeAmount,
+      interestAccruedWithFee,
       contractStartDate: contract.contract_start_date,
       contractEndDate: contract.contract_end_date,
     };
@@ -77,11 +90,10 @@ export async function POST(request: NextRequest) {
         // ต่อดอกเบี้ย: จ่ายดอกเบี้ยเต็มงวดแล้วขยายสัญญา
         // interest_rate is stored as DECIMAL (e.g., 0.03 for 3%)
         // Full period interest = principal * monthly rate * (contract days / 30)
-        const fullPeriodInterest = currentPrincipal * monthlyInterestRate * (daysInContract / 30);
-        const interestToPay = round2(fullPeriodInterest);
+        const interestToPay = interestAccruedWithFee;
 
         // New end date = current end date + contract duration days
-        const newEndDate = new Date(endDate);
+        const newEndDate = new Date(today);
         newEndDate.setDate(newEndDate.getDate() + daysInContract);
 
         calculation = {
@@ -106,17 +118,20 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const interestForPeriod = round2(interestAccrued);
+        const interestForPeriod = interestAccruedWithFee;
         const principalAfterReduction = currentPrincipal - reductionAmountValue;
 
         // Calculate new interest for remaining period
-        const newInterestForRemaining = round2(principalAfterReduction * dailyInterestRate * daysRemaining);
+        const newFeeAmount = round2(principalAfterReduction * feeRate * (daysInContract / 30));
+        const newInterestForRemaining = round2(
+          principalAfterReduction * dailyInterestRate * daysInContract + newFeeAmount
+        );
         const interestTotalIfPayLater = round2(interestForPeriod + newInterestForRemaining);
         const totalToPayNow = reductionAmountValue + interestForPeriod;
 
-        // Calculate interest difference (savings)
-        const originalRemainingInterest = currentPrincipal * dailyInterestRate * daysRemaining;
-        const interestSavings = round2(originalRemainingInterest - newInterestForRemaining);
+        // Calculate interest difference (savings) vs original full-period interest
+        const originalTotalInterest = round2(currentPrincipal * dailyInterestRate * daysInContract + feeAmount);
+        const interestSavings = round2(originalTotalInterest - newInterestForRemaining);
 
         calculation = {
           ...calculation,
@@ -152,7 +167,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const interestForPeriod = round2(interestAccrued);
+        const interestForPeriod = interestAccruedWithFee;
         const principalAfterIncrease = currentPrincipal + increaseAmountValue;
 
         // Calculate monthly interest (for UI display)
@@ -162,12 +177,15 @@ export async function POST(request: NextRequest) {
         const additionalMonthlyInterest = round2(newMonthlyInterest - currentMonthlyInterest);
 
         // Calculate new interest for remaining period
-        const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysRemaining);
+        const newFeeAmount = round2(principalAfterIncrease * feeRate * (daysInContract / 30));
+        const newInterestForRemaining = round2(
+          principalAfterIncrease * dailyInterestRate * daysInContract + newFeeAmount
+        );
         const interestTotalIfPayLater = round2(interestForPeriod + newInterestForRemaining);
 
-        // Calculate interest increase
-        const originalRemainingInterest = currentPrincipal * dailyInterestRate * daysRemaining;
-        const interestIncrease = round2(newInterestForRemaining - originalRemainingInterest);
+        // Calculate interest increase vs original full-period interest
+        const originalTotalInterest = round2(currentPrincipal * dailyInterestRate * daysInContract + feeAmount);
+        const interestIncrease = round2(newInterestForRemaining - originalTotalInterest);
 
         calculation = {
           ...calculation,

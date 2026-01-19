@@ -10,10 +10,12 @@ interface ContractDetail {
   contract_id: string;
   contract_number: string;
   loan_principal_amount: number;
+  original_principal_amount?: number | null;
   interest_rate: number;
   interest_amount: number;
   total_amount: number;
   amount_paid: number;
+  contract_duration_days: number;
   remainingAmount: number;
   remainingPrincipal: number;
   remainingInterest: number;
@@ -109,6 +111,12 @@ export default function RedemptionPaymentPage() {
     }
     return total;
   };
+
+  const feeRate = 0.01;
+  const durationMonths = contract ? (contract.contract_duration_days || 0) / 30 : 0;
+  const feeBase = contract?.original_principal_amount || contract?.loan_principal_amount || 0;
+  const feeAmount = Math.round(feeBase * feeRate * durationMonths * 100) / 100;
+  const interestOnly = Math.max(0, (contract?.remainingInterest || 0) - feeAmount);
 
   const handleProceedToUpload = async () => {
     if (!acceptedTerms) {
@@ -273,7 +281,8 @@ export default function RedemptionPaymentPage() {
           <div className="h-px bg-gray-200 my-4"></div>
 
           <DetailRow label="เงินต้น" value={`${contract.remainingPrincipal.toLocaleString()} บาท`} />
-          <DetailRow label="ดอกเบี้ย" value={`${contract.remainingInterest.toLocaleString()} บาท`} />
+          <DetailRow label="ดอกเบี้ย (2%)" value={`${interestOnly.toLocaleString()} บาท`} />
+          <DetailRow label="ค่าธรรมเนียม (1%)" value={`${feeAmount.toLocaleString()} บาท`} />
           {deliveryMethod === 'PLATFORM_ARRANGE' && (
             <DetailRow label="ค่าจัดส่ง" value={`${DELIVERY_FEE.toLocaleString()} บาท`} />
           )}
