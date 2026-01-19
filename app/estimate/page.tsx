@@ -815,12 +815,23 @@ function EstimatePageInner() {
     return null;
   };
 
+  const getCompressionOptions = (fileCount: number) => {
+    const maxTotalMB = 3.2;
+    const perImageMB = Math.min(0.8, maxTotalMB / Math.max(1, fileCount));
+    return {
+      maxSizeMB: perImageMB,
+      maxWidthOrHeight: 1920,
+      useWebWorker: true,
+      fileType: 'image/jpeg' as const,
+    };
+  };
+
   // Upload images
-  const uploadImages = async (signal?: AbortSignal): Promise<string[]> => {
-    if (images.length === 0) return [];
+  const uploadImages = async (files: File[], signal?: AbortSignal): Promise<string[]> => {
+    if (files.length === 0) return [];
     ensureNotCanceled(signal);
 
-    const uploadPromises = images.map(async (file) => {
+    const uploadPromises = files.map(async (file) => {
       ensureNotCanceled(signal);
       const formDataUpload = new FormData();
       formDataUpload.append('file', file);
@@ -866,18 +877,11 @@ function EstimatePageInner() {
     try {
       // Step 1: Compress and analyze condition with AI
       console.log('🗜️ Compressing images...');
+      const compressionOptions = getCompressionOptions(images.length);
       const compressedImages = await Promise.all(
         images.map(async (file) => {
-          // Compress image to max 800KB to ensure total payload stays under 4.5MB
-          const options = {
-            maxSizeMB: 0.8, // 800KB per image
-            maxWidthOrHeight: 1920,
-            useWebWorker: true,
-            fileType: 'image/jpeg' as const,
-          };
-
           try {
-            const compressedFile = await imageCompression(file, options);
+            const compressedFile = await imageCompression(file, compressionOptions);
             console.log(`📊 Original: ${(file.size / 1024).toFixed(2)}KB → Compressed: ${(compressedFile.size / 1024).toFixed(2)}KB`);
             return compressedFile;
           } catch (error) {
@@ -920,7 +924,7 @@ function EstimatePageInner() {
 
       // Step 2: Upload images
       console.log('📤 Starting image upload...');
-      const uploadedUrls = await uploadImages(signal);
+      const uploadedUrls = await uploadImages(compressedImages, signal);
       setUploadedImageUrls(uploadedUrls);
       console.log('✅ Image upload completed:', uploadedUrls);
       ensureNotCanceled(signal);

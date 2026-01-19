@@ -48,6 +48,9 @@ type ConditionResult = {
   totalScore: number;
   grade: string;
   reason: string;
+  assessable?: boolean;
+  assessmentStatus?: string;
+  assessmentIssue?: string;
   detailedBreakdown: {
     screen: { score: number; maxScore: number; description: string };
     body: { score: number; maxScore: number; description: string };
@@ -100,6 +103,7 @@ ${productLine}
 1) หากรูปภาพไม่ตรงกับประเภทสินค้า หรือเป็นคนละสินค้า/คนละประเภทกัน ให้ตอบว่า "ไม่สามารถประเมินได้" พร้อมเหตุผล
 2) หากภาพไม่ชัดเจน/ไม่ครบ ให้ระบุข้อจำกัดและแนะนำให้ถ่ายใหม่
 3) ให้ประเมินจากภาพเท่านั้น ห้ามเดาข้อมูลที่ไม่เห็น
+4) หากประเมินได้ ให้ระบุว่า "assessable": true
 
 ## หมวดหมู่การประเมิน (100 คะแนนเต็ม)
 ใช้โครงสร้างคะแนนคงที่ตามนี้ แต่ปรับคำอธิบายให้สอดคล้องกับประเภทสินค้า:
@@ -141,6 +145,9 @@ ${productLine}
 
 ## รูปแบบการตอบกลับ (JSON เท่านั้น)
 {
+  "assessable": true,
+  "assessmentStatus": "OK",
+  "assessmentIssue": "",
   "score": 0.XX,
   "totalScore": XX,
   "grade": "A+",
@@ -158,9 +165,12 @@ ${productLine}
 
 **คำอธิบาย score:** totalScore / 100 (0.0 - 1.0)
 **คำอธิบาย totalScore:** คะแนนรวมจากทุกหมวด (0-100)
+**assessable:** หากประเมินได้ให้เป็น true, หากประเมินไม่ได้ให้เป็น false
+**assessmentStatus:** ใช้ค่า "OK" เมื่อประเมินได้, ใช้ค่า "INSUFFICIENT" เมื่อประเมินไม่ได้
+**assessmentIssue:** ใส่เหตุผลสั้นๆ เมื่อประเมินไม่ได้, ถ้าประเมินได้ให้เป็นค่าว่าง
 
 ### ข้อความปฏิเสธความรับผิดชอบ:
-"การประเมินนี้อิงจากภาพถ่ายที่ได้รับเท่านั้น การประเมินสภาพจริงอาจต้องมีการตรวจสอบด้วยตนเอง รวมถึงการทดสอบฟังก์ชันการทำงานต่างๆ ที่ไม่สามารถประเมินจากภาพถ่ายได้"
+"การประเมินนี้อิงจากภาพถ่ายที่ได้รับเท่านั้น ผลลัพธ์อาจคลาดเคลื่อนและควรมีการตรวจสอบด้วยตนเอง รวมถึงการทดสอบฟังก์ชันการทำงานที่ไม่เห็นจากภาพถ่าย"
 `;
 };
 
@@ -367,12 +377,18 @@ async function analyzeConditionWithGemini(
   const totalScore = Math.max(0, Math.min(100, Number(parsed.totalScore) || 50));
   const rawScore = Number.isFinite(parsed.score) ? parsed.score : totalScore / 100;
   const score = Math.max(0, Math.min(1, rawScore));
+  const assessable = typeof parsed.assessable === 'boolean' ? parsed.assessable : undefined;
+  const assessmentStatus = typeof parsed.assessmentStatus === 'string' ? parsed.assessmentStatus : undefined;
+  const assessmentIssue = typeof parsed.assessmentIssue === 'string' ? parsed.assessmentIssue : '';
 
   return {
     score,
     totalScore,
     grade: parsed.grade || 'F',
     reason: parsed.reason || 'วิเคราะห์จากรูปภาพแล้ว',
+    assessable,
+    assessmentStatus,
+    assessmentIssue,
     detailedBreakdown: {
       screen: {
         score: parsed.detailedBreakdown?.screen?.score ?? 0,
@@ -406,8 +422,30 @@ async function analyzeConditionWithGemini(
 }
 
 function isAssessmentInsufficient(result: ConditionResult): boolean {
-  const combined = `${result.reason} ${result.recommendation} ${result.imageQuality}`.toLowerCase();
-  return /ไม่เพียงพอ|ไม่สามารถประเมิน|ต้องการภาพเพิ่มเติม|ภาพไม่ชัด|ไม่ครบ|อุปกรณ์ผิดประเภท|ไม่ตรงกับประเภท|คนละสินค้า|insufficient|unable to assess|cannot assess|wrong device|mismatch/.test(combined);
+  if (result.assessable === false) return true;
+
+  if (typeof result.assessmentStatus === 'string') {
+    const status = result.assessmentStatus.toLowerCase();
+    if (['insufficient', 'not_assessable', 'unassessable', 'failed'].includes(status)) {
+      return true;
+    }
+  }
+
+  const reasonText = `${result.reason || ''} ${result.assessmentIssue || ''}`.toLowerCase();
+  const qualityText = `${result.imageQuality || ''}`.toLowerCase();
+  const insufficientPattern = /ไม่เพียงพอ|ไม่สามารถประเมิน|ต้องการภาพเพิ่มเติม|ภาพไม่ชัด|ไม่ครบ|อุปกรณ์ผิดประเภท|ไม่ตรงกับประเภท|คนละสินค้า|insufficient|unable to assess|cannot assess|wrong device|mismatch/;
+
+  if (insufficientPattern.test(reasonText)) {
+    return true;
+  }
+
+  if (insufficientPattern.test(qualityText)) {
+    const totalScore = Number(result.totalScore ?? 0);
+    const score = Number(result.score ?? 0);
+    return totalScore <= 60 || score <= 0.6;
+  }
+
+  return false;
 }
 // Helper function to estimate base64 image size in bytes
 function estimateBase64Size(base64String: string): number {
