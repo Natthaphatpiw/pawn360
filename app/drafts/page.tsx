@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import Image from 'next/image';
 import { ArrowLeft, Trash2, Clock } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 import { useRouter } from 'next/navigation';
+import ImageCarousel from '@/components/ImageCarousel';
 
 const sarabun = Sarabun({
   subsets: ['latin'],
@@ -174,19 +174,14 @@ export default function DraftsPage() {
                 >
                   <div className="flex gap-3 p-3">
                     {/* Image */}
-                    <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                      {draft.image_urls && draft.image_urls.length > 0 ? (
-                        <Image
-                          src={draft.image_urls[0]}
-                          alt={draft.model}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          No Image
-                        </div>
-                      )}
+                    <div className="w-20 h-20 flex-shrink-0">
+                      <ImageCarousel
+                        images={draft.image_urls}
+                        className="w-20 h-20 rounded-lg gap-2 no-scrollbar"
+                        itemClassName="w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
+                        emptyLabel="No Image"
+                        emptyClassName="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 text-xs"
+                      />
                     </div>
 
                     {/* Content */}

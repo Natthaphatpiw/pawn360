@@ -10,6 +10,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const viewer = searchParams.get('viewer');
     const includeBank = searchParams.get('includeBank') === 'true';
+    const lineId = searchParams.get('lineId');
 
     if (!id) {
       return NextResponse.json(
@@ -19,6 +20,40 @@ export async function GET(
     }
 
     const supabase = supabaseAdmin();
+
+    if (viewer === 'investor' && !lineId) {
+      return NextResponse.json(
+        { error: 'LINE ID is required for investor view' },
+        { status: 400 }
+      );
+    }
+
+    if (viewer === 'investor' && lineId) {
+      const { data: investor, error: investorError } = await supabase
+        .from('investors')
+        .select('investor_id, kyc_status')
+        .eq('line_id', lineId)
+        .single();
+
+      if (investorError || !investor) {
+        return NextResponse.json(
+          { error: 'Investor not found' },
+          { status: 404 }
+        );
+      }
+
+      if (investor.kyc_status !== 'VERIFIED') {
+        return NextResponse.json(
+          {
+            error: 'ต้องยืนยันตัวตน (eKYC) ก่อนจึงจะดูข้อเสนอได้',
+            kycRequired: true,
+            kycStatus: investor.kyc_status,
+            redirectTo: '/ekyc-invest'
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     const { data: contract, error } = await supabase
       .from('contracts')

@@ -15,18 +15,21 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (contractId) {
-      fetchContractDetails();
-    }
-  }, [contractId]);
+    if (liffLoading || !profile?.userId || !contractId) return;
+    fetchContractDetails();
+  }, [liffLoading, profile?.userId, contractId]);
 
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&lineId=${profile?.userId}`);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);
+      if (error.response?.data?.kycRequired) {
+        router.replace('/ekyc-invest');
+        return;
+      }
       setError(error.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
     } finally {
       setLoading(false);

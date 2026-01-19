@@ -14,6 +14,7 @@ function InvestorOffersContent() {
   const [loading, setLoading] = useState(true);
   const [investor, setInvestor] = useState<any>(null);
   const [marketOffers, setMarketOffers] = useState<any[]>([]);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile?.userId) {
@@ -28,6 +29,7 @@ function InvestorOffersContent() {
       // Fetch investor profile
       const investorRes = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
       setInvestor(investorRes.data.investor);
+      setKycStatus(investorRes.data.investor?.kyc_status || null);
 
       // Fetch market offers (pending contracts)
       const offersRes = await axios.get('/api/contracts/market-offers');
@@ -94,6 +96,14 @@ function InvestorOffersContent() {
             const investorRatePercent = interestRatePercent * investorShare;
             const investorInterestAmount = (offer.interest_amount || 0) * investorShare;
 
+            const handleViewOffer = () => {
+              if (kycStatus !== 'VERIFIED') {
+                router.push('/ekyc-invest');
+                return;
+              }
+              router.push(`/offer-detail?contractId=${offer.contract_id}`);
+            };
+
             return (
               <div
                 key={offer.contract_id}
@@ -134,7 +144,7 @@ function InvestorOffersContent() {
                 </div>
 
                 <button
-                  onClick={() => router.push(`/offer-detail?contractId=${offer.contract_id}`)}
+                  onClick={handleViewOffer}
                   className="w-full mt-3 py-2 rounded-lg border border-[#1E3A8A] text-[#1E3A8A] text-sm font-bold hover:bg-[#1E3A8A] hover:text-white transition-colors"
                 >
                   ดูรายละเอียด

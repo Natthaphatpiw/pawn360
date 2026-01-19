@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
+import ImageCarousel from '@/components/ImageCarousel';
 
 function OfferDetailContent() {
   const router = useRouter();
@@ -33,24 +34,42 @@ function OfferDetailContent() {
   console.log('Extracted contractId:', contractId);
 
   useEffect(() => {
-    if (contractId) {
-      fetchContractDetails();
-    }
-  }, [contractId]);
+    if (!contractId || !profile?.userId) return;
+    ensureInvestorKyc();
+  }, [contractId, profile?.userId]);
 
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
       console.log('Fetching contract details for:', contractId);
-      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&lineId=${profile?.userId}`);
       console.log('Contract data received:', response.data);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);
       console.error('Error details:', error.response?.data);
+      if (error.response?.data?.kycRequired) {
+        router.replace('/ekyc-invest');
+        return;
+      }
       setError(error.response?.data?.error || 'ไม่สามารถโหลดรายละเอียดข้อเสนอได้');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const ensureInvestorKyc = async () => {
+    try {
+      const response = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
+      const status = response.data.investor?.kyc_status;
+      if (status !== 'VERIFIED') {
+        router.replace('/ekyc-invest');
+        return;
+      }
+      fetchContractDetails();
+    } catch (error) {
+      console.error('Error checking investor KYC:', error);
+      router.replace('/ekyc-invest');
     }
   };
 
@@ -86,6 +105,10 @@ function OfferDetailContent() {
       router.push('/register-invest'); // Go back to investor profile
     } catch (error: any) {
       console.error('Error accepting offer:', error);
+      if (error.response?.data?.kycRequired) {
+        router.replace('/ekyc-invest');
+        return;
+      }
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาดในการยอมรับข้อเสนอ');
     } finally {
       setActionLoading(false);
@@ -205,10 +228,12 @@ function OfferDetailContent() {
 
         {/* Product Image */}
         <div className="w-full aspect-square bg-gray-200 rounded-xl overflow-hidden mb-6 shadow-sm">
-          <img
-            src={contract.items?.image_urls?.[0] || 'https://via.placeholder.com/300x300?text=No+Image'}
-            alt="Product"
-            className="w-full h-full object-cover"
+          <ImageCarousel
+            images={contract.items?.image_urls}
+            className="w-full h-full gap-0 no-scrollbar"
+            itemClassName="w-full h-full flex-shrink-0"
+            emptyLabel="No Image"
+            emptyClassName="w-full h-full flex items-center justify-center text-gray-400 text-sm"
           />
         </div>
 
