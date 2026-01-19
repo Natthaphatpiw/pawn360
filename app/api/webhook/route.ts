@@ -1279,7 +1279,7 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
           action: {
             type: 'uri',
             label: 'ตรวจสอบสินค้า',
-            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q'}?contractId=${contract.contract_id}`
+            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_LIST || '2008651088-6wNs8Yrr'}?contractId=${contract.contract_id}`
           },
           style: 'primary',
           color: '#365314'

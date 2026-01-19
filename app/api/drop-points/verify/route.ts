@@ -17,7 +17,7 @@ const pawnerLineClient = new Client({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, lineId, verificationResult, verificationData } = body;
+    const { contractId, lineId, verificationResult, verificationData, bagNumber } = body;
 
     if (!contractId || !lineId || !verificationResult) {
       return NextResponse.json(
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Get drop point by LINE ID
     const { data: dropPoint, error: dpError } = await supabase
       .from('drop_points')
-      .select('drop_point_id, drop_point_name')
+      .select('drop_point_id, drop_point_name, phone_number')
       .eq('line_id', lineId)
       .single();
 
@@ -61,6 +61,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (contract.drop_point_id !== dropPoint.drop_point_id) {
+      return NextResponse.json(
+        { error: 'Unauthorized drop point' },
+        { status: 403 }
+      );
+    }
+
+    const resolvedBagNumber = String(bagNumber || verificationData?.bag_number || '').trim();
+
+    if (verificationResult === 'APPROVED' && !resolvedBagNumber) {
+      return NextResponse.json(
+        { error: 'Bag number is required for approval' },
+        { status: 400 }
+      );
+    }
+
+    if (['VERIFIED', 'RETURNED'].includes(contract.item_delivery_status)) {
+      return NextResponse.json(
+        { error: 'Item already verified or returned' },
+        { status: 409 }
+      );
+    }
+
     // Save verification record
     await supabase
       .from('drop_point_verifications')
@@ -82,11 +105,31 @@ export async function POST(request: NextRequest) {
       });
 
     if (verificationResult === 'APPROVED') {
+      const { error: bagError } = await supabase
+        .from('drop_point_bag_assignments')
+        .upsert({
+          drop_point_id: dropPoint.drop_point_id,
+          contract_id: contractId,
+          item_id: contract.item_id,
+          bag_number: resolvedBagNumber,
+          assigned_by_line_id: lineId,
+          assigned_at: new Date().toISOString(),
+        }, { onConflict: 'contract_id' });
+
+      if (bagError) {
+        console.error('Error saving bag assignment:', bagError);
+        return NextResponse.json(
+          { error: 'Failed to save bag assignment' },
+          { status: 500 }
+        );
+      }
+
       // Update contract status
       await supabase
         .from('contracts')
         .update({
           item_delivery_status: 'VERIFIED',
+          item_received_at: new Date().toISOString(),
           item_verified_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -130,7 +173,7 @@ export async function POST(request: NextRequest) {
       if (contract.pawners?.line_id) {
         await pawnerLineClient.pushMessage(contract.pawners.line_id, {
           type: 'text',
-          text: `สินค้าของคุณถูกปฏิเสธจาก Drop Point\n\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nกรุณาติดต่อรับสินค้าคืนที่ ${dropPoint.drop_point_name}`
+          text: `สินค้าของคุณถูกปฏิเสธจาก Drop Point\n\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nกรุณาติดต่อ Drop Point เพื่อรับสินค้าคืนหรือจัดส่งกลับ\nจุดรับฝาก: ${dropPoint.drop_point_name}\nเบอร์ติดต่อ: ${dropPoint.phone_number || 'ไม่ระบุ'}`
         });
       }
 
@@ -138,7 +181,7 @@ export async function POST(request: NextRequest) {
       if (contract.investors?.line_id) {
         await investorLineClient.pushMessage(contract.investors.line_id, {
           type: 'text',
-          text: `สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: สินค้าไม่ตรงตามข้อมูลที่ระบุ\n\nสัญญานี้ถูกยกเลิก`
+          text: `สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nสัญญานี้ถูกยกเลิก`
         });
       }
     }
