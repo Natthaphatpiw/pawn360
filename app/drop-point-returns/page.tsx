@@ -45,6 +45,7 @@ type RedemptionDetail = {
       firstname?: string;
       lastname?: string;
       phone_number?: string;
+      national_id?: string;
     };
     drop_points?: {
       drop_point_name?: string;
