@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, AlertTriangle, TrendingUp, Calculator, Wallet } from 'lucide-react';
+import { ChevronLeft, AlertTriangle, TrendingUp, Calculator, Wallet, Info } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 
@@ -182,6 +182,7 @@ export default function PrincipalIncreasePage() {
   const [submitting, setSubmitting] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   // Bank account info
   const [bankName, setBankName] = useState('');
@@ -314,6 +315,16 @@ export default function PrincipalIncreasePage() {
   const maxIncrease = Math.max(0, itemValue - currentPrincipal);
   const interestFirstPart = calculation?.interestFirstPart ?? calculation?.interestForPeriod ?? 0;
   const interestRemaining = calculation?.interestRemaining ?? calculation?.newInterestForRemaining ?? 0;
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  const originalRemainingInterest = calculation
+    ? calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysRemaining
+    : 0;
+  const originalTotalInterest = calculation
+    ? round2(interestFirstPart + originalRemainingInterest)
+    : 0;
+  const totalInterestAfterAction = calculation
+    ? round2(calculation.interestTotalIfPayLater ?? (interestFirstPart + interestRemaining))
+    : 0;
   const payTodayAmount = interestFirstPart;
   const payEndAmount = interestRemaining;
 
@@ -337,8 +348,35 @@ export default function PrincipalIncreasePage() {
           <h1 className="font-bold text-lg text-gray-800">เพิ่มเงินต้น</h1>
           <p className="text-xs text-gray-400">Increase Principal</p>
         </div>
-        <div className="w-6"></div>
+        <button
+          type="button"
+          onClick={() => setShowInfoModal(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          aria-label="ข้อมูลการเพิ่มเงินต้น"
+        >
+          <Info className="w-5 h-5 text-[#B85C38]" />
+        </button>
       </div>
+
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการเพิ่มเงินต้น</h2>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+              การเพิ่มเงินต้นคือการขอวงเงินเพิ่มในสัญญาเดิม ต้องชำระดอกเบี้ยที่ค้างถึงวันนี้ทันที
+              และดอกเบี้ยช่วงที่เหลือจะคำนวณใหม่ตามเงินต้นใหม่ นักลงทุนมีสิทธิ์อนุมัติหรือปฏิเสธ
+              เมื่ออนุมัติแล้วจะโอนเงินเพิ่มให้ตามยอดที่ร้องขอ
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowInfoModal(false)}
+              className="w-full bg-[#B85C38] text-white rounded-xl py-3 font-bold hover:bg-[#A04D2D] transition-colors"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col items-center p-6 pb-32">
         {error && (
@@ -455,6 +493,14 @@ export default function PrincipalIncreasePage() {
                 <div className="flex justify-between">
                   <span className="text-blue-700">ดอกเบี้ยช่วงที่เหลือ:</span>
                   <span className="font-bold text-blue-800">{interestRemaining.toLocaleString()} บาท</span>
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="text-blue-700">ดอกเบี้ยตามสัญญาเดิม:</span>
+                  <span className="font-bold text-blue-800">{originalTotalInterest.toLocaleString()} บาท</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-700">ดอกเบี้ยรวมหลังทำรายการ:</span>
+                  <span className="font-bold text-blue-800">{totalInterestAfterAction.toLocaleString()} บาท</span>
                 </div>
               </div>
 

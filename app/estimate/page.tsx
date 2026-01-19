@@ -8,7 +8,6 @@ import { Camera, ChevronUp, ChevronDown, Check, FileText } from 'lucide-react';
 import { Sarabun } from 'next/font/google';
 import imageCompression from 'browser-image-compression';
 import PawnSummary from './pawn-summary';
-import SuccessConfirmation from './success-confirmation';
 import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -331,7 +330,7 @@ interface Customer {
   pawnRequests: any[];
 }
 
-type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'success_confirmation' | 'contract_agreement' | 'contract_success';
+type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'contract_agreement' | 'contract_success';
 
 function EstimatePageInner() {
   const { profile, isLoading, error: liffError } = useLiff();
@@ -1757,50 +1756,7 @@ function EstimatePageInner() {
               console.log('📊 Setting state - loanRequestId:', reqId, 'itemId:', itmId);
               setLoanRequestId(reqId);
               setItemId(itmId);
-              setCurrentStep('success_confirmation');
-            }}
-          />
-        )}
-
-        {/* Success Confirmation Step */}
-        {currentStep === 'success_confirmation' && (
-          <SuccessConfirmation
-            loanRequestId={loanRequestId}
-            itemId={itemId}
-            onContinue={() => {
-              // Go to contract agreement step (same page, no navigation needed)
               setCurrentStep('contract_agreement');
-            }}
-            onBackToHome={() => {
-              setCurrentStep('form');
-              setFormData({
-                itemType: '',
-                brand: '',
-                model: '',
-                capacity: '',
-                serialNo: '',
-                accessories: '',
-                condition: 50,
-                defects: '',
-                note: '',
-                lenses: ['', ''],
-                appleCategory: '',
-                appleSpecs: '',
-                color: '',
-                appleAccessories: {
-                  box: false,
-                  adapter: false,
-                  cable: false,
-                  receipt: false,
-                },
-              });
-              setImages([]);
-              setImageUrls([]);
-              setEstimateResult(null);
-              setConditionResult(null);
-              setSelectedStore('');
-              setLoanRequestId('');
-              setItemId('');
             }}
           />
         )}
@@ -1811,7 +1767,7 @@ function EstimatePageInner() {
             loanRequestId={loanRequestId}
             itemId={itemId}
             lineId={profile.userId}
-            onBack={() => setCurrentStep('success_confirmation')}
+            onBack={() => setCurrentStep('pawn_summary')}
             onSuccess={(newContractId) => {
               setContractId(newContractId);
               setCurrentStep('contract_success');

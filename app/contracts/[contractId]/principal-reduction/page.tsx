@@ -49,6 +49,7 @@ export default function PrincipalReductionPage() {
   const [contract, setContract] = useState<any>(null);
   const [companyBank, setCompanyBank] = useState<CompanyBank | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     if (contractId && reductionAmount) {
@@ -141,6 +142,12 @@ export default function PrincipalReductionPage() {
 
   const interestFirstPart = calculation.interestFirstPart ?? calculation.interestForPeriod ?? 0;
   const interestRemaining = calculation.interestRemaining ?? calculation.newInterestForRemaining ?? 0;
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  const originalRemainingInterest = calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysRemaining;
+  const originalTotalInterest = round2(interestFirstPart + originalRemainingInterest);
+  const totalInterestAfterAction = round2(
+    calculation.interestTotalIfPayLater ?? (interestFirstPart + interestRemaining)
+  );
   const totalToPayNow = calculation.reductionAmount + interestFirstPart;
 
   return (
@@ -155,8 +162,34 @@ export default function PrincipalReductionPage() {
           <h1 className="font-bold text-lg text-gray-800">ลดเงินต้น</h1>
           <p className="text-xs text-gray-400">Principal Reduction</p>
         </div>
-        <div className="w-6"></div>
+        <button
+          type="button"
+          onClick={() => setShowInfoModal(true)}
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+          aria-label="ข้อมูลการลดเงินต้น"
+        >
+          <Info className="w-5 h-5 text-[#B85C38]" />
+        </button>
       </div>
+
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการลดเงินต้น</h2>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+              การลดเงินต้นคือการชำระเงินต้นบางส่วนทันที ดอกเบี้ยที่ค้างถึงวันนี้ต้องชำระพร้อมกัน
+              และระบบจะคำนวณดอกเบี้ยช่วงที่เหลือใหม่ตามเงินต้นหลังลด โดยวันครบกำหนดสัญญายังคงเดิม
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowInfoModal(false)}
+              className="w-full bg-[#B85C38] text-white rounded-xl py-3 font-bold hover:bg-[#A04D2D] transition-colors"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 px-4 py-6 pb-36 overflow-y-auto">
         {/* Contract Info */}
@@ -181,6 +214,8 @@ export default function PrincipalReductionPage() {
             <DetailRow label="จำนวนที่ต้องการลด" value={`${calculation.reductionAmount.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยช่วงแรก (ถึงวันนี้)" value={`${interestFirstPart.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยช่วงที่เหลือ" value={`${interestRemaining.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ยตามสัญญาเดิม" value={`${originalTotalInterest.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ยรวมหลังทำรายการ" value={`${totalInterestAfterAction.toLocaleString()} บาท`} />
             <div className="border-t border-[#F0D4C8] my-2"></div>
             <DetailRow label="เงินต้นหลังลด" value={`${calculation.principalAfterReduction.toLocaleString()} บาท`} highlight />
             <DetailRow label="ดอกเบี้ยที่ประหยัด" value={`${calculation.interestSavings.toLocaleString()} บาท`} highlight />

@@ -94,12 +94,18 @@ export async function GET(
       displayStatus = 'ใกล้ครบกำหนด';
     }
 
-    if (contract.contract_status === 'COMPLETED') {
+    if (contract.contract_status === 'PENDING' || contract.contract_status === 'PENDING_SIGNATURE') {
+      displayStatus = 'รอการดำเนินการ';
+    } else if (contract.contract_status === 'CONFIRMED') {
+      displayStatus = 'กำลังดำเนินการ';
+    } else if (contract.contract_status === 'COMPLETED') {
       displayStatus = 'เสร็จสิ้น';
     } else if (contract.contract_status === 'DEFAULTED') {
       displayStatus = 'เกินกำหนด';
     } else if (contract.contract_status === 'LIQUIDATED') {
       displayStatus = 'ชำระหนี้แล้ว';
+    } else if (contract.contract_status === 'TERMINATED') {
+      displayStatus = 'ยกเลิก';
     }
 
     // Calculate remaining payment
