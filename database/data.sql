@@ -216,6 +216,22 @@ CREATE TABLE public.drop_point_verifications (
   CONSTRAINT drop_point_verifications_drop_point_id_fkey FOREIGN KEY (drop_point_id) REFERENCES public.drop_points(drop_point_id),
   CONSTRAINT drop_point_verifications_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.items(item_id)
 );
+CREATE TABLE public.drop_point_bag_assignments (
+  assignment_id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  drop_point_id uuid NOT NULL,
+  contract_id uuid NOT NULL,
+  item_id uuid NOT NULL,
+  bag_number character varying NOT NULL,
+  assigned_by_line_id character varying,
+  assigned_at timestamp with time zone DEFAULT now(),
+  notes text,
+  CONSTRAINT drop_point_bag_assignments_pkey PRIMARY KEY (assignment_id),
+  CONSTRAINT drop_point_bag_assignments_drop_point_id_fkey FOREIGN KEY (drop_point_id) REFERENCES public.drop_points(drop_point_id),
+  CONSTRAINT drop_point_bag_assignments_contract_id_fkey FOREIGN KEY (contract_id) REFERENCES public.contracts(contract_id),
+  CONSTRAINT drop_point_bag_assignments_item_id_fkey FOREIGN KEY (item_id) REFERENCES public.items(item_id)
+);
+CREATE UNIQUE INDEX drop_point_bag_assignments_contract_id_key ON public.drop_point_bag_assignments (contract_id);
+CREATE INDEX drop_point_bag_assignments_drop_point_id_idx ON public.drop_point_bag_assignments (drop_point_id);
 CREATE TABLE public.drop_points (
   drop_point_id uuid NOT NULL DEFAULT uuid_generate_v4(),
   drop_point_name character varying NOT NULL,
@@ -536,10 +552,13 @@ CREATE TABLE public.redemption_requests (
   pawner_receipt_verified boolean DEFAULT false,
   support_contact_used character varying,
   item_return_confirmed_at timestamp with time zone,
+  item_return_confirmed_by_drop_point_id uuid,
+  item_return_confirmed_by_line_id character varying,
   final_completion_at timestamp with time zone,
   CONSTRAINT redemption_requests_pkey PRIMARY KEY (redemption_id),
   CONSTRAINT redemption_requests_contract_id_fkey FOREIGN KEY (contract_id) REFERENCES public.contracts(contract_id),
-  CONSTRAINT redemption_requests_verified_by_drop_point_id_fkey FOREIGN KEY (verified_by_drop_point_id) REFERENCES public.drop_points(drop_point_id)
+  CONSTRAINT redemption_requests_verified_by_drop_point_id_fkey FOREIGN KEY (verified_by_drop_point_id) REFERENCES public.drop_points(drop_point_id),
+  CONSTRAINT redemption_requests_item_return_confirmed_by_drop_point_id_fkey FOREIGN KEY (item_return_confirmed_by_drop_point_id) REFERENCES public.drop_points(drop_point_id)
 );
 CREATE TABLE public.repayment_schedules (
   schedule_id uuid NOT NULL DEFAULT uuid_generate_v4(),

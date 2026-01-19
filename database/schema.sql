@@ -716,6 +716,8 @@ CREATE TABLE redemption_requests (
   pawner_confirmed_at TIMESTAMPTZ,
   investor_confirmed_at TIMESTAMPTZ,
   item_return_confirmed_at TIMESTAMPTZ,
+  item_return_confirmed_by_drop_point_id UUID,
+  item_return_confirmed_by_line_id VARCHAR(255),
   final_completion_at TIMESTAMPTZ,
 
   -- Investor Earnings (calculated on completion)
@@ -936,6 +938,21 @@ CREATE TABLE drop_point_verifications (
 
 CREATE INDEX idx_drop_point_verifications_contract_id ON drop_point_verifications(contract_id);
 CREATE INDEX idx_drop_point_verifications_drop_point_id ON drop_point_verifications(drop_point_id);
+
+-- Table: drop_point_bag_assignments (การผูกถุงสินค้าเข้ากับสัญญา)
+CREATE TABLE drop_point_bag_assignments (
+  assignment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  drop_point_id UUID NOT NULL REFERENCES drop_points(drop_point_id) ON DELETE CASCADE,
+  contract_id UUID NOT NULL REFERENCES contracts(contract_id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+  bag_number VARCHAR(255) NOT NULL,
+  assigned_by_line_id VARCHAR(255),
+  assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  notes TEXT
+);
+
+CREATE UNIQUE INDEX idx_drop_point_bag_assignments_contract_id ON drop_point_bag_assignments(contract_id);
+CREATE INDEX idx_drop_point_bag_assignments_drop_point_id ON drop_point_bag_assignments(drop_point_id);
 
 -- =====================================================
 -- 6. PAYMENTS & REPAYMENTS

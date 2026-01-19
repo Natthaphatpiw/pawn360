@@ -144,7 +144,7 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
 
   if (action === 'verify_item' && contractId) {
     // Send verification page link
-    const verifyLink = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT || '2008651088-Ajw69zLb'}/droppoint-verify?contractId=${contractId}`;
+    const verifyLink = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_LIST || '2008651088-6wNs8Yrr'}?contractId=${contractId}`;
 
     const message = {
       type: 'text' as const,
@@ -202,15 +202,25 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       return;
     }
 
+    if (redemption.request_status === 'AMOUNT_VERIFIED' || redemption.request_status === 'COMPLETED') {
+      const dpClient = getDropPointLineClient();
+      if (!dpClient) throw new Error('DropPoint LINE client not configured');
+      await dpClient.replyMessage(replyToken, {
+        type: 'text',
+        text: 'รายการนี้ถูกยืนยันยอดไปแล้ว'
+      });
+      return;
+    }
+
     const pawner = redemption.contract?.pawners;
     const investor = redemption.contract?.investors;
     const dropPoint = redemption.contract?.drop_points;
 
-    // Update redemption status to COMPLETED
+    // Update redemption status to AMOUNT_VERIFIED
     await supabase
       .from('redemption_requests')
       .update({
-        request_status: 'COMPLETED',
+        request_status: 'AMOUNT_VERIFIED',
         verified_by_line_id: dropPointLineId,
         verified_by_drop_point_id: dropPoint?.drop_point_id,
         verified_at: new Date().toISOString(),
@@ -218,13 +228,10 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       })
       .eq('redemption_id', redemptionId);
 
-    // Update contract status
     await supabase
       .from('contracts')
       .update({
-        contract_status: 'COMPLETED',
-        redemption_status: 'COMPLETED',
-        completed_at: new Date().toISOString(),
+        redemption_status: 'IN_PROGRESS',
         updated_at: new Date().toISOString(),
       })
       .eq('contract_id', redemption.contract_id);
@@ -233,9 +240,9 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
     if (pawner?.line_id) {
       let pawnerMessage = '';
       if (redemption.delivery_method === 'SELF_PICKUP') {
-        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่จุดรับฝากที่ได้ติดต่อไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
+        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่ ${dropPoint?.drop_point_name || 'จุดรับฝาก'}\nเบอร์ติดต่อ: ${dropPoint?.phone_number || 'ไม่ระบุ'}\n\nโปรดแสดงหลักฐานการโอนเงินให้เจ้าหน้าที่`;
       } else {
-        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทางเรากำลังดำเนินการส่งสินค้าให้คุณตามที่ได้แจ้งไว้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้`;
+        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทาง ${dropPoint?.drop_point_name || 'จุดรับฝาก'} กำลังเตรียมการส่งสินค้าให้คุณ\nหากต้องการสอบถามเพิ่มเติม โทร: ${dropPoint?.phone_number || 'ไม่ระบุ'}`;
       }
 
       try {
@@ -250,7 +257,7 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 
     // Send message to investor about payment received
     if (investor?.line_id) {
-      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nเงินจะเข้าบัญชีของคุณภายใน 22.00 น. ของวันนี้`;
+      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nอยู่ระหว่างส่งคืนสินค้าให้ผู้จำนำ`;
 
       try {
         await investorLineClient.pushMessage(investor.line_id, {
@@ -262,28 +269,112 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       }
     }
 
-    // Reply to drop point
-    let deliveryInstructions = '';
-    if (redemption.delivery_method === 'SELF_PICKUP') {
-      deliveryInstructions = `ลูกค้าจะมารับของเอง\n\nข้อมูลลูกค้า:\nชื่อ: ${pawner?.firstname} ${pawner?.lastname}\nโทร: ${pawner?.phone_number}\n\nกรุณาเตรียมของไว้ให้พร้อม`;
-    } else if (redemption.delivery_method === 'SELF_ARRANGE') {
-      deliveryInstructions = `ลูกค้าจะเรียกบริการขนส่งมารับของเอง\n\nกรุณาเตรียมของรอ`;
-    } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
-      deliveryInstructions = `กรุณาเรียกบริการขนส่งไปส่งที่:\n\n${redemption.delivery_address_full}\n\nเบอร์ติดต่อ: ${redemption.delivery_contact_phone}\n${redemption.delivery_notes ? `หมายเหตุ: ${redemption.delivery_notes}` : ''}`;
-    }
-
     const dpClient = getDropPointLineClient();
     if (!dpClient) throw new Error('DropPoint LINE client not configured');
-    await dpClient.replyMessage(replyToken, {
-      type: 'text',
-      text: `ยืนยันยอดถูกต้องเรียบร้อย\n\nการไถ่ถอนเสร็จสิ้น\n\n${deliveryInstructions}`
-    });
+    const returnCard = createDropPointReturnConfirmCard(redemption);
+    await dpClient.replyMessage(replyToken, returnCard);
 
     console.log(`Redemption ${redemptionId} amount verified by drop point`);
 
   } catch (error) {
     console.error('Error handling redemption amount correct:', error);
   }
+}
+
+function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
+  const item = redemption.contract?.items;
+  const pawner = redemption.contract?.pawners;
+  const dropPoint = redemption.contract?.drop_points;
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
+  const detailUrl = `https://liff.line.me/${liffId}?redemptionId=${redemption.redemption_id}`;
+
+  return {
+    type: 'flex',
+    altText: 'รอส่งคืนสินค้า',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [{
+          type: 'text',
+          text: 'ยืนยันยอดเรียบร้อย',
+          weight: 'bold',
+          size: 'lg',
+          color: '#ffffff',
+          align: 'center'
+        }, {
+          type: 'text',
+          text: 'รอส่งคืนสินค้าให้ลูกค้า',
+          size: 'sm',
+          color: '#ffffff',
+          align: 'center',
+          margin: 'sm'
+        }],
+        backgroundColor: '#365314',
+        paddingAll: 'lg'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: `${item?.brand || ''} ${item?.model || ''}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'ลูกค้า:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', flex: 5 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'เบอร์ติดต่อ:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: pawner?.phone_number || '-', color: '#333333', size: 'sm', flex: 5 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'จุดรับฝาก:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: dropPoint?.drop_point_name || '-', color: '#333333', size: 'sm', flex: 5 }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [{
+          type: 'button',
+          action: {
+            type: 'uri',
+            label: 'ตรวจสอบและยืนยันส่งคืน',
+            uri: detailUrl
+          },
+          style: 'primary',
+          color: '#365314'
+        }]
+      }
+    }
+  };
 }
 
 // Handle when Drop Point says the redemption amount is incorrect
@@ -305,6 +396,16 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
 
     if (!redemption) {
       console.error('Redemption not found');
+      return;
+    }
+
+    if (['CANCELLED', 'COMPLETED', 'AMOUNT_MISMATCH'].includes(redemption.request_status)) {
+      const dpClient = getDropPointLineClient();
+      if (!dpClient) throw new Error('DropPoint LINE client not configured');
+      await dpClient.replyMessage(replyToken, {
+        type: 'text',
+        text: 'รายการนี้ถูกตรวจสอบไปแล้ว'
+      });
       return;
     }
 

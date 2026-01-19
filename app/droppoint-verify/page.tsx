@@ -42,6 +42,7 @@ function DropPointVerifyContent() {
 
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [bagNumber, setBagNumber] = useState('');
 
   useEffect(() => {
     if (contractId) {
@@ -110,6 +111,11 @@ function DropPointVerifyContent() {
       return;
     }
 
+    if (result === 'APPROVED' && !bagNumber.trim()) {
+      alert('กรุณากรอกหมายเลขถุงสินค้า');
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -117,6 +123,7 @@ function DropPointVerifyContent() {
         contractId,
         lineId: profile.userId,
         verificationResult: result,
+        bagNumber: bagNumber.trim(),
         verificationData: {
           ...verificationData,
           verification_result: result
@@ -379,6 +386,19 @@ function DropPointVerifyContent() {
               className="hidden"
             />
           </div>
+        </div>
+
+        {/* Bag Number */}
+        <div className="mb-6">
+          <label className="font-bold text-gray-700 text-sm mb-2 block">หมายเลขถุงสินค้า</label>
+          <input
+            type="text"
+            placeholder="กรอกหมายเลขถุงสินค้า"
+            value={bagNumber}
+            onChange={(e) => setBagNumber(e.target.value)}
+            className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#365314] text-sm text-gray-600 bg-white"
+          />
+          <p className="text-[10px] text-gray-400 mt-2">จำเป็นต้องกรอกก่อนยืนยัน</p>
         </div>
 
         {/* Remarks */}
