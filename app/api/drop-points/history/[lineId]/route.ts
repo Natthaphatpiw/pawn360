@@ -16,6 +16,24 @@ const mapRedemptionStatus = (status: string) => {
   return 'ไม่ทราบสถานะ';
 };
 
+const getItemTitle = (
+  items?: { brand?: string | null; model?: string | null }
+    | Array<{ brand?: string | null; model?: string | null }>
+) => {
+  const item = Array.isArray(items) ? items[0] : items;
+  const brand = item?.brand || '';
+  const model = item?.model || '';
+  return `${brand} ${model}`.trim();
+};
+
+const getContractItems = (
+  contract?: { items?: { brand?: string | null; model?: string | null } | Array<{ brand?: string | null; model?: string | null }> }
+    | Array<{ items?: { brand?: string | null; model?: string | null } | Array<{ brand?: string | null; model?: string | null }> }>
+) => {
+  const contractItem = Array.isArray(contract) ? contract[0] : contract;
+  return contractItem?.items;
+};
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ lineId: string }> }
@@ -102,7 +120,7 @@ export async function GET(
       return {
         id: contract.contract_id,
         type: 'PAWN',
-        title: `${contract.items?.brand || ''} ${contract.items?.model || ''}`.trim(),
+        title: getItemTitle(contract.items),
         status: mapPawnStatus(contract.item_delivery_status, contract.contract_status),
         rawStatus: contract.item_delivery_status,
         date
@@ -117,7 +135,7 @@ export async function GET(
       return {
         id: redemption.redemption_id,
         type: 'REDEMPTION',
-        title: `${redemption.contract?.items?.brand || ''} ${redemption.contract?.items?.model || ''}`.trim(),
+        title: getItemTitle(getContractItems(redemption.contract)),
         status: mapRedemptionStatus(redemption.request_status),
         rawStatus: redemption.request_status,
         date
