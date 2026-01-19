@@ -25,7 +25,7 @@ export default function PawnTicketPage() {
   const fetchTicketData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}`);
+      const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}?viewer=pawner`);
       setTicketData(response.data.ticketData);
     } catch (error) {
       console.error('Error fetching ticket data:', error);
@@ -246,24 +246,11 @@ export default function PawnTicketPage() {
             </div>
           </div>
 
-          {/* Investor Info */}
+          {/* Investor Info (Redacted) */}
           <div className="mb-6">
             <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้ให้เงินกู้</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">ชื่อ-นามสกุล</span>
-                <span className="font-medium text-gray-800 text-right">{ticketData.investor.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">เลขบัตรประชาชน</span>
-                <span className="font-medium text-gray-800 text-right">{ticketData.investor.idCard}</span>
-              </div>
-              <div className="flex justify-between items-start">
-                <span className="text-gray-500 whitespace-nowrap">ที่อยู่</span>
-                <span className="font-medium text-gray-800 text-right text-xs leading-relaxed max-w-[60%]">
-                  {ticketData.investor.address}
-                </span>
-              </div>
+            <div className="text-sm text-gray-500">
+              ข้อมูลส่วนบุคคลของผู้ให้เงินกู้ถูกปกปิดตามนโยบายความเป็นส่วนตัว
             </div>
           </div>
 

@@ -458,12 +458,6 @@ export default function PawnContractDetail() {
             <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
             <InfoRow label="วันเริ่มต้น" value={formatDate(contract.contract_start_date)} />
             <InfoRow label="วันสิ้นสุด" value={formatDate(contract.contract_end_date)} />
-            {contract.investor && (
-              <InfoRow
-                label="ชื่อคู่สัญญา"
-                value={`${contract.investor.firstname} ${contract.investor.lastname}`}
-              />
-            )}
           </div>
           <div className="h-px bg-gray-200 my-4"></div>
         </div>

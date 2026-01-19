@@ -42,7 +42,7 @@ function OfferDetailContent() {
     try {
       setLoading(true);
       console.log('Fetching contract details for:', contractId);
-      const response = await axios.get(`/api/contracts/${contractId}`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor`);
       console.log('Contract data received:', response.data);
       setContract(response.data.contract);
     } catch (error: any) {
@@ -214,7 +214,7 @@ function OfferDetailContent() {
 
         {/* Details List */}
         <div className="space-y-1 mb-4">
-          <InfoRow label="ชื่อผู้จำนำ" value={`${contract.pawners?.firstname} ${contract.pawners?.lastname}`} />
+          <InfoRow label="ผู้จำนำ" value="ไม่เปิดเผย" valueColor="text-gray-500" />
           <InfoRow label="สินค้า" value={`${contract.items?.brand} ${contract.items?.model}`} />
           <InfoRow label="ความจุ" value={contract.items?.capacity || 'ไม่ระบุ'} />
           <InfoRow label="สภาพ" value={`${contract.items?.item_condition}%`} />
