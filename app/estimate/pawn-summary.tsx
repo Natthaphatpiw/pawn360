@@ -418,7 +418,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           <ChevronDown className="absolute right-4 top-4.5 w-5 h-5 text-gray-400 pointer-events-none" />
         </div>
 
-        {/* 7. Interest */}
+        {/* 7. Interest & Fee */}
         <div className="mb-2 flex items-center gap-2">
           <label className="font-bold text-gray-800 whitespace-nowrap">
             ดอกเบี้ย*
@@ -426,26 +426,35 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           <span className="bg-[#EAEAEA] text-gray-600 text-[10px] px-2 py-0.5 rounded-full">Interest</span>
           <span className="ml-auto text-gray-500 text-xs">บาท</span>
         </div>
-        <div className="relative mb-2">
+        <div className="relative mb-1">
           <input
             type="text"
-            value={formatNumber(totalInterest)}
+            value={formatNumber(interestAmount)}
             readOnly
             className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 focus:outline-none font-medium"
           />
         </div>
-        <div className="text-[11px] text-gray-500 mb-4 space-y-1">
-          <div className="flex justify-between">
-            <span>ดอกเบี้ย (2%)</span>
-            <span>{formatNumber(interestAmount)} บาท</span>
-          </div>
-          <div className="flex justify-between">
-            <span>ค่าธรรมเนียม (1%)</span>
-            <span>{formatNumber(feeAmount)} บาท</span>
-          </div>
+        <p className="text-[11px] text-gray-500 mb-4">
+          ดอกเบี้ย 2% ของมูลค่าสัญญา (คิดตามระยะเวลาที่เลือก)
+        </p>
+
+        <div className="mb-2 flex items-center gap-2">
+          <label className="font-bold text-gray-800 whitespace-nowrap">
+            ค่าธรรมเนียม*
+          </label>
+          <span className="bg-[#EAEAEA] text-gray-600 text-[10px] px-2 py-0.5 rounded-full">Fee</span>
+          <span className="ml-auto text-gray-500 text-xs">บาท</span>
         </div>
-        <p className="text-[10px] text-gray-400 mb-8">
-          *ดอกเบี้ยคิดตามระยะเวลาที่เลือก ส่วนค่าธรรมเนียมคงที่ตามวงเงินเริ่มต้นของสัญญา
+        <div className="relative mb-1">
+          <input
+            type="text"
+            value={formatNumber(feeAmount)}
+            readOnly
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 focus:outline-none font-medium"
+          />
+        </div>
+        <p className="text-[11px] text-gray-500 mb-8">
+          ค่าธรรมเนียมคำนวณจากมูลค่าสัญญา (คงที่ตามวงเงินเริ่มต้น)
         </p>
 
         {/* 8. Action Buttons */}
