@@ -54,12 +54,20 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const [serialNo, setSerialNo] = useState<string>(itemData.serialNo || '');
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('pickup');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
+  const [defaultBranchId, setDefaultBranchId] = useState<string | null>(null);
   const [duration, setDuration] = useState<string>('30');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [suggestedBranch, setSuggestedBranch] = useState<{
+    branch_id: string;
+    branch_name: string;
+    distance_m?: number;
+  } | null>(null);
 
   const maxLoanAmount = itemData.estimatedPrice;
   const loanAmountNum = parseFloat(loanAmount.replace(/,/g, '')) || 0;
@@ -80,6 +88,14 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     fetchBranches();
   }, []);
 
+  useEffect(() => {
+    if (!branches.length) return;
+    if (selectedBranchId) return;
+    if (defaultBranchId && branches.find(b => b.branch_id === defaultBranchId)) {
+      setSelectedBranchId(defaultBranchId);
+    }
+  }, [branches, defaultBranchId, selectedBranchId]);
+
   const checkRegistration = async () => {
     try {
       setIsLoading(true);
@@ -89,6 +105,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         const status = response.data.pawner.kyc_status;
         setKycStatus(status);
         setIsRegistered(status === 'VERIFIED');
+        setDefaultBranchId(response.data.pawner.default_drop_point_id || null);
       } else {
         setIsRegistered(false);
         setKycStatus(null);
@@ -106,12 +123,73 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     try {
       const response = await axios.get('/api/drop-points');
       setBranches(response.data.branches || []);
-      if (response.data.branches && response.data.branches.length > 0) {
-        setSelectedBranchId(response.data.branches[0].branch_id);
-      }
     } catch (error) {
       console.error('Error fetching branches:', error);
     }
+  };
+
+  const handleBranchChange = async (branchId: string) => {
+    setSelectedBranchId(branchId);
+    if (!lineId) return;
+    try {
+      await axios.post('/api/pawners/default-branch', {
+        lineId,
+        branchId,
+        source: 'manual',
+      });
+    } catch (error) {
+      console.warn('Failed to set default branch:', error);
+    }
+  };
+
+  const handleUseLocation = () => {
+    if (!lineId) {
+      setLocationMessage('ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่');
+      return;
+    }
+    if (!navigator.geolocation) {
+      setLocationMessage('อุปกรณ์นี้ไม่รองรับการใช้งานตำแหน่ง');
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationMessage(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const response = await axios.post('/api/pawners/location', {
+            lineId,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            source: 'liff_geolocation',
+            setDefault: true,
+          });
+
+          const suggested = response.data?.suggestedBranch || null;
+          setSuggestedBranch(suggested);
+          if (suggested?.branch_id) {
+            setSelectedBranchId(suggested.branch_id);
+            setDefaultBranchId(suggested.branch_id);
+            setLocationMessage(`แนะนำสาขา ${suggested.branch_name} ให้แล้ว`);
+          } else {
+            setLocationMessage('ไม่พบสาขาใกล้เคียง กรุณาเลือกเอง');
+          }
+        } catch (error) {
+          console.error('Location save error:', error);
+          setLocationMessage('บันทึกตำแหน่งไม่สำเร็จ กรุณาเลือกสาขาเอง');
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        setIsLocating(false);
+        setLocationMessage('ไม่สามารถดึงตำแหน่งได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+    );
   };
 
   const formatNumber = (num: number): string => {
@@ -140,6 +218,10 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     const isSerialRequired = itemData.itemType === 'โทรศัพท์มือถือ' || itemData.itemType === 'Apple';
     if (isSerialRequired && !normalizedSerial) {
       alert('กรุณาระบุหมายเลขเครื่อง/Serial ก่อนดำเนินการ');
+      return;
+    }
+    if (!selectedBranchId) {
+      alert('กรุณาเลือกสาขาที่สะดวก');
       return;
     }
     if (!isRegistered || loanAmountNum === 0) {
@@ -346,15 +428,39 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
 
         {/* Branch Selection & Info Card */}
         <div className="mb-6">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm font-bold text-gray-700">สาขาใกล้คุณ</div>
+            <button
+              type="button"
+              onClick={handleUseLocation}
+              disabled={isLocating}
+              className="text-xs font-semibold text-[#C0562F] hover:text-[#A04D2D] disabled:text-gray-400"
+            >
+              {isLocating ? 'กำลังค้นหา...' : 'ใช้ตำแหน่งของฉัน'}
+            </button>
+          </div>
+
+          {locationMessage && (
+            <div className="mb-2 text-[11px] text-gray-500">
+              {locationMessage}
+              {suggestedBranch?.distance_m != null && (
+                <span className="ml-1 text-gray-400">
+                  ({(suggestedBranch.distance_m / 1000).toFixed(1)} กม.)
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Branch Dropdown Selector */}
           <div className="mb-2">
             <label className="text-sm font-bold text-gray-700 mb-1 block">เลือกสาขาที่สะดวก</label>
             <div className="relative">
               <select
                 value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
+                onChange={(e) => handleBranchChange(e.target.value)}
                 className="w-full p-3 pr-10 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#C0562F]"
               >
+                <option value="">เลือกสาขา</option>
                 {branches.map(branch => (
                   <option key={branch.branch_id} value={branch.branch_id}>{branch.branch_name}</option>
                 ))}
