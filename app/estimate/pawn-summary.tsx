@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown, MapPin, Phone, ExternalLink } from 'lucide-react';
 import axios from 'axios';
+import MapEmbed from '@/components/MapEmbed';
 
 interface Branch {
   branch_id: string;
@@ -13,6 +14,7 @@ interface Branch {
   postal_code: string;
   phone_number: string;
   google_maps_link: string;
+  map_embed?: string | null;
   operating_hours: string;
 }
 
@@ -498,6 +500,12 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
                   <ExternalLink className="w-3 h-3" />
                   ดูแผนที่ Google Maps
                 </a>
+              )}
+
+              {currentBranch.map_embed && (
+                <div className="mt-3">
+                  <MapEmbed embedHtml={currentBranch.map_embed} className="h-40" />
+                </div>
               )}
             </div>
           )}
