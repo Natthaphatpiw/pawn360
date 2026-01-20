@@ -1185,6 +1185,25 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
 
 // Helper function to create drop point notification card
 function createDropPointNotificationCard(contract: any): FlexMessage {
+  const formatShortDate = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('th-TH');
+  };
+  const deliveryDate = formatShortDate(
+    contract.item_received_at
+      || contract.item_verified_at
+      || contract.updated_at
+      || contract.created_at
+      || new Date().toISOString()
+  );
+  const capacityText = contract.items?.capacity
+    || contract.items?.storage
+    || contract.items?.storage_capacity
+    || '-';
+  const colorText = contract.items?.color || '-';
+
   return {
     type: 'flex',
     altText: 'มีสินค้าใหม่รอรับ',
@@ -1231,7 +1250,7 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
             margin: 'md',
             contents: [
               { type: 'text', text: 'ความจุ:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: contract.items?.storage_capacity || '-', color: '#333333', size: 'sm', flex: 5 }
+              { type: 'text', text: capacityText, color: '#333333', size: 'sm', flex: 5 }
             ]
           },
           {
@@ -1241,7 +1260,17 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
             margin: 'md',
             contents: [
               { type: 'text', text: 'สี:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: contract.items?.color || '-', color: '#333333', size: 'sm', flex: 5 }
+              { type: 'text', text: colorText, color: '#333333', size: 'sm', flex: 5 }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'วันที่ส่งมา:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: deliveryDate, color: '#333333', size: 'sm', flex: 5 }
             ]
           },
           {

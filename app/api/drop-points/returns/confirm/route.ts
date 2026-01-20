@@ -17,11 +17,18 @@ const ALLOWED_STATUSES = ['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { redemptionId, lineId } = body;
+    const { redemptionId, lineId, returnPhotos } = body;
 
     if (!redemptionId || !lineId) {
       return NextResponse.json(
         { error: 'Redemption ID and LINE ID are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(returnPhotos) || returnPhotos.length < 2 || returnPhotos.some((url) => typeof url !== 'string' || !url)) {
+      return NextResponse.json(
+        { error: 'Return photos are required (2 images)' },
         { status: 400 }
       );
     }
@@ -108,6 +115,8 @@ export async function POST(request: NextRequest) {
         item_return_confirmed_at: now,
         item_return_confirmed_by_drop_point_id: dropPoint.drop_point_id,
         item_return_confirmed_by_line_id: lineId,
+        drop_point_return_photos: returnPhotos.slice(0, 2),
+        drop_point_return_photos_uploaded_at: now,
         final_completion_at: now,
         investor_interest_earned: interestEarned,
         platform_fee_deducted: platformFee,

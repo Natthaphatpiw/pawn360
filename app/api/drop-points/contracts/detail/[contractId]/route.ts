@@ -41,6 +41,8 @@ export async function GET(
         item_delivery_status,
         item_received_at,
         item_verified_at,
+        created_at,
+        updated_at,
         contract_start_date,
         contract_end_date,
         items:item_id (
