@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     const latitude = Number(body.latitude);
     const longitude = Number(body.longitude);
     const accuracy = Number(body.accuracy);
+    const accuracyRounded = Number.isFinite(accuracy) ? Math.round(accuracy) : null;
 
     if (!lineId) {
       return NextResponse.json(
@@ -56,8 +57,8 @@ export async function POST(request: NextRequest) {
       last_location_source: body.source || 'liff_geolocation',
     };
 
-    if (Number.isFinite(accuracy)) {
-      updatePayload.last_location_accuracy = accuracy;
+    if (accuracyRounded !== null) {
+      updatePayload.last_location_accuracy = accuracyRounded;
     }
 
     const { error: updateError } = await supabase
