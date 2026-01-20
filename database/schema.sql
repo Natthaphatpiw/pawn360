@@ -149,6 +149,7 @@ CREATE TABLE drop_points (
 
   -- Location
   google_map_url TEXT,
+  map_embed TEXT,
   latitude DECIMAL(10, 8),
   longitude DECIMAL(11, 8),
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, X } from 'lucide-react';
 import axios from 'axios';
+import MapEmbed from '@/components/MapEmbed';
 
 interface Customer {
   customer_id: string;
@@ -47,6 +48,7 @@ interface DropPoint {
   addr_province: string;
   addr_postcode: string;
   google_map_url: string | null;
+  map_embed?: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -539,6 +541,13 @@ export default function PawnContractDetail() {
             <span className="text-[10px] font-light opacity-90">Increase loan</span>
           </button>
         </div>
+
+        {contract.drop_point?.map_embed && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+            <div className="text-sm font-bold text-gray-700 mb-2">แผนที่สาขา</div>
+            <MapEmbed embedHtml={contract.drop_point.map_embed} className="h-40" />
+          </div>
+        )}
 
         {/* 6. Bottom Outline Buttons */}
         <div className="space-y-3">

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { ChevronLeft, AlertTriangle, Truck, MapPin, Phone, Info } from 'lucide-react';
 import axios from 'axios';
+import MapEmbed from '@/components/MapEmbed';
 import { useLiff } from '@/lib/liff/liff-provider';
 
 interface ContractDetail {
@@ -37,6 +38,7 @@ interface ContractDetail {
     drop_point_id: string;
     drop_point_name: string;
     phone_number: string;
+    map_embed?: string | null;
   } | null;
 }
 
@@ -360,6 +362,13 @@ export default function RedemptionPaymentPage() {
               </div>
             </label>
           </div>
+
+          {contract.drop_point?.map_embed && (
+            <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3">
+              <div className="text-sm font-bold text-gray-700 mb-2">แผนที่สาขา</div>
+              <MapEmbed embedHtml={contract.drop_point.map_embed} className="h-40" />
+            </div>
+          )}
 
           {/* Address Form (for delivery options) */}
           {deliveryMethod !== 'SELF_PICKUP' && (

@@ -55,6 +55,7 @@ export async function GET(
           addr_province,
           addr_postcode,
           google_map_url,
+          map_embed,
           latitude,
           longitude
         )

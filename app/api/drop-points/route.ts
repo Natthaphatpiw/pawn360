@@ -33,6 +33,7 @@ export async function GET() {
       postal_code: dp.addr_postcode,
       phone_number: dp.phone_number,
       google_maps_link: dp.google_map_url,
+      map_embed: dp.map_embed,
       operating_hours: formatOperatingHours(dp.opening_hours),
     }));
 

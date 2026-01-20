@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     const { data: branch } = await supabase
       .from('drop_points')
-      .select('drop_point_id, drop_point_name, addr_district, addr_province, addr_postcode, google_map_url')
+      .select('drop_point_id, drop_point_name, addr_district, addr_province, addr_postcode, google_map_url, map_embed')
       .eq('drop_point_id', pawner.default_drop_point_id)
       .single();
 
@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
             province: branch.addr_province,
             postcode: branch.addr_postcode,
             google_maps_link: branch.google_map_url,
+            map_embed: branch.map_embed,
           }
         : null,
       source: pawner.default_drop_point_source,
