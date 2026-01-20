@@ -28,6 +28,8 @@ function RegisterDropPointContent() {
     addr_province: '',
     addr_postcode: '',
     google_map_url: '',
+    latitude: '',
+    longitude: '',
     manager_name: '',
     manager_phone: '',
     opening_hours: {
@@ -67,6 +69,28 @@ function RegisterDropPointContent() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleUseLocation = () => {
+    if (!navigator.geolocation) {
+      alert('อุปกรณ์ของคุณไม่รองรับการใช้งานตำแหน่ง');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFormData(prev => ({
+          ...prev,
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+        }));
+      },
+      (err) => {
+        console.error('Location error:', err);
+        alert('ไม่สามารถดึงตำแหน่งได้ กรุณาอนุญาตการเข้าถึงตำแหน่ง');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 600000 }
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -81,7 +105,9 @@ function RegisterDropPointContent() {
       const response = await axios.post('/api/drop-points/register', {
         ...formData,
         line_id: profile.userId,
-        manager_line_id: profile.userId
+        manager_line_id: profile.userId,
+        latitude: formData.latitude ? Number(formData.latitude) : null,
+        longitude: formData.longitude ? Number(formData.longitude) : null,
       });
 
       if (response.data.success) {
@@ -364,6 +390,46 @@ function RegisterDropPointContent() {
                   className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#365314]"
                   placeholder="https://maps.google.com/..."
                 />
+              </div>
+
+              <div className="bg-[#F5F7FA] border border-dashed border-gray-200 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">พิกัดสาขา (ไม่บังคับ)</span>
+                  <button
+                    type="button"
+                    onClick={handleUseLocation}
+                    className="text-xs font-semibold text-[#365314] hover:text-[#2d4610]"
+                  >
+                    ใช้ตำแหน่งปัจจุบัน
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Latitude</label>
+                    <input
+                      type="text"
+                      name="latitude"
+                      value={formData.latitude}
+                      onChange={handleChange}
+                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#365314]"
+                      placeholder="13.7563"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Longitude</label>
+                    <input
+                      type="text"
+                      name="longitude"
+                      value={formData.longitude}
+                      onChange={handleChange}
+                      className="w-full p-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#365314]"
+                      placeholder="100.5018"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">
+                  ใช้สำหรับแนะนำสาขาใกล้ลูกค้าในอนาคต
+                </p>
               </div>
             </div>
           </div>
