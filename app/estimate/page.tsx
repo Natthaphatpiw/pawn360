@@ -930,6 +930,18 @@ function EstimatePageInner() {
       ensureNotCanceled(signal);
       updateProcessingStatus(80, 'ประเมินราคา', 'กำลังคำนวณราคาประเมิน');
 
+      const pawnerConditionPercent = Number.isFinite(formData.condition)
+        ? Math.min(100, Math.max(0, formData.condition))
+        : 0;
+      const aiConditionPercent = Number.isFinite(conditionResponse.data.score)
+        ? Math.min(100, Math.max(0, conditionResponse.data.score <= 1 ? conditionResponse.data.score * 100 : conditionResponse.data.score))
+        : 0;
+      const finalConditionPercent = Math.min(
+        100,
+        Math.max(0, pawnerConditionPercent * 0.6 + aiConditionPercent * 0.4)
+      );
+      const finalConditionScore = finalConditionPercent / 100;
+
       // Step 3: Estimate price with AI
       console.log('🧠 Starting price estimation...');
       const appleExtraLines = formData.itemType === 'Apple'
@@ -951,7 +963,9 @@ function EstimatePageInner() {
               .map(([key]) => key)
               .join(', ')
           : formData.accessories,
-        condition: conditionResponse.data.score,
+        condition: finalConditionScore,
+        pawnerCondition: pawnerConditionPercent,
+        aiCondition: conditionResponse.data.score,
         defects: formData.defects,
         note: [formData.note, appleExtraLines].filter(Boolean).join('\n'),
         images: uploadedUrls,
@@ -972,10 +986,10 @@ function EstimatePageInner() {
       setDesiredPrice(estimateResponse.data.estimatedPrice.toString());
       updateProcessingStatus(100, 'สรุปผล', 'กำลังจัดเตรียมผลการประเมิน');
 
-      // Update form data with condition from AI
+      // Update form data with blended condition
       setFormData(prev => ({
         ...prev,
-        condition: conditionResponse.data.score * 100
+        condition: finalConditionPercent
       }));
 
       // Move to pawn summary step
@@ -1022,7 +1036,7 @@ function EstimatePageInner() {
         model: formData.model,
         type: formData.itemType,
         serialNo: formData.serialNo,
-        condition: conditionResult?.score || formData.condition,
+        condition: formData.condition,
         defects: formData.defects,
         note: formData.note,
         accessories: formData.itemType === 'Apple'

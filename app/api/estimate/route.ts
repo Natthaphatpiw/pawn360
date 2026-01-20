@@ -21,6 +21,25 @@ const NON_TH_WEIGHT = 1;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+function normalizeConditionInput(value: number | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const normalized = value > 1 ? value / 100 : value;
+  return Math.min(1, Math.max(0, normalized));
+}
+
+function blendConditionScores(pawner: number | null, ai: number | null, fallback: number | null): number {
+  if (pawner !== null && ai !== null) {
+    return Math.min(1, Math.max(0, pawner * 0.6 + ai * 0.4));
+  }
+  if (pawner !== null) {
+    return pawner;
+  }
+  if (ai !== null) {
+    return ai;
+  }
+  return fallback ?? 0;
+}
+
 interface EstimateRequest {
   itemType: string;
   brand: string;
@@ -29,6 +48,8 @@ interface EstimateRequest {
   serialNo?: string;
   accessories?: string;
   condition: number;
+  pawnerCondition?: number;
+  aiCondition?: number;
   defects?: string;
   note?: string;
   images: string[];
@@ -463,7 +484,7 @@ async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
 - รุ่น: ${input.model}
 - Serial: ${input.serialNo || '-'}
 - อุปกรณ์เสริม: ${input.accessories || '-'}
-- สภาพ (AI): ${conditionPercent}%
+- สภาพ (รวมผู้ใช้+AI): ${conditionPercent}%
 - ตำหนิ: ${input.defects || '-'}
 - หมายเหตุ: ${input.note || '-'}
 ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}` : ''}
@@ -648,10 +669,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
     const pawnPrice = Math.round(marketPrice * 0.6);
     console.log('🏦 Pawn price (60% of market):', pawnPrice);
 
-    const rawCondition = body.condition;
-    const conditionScore = rawCondition > 1 ? rawCondition / 100 : rawCondition;
-    const normalizedCondition = Math.min(1, Math.max(0, conditionScore));
-    console.log('✅ Using condition score from AI analysis:', normalizedCondition);
+    const pawnerCondition = normalizeConditionInput(body.pawnerCondition);
+    const aiCondition = normalizeConditionInput(body.aiCondition);
+    const fallbackCondition = normalizeConditionInput(body.condition);
+    const normalizedCondition = blendConditionScores(pawnerCondition, aiCondition, fallbackCondition);
+    console.log('✅ Using blended condition score:', {
+      pawner: pawnerCondition,
+      ai: aiCondition,
+      final: normalizedCondition,
+    });
 
     const estimatedPrice = Math.round(pawnPrice * normalizedCondition);
     console.log('💰 Final estimated price:', estimatedPrice);
