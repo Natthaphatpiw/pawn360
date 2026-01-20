@@ -36,6 +36,8 @@ type ContractDetail = {
   item_delivery_status: string;
   item_received_at?: string;
   item_verified_at?: string;
+  created_at?: string;
+  updated_at?: string;
   bag_number?: string | null;
   bag_assigned_at?: string | null;
   items?: {
@@ -169,7 +171,7 @@ function DropPointContent() {
         : 'ไม่ทราบสถานะ';
 
     const verifyLiffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q';
-    const verifyUrl = `https://liff.line.me/${verifyLiffId}/droppoint-verify?contractId=${contractDetail.contract_id}`;
+    const verifyUrl = `https://liff.line.me/${verifyLiffId}?contractId=${encodeURIComponent(contractDetail.contract_id)}`;
 
     return (
       <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6">
@@ -187,7 +189,9 @@ function DropPointContent() {
           </h1>
           <div className="text-sm text-gray-500">สถานะ: {statusText}</div>
           <div className="text-sm text-gray-500">หมายเลขสัญญา: {contractDetail.contract_number}</div>
-          <div className="text-sm text-gray-500">วันส่งมา: {formatDate(contractDetail.item_received_at || contractDetail.item_verified_at)}</div>
+          <div className="text-sm text-gray-500">
+            วันส่งมา: {formatDate(contractDetail.item_received_at || contractDetail.item_verified_at || contractDetail.updated_at || contractDetail.created_at)}
+          </div>
           {contractDetail.bag_number && (
             <div className="text-sm text-gray-700 mt-2">
               หมายเลขถุงสินค้า: <span className="font-bold">{contractDetail.bag_number}</span>

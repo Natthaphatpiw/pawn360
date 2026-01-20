@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { ChevronLeft, CheckCircle } from 'lucide-react';
+import { ChevronLeft, CheckCircle, Camera, RefreshCw } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 
 type RedemptionItem = {
@@ -31,6 +31,7 @@ type RedemptionItem = {
 type RedemptionDetail = {
   redemption_id: string;
   request_status: string;
+  drop_point_return_photos?: string[] | null;
   delivery_method?: string;
   delivery_address_full?: string;
   delivery_contact_phone?: string;
@@ -72,6 +73,10 @@ function DropPointReturnsContent() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [returnPhotos, setReturnPhotos] = useState<Array<string | null>>([null, null]);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const returnPhotoInputRef1 = useRef<HTMLInputElement>(null);
+  const returnPhotoInputRef2 = useRef<HTMLInputElement>(null);
 
   let redemptionId = searchParams.get('redemptionId');
   if (!redemptionId) {
@@ -90,6 +95,17 @@ function DropPointReturnsContent() {
       fetchList(profile.userId);
     }
   }, [liffLoading, profile?.userId, redemptionId]);
+
+  useEffect(() => {
+    if (!detail) return;
+    const nextPhotos: Array<string | null> = [null, null];
+    if (detail.drop_point_return_photos?.length) {
+      detail.drop_point_return_photos.slice(0, 2).forEach((url, index) => {
+        nextPhotos[index] = url;
+      });
+    }
+    setReturnPhotos(nextPhotos);
+  }, [detail]);
 
   const fetchList = async (lineId: string) => {
     try {
@@ -119,11 +135,16 @@ function DropPointReturnsContent() {
 
   const handleConfirmReturn = async () => {
     if (!detail || confirming || !profile?.userId) return;
+    if (!returnPhotos[0] || !returnPhotos[1]) {
+      alert('กรุณาถ่ายรูปให้ครบ 2 รูปก่อนยืนยันการส่งคืน');
+      return;
+    }
     try {
       setConfirming(true);
       const response = await axios.post('/api/drop-points/returns/confirm', {
         redemptionId: detail.redemption_id,
-        lineId: profile.userId
+        lineId: profile.userId,
+        returnPhotos: returnPhotos.filter((photo): photo is string => Boolean(photo))
       });
       if (response.data.success) {
         setConfirmed(true);
@@ -133,6 +154,39 @@ function DropPointReturnsContent() {
       alert(confirmError.response?.data?.error || 'เกิดข้อผิดพลาด');
     } finally {
       setConfirming(false);
+    }
+  };
+
+  const handleReturnPhotoChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingIndex(index);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'drop-point-returns');
+
+      const response = await axios.post('/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.url) {
+        setReturnPhotos((prev) => {
+          const next = [...prev];
+          next[index] = response.data.url;
+          return next;
+        });
+      }
+    } catch (uploadError) {
+      console.error('Error uploading return photo:', uploadError);
+      alert('ไม่สามารถอัปโหลดรูปภาพได้');
+    } finally {
+      setUploadingIndex(null);
+      if (e.target) {
+        e.target.value = '';
+      }
     }
   };
 
@@ -197,6 +251,16 @@ function DropPointReturnsContent() {
           : detail.delivery_method || '-';
     const contactPhone = detail.delivery_contact_phone || detail.contract?.pawners?.phone_number || '-';
     const addressText = detail.delivery_address_full || '-';
+    const returnPhotoLabels = [
+      {
+        title: 'รูปสินค้า',
+        description: 'ถ่ายสินค้าให้เห็นชัดเจน 1 รูป'
+      },
+      {
+        title: 'รูปคู่สินค้ากับผู้รับ',
+        description: 'ถ่ายคู่กับคนที่มารับของเพื่อยืนยันตัวตน'
+      }
+    ];
 
     return (
       <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 pb-24">
@@ -236,9 +300,61 @@ function DropPointReturnsContent() {
           <div className="text-sm text-gray-700">วิธีส่งคืน: {deliveryMethodText}</div>
         </div>
 
+        <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">ถ่ายรูปก่อนส่งคืน</h2>
+          <p className="text-xs text-gray-500 mb-4">ต้องถ่ายครบ 2 รูป (ถ่ายจากกล้องเท่านั้น)</p>
+
+          <div className="space-y-4">
+            {returnPhotoLabels.map((label, index) => {
+              const photoUrl = returnPhotos[index];
+              const isUploading = uploadingIndex === index;
+              const inputRef = index === 0 ? returnPhotoInputRef1 : returnPhotoInputRef2;
+              return (
+                <div key={label.title} className="border border-dashed border-gray-200 rounded-2xl p-4 bg-[#F9FAFB]">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="text-sm font-bold text-gray-800">{label.title}</div>
+                      <div className="text-xs text-gray-500">{label.description}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => inputRef.current?.click()}
+                      disabled={isUploading}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#365314] text-white text-xs font-semibold disabled:opacity-60"
+                    >
+                      {photoUrl ? <RefreshCw className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
+                      {photoUrl ? 'ถ่ายใหม่' : 'ถ่ายรูป'}
+                    </button>
+                  </div>
+
+                  <div className="w-full aspect-video rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center text-xs text-gray-400">
+                    {photoUrl ? (
+                      <img src={photoUrl} alt={label.title} className="w-full h-full object-cover" />
+                    ) : (
+                      'ยังไม่มีรูป'
+                    )}
+                  </div>
+
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(event) => handleReturnPhotoChange(index, event)}
+                  />
+                  {isUploading && (
+                    <div className="mt-2 text-xs text-gray-500">กำลังอัปโหลดรูป...</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <button
           onClick={handleConfirmReturn}
-          disabled={confirming}
+          disabled={confirming || uploadingIndex !== null || !returnPhotos[0] || !returnPhotos[1]}
           className="w-full bg-[#0F6C2F] text-white rounded-2xl py-4 font-bold shadow-sm hover:bg-[#0B5A27] transition-colors disabled:opacity-60"
         >
           {confirming ? 'กำลังยืนยัน...' : 'ยืนยันการส่งคืน'}

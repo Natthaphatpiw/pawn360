@@ -719,6 +719,8 @@ CREATE TABLE redemption_requests (
   item_return_confirmed_at TIMESTAMPTZ,
   item_return_confirmed_by_drop_point_id UUID,
   item_return_confirmed_by_line_id VARCHAR(255),
+  drop_point_return_photos TEXT[],
+  drop_point_return_photos_uploaded_at TIMESTAMPTZ,
   final_completion_at TIMESTAMPTZ,
 
   -- Investor Earnings (calculated on completion)
