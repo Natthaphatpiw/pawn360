@@ -179,6 +179,14 @@ async function requestRedemption(contractId: string, lineUserId: string) {
 
     const data = await response.json();
 
+    if (data?.pinRequired || data?.pinSetupRequired || data?.pinLocked) {
+      const lockMessage = data?.pinLocked && data?.lockRemainingSeconds
+        ? `บัญชีถูกล็อกชั่วคราว กรุณาลองใหม่อีกครั้งใน ${Math.ceil(data.lockRemainingSeconds / 60)} นาที`
+        : 'กรุณายืนยัน PIN ก่อนทำรายการไถ่ถอน';
+      await sendTextMessage(lineUserId, `${lockMessage}\n\nโปรดทำรายการผ่านหน้าแอปเพื่อยืนยัน PIN`);
+      return;
+    }
+
     if (data.success) {
       await sendTextMessage(lineUserId, data.message);
     } else {
@@ -205,6 +213,14 @@ async function requestExtension(contractId: string, lineUserId: string) {
     console.log('Response status:', response.status);
 
     const data = await response.json();
+
+    if (data?.pinRequired || data?.pinSetupRequired || data?.pinLocked) {
+      const lockMessage = data?.pinLocked && data?.lockRemainingSeconds
+        ? `บัญชีถูกล็อกชั่วคราว กรุณาลองใหม่อีกครั้งใน ${Math.ceil(data.lockRemainingSeconds / 60)} นาที`
+        : 'กรุณายืนยัน PIN ก่อนทำรายการต่อดอกเบี้ย';
+      await sendTextMessage(lineUserId, `${lockMessage}\n\nโปรดทำรายการผ่านหน้าแอปเพื่อยืนยัน PIN`);
+      return;
+    }
 
     if (data.success) {
       await sendTextMessage(lineUserId, data.message);

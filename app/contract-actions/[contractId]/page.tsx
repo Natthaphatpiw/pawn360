@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
 import { Sarabun } from 'next/font/google';
 import liff from '@line/liff';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 const sarabun = Sarabun({
   subsets: ['thai'],
@@ -41,10 +43,13 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
   const [submitting, setSubmitting] = useState(false);
   const [lineUserId, setLineUserId] = useState<string>('');
   const [resolvedContractId, setResolvedContractId] = useState<string>('');
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   useEffect(() => {
     const getParams = async () => {
       const resolvedParams = await params;
+      setContractId(resolvedParams.contractId);
       setResolvedContractId(resolvedParams.contractId);
     };
     getParams();
@@ -96,12 +101,10 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
 
     switch (actionType) {
       case 'redeem':
-        // NEW FLOW: Send request to shop system first
-        await handleRedemptionRequest();
+        await handlePinGuardedAction(() => handleRedemptionRequest);
         break;
       case 'renew':
-        // NEW FLOW: Send request to shop system first
-        await handleExtensionRequest();
+        await handlePinGuardedAction(() => handleExtensionRequest);
         break;
       case 'increase':
         // เพิ่มต้น - ยังใช้ flow เดิม
@@ -114,14 +117,28 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
     }
   };
 
-  const handleRedemptionRequest = async () => {
+  const handlePinGuardedAction = async (actionFactory: () => (pinToken: string) => Promise<void>) => {
+    const session = getPinSession('PAWNER', lineUserId);
+    if (session?.token) {
+      await actionFactory()(session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await actionFactory()(token);
+    };
+    setPinModalOpen(true);
+  };
+
+  const handleRedemptionRequest = async (pinToken: string) => {
     try {
       setSubmitting(true);
 
       const response = await axios.post('/api/customer/request-redemption', {
         contractId,
         lineUserId,
-        message: 'ลูกค้าต้องการไถ่ถอนสัญญา'
+        message: 'ลูกค้าต้องการไถ่ถอนสัญญา',
+        pinToken
       });
 
       if (response.data.success) {
@@ -141,14 +158,15 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
     }
   };
 
-  const handleExtensionRequest = async () => {
+  const handleExtensionRequest = async (pinToken: string) => {
     try {
       setSubmitting(true);
 
       const response = await axios.post('/api/customer/request-extension', {
         contractId,
         lineUserId,
-        message: 'ลูกค้าต้องการต่อดอกเบี้ย'
+        message: 'ลูกค้าต้องการต่อดอกเบี้ย',
+        pinToken
       });
 
       if (response.data.success) {
@@ -329,6 +347,18 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
           </div>
         </button>
       </div>
+
+      <PinModal
+        open={pinModalOpen}
+        role="PAWNER"
+        lineId={lineUserId}
+        onClose={() => setPinModalOpen(false)}
+        onVerified={(token) => {
+          setPinModalOpen(false);
+          pendingActionRef.current?.(token);
+          pendingActionRef.current = null;
+        }}
+      />
     </div>
   );
 }
