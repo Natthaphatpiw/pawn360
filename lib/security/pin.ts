@@ -346,6 +346,13 @@ export async function resetPin(
         payload: { error: 'Identity verification required' },
       } satisfies PinCheckResult;
     }
+    if (!('national_id' in user)) {
+      return {
+        ok: false,
+        status: 400,
+        payload: { error: 'Identity verification required' },
+      } satisfies PinCheckResult;
+    }
     if (
       normalizeDigits(user.phone_number) !== normalizeDigits(identity.phoneNumber) ||
       normalizeDigits(user.national_id) !== normalizeDigits(identity.nationalId)
@@ -358,6 +365,13 @@ export async function resetPin(
     }
   } else {
     if (!identity.phoneNumber || !identity.dropPointCode) {
+      return {
+        ok: false,
+        status: 400,
+        payload: { error: 'Identity verification required' },
+      } satisfies PinCheckResult;
+    }
+    if (!('drop_point_code' in user)) {
       return {
         ok: false,
         status: 400,

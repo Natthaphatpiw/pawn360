@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { Client } from '@line/bot-sdk';
 import { createPendingApprovalMessage } from '@/lib/line/flex-templates';
+import { requirePinToken } from '@/lib/security/pin';
 
 // Lazy initialization of LINE client
 let lineClient: Client | null = null;
@@ -27,13 +28,18 @@ function getLineClient(): Client {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, lineUserId, message } = body;
+    const { contractId, lineUserId, message, pinToken } = body;
 
     if (!contractId || !lineUserId) {
       return NextResponse.json(
         { error: 'ข้อมูลไม่ครบถ้วน' },
         { status: 400 }
       );
+    }
+
+    const pinCheck = await requirePinToken('PAWNER', lineUserId, pinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
     }
 
     const { db } = await connectToDatabase();
