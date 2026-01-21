@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import axios from 'axios';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 interface ContractAgreementStepProps {
   loanRequestId: string;
@@ -23,6 +25,35 @@ export default function ContractAgreementStep({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const signatureRef = useRef<SignatureCanvas>(null);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
+
+  const submitWithPin = async (pinToken: string) => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      const signatureDataURL = signatureRef.current?.toDataURL();
+
+      const response = await axios.post('/api/contracts/create', {
+        loanRequestId,
+        itemId,
+        accepted,
+        signature: signatureDataURL,
+        lineId,
+        pinToken
+      });
+
+      if (response.data.success) {
+        onSuccess(response.data.contractId);
+      }
+    } catch (error: any) {
+      console.error('Error submitting agreement:', error);
+      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกสัญญา');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!accepted) {
@@ -40,30 +71,16 @@ export default function ContractAgreementStep({
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError(null);
-
-      // Get signature as data URL
-      const signatureDataURL = signatureRef.current?.toDataURL();
-
-      const response = await axios.post('/api/contracts/create', {
-        loanRequestId,
-        itemId,
-        accepted,
-        signature: signatureDataURL,
-        lineId
-      });
-
-      if (response.data.success) {
-        onSuccess(response.data.contractId);
-      }
-    } catch (error: any) {
-      console.error('Error submitting agreement:', error);
-      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึกสัญญา');
-    } finally {
-      setIsSubmitting(false);
+    const session = getPinSession('PAWNER', lineId);
+    if (session?.token) {
+      await submitWithPin(session.token);
+      return;
     }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitWithPin(token);
+    };
+    setPinModalOpen(true);
   };
 
   const clearSignature = () => {
@@ -202,6 +219,18 @@ export default function ContractAgreementStep({
         </p>
 
       </div>
+
+      <PinModal
+        open={pinModalOpen}
+        role="PAWNER"
+        lineId={lineId}
+        onClose={() => setPinModalOpen(false)}
+        onVerified={(token) => {
+          setPinModalOpen(false);
+          pendingActionRef.current?.(token);
+          pendingActionRef.current = null;
+        }}
+      />
     </div>
   );
 }

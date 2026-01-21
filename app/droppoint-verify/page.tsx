@@ -6,6 +6,8 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { Camera, Check, X, Upload } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 function DropPointVerifyContent() {
   const router = useRouter();
@@ -44,6 +46,8 @@ function DropPointVerifyContent() {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [bagNumber, setBagNumber] = useState('');
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   useEffect(() => {
     if (contractId) {
@@ -107,7 +111,7 @@ function DropPointVerifyContent() {
     }));
   };
 
-  const handleVerificationSubmit = async (result: 'APPROVED' | 'REJECTED') => {
+  const submitVerification = async (result: 'APPROVED' | 'REJECTED', pinToken: string) => {
     if (!profile?.userId) {
       alert('กรุณาเข้าสู่ระบบ LINE');
       return;
@@ -134,7 +138,8 @@ function DropPointVerifyContent() {
         verificationData: {
           ...verificationData,
           verification_result: result
-        }
+        },
+        pinToken
       });
 
       if (response.data.success) {
@@ -150,6 +155,24 @@ function DropPointVerifyContent() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleVerificationSubmit = async (result: 'APPROVED' | 'REJECTED') => {
+    if (!profile?.userId) {
+      alert('กรุณาเข้าสู่ระบบ LINE');
+      return;
+    }
+
+    const session = getPinSession('DROP_POINT', profile.userId);
+    if (session?.token) {
+      await submitVerification(result, session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitVerification(result, token);
+    };
+    setPinModalOpen(true);
   };
 
   // Helper Component for verification toggle buttons
@@ -460,6 +483,18 @@ function DropPointVerifyContent() {
             <span className="text-[10px] font-light opacity-80">Return</span>
           </button>
         </div>
+
+        <PinModal
+          open={pinModalOpen}
+          role="DROP_POINT"
+          lineId={profile?.userId || ''}
+          onClose={() => setPinModalOpen(false)}
+          onVerified={(token) => {
+            setPinModalOpen(false);
+            pendingActionRef.current?.(token);
+            pendingActionRef.current = null;
+          }}
+        />
 
       </div>
     </div>

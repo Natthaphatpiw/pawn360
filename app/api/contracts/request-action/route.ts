@@ -4,6 +4,7 @@ import { Client, ClientConfig } from '@line/bot-sdk';
 import { ObjectId } from 'mongodb';
 import { getS3Client } from '@/lib/aws/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { requirePinToken } from '@/lib/security/pin';
 
 // Lazy initialization of LINE client
 let storeClient: Client | null = null;
@@ -62,14 +63,15 @@ export async function POST(request: NextRequest) {
         contractId: formData.get('contractId'),
         actionType: formData.get('actionType'),
         amount: formData.get('amount'),
-        lineId: null, // Will be set later from session/LIFF
+        lineId: formData.get('lineId'),
+        pinToken: formData.get('pinToken'),
       };
       slipFile = formData.get('slip') as File;
     } else {
       body = await request.json();
     }
 
-    const { contractId, actionType, amount, lineId, contractNumber } = body;
+    const { contractId, actionType, amount, lineId, contractNumber, pinToken } = body;
 
     if (!contractId || !actionType) {
       return NextResponse.json(
@@ -93,7 +95,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Get customer details (use contract.lineId if not provided)
-    const customerLineId = lineId || contract.lineId;
+    const customerLineId = typeof lineId === 'string' && lineId ? lineId : contract.lineId;
+    if (!customerLineId) {
+      return NextResponse.json(
+        { error: 'LINE ID is required' },
+        { status: 400 }
+      );
+    }
+    if (lineId && contract.lineId && lineId !== contract.lineId) {
+      return NextResponse.json(
+        { error: 'Unauthorized request' },
+        { status: 403 }
+      );
+    }
+
+    const normalizedPinToken = typeof pinToken === 'string' ? pinToken : undefined;
+    const pinCheck = await requirePinToken('PAWNER', customerLineId, normalizedPinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
+    }
+
     const customer = await customersCollection.findOne({ lineId: customerLineId });
     if (!customer) {
       return NextResponse.json(

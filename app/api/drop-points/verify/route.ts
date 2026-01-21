@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { requirePinToken } from '@/lib/security/pin';
 
 // Investor LINE OA client
 const investorLineClient = new Client({
@@ -17,13 +18,18 @@ const pawnerLineClient = new Client({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, lineId, verificationResult, verificationData, bagNumber } = body;
+    const { contractId, lineId, verificationResult, verificationData, bagNumber, pinToken } = body;
 
     if (!contractId || !lineId || !verificationResult) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    const pinCheck = await requirePinToken('DROP_POINT', lineId, pinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
     }
 
     const supabase = supabaseAdmin();

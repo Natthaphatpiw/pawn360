@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import axios from 'axios';
 import Image from 'next/image';
+import liff from '@line/liff';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 interface Contract {
   _id: string;
@@ -47,6 +50,24 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
   const [submitting, setSubmitting] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>(initialAmount > 0 ? initialAmount.toString() : '');
   const [amount, setAmount] = useState<number>(initialAmount);
+  const [lineUserId, setLineUserId] = useState('');
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
+
+  const initializeLiff = async () => {
+    try {
+      const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS || '';
+      await liff.init({ liffId });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      const profile = await liff.getProfile();
+      setLineUserId(profile.userId);
+    } catch (err) {
+      console.error('LIFF initialization error:', err);
+    }
+  };
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -67,6 +88,7 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
     };
 
     if (contractId) {
+      initializeLiff();
       fetchContract();
     }
   }, [contractId]);
@@ -106,7 +128,7 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
     }
   };
 
-  const handleSubmit = async () => {
+  const submitWithPin = async (pinToken: string) => {
     if (!slipFile) {
       alert('กรุณาอัพโหลดสลิปการโอนเงิน');
       return;
@@ -126,6 +148,8 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
       formData.append('contractId', contractId);
       formData.append('actionType', actionType);
       formData.append('amount', amount.toString());
+      formData.append('lineId', lineUserId);
+      formData.append('pinToken', pinToken);
 
       const response = await axios.post('/api/contracts/request-action', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -140,6 +164,24 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (!lineUserId) {
+      alert('กรุณาเข้าสู่ระบบผ่าน LINE');
+      return;
+    }
+
+    const session = getPinSession('PAWNER', lineUserId);
+    if (session?.token) {
+      await submitWithPin(session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitWithPin(token);
+    };
+    setPinModalOpen(true);
   };
 
   if (loading) {
@@ -273,6 +315,18 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
       >
         {submitting ? 'กำลังส่งคำขอ...' : 'ยืนยันการชำระเงิน'}
       </button>
+
+      <PinModal
+        open={pinModalOpen}
+        role="PAWNER"
+        lineId={lineUserId}
+        onClose={() => setPinModalOpen(false)}
+        onVerified={(token) => {
+          setPinModalOpen(false);
+          pendingActionRef.current?.(token);
+          pendingActionRef.current = null;
+        }}
+      />
     </div>
   );
 }

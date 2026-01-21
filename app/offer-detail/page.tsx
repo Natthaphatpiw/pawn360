@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, Suspense, type ReactNode } from 'react';
+import { useState, useEffect, Suspense, type ReactNode, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import ImageCarousel from '@/components/ImageCarousel';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 function OfferDetailContent() {
   const router = useRouter();
@@ -15,6 +17,8 @@ function OfferDetailContent() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   // Get contractId from either direct param or from liff.state
   let contractId = searchParams.get('contractId');
@@ -73,7 +77,7 @@ function OfferDetailContent() {
     }
   };
 
-  const handleAccept = async () => {
+  const submitAccept = async (pinToken: string) => {
     if (!profile?.userId) {
       alert('กรุณาเข้าสู่ระบบ LINE');
       return;
@@ -94,7 +98,8 @@ function OfferDetailContent() {
       const response = await axios.post('/api/contracts/investor-action', {
         action: 'accept',
         contractId,
-        lineId: profile.userId
+        lineId: profile.userId,
+        pinToken
       });
 
       if (response.data?.alreadyAccepted) {
@@ -113,6 +118,24 @@ function OfferDetailContent() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleAccept = async () => {
+    if (!profile?.userId) {
+      alert('กรุณาเข้าสู่ระบบ LINE');
+      return;
+    }
+
+    const session = getPinSession('INVESTOR', profile.userId);
+    if (session?.token) {
+      await submitAccept(session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitAccept(token);
+    };
+    setPinModalOpen(true);
   };
 
   const handleDecline = async () => {
@@ -295,6 +318,18 @@ function OfferDetailContent() {
           <span className="text-[10px] font-light opacity-90">ปฏิเสธ</span>
         </button>
       </div>
+
+      <PinModal
+        open={pinModalOpen}
+        role="INVESTOR"
+        lineId={profile?.userId || ''}
+        onClose={() => setPinModalOpen(false)}
+        onVerified={(token) => {
+          setPinModalOpen(false);
+          pendingActionRef.current?.(token);
+          pendingActionRef.current = null;
+        }}
+      />
 
     </div>
   );

@@ -179,6 +179,24 @@ CREATE INDEX idx_drop_points_province ON drop_points(addr_province);
 CREATE INDEX idx_drop_points_active ON drop_points(is_active);
 CREATE INDEX idx_drop_points_line_id ON drop_points(line_id);
 
+-- Table: user_security (PIN & security metadata)
+CREATE TABLE user_security (
+  security_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  role VARCHAR(20) NOT NULL CHECK (role IN ('PAWNER', 'INVESTOR', 'DROP_POINT')),
+  line_id VARCHAR(255) NOT NULL,
+  pin_hash TEXT,
+  failed_attempts INT DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  pin_updated_at TIMESTAMPTZ,
+  pin_session_token VARCHAR(128),
+  pin_session_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX idx_user_security_role_line_id ON user_security(role, line_id);
+CREATE INDEX idx_user_security_line_id ON user_security(line_id);
+
 -- Table: admin_users (ผู้ดูแลระบบ)
 CREATE TABLE admin_users (
   admin_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

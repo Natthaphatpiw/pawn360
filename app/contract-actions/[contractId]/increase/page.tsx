@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
+import liff from '@line/liff';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 interface Contract {
   _id: string;
@@ -32,6 +35,24 @@ export default function IncreasePrincipalPage() {
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [lineUserId, setLineUserId] = useState('');
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
+
+  const initializeLiff = async () => {
+    try {
+      const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS || '';
+      await liff.init({ liffId });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      const profile = await liff.getProfile();
+      setLineUserId(profile.userId);
+    } catch (err) {
+      console.error('LIFF initialization error:', err);
+    }
+  };
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -49,11 +70,12 @@ export default function IncreasePrincipalPage() {
     };
 
     if (contractId) {
+      initializeLiff();
       fetchContract();
     }
   }, [contractId]);
 
-  const handleSubmit = async () => {
+  const submitWithPin = async (pinToken: string) => {
     const increaseAmount = parseFloat(amount);
     if (!increaseAmount || increaseAmount <= 0) {
       alert('กรุณาระบุจำนวนเงินที่ถูกต้อง');
@@ -67,6 +89,8 @@ export default function IncreasePrincipalPage() {
         contractId,
         actionType: 'increase_principal',
         amount: increaseAmount,
+        lineId: lineUserId,
+        pinToken,
       });
 
       if (response.data.success) {
@@ -78,6 +102,24 @@ export default function IncreasePrincipalPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (!lineUserId) {
+      alert('กรุณาเข้าสู่ระบบผ่าน LINE');
+      return;
+    }
+
+    const session = getPinSession('PAWNER', lineUserId);
+    if (session?.token) {
+      await submitWithPin(session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitWithPin(token);
+    };
+    setPinModalOpen(true);
   };
 
   if (loading) {
@@ -174,6 +216,18 @@ export default function IncreasePrincipalPage() {
       >
         {submitting ? 'กำลังส่งคำขอ...' : 'ส่งคำขอเพิ่มเงินต้น'}
       </button>
+
+      <PinModal
+        open={pinModalOpen}
+        role="PAWNER"
+        lineId={lineUserId}
+        onClose={() => setPinModalOpen(false)}
+        onVerified={(token) => {
+          setPinModalOpen(false);
+          pendingActionRef.current?.(token);
+          pendingActionRef.current = null;
+        }}
+      />
     </div>
   );
 }
