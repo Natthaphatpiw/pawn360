@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { requirePinToken } from '@/lib/security/pin';
 
 const investorLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
@@ -15,7 +16,7 @@ const pawnerLineClient = new Client({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, contractId, lineId } = body; // Changed from investorId to lineId
+    const { action, contractId, lineId, pinToken } = body; // Changed from investorId to lineId
 
     if (!action || !contractId || !lineId) {
       return NextResponse.json(
@@ -62,6 +63,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'accept') {
+      const pinCheck = await requirePinToken('INVESTOR', lineId, pinToken);
+      if (!pinCheck.ok) {
+        return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
+      }
+
       if (investor.kyc_status !== 'VERIFIED') {
         return NextResponse.json(
           {

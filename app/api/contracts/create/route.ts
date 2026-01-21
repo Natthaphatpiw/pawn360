@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { uploadSignatureToS3 } from '@/lib/aws/s3';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { requirePinToken } from '@/lib/security/pin';
 
 const investorLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
       itemId,
       accepted,
       signature,
-      lineId
+      lineId,
+      pinToken
     } = body;
 
     console.log('📝 Contract create request:', {
@@ -39,6 +41,11 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    const pinCheck = await requirePinToken('PAWNER', lineId, pinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
     }
 
     const supabase = supabaseAdmin();

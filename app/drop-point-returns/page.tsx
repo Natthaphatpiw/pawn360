@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { ChevronLeft, CheckCircle, Camera, RefreshCw } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 type RedemptionItem = {
   redemption_id: string;
@@ -77,6 +79,8 @@ function DropPointReturnsContent() {
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const returnPhotoInputRef1 = useRef<HTMLInputElement>(null);
   const returnPhotoInputRef2 = useRef<HTMLInputElement>(null);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   let redemptionId = searchParams.get('redemptionId');
   if (!redemptionId) {
@@ -133,7 +137,7 @@ function DropPointReturnsContent() {
     }
   };
 
-  const handleConfirmReturn = async () => {
+  const submitConfirmReturn = async (pinToken: string) => {
     if (!detail || confirming || !profile?.userId) return;
     if (!returnPhotos[0] || !returnPhotos[1]) {
       alert('กรุณาถ่ายรูปให้ครบ 2 รูปก่อนยืนยันการส่งคืน');
@@ -144,7 +148,8 @@ function DropPointReturnsContent() {
       const response = await axios.post('/api/drop-points/returns/confirm', {
         redemptionId: detail.redemption_id,
         lineId: profile.userId,
-        returnPhotos: returnPhotos.filter((photo): photo is string => Boolean(photo))
+        returnPhotos: returnPhotos.filter((photo): photo is string => Boolean(photo)),
+        pinToken
       });
       if (response.data.success) {
         setConfirmed(true);
@@ -155,6 +160,24 @@ function DropPointReturnsContent() {
     } finally {
       setConfirming(false);
     }
+  };
+
+  const handleConfirmReturn = async () => {
+    if (!profile?.userId) {
+      alert('กรุณาเข้าสู่ระบบ LINE');
+      return;
+    }
+
+    const session = getPinSession('DROP_POINT', profile.userId);
+    if (session?.token) {
+      await submitConfirmReturn(session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitConfirmReturn(token);
+    };
+    setPinModalOpen(true);
   };
 
   const handleReturnPhotoChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -359,6 +382,18 @@ function DropPointReturnsContent() {
         >
           {confirming ? 'กำลังยืนยัน...' : 'ยืนยันการส่งคืน'}
         </button>
+
+        <PinModal
+          open={pinModalOpen}
+          role="DROP_POINT"
+          lineId={profile?.userId || ''}
+          onClose={() => setPinModalOpen(false)}
+          onVerified={(token) => {
+            setPinModalOpen(false);
+            pendingActionRef.current?.(token);
+            pendingActionRef.current = null;
+          }}
+        />
       </div>
     );
   }

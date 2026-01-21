@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client } from '@line/bot-sdk';
+import { requirePinToken } from '@/lib/security/pin';
 
 const pawnerLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -17,13 +18,18 @@ const ALLOWED_STATUSES = ['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { redemptionId, lineId, returnPhotos } = body;
+    const { redemptionId, lineId, returnPhotos, pinToken } = body;
 
     if (!redemptionId || !lineId) {
       return NextResponse.json(
         { error: 'Redemption ID and LINE ID are required' },
         { status: 400 }
       );
+    }
+
+    const pinCheck = await requirePinToken('DROP_POINT', lineId, pinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
     }
 
     if (!Array.isArray(returnPhotos) || returnPhotos.length < 2 || returnPhotos.some((url) => typeof url !== 'string' || !url)) {
