@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 interface ContractItem {
   item_id: string;
@@ -41,6 +43,8 @@ export default function PawnerContractList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
 
   useEffect(() => {
     if (liffLoading) return;
@@ -57,7 +61,15 @@ export default function PawnerContractList() {
       return;
     }
 
-    fetchContracts();
+    const session = getPinSession('PAWNER', profile.userId);
+    if (session?.token) {
+      setPinVerified(true);
+      fetchContracts();
+    } else {
+      setPinVerified(false);
+      setPinModalOpen(true);
+      setLoading(false);
+    }
   }, [liffLoading, liffError, profile?.userId]);
 
   const fetchContracts = async () => {
@@ -130,6 +142,40 @@ export default function PawnerContractList() {
           <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
           <p className="text-red-600">{error}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!pinVerified) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
+          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+          <p className="text-sm text-gray-500 mt-2">
+            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการสัญญา
+          </p>
+          <button
+            type="button"
+            onClick={() => setPinModalOpen(true)}
+            className="mt-4 w-full rounded-2xl bg-[#C0562F] py-3 text-sm font-bold text-white"
+          >
+            ยืนยัน PIN
+          </button>
+        </div>
+
+        {profile?.userId && (
+          <PinModal
+            open={pinModalOpen}
+            role="PAWNER"
+            lineId={profile.userId}
+            onClose={() => setPinModalOpen(false)}
+            onVerified={() => {
+              setPinVerified(true);
+              setPinModalOpen(false);
+              fetchContracts();
+            }}
+          />
+        )}
       </div>
     );
   }
