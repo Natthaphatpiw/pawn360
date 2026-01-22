@@ -96,7 +96,9 @@ const normalizePreferences = (raw: any): PreferenceState => {
   Object.keys(base).forEach((key) => {
     const entry = source?.[key];
     if (!entry) return;
-    const sub = Array.isArray(entry.sub) ? entry.sub.filter((value) => typeof value === 'string') : [];
+    const sub = Array.isArray(entry.sub)
+      ? entry.sub.filter((value: unknown): value is string => typeof value === 'string')
+      : [];
     const enabled = typeof entry.enabled === 'boolean' ? entry.enabled : sub.length > 0;
     base[key] = { enabled, sub };
   });

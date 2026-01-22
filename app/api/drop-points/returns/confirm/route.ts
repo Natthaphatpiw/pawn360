@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const now = new Date();
+    const nowIso = now.toISOString();
     const msPerDay = 1000 * 60 * 60 * 24;
     const startDate = new Date(redemption.contract?.contract_start_date || now);
     startDate.setHours(0, 0, 0, 0);
@@ -128,22 +130,20 @@ export async function POST(request: NextRequest) {
     const interestEarned = Math.round(principal * investorRate * (daysElapsed / 30) * 100) / 100;
     const platformFee = Number(redemption.contract?.platform_fee_amount) || 0;
     const netProfit = Math.max(0, interestEarned);
-    const now = new Date().toISOString();
-
     const { error: updateError } = await supabase
       .from('redemption_requests')
       .update({
         request_status: 'COMPLETED',
-        item_return_confirmed_at: now,
+        item_return_confirmed_at: nowIso,
         item_return_confirmed_by_drop_point_id: dropPoint.drop_point_id,
         item_return_confirmed_by_line_id: lineId,
         drop_point_return_photos: returnPhotos.slice(0, 2),
-        drop_point_return_photos_uploaded_at: now,
-        final_completion_at: now,
+        drop_point_return_photos_uploaded_at: nowIso,
+        final_completion_at: nowIso,
         investor_interest_earned: interestEarned,
         platform_fee_deducted: platformFee,
         investor_net_profit: netProfit,
-        updated_at: now
+        updated_at: nowIso
       })
       .eq('redemption_id', redemptionId);
 
@@ -161,8 +161,8 @@ export async function POST(request: NextRequest) {
         contract_status: 'COMPLETED',
         redemption_status: 'COMPLETED',
         item_delivery_status: 'RETURNED',
-        completed_at: now,
-        updated_at: now
+        completed_at: nowIso,
+        updated_at: nowIso
       })
       .eq('contract_id', redemption.contract?.contract_id);
 
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         .from('items')
         .update({
           item_status: 'RETURNED',
-          updated_at: now
+        updated_at: nowIso
         })
         .eq('item_id', redemption.contract.items.item_id);
     }
