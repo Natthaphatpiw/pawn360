@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate pawn ticket URL for frontend to access
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawnly.io';
     const ticketUrl = `${baseUrl}/pawn-ticket/${contractId}`;
 
     console.log('[Auto-Generate] Generated ticket URL:', ticketUrl);

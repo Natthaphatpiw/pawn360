@@ -1,6 +1,11 @@
 'use client';
 
 import { LiffProvider } from '@/lib/liff/liff-provider';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'ข้อเสนอ',
+};
 
 export default function InvestorOffersLayout({
   children,

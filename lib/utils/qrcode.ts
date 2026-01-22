@@ -21,7 +21,7 @@ export async function generateQRCode(data: string, filename?: string): Promise<s
 
 export function generateQRCodeData(itemId: string): string {
   // สร้าง URL ที่ไปที่ QR code page ก่อน แล้วจะ redirect ไป LIFF
-  const domain = process.env.NEXT_PUBLIC_DOMAIN || 'https://pawn360.vercel.app';
+  const domain = process.env.NEXT_PUBLIC_DOMAIN || 'https://pawnly.io';
   const url = `${domain}/qr/${itemId}`;
   console.log('Generated QR code URL:', url, 'for itemId:', itemId);
   return url;

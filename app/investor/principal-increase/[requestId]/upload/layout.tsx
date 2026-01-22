@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
-  title: 'อัปโหลดสลิปโอนเงิน - Pawn360',
+  title: 'อัปโหลดสลิปโอนเงิน',
   description: 'อัปโหลดสลิปการโอนเงินสำหรับคำขอเพิ่มเงินต้น',
 };
 

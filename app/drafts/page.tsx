@@ -33,6 +33,7 @@ export default function DraftsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DraftItem | null>(null);
 
   useEffect(() => {
     if (profile?.userId) {
@@ -55,15 +56,14 @@ export default function DraftsPage() {
     }
   };
 
-  const handleDelete = async (itemId: string) => {
-    if (!confirm('คุณต้องการลบบันทึกนี้ใช่หรือไม่?')) {
-      return;
-    }
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
 
     try {
-      setDeletingId(itemId);
-      await axios.delete(`/api/items/draft?itemId=${itemId}&lineId=${profile?.userId}`);
-      setDrafts(drafts.filter(d => d.item_id !== itemId));
+      setDeletingId(pendingDelete.item_id);
+      await axios.delete(`/api/items/draft?itemId=${pendingDelete.item_id}&lineId=${profile?.userId}`);
+      setDrafts(drafts.filter(d => d.item_id !== pendingDelete.item_id));
+      setPendingDelete(null);
     } catch (error) {
       console.error('Error deleting draft:', error);
       alert('ไม่สามารถลบบันทึกได้');
@@ -230,7 +230,7 @@ export default function DraftsPage() {
                 {/* Delete Button */}
                 <div className="border-t border-gray-100 px-3 py-2 bg-gray-50">
                   <button
-                    onClick={() => handleDelete(draft.item_id)}
+                    onClick={() => setPendingDelete(draft)}
                     disabled={deletingId === draft.item_id}
                     className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50"
                   >
@@ -243,6 +243,34 @@ export default function DraftsPage() {
           </div>
         )}
       </div>
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-bold text-gray-800">ยืนยันการลบบันทึก</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              ต้องการลบบันทึก <span className="font-semibold text-gray-800">{pendingDelete.brand} {pendingDelete.model}</span> ใช่หรือไม่
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                className="flex-1 rounded-xl border border-gray-200 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deletingId === pendingDelete.item_id}
+                className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+              >
+                {deletingId === pendingDelete.item_id ? 'กำลังลบ...' : 'ลบบันทึก'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
