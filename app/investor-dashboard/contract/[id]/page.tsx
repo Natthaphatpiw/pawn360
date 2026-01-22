@@ -92,18 +92,25 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
 
   const badge = getStatusBadge(contract.contract_status);
   const daysRemaining = getDaysRemaining(contract.contract_end_date);
-  const totalInterest = Number(contract.interest_amount) || 0;
+  const interestAmount = Number(contract.interest_amount) || 0;
   const platformFeeRate = typeof contract.platform_fee_rate === 'number'
     ? contract.platform_fee_rate
-    : 0.5;
-  const investorShare = Math.max(0, 1 - platformFeeRate);
-  const investorReward = Math.round(totalInterest * investorShare * 100) / 100;
-  const platformFee = Math.round(totalInterest * platformFeeRate * 100) / 100;
+    : 0.01;
   const interestRatePercent = typeof contract.interest_rate === 'number'
     ? contract.interest_rate * 100
     : 0;
-  const investorRatePercent = interestRatePercent * investorShare;
-  const platformRatePercent = interestRatePercent * platformFeeRate;
+  const feeRatePercent = platformFeeRate * 100;
+  const principal = Number(contract.loan_principal_amount || 0);
+  const durationDays = Number(contract.contract_duration_days || 0);
+  const platformFeeRaw = Number(contract.platform_fee_amount);
+  const platformFeeAmount = Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
+    ? platformFeeRaw
+    : Math.round(principal * platformFeeRate * (durationDays / 30) * 100) / 100;
+  const investorRate = typeof contract.investor_rate === 'number'
+    ? contract.investor_rate
+    : 0.015;
+  const investorRatePercent = investorRate * 100;
+  const investorReward = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 pb-20">
@@ -138,12 +145,12 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
             label="ดอกเบี้ย"
             value={(
               <div className="text-right">
-                <div>{`${totalInterest.toLocaleString()} บาท (${interestRatePercent.toFixed(0)}%)`}</div>
+                <div>{`${interestAmount.toLocaleString()} บาท (${interestRatePercent.toFixed(1)}%)`}</div>
                 <div className="text-xs text-gray-500">
-                  นักลงทุน {investorRatePercent.toFixed(1)}% {investorReward.toLocaleString()} บาท
+                  นักลงทุน {investorRatePercent.toFixed(2)}% {investorReward.toLocaleString()} บาท
                 </div>
                 <div className="text-xs text-gray-500">
-                  ค่าธรรมเนียมระบบ {platformRatePercent.toFixed(1)}% {platformFee.toLocaleString()} บาท
+                  ค่าธรรมเนียมระบบ {feeRatePercent.toFixed(1)}% {platformFeeAmount.toLocaleString()} บาท
                 </div>
               </div>
             )}

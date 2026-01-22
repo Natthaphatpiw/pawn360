@@ -80,7 +80,8 @@ export async function POST(request: NextRequest) {
         is_blocked: false,
         min_investment_amount: 1000, // Default minimum
         auto_invest_enabled: false,
-        investor_tier: 'STANDARD'
+        investor_tier: 'SILVER',
+        total_active_principal: 0
       }])
       .select()
       .single();

@@ -103,9 +103,8 @@ export async function POST(request: NextRequest) {
 
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = 0.01;
-    const interestRateForAccrual = Math.max(0, monthlyInterestRate - feeRate);
-    const dailyInterestRate = interestRateForAccrual / 30;
+    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const dailyInterestRate = monthlyInterestRate / 30;
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
     const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;
     const feeAmount = round2(feeBase * feeRate * (daysInContract / 30));
@@ -158,8 +157,7 @@ export async function POST(request: NextRequest) {
         const interestForPeriod = interestAccruedWithFee;
         const totalToPay = reductionAmt + interestForPeriod;
         const principalAfterReduction = currentPrincipal - reductionAmt;
-        const newFeeAmount = round2(principalAfterReduction * feeRate * (daysInContract / 30));
-        const newInterestForRemaining = round2(principalAfterReduction * dailyInterestRate * daysInContract + newFeeAmount);
+        const newInterestForRemaining = round2(principalAfterReduction * dailyInterestRate * daysInContract + feeAmount);
 
         requestData = {
           ...requestData,
@@ -219,8 +217,7 @@ export async function POST(request: NextRequest) {
 
         const interestForPeriod = interestAccruedWithFee;
         const principalAfterIncrease = currentPrincipal + increaseAmt;
-        const newFeeAmount = round2(principalAfterIncrease * feeRate * (daysInContract / 30));
-        const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysInContract + newFeeAmount);
+        const newInterestForRemaining = round2(principalAfterIncrease * dailyInterestRate * daysInContract + feeAmount);
         const totalToPayNow = interestForPeriod;
         const nextStatus = 'AWAITING_PAYMENT';
 
@@ -312,13 +309,8 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
   const pawner = contract?.pawners;
   const increaseAmount = Number(actionRequest.increase_amount || 0);
   const newPrincipal = actionRequest.principal_after_increase;
-  const rawInterestRate = Number(contract?.interest_rate || 0);
-  const normalizedInterestRate = rawInterestRate > 1 ? rawInterestRate / 100 : rawInterestRate;
-  const platformFeeRate = typeof contract?.platform_fee_rate === 'number'
-    ? contract.platform_fee_rate
-    : 0.5;
-  const investorShare = Math.max(0, 1 - platformFeeRate);
-  const additionalMonthlyInterest = Math.round(increaseAmount * normalizedInterestRate * investorShare * 100) / 100;
+  const investorRate = Number(contract?.investor_rate || 0.015);
+  const additionalMonthlyInterest = Math.round(increaseAmount * investorRate * 100) / 100;
   const formatAmount = (value: number) => (
     value % 1
       ? value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

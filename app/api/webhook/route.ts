@@ -4,6 +4,7 @@ import { verifySignature, sendStoreLocationCard, sendConfirmationSuccessMessage 
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 
 function getDropPointLineClient() {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT;
@@ -882,10 +883,24 @@ async function handlePostbackEvent(event: WebhookEvent) {
         const investor = contract?.investors;
         const item = contract?.items;
 
-        // Calculate investor earnings
-        const interestEarned = redemption.interest_amount || 0;
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const startDate = new Date(contract?.contract_start_date || new Date().toISOString());
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(contract?.contract_end_date || new Date().toISOString());
+        endDate.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const rawDaysInContract = Number(contract?.contract_duration_days || 0)
+          || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
+        const daysInContract = Math.max(1, rawDaysInContract);
+        const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+        const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
+
+        const investorRate = Number(contract?.investor_rate || 0.015);
+        const principal = Number(contract?.loan_principal_amount || 0);
+        const interestEarned = Math.round(principal * investorRate * (daysElapsed / 30) * 100) / 100;
         const platformFee = contract?.platform_fee_amount || 0;
-        const netProfit = interestEarned - platformFee;
+        const netProfit = interestEarned;
 
         // Update redemption status
         await supabase
@@ -911,6 +926,14 @@ async function handlePostbackEvent(event: WebhookEvent) {
             updated_at: new Date().toISOString(),
           })
           .eq('contract_id', redemption.contract_id);
+
+        if (contract?.investor_id) {
+          try {
+            await refreshInvestorTierAndTotals(contract.investor_id);
+          } catch (refreshError) {
+            console.error('Error refreshing investor totals:', refreshError);
+          }
+        }
 
         // Update item status
         await supabase

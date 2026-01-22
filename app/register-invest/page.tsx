@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -12,6 +13,11 @@ interface InvestorData {
   lastname: string;
   kyc_status: string;
   max_investment_amount?: number | null;
+  investor_tier?: string | null;
+  total_active_principal?: number | null;
+  auto_invest_enabled?: boolean | null;
+  auto_liquidation_enabled?: boolean | null;
+  investment_preferences?: any;
   stats: {
     totalContracts: number;
     activeContracts: number;
@@ -44,11 +50,43 @@ interface RegisterFormData {
   };
 }
 
+const TIER_IMAGES: Record<string, string> = {
+  SILVER: '/tier-image/silver-pawnlytier.png',
+  GOLD: '/tier-image/gold-pawnlytier.png',
+  PLATINUM: '/tier-image/plattinam-pawnlytier.png',
+};
+
+const TIER_LABELS: Record<string, string> = {
+  SILVER: 'Silver',
+  GOLD: 'Gold',
+  PLATINUM: 'Platinum',
+};
+
+const TIER_MONTHLY_RATES: Record<string, number> = {
+  SILVER: 0.015,
+  GOLD: 0.0153,
+  PLATINUM: 0.016,
+};
+
+const TIER_THRESHOLDS = {
+  GOLD: 400000,
+  PLATINUM: 1000000,
+};
+
+const ITEM_TYPE_LABELS: Record<string, string> = {
+  'โทรศัพท์มือถือ': 'Mobile',
+  'อุปกรณ์เสริมโทรศัพท์': 'Mobile acc.',
+  'กล้อง': 'Camera',
+  'Apple': 'Apple',
+  'โน้ตบุค': 'Laptop',
+};
+
 export default function InvestorRegister() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [investorData, setInvestorData] = useState<InvestorData | null>(null);
+  const [tierModalOpen, setTierModalOpen] = useState(false);
   const [formData, setFormData] = useState<RegisterFormData>({
     firstname: '',
     lastname: '',
@@ -183,71 +221,158 @@ export default function InvestorRegister() {
   if (investorData) {
     const currentLimit = investorData.stats.currentInvestedAmount ?? investorData.stats.totalInvestedAmount;
     const maxLimit = investorData.max_investment_amount || 0;
+    const investorTier = (investorData.investor_tier || 'SILVER').toUpperCase();
+    const tierImage = TIER_IMAGES[investorTier] || TIER_IMAGES.SILVER;
+    const monthlyRate = TIER_MONTHLY_RATES[investorTier] || TIER_MONTHLY_RATES.SILVER;
+    const annualRate = monthlyRate * 12 * 100;
+    const totalActivePrincipal = Number(investorData.total_active_principal || 0);
+    const nextTier = investorTier === 'SILVER' ? 'GOLD' : investorTier === 'GOLD' ? 'PLATINUM' : null;
+    const nextTarget = nextTier === 'GOLD'
+      ? TIER_THRESHOLDS.GOLD
+      : nextTier === 'PLATINUM'
+        ? TIER_THRESHOLDS.PLATINUM
+        : null;
+    const remainingToNext = nextTarget ? Math.max(0, nextTarget - totalActivePrincipal) : 0;
+
+    const preferences = investorData.investment_preferences?.categories || {};
+    const selectedCategories = Object.keys(ITEM_TYPE_LABELS).filter((key) => {
+      const entry = preferences?.[key];
+      if (!entry) return false;
+      const hasSub = Array.isArray(entry.sub) && entry.sub.length > 0;
+      return !!entry.enabled || hasSub;
+    });
+    const autoMatchAllowed = investorTier === 'GOLD' || investorTier === 'PLATINUM';
+    const autoMatchEnabled = !!investorData.auto_invest_enabled;
+    const autoLiquidationEnabled = !!investorData.auto_liquidation_enabled;
 
     return (
-      <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center">
-        {/* Current Credit Limit */}
-        <div className="w-full max-w-sm bg-[#E9EFF6] rounded-2xl p-6 text-center mb-4 mt-2">
-          <h2 className="text-[#1E3A8A] text-lg font-medium mb-2">วงเงินปัจจุบัน</h2>
-          <div className="flex items-baseline justify-center gap-2">
-            <span className="text-3xl font-bold text-gray-800">
-              {currentLimit.toLocaleString()}
-            </span>
-            <span className="text-gray-400 text-sm font-light">
-              / {maxLimit.toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        {/* Profile & Stats Card */}
-        <div className="w-full max-w-sm bg-[#E9EFF6] rounded-3xl p-6 pt-8 pb-8 shadow-sm mb-6">
-          {/* Inner White Profile Card */}
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm mb-6">
-            <h1 className="text-xl font-bold text-gray-800 mb-2">
-              {investorData.firstname} {investorData.lastname}
-            </h1>
-            <p className="text-gray-400 text-sm font-light">
-              Member ID: {investorData.investor_id.slice(0, 8)}
-            </p>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-3 gap-2 text-center divide-x divide-[#D1D9E6]">
-            <div className="px-2">
-              <div className="text-2xl font-bold text-gray-700 mb-1">
-                {investorData.stats.totalContracts}
-              </div>
-              <div className="text-xs text-gray-600 font-medium">
-                สัญญาทั้งหมด
+      <div className="min-h-screen bg-[#F5F7FA] font-sans p-4 flex flex-col items-center pb-8">
+        <div className="w-full max-w-sm space-y-4">
+          {/* Tier Card */}
+          <button
+            onClick={() => setTierModalOpen(true)}
+            className="w-full rounded-3xl overflow-hidden shadow-sm border border-white/80 bg-white/70 active:scale-[0.99] transition-transform"
+          >
+            <div className="relative w-full h-28">
+              <Image
+                src={tierImage}
+                alt={`${TIER_LABELS[investorTier]} tier`}
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 flex items-end justify-between px-4 pb-3 text-white">
+                <div>
+                  <div className="text-sm opacity-80">Current tier</div>
+                  <div className="text-xl font-bold">{TIER_LABELS[investorTier]}</div>
+                </div>
+                <div className="text-right text-xs opacity-80">
+                  {autoMatchAllowed ? 'Auto matching available' : 'Auto matching locked'}
+                </div>
               </div>
             </div>
-            <div className="px-2">
-              <div className="text-2xl font-bold text-gray-700 mb-1">
-                {investorData.stats.activeContracts}
+          </button>
+
+          {/* Current Credit Limit */}
+          <div className="w-full bg-[#E9EFF6] rounded-2xl p-6 text-center">
+            <h2 className="text-[#1E3A8A] text-lg font-medium mb-2">วงเงินปัจจุบัน</h2>
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-3xl font-bold text-gray-800">
+                {currentLimit.toLocaleString()}
+              </span>
+              <span className="text-gray-400 text-sm font-light">
+                / {maxLimit.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Profile & Stats Card */}
+          <div className="w-full bg-[#E9EFF6] rounded-3xl p-6 pt-8 pb-6 shadow-sm">
+            {/* Inner White Profile Card */}
+            <div className="bg-white rounded-2xl p-6 text-center shadow-sm mb-6">
+              <h1 className="text-xl font-bold text-gray-800 mb-2">
+                {investorData.firstname} {investorData.lastname}
+              </h1>
+              <p className="text-gray-400 text-sm font-light">
+                Member ID: {investorData.investor_id.slice(0, 8)}
+              </p>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-3 gap-2 text-center divide-x divide-[#D1D9E6]">
+              <div className="px-2">
+                <div className="text-2xl font-bold text-gray-700 mb-1">
+                  {investorData.stats.totalContracts}
+                </div>
+                <div className="text-xs text-gray-600 font-medium">
+                  สัญญาทั้งหมด
+                </div>
               </div>
-              <div className="text-xs text-gray-600 font-medium">
-                สัญญายังไม่สิ้นสุด
+              <div className="px-2">
+                <div className="text-2xl font-bold text-gray-700 mb-1">
+                  {investorData.stats.activeContracts}
+                </div>
+                <div className="text-xs text-gray-600 font-medium">
+                  สัญญายังไม่สิ้นสุด
+                </div>
+              </div>
+              <div className="px-2">
+                <div className="text-2xl font-bold text-gray-700 mb-1">
+                  {investorData.stats.endedContracts}
+                </div>
+                <div className="text-xs text-gray-600 font-medium">
+                  สัญญาสิ้นสุดแล้ว
+                </div>
               </div>
             </div>
-            <div className="px-2">
-              <div className="text-2xl font-bold text-gray-700 mb-1">
-                {investorData.stats.endedContracts}
+
+            {/* Item Preferences Summary */}
+            <div className="mt-6 bg-white rounded-2xl p-4 border border-[#E1E7F2]">
+              <div className="text-center text-[#1E3A8A] font-semibold mb-3">Item preferences</div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {selectedCategories.length === 0 ? (
+                  <span className="text-xs text-gray-400">ยังไม่ได้ตั้งค่า</span>
+                ) : (
+                  selectedCategories.map((key) => (
+                    <span
+                      key={key}
+                      className="px-3 py-1 rounded-full text-xs font-medium bg-[#5D79B4] text-white"
+                    >
+                      {ITEM_TYPE_LABELS[key] || key}
+                    </span>
+                  ))
+                )}
               </div>
-              <div className="text-xs text-gray-600 font-medium">
-                สัญญาสิ้นสุดแล้ว
+              <div className="mt-4 space-y-2 text-xs text-gray-600">
+                <div className="flex items-center justify-between">
+                  <span>Auto matching</span>
+                  <span className={`px-2 py-0.5 rounded-full ${autoMatchAllowed ? (autoMatchEnabled ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-gray-100 text-gray-500') : 'bg-[#FEF3C7] text-[#92400E]'}`}>
+                    {autoMatchAllowed ? (autoMatchEnabled ? 'เปิดใช้งาน' : 'ปิด') : 'ยังไม่ปลดล็อก'}
+                  </span>
+                </div>
+                {!autoMatchAllowed && remainingToNext > 0 && (
+                  <div className="text-[10px] text-gray-400">
+                    ปล่อยสัญญาเพิ่มอีก {remainingToNext.toLocaleString()} บาท เพื่อปลดล็อก
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span>Liquidated by Pawnly</span>
+                  <span className={`px-2 py-0.5 rounded-full ${autoLiquidationEnabled ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-gray-100 text-gray-500'}`}>
+                    {autoLiquidationEnabled ? 'เปิดใช้งาน' : 'ปิด'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Adjust Credit Limit Button */}
-        <div className="w-full max-w-sm space-y-3">
+          {/* Action Buttons */}
+          <div className="space-y-3">
           <button
             onClick={() => router.push('/register-invest/credit-limit')}
             className="w-full bg-white border border-[#3B5BA5] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
-            <span className="text-base font-bold">ปรับวงเงิน</span>
-            <span className="text-[10px] opacity-80 font-light">Adjust the credit limit</span>
+            <span className="text-base font-bold">ตั้งค่าการลงทุน</span>
+            <span className="text-[10px] opacity-80 font-light">Investment settings</span>
           </button>
 
           <button
@@ -272,9 +397,57 @@ export default function InvestorRegister() {
             >
               <span className="text-base font-bold">ยืนยันตัวตน</span>
               <span className="text-[10px] opacity-80 font-light">Verify identity</span>
-            </button>
+              </button>
           )}
+          </div>
         </div>
+
+        {tierModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <div className="text-xs text-gray-400">Tier ของคุณ</div>
+                  <div className="text-xl font-bold text-gray-800">{TIER_LABELS[investorTier]}</div>
+                  <div className="text-sm text-[#1E3A8A] mt-1">
+                    {`${(monthlyRate * 100).toFixed(2)}% / เดือน • ${annualRate.toFixed(2)}% / ปี`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setTierModalOpen(false)}
+                  className="text-gray-400 text-sm"
+                >
+                  ปิด
+                </button>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <div className={`rounded-2xl border px-4 py-3 ${investorTier === 'SILVER' ? 'border-[#CBD6EA] bg-[#F5F7FA]' : 'border-gray-200'}`}>
+                  <div className="font-semibold text-gray-800">Silver</div>
+                  <div className="text-xs text-gray-500">เริ่มต้น • ผลตอบแทน 1.50%/เดือน (18%/ปี)</div>
+                  <div className="text-xs text-gray-500 mt-1">รับข้อเสนอจำนำทั่วไป</div>
+                </div>
+                <div className={`rounded-2xl border px-4 py-3 ${investorTier === 'GOLD' ? 'border-[#C9A33B] bg-[#FFF8E7]' : 'border-gray-200'}`}>
+                  <div className="font-semibold text-gray-800">Gold</div>
+                  <div className="text-xs text-gray-500">ยอดสัญญารวม ≥ 400,000 บาท</div>
+                  <div className="text-xs text-gray-500 mt-1">ผลตอบแทน 1.53%/เดือน (18.36%/ปี) + เปิดใช้ Auto matching</div>
+                </div>
+                <div className={`rounded-2xl border px-4 py-3 ${investorTier === 'PLATINUM' ? 'border-[#B4B4B4] bg-[#F7F7F7]' : 'border-gray-200'}`}>
+                  <div className="font-semibold text-gray-800">Platinum</div>
+                  <div className="text-xs text-gray-500">ยอดสัญญารวม ≥ 1,000,000 บาท</div>
+                  <div className="text-xs text-gray-500 mt-1">ผลตอบแทน 1.60%/เดือน (19.20%/ปี) • สิทธิ์สูงสุด</div>
+                </div>
+              </div>
+
+              {nextTier && (
+                <div className="mt-4 rounded-2xl bg-[#F1F5FB] px-4 py-3 text-xs text-gray-600">
+                  <div className="font-semibold text-gray-800 mb-1">Tier ถัดไป: {TIER_LABELS[nextTier]}</div>
+                  <div>เพิ่มยอดสัญญาอีก {remainingToNext.toLocaleString()} บาทเพื่อเลื่อนระดับ</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

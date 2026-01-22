@@ -105,6 +105,8 @@ CREATE TABLE investors (
 
   -- Investor Settings
   auto_invest_enabled BOOLEAN DEFAULT FALSE,
+  investment_preferences JSONB DEFAULT '{}'::jsonb,
+  auto_liquidation_enabled BOOLEAN DEFAULT FALSE,
   preferred_loan_types VARCHAR(50)[],
   min_investment_amount DECIMAL(12,2) DEFAULT 1000,
   max_investment_amount DECIMAL(12,2),
@@ -113,7 +115,8 @@ CREATE TABLE investors (
   is_active BOOLEAN DEFAULT TRUE,
   is_blocked BOOLEAN DEFAULT FALSE,
   blocked_reason TEXT,
-  investor_tier VARCHAR(20) DEFAULT 'STANDARD' CHECK (investor_tier IN ('STANDARD', 'PREMIUM', 'VIP')),
+  investor_tier VARCHAR(20) DEFAULT 'SILVER' CHECK (investor_tier IN ('SILVER', 'GOLD', 'PLATINUM')),
+  total_active_principal DECIMAL(12,2) DEFAULT 0,
 
   -- Timestamps
   created_at TIMESTAMP DEFAULT NOW(),
@@ -853,8 +856,9 @@ CREATE TABLE contracts (
   interest_amount DECIMAL(12,2) NOT NULL,
   total_amount DECIMAL(12,2) NOT NULL, -- principal + interest
 
-  platform_fee_rate DECIMAL(5,4) NOT NULL DEFAULT 0.50, -- 50% of interest (1.5% out of 3%)
+  platform_fee_rate DECIMAL(5,4) NOT NULL DEFAULT 0.01, -- 1% per month platform fee (fixed for full term)
   platform_fee_amount DECIMAL(12,2) NOT NULL,
+  investor_rate DECIMAL(6,5),
 
   -- Payment Status
   amount_paid DECIMAL(12,2) DEFAULT 0,

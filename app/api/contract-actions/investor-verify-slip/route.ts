@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { verifyPaymentSlip, saveSlipVerification, logContractAction } from '@/lib/services/slip-verification';
+import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 import { Client } from '@line/bot-sdk';
 
 // Pawner LINE OA client
@@ -24,8 +25,8 @@ const buildRenewedContractRecord = (params: {
   durationDays: number;
   signedContractUrl?: string | null;
 }) => {
-  const platformFeeRate = params.contract.platform_fee_rate ?? 0.5;
-  const platformFeeAmount = round2(params.interestAmount * platformFeeRate);
+  const platformFeeRate = params.contract.platform_fee_rate ?? 0.01;
+  const platformFeeAmount = round2(params.principalAmount * platformFeeRate * (params.durationDays / 30));
   const originalContractId = params.contract.original_contract_id || params.contract.contract_id;
 
   return {
@@ -42,9 +43,10 @@ const buildRenewedContractRecord = (params: {
     loan_principal_amount: params.principalAmount,
     interest_rate: params.contract.interest_rate,
     interest_amount: params.interestAmount,
-    total_amount: round2(params.principalAmount + params.interestAmount),
+    total_amount: round2(params.principalAmount + params.interestAmount + platformFeeAmount),
     platform_fee_rate: platformFeeRate,
     platform_fee_amount: platformFeeAmount,
+    investor_rate: params.contract.investor_rate,
     amount_paid: 0,
     interest_paid: 0,
     principal_paid: 0,
@@ -223,6 +225,14 @@ export async function POST(request: NextRequest) {
         .from('contract_action_requests')
         .update(updateData)
         .eq('request_id', requestId);
+
+      if (contract?.investor_id) {
+        try {
+          await refreshInvestorTierAndTotals(contract.investor_id);
+        } catch (refreshError) {
+          console.error('Error refreshing investor totals:', refreshError);
+        }
+      }
 
       // Log success
       await logContractAction(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
+import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 
 const pawnerLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -109,9 +110,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const interestEarned = Number(redemption.interest_amount) || 0;
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const startDate = new Date(redemption.contract?.contract_start_date || now);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(redemption.contract?.contract_end_date || now);
+    endDate.setHours(0, 0, 0, 0);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const rawDaysInContract = Number(redemption.contract?.contract_duration_days || 0)
+      || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
+    const daysInContract = Math.max(1, rawDaysInContract);
+    const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+    const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
+
+    const investorRate = Number(redemption.contract?.investor_rate || 0.015);
+    const principal = Number(redemption.contract?.loan_principal_amount || 0);
+    const interestEarned = Math.round(principal * investorRate * (daysElapsed / 30) * 100) / 100;
     const platformFee = Number(redemption.contract?.platform_fee_amount) || 0;
-    const netProfit = Math.max(0, interestEarned - platformFee);
+    const netProfit = Math.max(0, interestEarned);
     const now = new Date().toISOString();
 
     const { error: updateError } = await supabase
@@ -179,6 +195,14 @@ export async function POST(request: NextRequest) {
         });
       } catch (msgError) {
         console.error('Error sending to investor:', msgError);
+      }
+    }
+
+    if (redemption.contract?.investor_id) {
+      try {
+        await refreshInvestorTierAndTotals(redemption.contract.investor_id);
+      } catch (refreshError) {
+        console.error('Error refreshing investor totals:', refreshError);
       }
     }
 

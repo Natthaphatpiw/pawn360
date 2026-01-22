@@ -8,6 +8,8 @@ const pawnerLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET || ''
 });
 
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -33,7 +35,12 @@ export async function POST(request: NextRequest) {
           loan_principal_amount,
           interest_amount,
           total_amount,
+          contract_start_date,
+          contract_end_date,
+          contract_duration_days,
           platform_fee_rate,
+          platform_fee_amount,
+          investor_rate,
           investor_id,
           items:item_id (
             brand,
@@ -82,19 +89,31 @@ export async function POST(request: NextRequest) {
       })
       .eq('contract_id', redemption.contract_id);
 
-    // Calculate investor earnings (1.5% per month after platform fee)
-    const totalInterest = redemption.interest_amount || 0;
-    const platformFeeRate = typeof redemption.contract?.platform_fee_rate === 'number'
-      ? redemption.contract.platform_fee_rate
-      : 0.5;
-    const platformFee = totalInterest * platformFeeRate;
-    const investorNetProfit = totalInterest - platformFee; // Investor gets 1.5% per month
+    // Calculate investor earnings based on actual days (tier-based rate)
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const startDate = new Date(redemption.contract?.contract_start_date || new Date().toISOString());
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(redemption.contract?.contract_end_date || new Date().toISOString());
+    endDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const rawDaysInContract = Number(redemption.contract?.contract_duration_days || 0)
+      || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
+    const daysInContract = Math.max(1, rawDaysInContract);
+    const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
+    const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
+
+    const investorRate = Number(redemption.contract?.investor_rate || 0.015);
+    const principal = Number(redemption.contract?.loan_principal_amount || 0);
+    const interestEarned = round2(principal * investorRate * (daysElapsed / 30));
+    const platformFee = Number(redemption.contract?.platform_fee_amount) || 0;
+    const investorNetProfit = interestEarned;
 
     // Update redemption with earnings info
     await supabase
       .from('redemption_requests')
       .update({
-        investor_interest_earned: totalInterest,
+        investor_interest_earned: interestEarned,
         platform_fee_deducted: platformFee,
         investor_net_profit: investorNetProfit,
       })
