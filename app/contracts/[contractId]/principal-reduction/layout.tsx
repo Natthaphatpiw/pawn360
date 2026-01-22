@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'ลดเงินต้น - Pawn360',
+  title: 'ลดเงินต้น',
   description: 'ดำเนินการลดเงินต้นสัญญาจำนำ',
 };
 

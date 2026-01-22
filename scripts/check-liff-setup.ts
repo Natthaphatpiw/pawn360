@@ -23,7 +23,7 @@ requiredEnvVars.forEach(envVar => {
 });
 
 console.log('\n🔗 Expected LIFF URLs:');
-const baseUrl = 'https://pawn360.vercel.app';
+const baseUrl = 'https://pawnly.io';
 const liffMappings = [
   { path: '/register', env: 'NEXT_PUBLIC_LIFF_ID_REGISTER' },
   { path: '/pawn/new', env: 'NEXT_PUBLIC_LIFF_ID_PAWN' },
@@ -46,12 +46,12 @@ console.log('\n📝 Next Steps:');
 console.log('1. Go to LINE Developers Console → LIFF tab');
 console.log('2. Create new LIFF app for contract-agreement:');
 console.log('   - Name: Contract Agreement');
-console.log('   - Endpoint URL: https://pawn360.vercel.app/contract-agreement');
+console.log('   - Endpoint URL: https://pawnly.io/contract-agreement');
 console.log('   - Size: Full screen');
 console.log('   - Scopes: profile, chat_message.write');
 console.log('3. Create new LIFF app for pawner contract details:');
 console.log('   - Name: Pawner Contract Details');
-console.log('   - Endpoint URL: https://pawn360.vercel.app/pawner/contract');
+console.log('   - Endpoint URL: https://pawnly.io/pawner/contract');
 console.log('   - Size: Full screen');
 console.log('   - Scopes: profile, chat_message.write');
 console.log('4. Copy the LIFF IDs and add to environment variables');

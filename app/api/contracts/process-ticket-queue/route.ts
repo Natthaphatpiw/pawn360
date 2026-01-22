@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const results = [];
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawn360.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawnly.io';
 
     for (const item of queueItems) {
       try {

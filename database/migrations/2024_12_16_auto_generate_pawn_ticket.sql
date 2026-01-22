@@ -21,7 +21,7 @@ BEGIN
     -- Get webhook URL from environment or use default
     webhook_url := current_setting('app.webhook_url', true);
     IF webhook_url IS NULL THEN
-      webhook_url := 'https://pawn360.vercel.app/api/contracts/auto-generate-ticket';
+      webhook_url := 'https://pawnly.io/api/contracts/auto-generate-ticket';
     END IF;
 
     -- Prepare payload

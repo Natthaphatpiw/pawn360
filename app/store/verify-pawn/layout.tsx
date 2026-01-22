@@ -1,4 +1,9 @@
 import { LiffProvider } from '@/lib/liff/liff-provider';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'ตรวจสอบสินค้า',
+};
 
 export default function StoreVerifyLayout({
   children,

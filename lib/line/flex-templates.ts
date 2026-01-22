@@ -320,7 +320,7 @@ export function createPaymentSuccessFlexMessage(
           action: {
             type: 'uri',
             label: 'ดูรายละเอียดสัญญา',
-            uri: `https://pawn360.vercel.app/contracts`
+            uri: `https://pawnly.io/contracts`
           },
           style: 'link',
           height: 'sm'

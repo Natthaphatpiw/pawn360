@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
-  title: 'คำขอเพิ่มเงินต้น - Pawn360',
+  title: 'คำขอเพิ่มเงินต้น',
   description: 'อนุมัติหรือปฏิเสธคำขอเพิ่มเงินต้น',
 };
 

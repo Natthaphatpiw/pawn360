@@ -1,6 +1,11 @@
 import { LiffProvider } from '@/lib/liff/liff-provider';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'ตรวจสอบสินค้า',
+};
 
 export default function DropPointVerifyLayout({
   children,

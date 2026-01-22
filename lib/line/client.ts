@@ -568,7 +568,7 @@ export async function sendContractCompletionNotification(
               action: {
                 type: 'uri',
                 label: 'รายละเอียดสัญญา',
-                uri: `https://pawn360.vercel.app/contract-info/${itemId}`
+                uri: `https://pawnly.io/contract-info/${itemId}`
               },
               color: '#c2410c',
               flex: 1
@@ -920,7 +920,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
               action: {
                 type: 'uri',
                 label: 'ดูสัญญาและจัดการ',
-                uri: `https://pawn360.vercel.app/contracts`
+                uri: `https://pawnly.io/contracts`
               },
               style: 'primary',
               color: '#c2410c'
