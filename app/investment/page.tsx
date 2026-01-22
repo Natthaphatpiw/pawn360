@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 type ContractItem = {
   item_type?: string;
@@ -62,24 +64,34 @@ export default function InvestmentDashboard() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
 
   useEffect(() => {
     if (!profile?.userId) return;
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await axios.get(`/api/contracts/by-investor/${profile.userId}`);
-        setContracts(response.data.contracts || []);
-      } catch (fetchError: any) {
-        console.error('Error fetching investment data:', fetchError);
-        setError('ไม่สามารถโหลดข้อมูลได้');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    const session = getPinSession('INVESTOR', profile.userId);
+    if (session?.token) {
+      setPinVerified(true);
+      fetchData();
+    } else {
+      setPinVerified(false);
+      setPinModalOpen(true);
+      setLoading(false);
+    }
   }, [profile?.userId]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/contracts/by-investor/${profile?.userId}`);
+      setContracts(response.data.contracts || []);
+    } catch (fetchError: any) {
+      console.error('Error fetching investment data:', fetchError);
+      setError('ไม่สามารถโหลดข้อมูลได้');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const analytics = useMemo(() => {
     const allCounts: Record<string, number> = {
@@ -234,6 +246,40 @@ export default function InvestmentDashboard() {
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!pinVerified) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
+          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+          <p className="text-sm text-gray-500 mt-2">
+            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการจำนำของคุณ
+          </p>
+          <button
+            type="button"
+            onClick={() => setPinModalOpen(true)}
+            className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white"
+          >
+            ยืนยัน PIN
+          </button>
+        </div>
+
+        {profile?.userId && (
+          <PinModal
+            open={pinModalOpen}
+            role="INVESTOR"
+            lineId={profile.userId}
+            onClose={() => setPinModalOpen(false)}
+            onVerified={() => {
+              setPinVerified(true);
+              setPinModalOpen(false);
+              fetchData();
+            }}
+          />
+        )}
       </div>
     );
   }
