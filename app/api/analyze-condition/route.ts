@@ -11,7 +11,7 @@ const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GE
 const PRECHECK_MODEL = 'gpt-4.1-mini';
 const GEMINI_MODEL = 'gemini-3-flash-preview';
 const MAX_IMAGE_COUNT = 6;
-const MAX_TOTAL_IMAGE_MB = 5;
+const MAX_TOTAL_IMAGE_MB = 10;
 
 function getResponseText(response: any): string {
   if (typeof response?.output_text === 'string') {
