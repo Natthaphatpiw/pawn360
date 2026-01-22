@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Pawnly",
   description: "Pawnly",
+  icons: {
+    icon: "/landing/picon2.png",
+  },
 };
 
 export default function RootLayout({
