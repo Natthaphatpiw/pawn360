@@ -11,6 +11,7 @@ const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GE
 const PRECHECK_MODEL = 'gpt-4.1-mini';
 const GEMINI_MODEL = 'gemini-3-flash-preview';
 const MAX_IMAGE_COUNT = 6;
+const MAX_TOTAL_IMAGE_MB = 5;
 
 function getResponseText(response: any): string {
   if (typeof response?.output_text === 'string') {
@@ -449,33 +450,19 @@ function isAssessmentInsufficient(result: ConditionResult): boolean {
 }
 // Helper function to estimate base64 image size in bytes
 function estimateBase64Size(base64String: string): number {
+  if (!base64String || typeof base64String !== 'string') return 0;
+  if (base64String.startsWith('http://') || base64String.startsWith('https://')) return 0;
   // Remove data URL prefix if present
   const base64Data = base64String.includes(',') ? base64String.split(',')[1] : base64String;
   // Base64 string length * 0.75 gives approximate size in bytes (accounting for padding)
   return Math.ceil(base64Data.length * 0.75);
 }
 
-// Helper function to reduce image quality by truncating base64 data
-function reduceImageQuality(base64Image: string, targetSizeKB: number = 500): string {
-  const targetBytes = targetSizeKB * 1024;
-  const currentSize = estimateBase64Size(base64Image);
-
-  if (currentSize <= targetBytes) {
-    return base64Image;
-  }
-
-  // Calculate reduction ratio
-  const ratio = targetBytes / currentSize;
-  const [prefix, base64Data] = base64Image.includes(',') ? base64Image.split(',') : ['', base64Image];
-
-  // Truncate base64 data
-  const newLength = Math.floor(base64Data.length * ratio);
-  const safeLength = newLength - (newLength % 4);
-  const reducedData = base64Data.substring(0, safeLength);
-  const padding = '='.repeat((4 - (reducedData.length % 4)) % 4);
-  const payload = `${reducedData}${padding}`;
-
-  return prefix ? `${prefix},${payload}` : payload;
+function normalizeImageInput(value: string): string {
+  if (!value || typeof value !== 'string') return '';
+  if (value.startsWith('data:')) return value;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  return `data:image/jpeg;base64,${value}`;
 }
 
 // Configure route to accept larger payloads
@@ -507,32 +494,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาเลือกประเภทสินค้าให้ถูกต้อง' }, { status: 400 });
     }
 
-    // 🔥 Check if images are too large and need compression
-    const originalTotalSize = images.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
+    // Normalize image payloads for OpenAI/Gemini (data URL or https)
+    const normalizedImages = images.map((img: string) => normalizeImageInput(img)).filter(Boolean);
+
+    // Check total payload size to avoid invalid/truncated images
+    const originalTotalSize = normalizedImages.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
     const originalSizeMB = originalTotalSize / (1024 * 1024);
 
-    console.log(`📊 Original images size: ${originalSizeMB.toFixed(2)}MB (${images.length} images)`);
+    console.log(`📊 Original images size: ${originalSizeMB.toFixed(2)}MB (${normalizedImages.length} images)`);
 
-    // Target: 2.5MB total for safety margin (including JSON overhead)
-    const targetSizePerImage = Math.floor(2500 / images.length);
-    let imagesWereCompressed = false;
+    if (originalSizeMB > MAX_TOTAL_IMAGE_MB) {
+      return NextResponse.json(
+        { error: 'รูปภาพมีขนาดใหญ่เกินไป กรุณาถ่ายใหม่หรือบีบอัดให้เล็กลงก่อนอัปโหลด' },
+        { status: 413 }
+      );
+    }
 
-    const processedImages = images.map((img: string) => {
-      const originalSize = estimateBase64Size(img) / 1024;
-      const compressed = reduceImageQuality(img, targetSizePerImage);
-      const compressedSize = estimateBase64Size(compressed) / 1024;
+    const processedImages = normalizedImages;
 
-      if (compressedSize < originalSize * 0.9) { // If reduced by more than 10%
-        imagesWereCompressed = true;
-      }
-
-      return compressed;
-    });
-
-    const totalSize = processedImages.reduce((sum: number, img: string) => sum + estimateBase64Size(img), 0);
-    const totalSizeMB = totalSize / (1024 * 1024);
-
-    console.log(`✅ Processed size: ${totalSizeMB.toFixed(2)}MB${imagesWereCompressed ? ' (compressed)' : ''}`);
+    console.log(`✅ Processed size: ${originalSizeMB.toFixed(2)}MB`);
 
     console.log('🔍 Prechecking images with OpenAI...');
     const precheck = await precheckImages({
@@ -574,10 +554,6 @@ export async function POST(request: NextRequest) {
     const result: any = {
       ...conditionResult
     };
-
-    if (imagesWereCompressed) {
-      result.warning = 'รูปภาพของคุณมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถวิเคราะห์ได้ กรุณาถ่ายรูปที่มีขนาดเล็กกว่านี้เพื่อผลลัพธ์ที่ดีขึ้น';
-    }
 
     return NextResponse.json(result);
   } catch (error) {
