@@ -1,5 +1,3 @@
-'use client';
-
 import { LiffProvider } from '@/lib/liff/liff-provider';
 import type { Metadata } from 'next';
 
