@@ -8,12 +8,30 @@ import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 
+const INVESTOR_TIER_THRESHOLDS = {
+  GOLD: 400_000,
+  PLATINUM: 1_000_000,
+};
+
+const INVESTOR_TIER_RATES = {
+  SILVER: 0.015,
+  GOLD: 0.0153,
+  PLATINUM: 0.016,
+};
+
+const resolveInvestorTier = (total: number) => {
+  if (total >= INVESTOR_TIER_THRESHOLDS.PLATINUM) return 'PLATINUM';
+  if (total >= INVESTOR_TIER_THRESHOLDS.GOLD) return 'GOLD';
+  return 'SILVER';
+};
+
 function OfferDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useLiff();
 
   const [contract, setContract] = useState<any>(null);
+  const [investor, setInvestor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +84,7 @@ function OfferDetailContent() {
     try {
       const response = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
       const status = response.data.investor?.kyc_status;
+      setInvestor(response.data.investor);
       if (status !== 'VERIFIED') {
         router.replace('/ekyc-invest');
         return;
@@ -221,18 +240,27 @@ function OfferDetailContent() {
     </div>
   );
 
-  const totalInterest = Number(contract.interest_amount) || 0;
+  const interestAmount = Number(contract.interest_amount) || 0;
   const platformFeeRate = typeof contract.platform_fee_rate === 'number'
     ? contract.platform_fee_rate
-    : 0.5;
-  const investorShare = Math.max(0, 1 - platformFeeRate);
-  const investorInterest = Math.round(totalInterest * investorShare * 100) / 100;
-  const platformFee = Math.round(totalInterest * platformFeeRate * 100) / 100;
+    : 0.01;
   const interestRatePercent = typeof contract.interest_rate === 'number'
     ? contract.interest_rate * 100
     : 0;
-  const investorRatePercent = interestRatePercent * investorShare;
-  const platformRatePercent = interestRatePercent * platformFeeRate;
+  const feeRatePercent = platformFeeRate * 100;
+  const principal = Number(contract.loan_principal_amount || 0);
+  const durationDays = Number(contract.contract_duration_days || 0);
+  const platformFeeRaw = Number(contract.platform_fee_amount);
+  const platformFeeAmount = Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
+    ? platformFeeRaw
+    : Math.round(principal * platformFeeRate * (durationDays / 30) * 100) / 100;
+  const currentTotal = Number(investor?.total_active_principal || 0);
+  const projectedTier = resolveInvestorTier(currentTotal + principal);
+  const investorRate = typeof contract.investor_rate === 'number'
+    ? contract.investor_rate
+    : INVESTOR_TIER_RATES[projectedTier];
+  const investorRatePercent = investorRate * 100;
+  const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 
   return (
     <div className="min-h-screen bg-white font-sans p-4 pb-10 flex flex-col items-center">
@@ -272,12 +300,12 @@ function OfferDetailContent() {
             label="ดอกเบี้ย"
             value={(
               <div className="text-right">
-                <div>{`${interestRatePercent.toFixed(1)}% | ${totalInterest.toLocaleString()}`}</div>
+                <div>{`${interestRatePercent.toFixed(1)}% | ${interestAmount.toLocaleString()}`}</div>
                 <div className="text-xs text-gray-500">
-                  นักลงทุน {investorRatePercent.toFixed(1)}% {investorInterest.toLocaleString()}
+                  นักลงทุน {investorRatePercent.toFixed(2)}% {investorInterest.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-500">
-                  ค่าธรรมเนียมระบบ {platformRatePercent.toFixed(1)}% {platformFee.toLocaleString()}
+                  ค่าธรรมเนียมระบบ {feeRatePercent.toFixed(1)}% {platformFeeAmount.toLocaleString()}
                 </div>
               </div>
             )}

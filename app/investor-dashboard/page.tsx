@@ -115,15 +115,13 @@ function InvestorDashboardContent() {
           myContracts.map((contract) => {
             const badge = getStatusBadge(contract.contract_status);
             const daysRemaining = getDaysRemaining(contract.contract_end_date);
-            const totalInterest = Number(contract.interest_amount) || 0;
-            const platformFeeRate = typeof contract.platform_fee_rate === 'number'
-              ? contract.platform_fee_rate
-              : 0.5;
-            const investorShare = Math.max(0, 1 - platformFeeRate);
-            const investorInterest = Math.round(totalInterest * investorShare * 100) / 100;
-            const investorRate = typeof contract.interest_rate === 'number'
-              ? contract.interest_rate * investorShare * 100
-              : 0;
+            const principal = Number(contract.loan_principal_amount || 0);
+            const durationDays = Number(contract.contract_duration_days || 0);
+            const investorRate = typeof contract.investor_rate === 'number'
+              ? contract.investor_rate
+              : 0.015;
+            const investorRatePercent = investorRate * 100;
+            const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 
             return (
               <div
@@ -151,7 +149,7 @@ function InvestorDashboardContent() {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500 text-xs">ดอกเบี้ยรับ:</span>
                     <span className="font-bold text-[#1E3A8A]">
-                      +{investorInterest.toLocaleString()} บาท ({investorRate.toFixed(1)}%)
+                      +{investorInterest.toLocaleString()} บาท ({investorRatePercent.toFixed(2)}%)
                     </span>
                   </div>
                   <div className="flex justify-between text-sm pt-1">

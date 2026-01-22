@@ -316,13 +316,8 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
   const pawner = contract?.pawners;
   const increaseAmount = Number(actionRequest.increase_amount || 0);
   const newPrincipal = actionRequest.principal_after_increase;
-  const rawInterestRate = Number(contract?.interest_rate || 0);
-  const normalizedInterestRate = rawInterestRate > 1 ? rawInterestRate / 100 : rawInterestRate;
-  const platformFeeRate = typeof contract?.platform_fee_rate === 'number'
-    ? contract.platform_fee_rate
-    : 0.5;
-  const investorShare = Math.max(0, 1 - platformFeeRate);
-  const additionalMonthlyInterest = Math.round(increaseAmount * normalizedInterestRate * investorShare * 100) / 100;
+  const investorRate = Number(contract?.investor_rate || 0.015);
+  const additionalMonthlyInterest = Math.round(increaseAmount * investorRate * 100) / 100;
   const formatAmount = (value: number) => (
     value % 1
       ? value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
+import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 
 // Investor LINE OA client
 const investorLineClient = new Client({
@@ -189,6 +190,14 @@ export async function POST(request: NextRequest) {
           type: 'text',
           text: `สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nสัญญานี้ถูกยกเลิก`
         });
+      }
+
+      if (contract.investor_id) {
+        try {
+          await refreshInvestorTierAndTotals(contract.investor_id);
+        } catch (refreshError) {
+          console.error('Error refreshing investor totals:', refreshError);
+        }
       }
     }
 

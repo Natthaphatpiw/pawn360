@@ -16,10 +16,12 @@ type Contract = {
   contract_status?: string;
   contract_start_date?: string;
   contract_end_date?: string;
+  completed_at?: string;
   contract_duration_days?: number;
   loan_principal_amount?: number;
   interest_amount?: number;
   platform_fee_rate?: number;
+  investor_rate?: number;
   items?: ContractItem;
 };
 
@@ -52,6 +54,8 @@ const formatCurrency = (value: number) => value.toLocaleString('en-US', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0
 });
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
 
 export default function InvestmentDashboard() {
   const { profile, isLoading: liffLoading } = useLiff();
@@ -92,14 +96,35 @@ export default function InvestmentDashboard() {
     };
 
     const now = new Date();
+    const msPerDay = 1000 * 60 * 60 * 24;
     let currentValue = 0;
     let currentProfit = 0;
     let accumulatedProfit = 0;
 
+    const getTiming = (contract: Contract, referenceDate: Date) => {
+      if (!contract.contract_start_date) {
+        return { daysInContract: 0, daysElapsed: 0 };
+      }
+
+      const startDate = new Date(contract.contract_start_date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = contract.contract_end_date ? new Date(contract.contract_end_date) : null;
+      endDate?.setHours(0, 0, 0, 0);
+      const ref = new Date(referenceDate);
+      ref.setHours(0, 0, 0, 0);
+
+      const rawDaysInContract = Number(contract.contract_duration_days || 0)
+        || (endDate ? Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay) : 0);
+      const daysInContract = Math.max(1, rawDaysInContract);
+      const rawDaysElapsed = Math.floor((ref.getTime() - startDate.getTime()) / msPerDay) + 1;
+      const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
+
+      return { daysInContract, daysElapsed };
+    };
+
     const notifications = contracts.map((contract) => {
       const endDate = contract.contract_end_date ? new Date(contract.contract_end_date) : null;
       const startDate = contract.contract_start_date ? new Date(contract.contract_start_date) : null;
-      const totalDays = contract.contract_duration_days || 0;
 
       const daysRemaining = endDate
         ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -119,17 +144,15 @@ export default function InvestmentDashboard() {
       }
 
       let unrealized = 0;
-      if (startDate && totalDays > 0) {
-        const elapsedDays = Math.min(
-          totalDays,
-          Math.max(0, Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
-        );
-        const interest = Number(contract.interest_amount) || 0;
-        const platformFeeRate = typeof contract.platform_fee_rate === 'number'
-          ? contract.platform_fee_rate
-          : 0.5;
-        const investorInterest = interest * (1 - platformFeeRate);
-        unrealized = Math.round((investorInterest * (elapsedDays / totalDays)) * 100) / 100;
+      if (startDate) {
+        const { daysInContract, daysElapsed } = getTiming(contract, now);
+        if (daysInContract > 0) {
+          const principal = Number(contract.loan_principal_amount) || 0;
+          const investorRate = typeof contract.investor_rate === 'number'
+            ? contract.investor_rate
+            : 0.015;
+          unrealized = round2(principal * investorRate * (daysElapsed / 30));
+        }
       }
 
       return {
@@ -151,11 +174,15 @@ export default function InvestmentDashboard() {
         currentValue += Number(contract.loan_principal_amount) || 0;
       }
 
-      const interestAmount = Number(contract.interest_amount) || 0;
-      const platformFeeRate = typeof contract.platform_fee_rate === 'number'
-        ? contract.platform_fee_rate
-        : 0.5;
-      const investorInterest = interestAmount * (1 - platformFeeRate);
+      const principal = Number(contract.loan_principal_amount) || 0;
+      const investorRate = typeof contract.investor_rate === 'number'
+        ? contract.investor_rate
+        : 0.015;
+      const referenceDate = isEnded && contract.completed_at
+        ? new Date(contract.completed_at)
+        : now;
+      const { daysElapsed } = getTiming(contract, referenceDate);
+      const investorInterest = round2(principal * investorRate * (daysElapsed / 30));
       if (isEnded) {
         accumulatedProfit += investorInterest;
       } else {

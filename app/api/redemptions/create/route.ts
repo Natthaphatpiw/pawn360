@@ -103,9 +103,8 @@ export async function POST(request: NextRequest) {
 
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = 0.01;
-    const interestRateForAccrual = Math.max(0, monthlyInterestRate - feeRate);
-    const dailyInterestRate = interestRateForAccrual / 30;
+    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const dailyInterestRate = monthlyInterestRate / 30;
 
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
     const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;

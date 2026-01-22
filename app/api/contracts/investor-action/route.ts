@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
+import { getInvestorRateForTier, resolveInvestorTier } from '@/lib/services/investor-tier';
 
 const investorLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     // Get investor ID from LINE ID
     const { data: investor, error: investorError } = await supabase
       .from('investors')
-      .select('investor_id, kyc_status')
+      .select('investor_id, kyc_status, investor_tier, total_active_principal')
       .eq('line_id', lineId)
       .single();
 
@@ -109,6 +110,11 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const currentTotal = Number(investor.total_active_principal || 0);
+      const projectedTotal = currentTotal + Number(contract.loan_principal_amount || 0);
+      const projectedTier = resolveInvestorTier(projectedTotal);
+      const investorRate = getInvestorRateForTier(projectedTier);
+
       // Update contract with investor (guard against stale/closed contracts)
       const { data: updatedContracts, error: updateError } = await supabase
         .from('contracts')
@@ -116,7 +122,8 @@ export async function POST(request: NextRequest) {
           investor_id: investorId,
           contract_status: 'ACTIVE',
           funding_status: 'FUNDED',
-          funded_at: new Date().toISOString()
+          funded_at: new Date().toISOString(),
+          investor_rate: investorRate
         })
         .eq('contract_id', contractId)
         .is('investor_id', null)
@@ -138,6 +145,15 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
+
+      await supabase
+        .from('investors')
+        .update({
+          total_active_principal: projectedTotal,
+          investor_tier: projectedTier,
+          updated_at: new Date().toISOString()
+        })
+        .eq('investor_id', investorId);
 
       // Update loan request
       const { error: loanRequestError } = await supabase

@@ -251,8 +251,8 @@ export async function GET(
 
     const rawRate = Number(contract.interest_rate || 0);
     const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = 0.01;
-    const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
+    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const interestRatePawner = totalMonthlyRate;
     const durationMonths = (contract.contract_duration_days || 0) / 30;
     const principalBase = contract.original_principal_amount || contract.loan_principal_amount || 0;
     const interestOnly = Math.round(principalBase * interestRatePawner * durationMonths * 100) / 100;

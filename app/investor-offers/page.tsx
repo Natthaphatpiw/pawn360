@@ -6,6 +6,23 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { Search, ArrowLeft } from 'lucide-react';
 
+const INVESTOR_TIER_THRESHOLDS = {
+  GOLD: 400_000,
+  PLATINUM: 1_000_000,
+};
+
+const INVESTOR_TIER_RATES = {
+  SILVER: 0.015,
+  GOLD: 0.0153,
+  PLATINUM: 0.016,
+};
+
+const resolveInvestorTier = (total: number) => {
+  if (total >= INVESTOR_TIER_THRESHOLDS.PLATINUM) return 'PLATINUM';
+  if (total >= INVESTOR_TIER_THRESHOLDS.GOLD) return 'GOLD';
+  return 'SILVER';
+};
+
 function InvestorOffersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,13 +105,14 @@ function InvestorOffersContent() {
           </div>
         ) : (
           marketOffers.map((offer) => {
-            const platformFeeRate = typeof offer.platform_fee_rate === 'number'
-              ? offer.platform_fee_rate
-              : 0.5;
-            const investorShare = Math.max(0, 1 - platformFeeRate);
-            const interestRatePercent = (offer.interest_rate || 0) * 100;
-            const investorRatePercent = interestRatePercent * investorShare;
-            const investorInterestAmount = (offer.interest_amount || 0) * investorShare;
+            const principal = Number(offer.loan_principal_amount || 0);
+            const durationDays = Number(offer.contract_duration_days || 0);
+            const currentTotal = Number(investor?.total_active_principal || 0);
+            const projectedTotal = currentTotal + principal;
+            const projectedTier = resolveInvestorTier(projectedTotal);
+            const investorRate = INVESTOR_TIER_RATES[projectedTier];
+            const investorRatePercent = investorRate * 100;
+            const investorInterestAmount = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 
             const handleViewOffer = () => {
               if (kycStatus !== 'VERIFIED') {
@@ -135,7 +153,7 @@ function InvestorOffersContent() {
                 <div className="grid grid-cols-2 gap-2 mt-2 bg-[#F8FAFC] p-3 rounded-xl">
                   <div>
                     <div className="text-[10px] text-gray-400">ดอกเบี้ย/เดือน</div>
-                    <div className="text-sm font-bold text-gray-700">{investorRatePercent.toFixed(1)}%</div>
+                    <div className="text-sm font-bold text-gray-700">{investorRatePercent.toFixed(2)}%</div>
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] text-gray-400">ดอกเบี้ยที่ได้รับ</div>
