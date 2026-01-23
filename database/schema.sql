@@ -391,6 +391,27 @@ CREATE TABLE item_valuations (
 
 CREATE INDEX idx_item_valuations_item_id ON item_valuations(item_id);
 
+-- Table: manual_estimate_requests (คำขอประเมินราคาแบบแมนนวล)
+CREATE TABLE manual_estimate_requests (
+  request_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  line_id VARCHAR(255) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING', 'COMPLETED', 'CANCELLED')),
+  item_data JSONB NOT NULL,
+  image_urls TEXT[] NOT NULL,
+  estimated_price DECIMAL(12,2),
+  condition_score DECIMAL(5,2),
+  condition_note TEXT,
+  admin_line_id VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  completed_at TIMESTAMP
+);
+
+CREATE INDEX idx_manual_estimate_requests_line_id ON manual_estimate_requests(line_id);
+CREATE INDEX idx_manual_estimate_requests_status ON manual_estimate_requests(status);
+CREATE INDEX idx_manual_estimate_requests_created_at ON manual_estimate_requests(created_at);
+
 -- =====================================================
 -- 4. LOAN REQUESTS & OFFERS
 -- =====================================================

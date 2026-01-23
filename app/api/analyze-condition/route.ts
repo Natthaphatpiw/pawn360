@@ -2,16 +2,106 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null;
+const collectEnvKeys = (values: Array<string | undefined>) => (
+  values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+);
 
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+const OPENAI_KEYS = collectEnvKeys([
+  process.env.OPENAI_API_KEY,
+  process.env.OPENAI_API_KEY_2,
+  process.env.OPENAI_API_KEY_3,
+  process.env.OPENAI_API_KEY_4,
+]);
+
+const GEMINI_KEYS = collectEnvKeys([
+  process.env.GEMINI_API_KEY,
+  process.env.GEMINI_API_KEY_2,
+  process.env.GEMINI_API_KEY_3,
+  process.env.GEMINI_API_KEY_4,
+]);
+
+const openaiClients = OPENAI_KEYS.map((apiKey) => new OpenAI({ apiKey }));
+const geminiClients = GEMINI_KEYS.map((apiKey) => new GoogleGenerativeAI(apiKey));
 
 const PRECHECK_MODEL = 'gpt-4.1-mini';
 const GEMINI_MODEL = 'gemini-3-flash-preview';
 const MAX_IMAGE_COUNT = 6;
 const MAX_TOTAL_IMAGE_MB = 10;
+const MIN_AI_CONDITION_SCORE = 0.3;
+
+const hasOpenAIKeys = () => openaiClients.length > 0;
+const hasGeminiKeys = () => geminiClients.length > 0;
+
+const isOpenAIRateLimitError = (error: any): boolean => {
+  const status = error?.status ?? error?.response?.status;
+  if (status === 429) return true;
+  const code = `${error?.code || error?.error?.code || ''}`.toLowerCase();
+  const message = `${error?.message || ''} ${error?.error?.message || ''}`.toLowerCase();
+  return (
+    code.includes('rate_limit') ||
+    code.includes('insufficient_quota') ||
+    message.includes('rate limit') ||
+    message.includes('insufficient quota') ||
+    message.includes('quota') ||
+    message.includes('429')
+  );
+};
+
+const isGeminiRateLimitError = (error: any): boolean => {
+  const status = error?.status ?? error?.response?.status;
+  if (status === 429) return true;
+  const message = `${error?.message || ''}`.toLowerCase();
+  return (
+    message.includes('resource has been exhausted') ||
+    message.includes('quota') ||
+    message.includes('rate limit') ||
+    message.includes('429')
+  );
+};
+
+async function runWithOpenAIFallback<T>(task: (client: OpenAI) => Promise<T>): Promise<T> {
+  if (!hasOpenAIKeys()) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+  let lastError: any;
+  for (let i = 0; i < openaiClients.length; i++) {
+    const client = openaiClients[i];
+    try {
+      return await task(client);
+    } catch (error) {
+      lastError = error;
+      if (isOpenAIRateLimitError(error) && i < openaiClients.length - 1) {
+        console.warn(`⚠️ OpenAI rate limit hit. Switching to fallback key ${i + 2}.`);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
+async function runWithGeminiFallback<T>(task: (client: GoogleGenerativeAI) => Promise<T>): Promise<T> {
+  if (!hasGeminiKeys()) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  let lastError: any;
+  for (let i = 0; i < geminiClients.length; i++) {
+    const client = geminiClients[i];
+    try {
+      return await task(client);
+    } catch (error) {
+      lastError = error;
+      if (isGeminiRateLimitError(error) && i < geminiClients.length - 1) {
+        console.warn(`⚠️ Gemini rate limit hit. Switching to fallback key ${i + 2}.`);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
 
 function getResponseText(response: any): string {
   if (typeof response?.output_text === 'string') {
@@ -223,7 +313,7 @@ async function precheckImages(options: {
   model?: string;
   appleCategory?: string;
 }): Promise<ImagePrecheckResult> {
-  if (!openai) {
+  if (!hasOpenAIKeys()) {
     throw new Error('OPENAI_API_KEY is not configured');
   }
 
@@ -275,7 +365,7 @@ expectedType: ${expectedType}
     });
   }
 
-  const response = await openai.responses.create({
+  const response = await runWithOpenAIFallback((client) => client.responses.create({
     model: PRECHECK_MODEL,
     input,
     max_output_tokens: 400,
@@ -313,7 +403,7 @@ expectedType: ${expectedType}
         },
       },
     },
-  });
+  }));
 
   const content = getResponseText(response);
   const parsed = parseJsonFromText<ImagePrecheckResult>(content);
@@ -349,16 +439,9 @@ async function analyzeConditionWithGemini(
     appleCategory?: string;
   }
 ): Promise<ConditionResult> {
-  if (!genAI) {
+  if (!hasGeminiKeys()) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
-
-  const model = genAI.getGenerativeModel({
-    model: GEMINI_MODEL,
-    generationConfig: {
-      responseMimeType: 'application/json',
-    },
-  });
 
   const parts: any[] = [{ text: buildConditionPrompt(options) }];
   const maxImages = Math.min(images.length, MAX_IMAGE_COUNT);
@@ -366,9 +449,17 @@ async function analyzeConditionWithGemini(
     parts.push(toGeminiImagePart(images[i]));
   }
 
-  const result = await model.generateContent(parts);
-  const response = await result.response;
-  const content = response.text();
+  const content = await runWithGeminiFallback(async (client) => {
+    const model = client.getGenerativeModel({
+      model: GEMINI_MODEL,
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    });
+    const result = await model.generateContent(parts);
+    const response = await result.response;
+    return response.text();
+  });
   const parsed = parseJsonFromText<ConditionResult>(content);
 
   if (!parsed) {
@@ -448,6 +539,18 @@ function isAssessmentInsufficient(result: ConditionResult): boolean {
 
   return false;
 }
+
+function isConditionScoreSuspicious(result: ConditionResult): boolean {
+  const totalScore = Number(result.totalScore ?? 0);
+  const score = Number(result.score ?? 0);
+  if (Number.isFinite(totalScore) && totalScore >= 0 && totalScore <= MIN_AI_CONDITION_SCORE * 100) {
+    return true;
+  }
+  if (Number.isFinite(score) && score >= 0 && score <= MIN_AI_CONDITION_SCORE) {
+    return true;
+  }
+  return false;
+}
 // Helper function to estimate base64 image size in bytes
 function estimateBase64Size(base64String: string): number {
   if (!base64String || typeof base64String !== 'string') return 0;
@@ -471,13 +574,13 @@ export const dynamic = 'force-dynamic'; // Always run dynamically
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!hasOpenAIKeys()) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 500 }
       );
     }
-    if (!process.env.GEMINI_API_KEY) {
+    if (!hasGeminiKeys()) {
       return NextResponse.json(
         { error: 'Gemini API key not configured' },
         { status: 500 }
@@ -544,6 +647,13 @@ export async function POST(request: NextRequest) {
     if (isAssessmentInsufficient(conditionResult)) {
       const recommendation = conditionResult.recommendation ? `คำแนะนำ: ${conditionResult.recommendation}` : '';
       const errorMessage = `ไม่สามารถประเมินสภาพได้: ${conditionResult.reason}${recommendation ? `\n${recommendation}` : ''}`;
+      return NextResponse.json(
+        { error: errorMessage, details: conditionResult },
+        { status: 400 }
+      );
+    }
+    if (isConditionScoreSuspicious(conditionResult)) {
+      const errorMessage = 'ไม่สามารถประเมินสภาพได้: คะแนนสภาพต่ำผิดปกติ กรุณาถ่ายรูปหรืออัปโหลดรูปใหม่อีกครั้ง';
       return NextResponse.json(
         { error: errorMessage, details: conditionResult },
         { status: 400 }

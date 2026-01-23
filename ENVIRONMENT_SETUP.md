@@ -5,6 +5,15 @@ Copy these variables to your `.env.local` file:
 ```bash
 # OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_API_KEY_2=your_openai_api_key_backup_2
+OPENAI_API_KEY_3=your_openai_api_key_backup_3
+OPENAI_API_KEY_4=your_openai_api_key_backup_4
+
+# Gemini Configuration
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_API_KEY_2=your_gemini_api_key_backup_2
+GEMINI_API_KEY_3=your_gemini_api_key_backup_3
+GEMINI_API_KEY_4=your_gemini_api_key_backup_4
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID=your_aws_access_key
@@ -18,6 +27,14 @@ MONGODB_DB=pawn
 # LINE Channel Configuration (ตามที่ตั้งค่าใน Vercel)
 LINE_CHANNEL_ACCESS_TOKEN=<REDACTED>
 LINE_CHANNEL_SECRET=<REDACTED>
+
+# Manual Estimate (Admin OA)
+MANUAL_ESTIMATE_ENABLED=true
+LINE_ADMIN_CHANNEL_ACCESS_TOKEN=<REDACTED>
+LINE_ADMIN_CHANNEL_SECRET=<REDACTED>
+# Optional: comma-separated admin LINE IDs for push/multicast (fallback uses broadcast)
+LINE_ADMIN_TARGET_IDS=Uxxxxxxxxxxxx,Uyyyyyyyyyyyy
+NEXT_PUBLIC_LIFF_ID_ADMIN_ESTIMATE=2008954664-Wan1WlHX
 
 # LINE LIFF Configuration
 # สำหรับ estimate page

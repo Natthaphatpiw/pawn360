@@ -412,7 +412,11 @@ function EstimatePageInner() {
     detail: string;
   } | null>(null);
   const [isCanceling, setIsCanceling] = useState(false);
+  const [manualEstimateEnabled, setManualEstimateEnabled] = useState(false);
+  const [manualConfigLoaded, setManualConfigLoaded] = useState(false);
+  const [manualRequestId, setManualRequestId] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const manualPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const appleModels = formData.appleCategory ? (APPLE_MODELS_BY_CATEGORY[formData.appleCategory] || []) : [];
 
@@ -457,7 +461,9 @@ function EstimatePageInner() {
     setIsEstimating(false);
     setProcessingStatus(null);
     setIsCanceling(false);
+    setManualRequestId(null);
     abortControllerRef.current = null;
+    clearManualPolling();
   };
 
   const isProcessing = isAnalyzing || isEstimating;
@@ -470,13 +476,20 @@ function EstimatePageInner() {
     });
   };
 
+  const clearManualPolling = () => {
+    if (manualPollTimeoutRef.current) {
+      clearTimeout(manualPollTimeoutRef.current);
+      manualPollTimeoutRef.current = null;
+    }
+  };
+
   const ensureNotCanceled = (signal?: AbortSignal) => {
     if (signal?.aborted) {
       throw new DOMException('Aborted', 'AbortError');
     }
   };
 
-  const handleCancelProcessing = () => {
+  const handleCancelProcessing = async () => {
     setIsCanceling(true);
     setProcessingStatus((prev) => ({
       percent: prev?.percent ?? 0,
@@ -484,6 +497,27 @@ function EstimatePageInner() {
       detail: 'กำลังหยุดการประมวลผล',
     }));
     abortControllerRef.current?.abort();
+
+    if (manualRequestId) {
+      try {
+        await axios.delete('/api/manual-estimate', {
+          data: {
+            requestId: manualRequestId,
+            lineId: profile?.userId,
+          },
+        });
+      } catch (cancelError) {
+        console.warn('Failed to cancel manual estimate:', cancelError);
+      }
+
+      setManualRequestId(null);
+      clearManualPolling();
+      setIsAnalyzing(false);
+      setIsEstimating(false);
+      setProcessingStatus(null);
+      setIsCanceling(false);
+      setError('ยกเลิกการประเมินแล้ว');
+    }
   };
 
   // Check customer exists
@@ -509,6 +543,30 @@ function EstimatePageInner() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.userId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchManualConfig = async () => {
+      try {
+        const response = await axios.get('/api/manual-estimate/config');
+        if (mounted) {
+          setManualEstimateEnabled(Boolean(response.data?.enabled));
+        }
+      } catch (configError) {
+        console.warn('Manual estimate config fetch failed:', configError);
+      } finally {
+        if (mounted) {
+          setManualConfigLoaded(true);
+        }
+      }
+    };
+
+    fetchManualConfig();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Load draft into estimate flow (continue from /drafts/[itemId])
   useEffect(() => {
@@ -603,6 +661,76 @@ function EstimatePageInner() {
       fetchStores();
     }
   }, [currentStep]);
+
+  useEffect(() => {
+    if (!manualRequestId || !profile?.userId) return;
+
+    let canceled = false;
+
+    const pollStatus = async () => {
+      try {
+        const response = await axios.get('/api/manual-estimate', {
+          params: { requestId: manualRequestId, lineId: profile.userId },
+        });
+        const request = response.data?.request;
+        if (!request || canceled) return;
+
+        if (request.status === 'COMPLETED') {
+          const estimatedPrice = Number(request.estimated_price ?? 0);
+          const conditionScore = Number(request.condition_score ?? 0);
+          const note = request.condition_note || 'ประเมินโดยเจ้าหน้าที่';
+
+          setEstimateResult({
+            estimatedPrice,
+            condition: conditionScore / 100,
+            confidence: 0.9,
+          });
+          setDesiredPrice(estimatedPrice.toString());
+          setConditionResult({
+            score: conditionScore / 100,
+            reason: note,
+          });
+          setFormData(prev => ({
+            ...prev,
+            condition: conditionScore,
+          }));
+
+          setManualRequestId(null);
+          clearManualPolling();
+          setIsAnalyzing(false);
+          setIsEstimating(false);
+          setProcessingStatus(null);
+          setIsCanceling(false);
+          setCurrentStep('pawn_summary');
+          return;
+        }
+
+        if (request.status === 'CANCELLED') {
+          setManualRequestId(null);
+          clearManualPolling();
+          setIsAnalyzing(false);
+          setIsEstimating(false);
+          setProcessingStatus(null);
+          setIsCanceling(false);
+          setError('ยกเลิกการประเมินแล้ว');
+          return;
+        }
+      } catch (pollError: any) {
+        console.warn('Manual estimate polling failed:', pollError);
+      }
+
+      if (!canceled) {
+        manualPollTimeoutRef.current = setTimeout(pollStatus, 5000);
+      }
+    };
+
+    pollStatus();
+
+    return () => {
+      canceled = true;
+      clearManualPolling();
+    };
+  }, [manualRequestId, profile?.userId]);
 
   // Calculate interest
   useEffect(() => {
@@ -870,6 +998,19 @@ function EstimatePageInner() {
       return;
     }
 
+    let useManualEstimate = manualEstimateEnabled;
+    if (!manualConfigLoaded) {
+      try {
+        const response = await axios.get('/api/manual-estimate/config');
+        useManualEstimate = Boolean(response.data?.enabled);
+        setManualEstimateEnabled(useManualEstimate);
+      } catch (configError) {
+        console.warn('Manual estimate config refresh failed:', configError);
+      } finally {
+        setManualConfigLoaded(true);
+      }
+    }
+
     setIsAnalyzing(true);
     setIsEstimating(true);
     setError(null);
@@ -880,6 +1021,8 @@ function EstimatePageInner() {
     const { signal } = abortController;
 
     updateProcessingStatus(5, 'เตรียมรูปภาพ', 'กำลังบีบอัดและเตรียมรูปภาพ');
+
+    let waitingForManual = false;
 
     try {
       // Step 1: Compress and analyze condition with AI
@@ -898,6 +1041,58 @@ function EstimatePageInner() {
         })
       );
       ensureNotCanceled(signal);
+
+      if (useManualEstimate) {
+        updateProcessingStatus(30, 'อัปโหลดรูปภาพ', 'กำลังอัปโหลดรูปภาพเพื่อประเมินราคา');
+        const uploadedUrls = await uploadImages(compressedImages, signal);
+        setUploadedImageUrls(uploadedUrls);
+        ensureNotCanceled(signal);
+        updateProcessingStatus(65, 'ส่งข้อมูล', 'กำลังส่งข้อมูลเพื่อประเมินราคา');
+
+        const appleAccessories = formData.appleAccessories
+          ? Object.entries(formData.appleAccessories)
+              .filter(([, value]) => value)
+              .map(([key]) => key)
+          : [];
+        const accessoriesValue = formData.itemType === 'Apple'
+          ? appleAccessories.join(', ')
+          : formData.accessories;
+
+        const manualItemData = {
+          itemType: formData.itemType,
+          brand: formData.brand,
+          model: formData.model,
+          capacity: formData.capacity,
+          color: formData.color,
+          screenSize: formData.screenSize,
+          watchSize: formData.watchSize,
+          watchConnectivity: formData.watchConnectivity,
+          accessories: accessoriesValue,
+          appleAccessories,
+          pawnerCondition: formData.condition,
+          defects: formData.defects,
+          note: formData.note,
+          appleCategory: formData.appleCategory,
+          appleSpecs: formData.appleSpecs,
+          cpu: formData.cpu,
+          ram: formData.ram,
+          storage: formData.storage,
+          gpu: formData.gpu,
+          lenses: formData.lenses?.filter(l => l.trim() !== ''),
+        };
+
+        const manualResponse = await axios.post('/api/manual-estimate', {
+          lineId: profile.userId,
+          itemData: manualItemData,
+          imageUrls: uploadedUrls,
+        }, { signal });
+
+        setManualRequestId(manualResponse.data.requestId);
+        updateProcessingStatus(90, 'ประเมินราคา', 'กำลังรอผลการประเมิน');
+        waitingForManual = true;
+        return;
+      }
+
       updateProcessingStatus(20, 'เตรียมรูปภาพ', 'กำลังแปลงรูปภาพสำหรับตรวจสอบ');
 
       // Convert compressed images to base64
@@ -1011,11 +1206,18 @@ function EstimatePageInner() {
       }
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการประเมินราคา');
     } finally {
-      setIsAnalyzing(false);
-      setIsEstimating(false);
-      setProcessingStatus(null);
-      setIsCanceling(false);
-      abortControllerRef.current = null;
+      if (waitingForManual) {
+        setIsAnalyzing(false);
+        setIsEstimating(true);
+        setIsCanceling(false);
+        abortControllerRef.current = null;
+      } else {
+        setIsAnalyzing(false);
+        setIsEstimating(false);
+        setProcessingStatus(null);
+        setIsCanceling(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
