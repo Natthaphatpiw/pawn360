@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { Montserrat, Noto_Sans_Thai } from 'next/font/google';
 import sub1 from '../landind/sub1.png';
 import sub2 from '../landind/sub2.png';
@@ -21,7 +22,7 @@ export default function Home() {
         <div className="pointer-events-none absolute -top-40 right-[-10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle_at_center,rgba(255,181,92,0.35),rgba(245,244,242,0))]" />
         <div className="pointer-events-none absolute top-[20%] left-[-6%] h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle_at_center,rgba(240,160,120,0.25),rgba(245,244,242,0))]" />
 
-        <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-6 py-6 lg:px-14">
+        <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-6 py-6 lg:px-14 font-extralight">
           <div className="flex items-center gap-4">
             <Image
               src="/landing/pawnly_logo.png"
@@ -33,12 +34,16 @@ export default function Home() {
             />
           </div>
 
-          <nav className={`${montserrat.className} hidden items-center gap-2 text-sm lg:flex`}>
-            <button className="rounded-full bg-[var(--muted-2)] px-4 py-1.5 text-white transition-all duration-300 hover:scale-105 hover:shadow-md">
-              หน้าหลัก
-            </button>
+          <nav className="hidden items-center gap-2 text-sm lg:flex font-semibold">
+            <Link href="/">
+              <button className="rounded-full bg-[var(--muted-2)] px-4 py-1.5 text-white transition-all duration-300 hover:scale-105 hover:shadow-md">
+                หน้าหลัก
+              </button>
+            </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">ผู้ขอสินเชื่อ</button>
+            <Link href="/pawner">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">ผู้ขอสินเชื่อ</button>
+            </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
             <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
             <span className="h-6 w-px bg-[var(--line)]" />
@@ -72,9 +77,11 @@ export default function Home() {
               และดำเนินการผ่าน Line OA 100% ไม่ต้องเสียเวลาเดินทางไปที่ร้าน
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
-                ต้องการเงินทุน (Start Borrowing)
-              </button>
+              <Link href="/pawner">
+                <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
+                  ต้องการเงินทุน (Start Borrowing)
+                </button>
+              </Link>
               <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
                 สนใจลงทุน (Start Investing)
               </button>
@@ -135,11 +142,13 @@ export default function Home() {
             className="fade-up mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
             style={{ animationDelay: '0.2s' }}
           >
-            <Image
-              src={sub1}
-              alt="Access to funding for pawners"
-              className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
-            />
+            <Link href="/pawner">
+              <Image
+                src={sub1}
+                alt="Access to funding for pawners"
+                className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
+              />
+            </Link>
             <Image
               src={sub2}
               alt="Stable investment for investors"
@@ -176,8 +185,8 @@ export default function Home() {
                   {item.title === 'Safety First' && (
                     <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M0 32C0 14.3269 14.3269 0 32 0C49.6731 0 64 14.3269 64 32C64 49.6731 49.6731 64 32 64C14.3269 64 0 49.6731 0 32Z" fill="#F5F4F2"/>
-<path d="M17 43.6667V20.3333C17 19.4493 17.3512 18.6014 17.9763 17.9763C18.6014 17.3512 19.4493 17 20.3333 17H43.6667C44.5507 17 45.3986 17.3512 46.0237 17.9763C46.6488 18.6014 47 19.4493 47 20.3333V43.6667C47 44.5507 46.6488 45.3986 46.0237 46.0237C45.3986 46.6488 44.5507 47 43.6667 47H20.3333C19.4493 47 18.6014 46.6488 17.9763 46.0237C17.3512 45.3986 17 44.5507 17 43.6667Z" stroke="#686360" stroke-width="2.5"/>
-<path d="M42.0007 35.3333V28.6667M32.834 27.8333L34.5007 26.1667M24.5007 27.8333L22.834 26.1667M22.834 37.8333L24.5007 36.1667M34.5007 37.8333L32.834 36.1667M15.334 25.3333H17.0007M15.334 22H17.0007M17.0007 38.6667H15.334M17.0007 42H15.334M28.6673 37C27.3412 37 26.0695 36.4732 25.1318 35.5355C24.1941 34.5979 23.6673 33.3261 23.6673 32C23.6673 30.6739 24.1941 29.4021 25.1318 28.4645C26.0695 27.5268 27.3412 27 28.6673 27C29.9934 27 31.2652 27.5268 32.2029 28.4645C33.1405 29.4021 33.6673 30.6739 33.6673 32C33.6673 33.3261 33.1405 34.5979 32.2029 35.5355C31.2652 36.4732 29.9934 37 28.6673 37Z" stroke="#686360" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M17 43.6667V20.3333C17 19.4493 17.3512 18.6014 17.9763 17.9763C18.6014 17.3512 19.4493 17 20.3333 17H43.6667C44.5507 17 45.3986 17.3512 46.0237 17.9763C46.6488 18.6014 47 19.4493 47 20.3333V43.6667C47 44.5507 46.6488 45.3986 46.0237 46.0237C45.3986 46.6488 44.5507 47 43.6667 47H20.3333C19.4493 47 18.6014 46.6488 17.9763 46.0237C17.3512 45.3986 17 44.5507 17 43.6667Z" stroke="#686360" strokeWidth="2.5"/>
+<path d="M42.0007 35.3333V28.6667M32.834 27.8333L34.5007 26.1667M24.5007 27.8333L22.834 26.1667M22.834 37.8333L24.5007 36.1667M34.5007 37.8333L32.834 36.1667M15.334 25.3333H17.0007M15.334 22H17.0007M17.0007 38.6667H15.334M17.0007 42H15.334M28.6673 37C27.3412 37 26.0695 36.4732 25.1318 35.5355C24.1941 34.5979 23.6673 33.3261 23.6673 32C23.6673 30.6739 24.1941 29.4021 25.1318 28.4645C26.0695 27.5268 27.3412 27 28.6673 27C29.9934 27 31.2652 27.5268 32.2029 28.4645C33.1405 29.4021 33.6673 30.6739 33.6673 32C33.6673 33.3261 33.1405 34.5979 32.2029 35.5355C31.2652 36.4732 29.9934 37 28.6673 37Z" stroke="#686360" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
 </svg>
                   )}
                   {item.title === 'Expert Team' && (
