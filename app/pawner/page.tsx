@@ -16,7 +16,7 @@ export default function PawnerPage() {
   return (
     <div className={`${notoSansThai.className} bg-[var(--bg)] text-[var(--ink)]`}>
       <div className="relative overflow-hidden">
-        <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-6 py-6 lg:px-14">
+        <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-4 py-4 sm:px-6 sm:py-6 lg:px-14">
           <div className="flex items-center gap-4">
             <Link href="/">
               <Image
@@ -25,7 +25,7 @@ export default function PawnerPage() {
                 width={302}
                 height={80}
                 priority
-                className="h-8 w-auto"
+                className="h-7 w-auto sm:h-8"
               />
             </Link>
           </div>
@@ -56,49 +56,87 @@ export default function PawnerPage() {
               Join us
             </button>
           </div>
+          <details className="relative lg:hidden">
+            <summary className="flex h-9 w-9 list-none cursor-pointer items-center justify-center rounded-full border border-[#cfcac7] text-[#686360] transition-colors duration-300 hover:border-[#bdb9b6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60">
+              <span className="sr-only">เปิดเมนู</span>
+              <span className="flex h-4 w-4 flex-col justify-between">
+                <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
+                <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
+                <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
+              </span>
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 w-52 rounded-2xl border border-[#e2e0dd] bg-[#f5f4f2] p-2 text-[#686360] shadow-[0_12px_24px_rgba(67,63,60,0.15)]">
+              <Link
+                href="/"
+                className="block rounded-xl px-3 py-2 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+              >
+                หน้าหลัก
+              </Link>
+              <div className="rounded-xl bg-[#686360] px-3 py-2 text-sm text-white">
+                ผู้ขอสินเชื่อ
+              </div>
+              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                นักลงทุน
+              </button>
+              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                จุดรับฝาก
+              </button>
+              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                เกี่ยวกับเรา
+              </button>
+              <div className="mt-2 border-t border-[#e2e0dd] pt-2">
+                <button className="w-full rounded-full border border-[#bdb9b6] px-3 py-1.5 text-xs text-[#686360]">
+                  Login
+                </button>
+                <button className="mt-2 w-full rounded-full bg-[#686360] px-3 py-1.5 text-xs text-[#f5f4f2]">
+                  Join us
+                </button>
+              </div>
+            </div>
+          </details>
         </header>
 
-        <section className="mx-auto grid w-full max-w-[1216px] items-start gap-16 px-6 pb-24 pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-14">
-          <div className="fade-up lg:pt-6">
-            <h1 className="max-w-[480px] text-3xl font-light leading-[1.45] text-[#686360] sm:text-4xl lg:text-[44px]">
+        <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-4 sm:gap-12 sm:px-6 sm:pb-20 sm:pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
+          <div className="fade-up text-center sm:text-left lg:pt-6">
+            <h1 className="max-w-[520px] text-[28px] font-light leading-[1.45] text-[#686360] sm:text-4xl lg:text-[44px]">
               เปลี่ยนทรัพย์สินของคุณ
               <br />เป็นเงินทุน... ง่ายๆ
               <br />เพียงปลายนิ้ว
             </h1>
-            <p className="mt-4 max-w-[520px] text-sm leading-6 text-[#9a9694] sm:text-base">
+            <p className="mt-4 max-w-[520px] text-sm leading-6 text-[#9a9694] mx-auto sm:mx-0 sm:text-base sm:leading-7">
               ไม่ต้องเดินทางไปหน้าร้าน ไม่ต้องรอคิว ประเมินราคาด้วย AI
-              <br />
+              <br className="hidden sm:block" />
               และรับเงินโอนผ่านระบบ P2P ที่ปลอดภัยที่สุดบน Line OA
             </p>
-            <div className="mt-5 flex flex-wrap">
+            <div className="mt-5 flex flex-wrap justify-center sm:justify-start">
               <Link href="https://lin.ee/yX4oRny" target="_blank" rel="noopener noreferrer">
-                <button className="btn-sheen rounded-full border border-[var(--accent)] px-6 py-1.5 text-xs text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white">
+                <button className="btn-sheen rounded-full border border-[var(--accent)] px-7 py-2 text-xs text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-6 sm:py-1.5">
                   เริ่มเลย!
                 </button>
               </Link>
             </div>
           </div>
-          <div className="fade-up flex flex-col items-center gap-3" style={{ animationDelay: '0.2s' }}>
+          <div className="fade-up flex flex-col items-center gap-2 sm:gap-3" style={{ animationDelay: '0.2s' }}>
             <div className="relative float-slow">
-              <div className="pointer-events-none absolute -inset-6 rounded-[30px] bg-[radial-gradient(circle_at_top,rgba(255,210,165,0.65),rgba(245,244,242,0))] blur-2xl opacity-70 glow-pulse" />
-              <div className="pointer-events-none absolute -right-10 -top-8 h-24 w-24 rounded-full bg-[#f2d3be] blur-2xl opacity-60 float-slower" />
+              <div className="pointer-events-none absolute -inset-4 rounded-[30px] bg-[radial-gradient(circle_at_top,rgba(255,210,165,0.65),rgba(245,244,242,0))] blur-2xl opacity-70 glow-pulse sm:-inset-6" />
+              <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[#f2d3be] blur-2xl opacity-60 float-slower sm:-right-10 sm:-top-8 sm:h-24 sm:w-24" />
               <Image
                 src="/landing/com1_pawner.png"
                 alt="Pawner app preview"
                 width={1068}
                 height={1068}
-                className="relative z-10 h-auto w-full max-w-[430px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)]"
+                className="relative z-10 h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] sm:max-w-[380px] lg:max-w-[430px]"
                 priority
               />
             </div>
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1216px] px-6 pb-20 pt-10 lg:px-14">
+        <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-14">
           <div className="flex justify-center">
             <div className="h-px w-full max-w-[360px] bg-[#686360]/50" />
           </div>
-          <div className="mt-14 grid items-center gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
+          <div className="mt-10 grid items-center gap-8 sm:mt-12 sm:gap-10 md:grid-cols-[0.9fr_1.1fr] md:gap-12 lg:mt-14 lg:gap-16">
             <div className="fade-up text-center" style={{ animationDelay: '0.3s' }}>
               <h2 className="mt-2 text-2xl font-medium text-[#686360] sm:text-3xl lg:text-[32px]">
                 Why <span className="text-[var(--accent)]">Pawnly</span> for You?
@@ -107,7 +145,7 @@ export default function PawnerPage() {
             </div>
 
             <div className="fade-up w-full lg:ml-auto" style={{ animationDelay: '0.4s' }}>
-              <div className="relative flex flex-col gap-2 w-full max-w-[520px] rounded-[20px] bg-[#d8d6d4] p-4 soft-card overflow-hidden">
+              <div className="relative flex flex-col gap-2 w-full max-w-[520px] rounded-[20px] bg-[#d8d6d4] p-3 sm:p-4 soft-card overflow-hidden">
                 <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.7),rgba(216,214,212,0))] blur-2xl opacity-70 glow-pulse" />
                 <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.5),rgba(216,214,212,0))] blur-2xl opacity-60 float-slower" />
                 {[
@@ -117,18 +155,18 @@ export default function PawnerPage() {
                   { en: 'Secure Messaging', th: 'แชทส่วนตัวปลอดภัย' },
                   { en: 'Digital Loan Agreements', th: 'ทำสัญญาดิจิทัล' },
                 ].map((item) => (
-                  <div key={item.en} className="relative z-10 flex flex-row items-center gap-3 rounded-[14px] bg-[#cfcac7] px-4 py-2.5 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_18px_rgba(67,63,60,0.18)]">
+                  <div key={item.en} className="relative z-10 flex flex-row flex-wrap items-center gap-3 rounded-[14px] bg-[#cfcac7] px-4 py-2.5 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_18px_rgba(67,63,60,0.18)] sm:flex-nowrap">
                     <div className="flex-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="8" cy="8" r="8" fill="#686360"/>
                         <path d="M4.5 8L6.5 10L11.5 5" stroke="#D0CFCE" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </div>
-                    <div className="text-xs text-[#686360]" style={{ fontFamily: 'Noto Sans Thai' }}>
+                    <div className="text-[11px] text-[#686360] sm:text-xs" style={{ fontFamily: 'Noto Sans Thai' }}>
                       {item.en}
                     </div>
-                    <div className="ml-auto flex h-[20px] items-center justify-center rounded-full bg-[#efeeed] px-3">
-                      <span className="text-[11px] text-[#686360]" style={{ fontFamily: 'Noto Sans Thai' }}>{item.th}</span>
+                    <div className="ml-auto flex h-[20px] items-center justify-center rounded-full bg-[#efeeed] px-2.5 sm:h-[22px] sm:px-3">
+                      <span className="text-[10px] text-[#686360] sm:text-[11px]" style={{ fontFamily: 'Noto Sans Thai' }}>{item.th}</span>
                     </div>
                   </div>
                 ))}
@@ -137,17 +175,17 @@ export default function PawnerPage() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden bg-[#686360] py-16">
+        <section className="relative overflow-hidden bg-[#686360] py-12 sm:py-16">
           <div className="pointer-events-none absolute -top-24 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.22),rgba(104,99,96,0))] blur-3xl glow-pulse" />
           <div className="pointer-events-none absolute bottom-[-40px] right-10 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.14),rgba(104,99,96,0))] blur-3xl float-slower" />
-          <div className="mx-auto w-full max-w-[1216px] px-6 text-center text-[#f5f4f2] lg:px-14">
-            <h3 className="text-xl font-medium sm:text-[32px]">Benefits</h3>
-            <p className="mt-1 text-xs text-[#c8b8b0]">ผลประโยชน์ของผู้ขอสินเชื่อ</p>
-            <div className="mt-6 flex justify-center">
+          <div className="mx-auto w-full max-w-[1216px] px-4 text-center text-[#f5f4f2] sm:px-6 lg:px-14">
+            <h3 className="text-lg font-medium sm:text-xl lg:text-[32px]">Benefits</h3>
+            <p className="mt-1 text-[11px] text-[#c8b8b0] sm:text-xs">ผลประโยชน์ของผู้ขอสินเชื่อ</p>
+            <div className="mt-4 flex justify-center sm:mt-6">
               <div className="h-px w-full max-w-[980px] bg-[#8e8a86]/60" />
             </div>
 
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mt-6 grid gap-6 sm:mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               {[
                 { title: 'Expanded Access to Capital', desc: "You're not limited to a single pawn shop's funds; connect with a wider network of investors eager to provide loans for your valuables.\nคุณไม่ได้จำกัดอยู่เพียงเงินทุนของร้านที่ให้บริการแห่งเดียว แต่เชื่อมต่อกับเครือข่ายนักลงทุนที่กว้างขวางขึ้นที่ต้องการให้ สินเชื่อ สำหรับสิ่งของมีค่าของคุณ" },
                 { title: 'Superior Loan Terms', desc: "Receive multiple loan offers from various investors, allowing you to choose the best terms, interest rates, or loan amounts for your needs.\nรับข้อเสนอสินเชื่อต่างๆ จากนักลงทุนหลายราย ซึ่งช่วยให้คุณเลือกเงื่อนไข อัตราดอกเบี้ยหรือจำนวนเงินกู้ที่ดีที่สุดสำหรับความต้องการของคุณได้" },
@@ -156,7 +194,7 @@ export default function PawnerPage() {
                 { title: 'Increased Flexibility', desc: "A larger pool of lenders often translates to more adaptable loan structures tailored to individual circumstances.\nกลุ่มผู้ให้กู้ที่มากขึ้นมักจะทำให้โครงสร้างสินเชื่อมีความยืดหยุ่นมากขึ้นซึ่งเหมาะสมกับสถานการณ์ แต่ละบุคคล" },
               ].map((item) => (
                 <div key={item.title} className="flex flex-col items-center text-center transition-transform duration-300 hover:-translate-y-1">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#f5f4f2] text-[#686360]">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f4f2] text-[#686360] sm:h-12 sm:w-12">
                     {item.title.includes('Capital') && (
                       <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M0 32C0 14.3269 14.3269 0 32 0C49.6731 0 64 14.3269 64 32C64 49.6731 49.6731 64 32 64C14.3269 64 0 49.6731 0 32Z" fill="#F5F4F2"/>
@@ -197,21 +235,21 @@ export default function PawnerPage() {
                       </svg>
                     )}
                   </div>
-                  <h4 className="text-xs font-semibold text-[#f5f4f2]">{item.title}</h4>
-                  <p className="mt-2 text-[10px] leading-relaxed text-[#e7e5e4] whitespace-pre-line">{item.desc}</p>
+                  <h4 className="text-[11px] font-semibold text-[#f5f4f2] sm:text-xs">{item.title}</h4>
+                  <p className="mt-2 text-[11px] leading-relaxed text-[#e7e5e4] whitespace-pre-line">{item.desc}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1216px] px-6 py-20 lg:px-14">
+        <section className="mx-auto w-full max-w-[1216px] px-4 py-16 sm:px-6 sm:py-20 lg:px-14">
           <div className="mb-10 text-center">
-            <h3 className="text-xl font-medium text-[#686360] sm:text-[32px]">How it Works</h3>
-            <p className="mt-1 text-[20] text-[#9a9694]">4 ขั้นตอนง่ายๆ</p>
+            <h3 className="text-lg font-medium text-[#686360] sm:text-xl lg:text-[32px]">How it Works</h3>
+            <p className="mt-1 text-[11px] text-[#9a9694] sm:text-xs">4 ขั้นตอนง่ายๆ</p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { step: '1', title: 'Add Line', desc: 'แอดไลน์ของผู้ขอสินเชื่อ\nและลงทะเบียนง่ายๆ ใน 1 นาที', href: 'https://lin.ee/yX4oRny' },
               { step: '2', title: 'Upload & Appraise', desc: 'ถ่ายรูปทรัพย์สินเพื่อรับการประเมินราคาเบื้องต้นด้วย AI' },
@@ -219,13 +257,13 @@ export default function PawnerPage() {
               { step: '4', title: 'Drop & Fund', desc: 'นำทรัพย์สินไปฝากที่ Drop Point หรือเลือกบริการรับของ\nเพื่อรับเงินโอนเข้าบัญชีทันที' },
             ].map((item) => {
               const cardClasses =
-                'rounded-[20px] bg-[#c8c5c2] px-5 py-8 text-center soft-card transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_16px_28px_rgba(67,63,60,0.18)]';
+                'rounded-[20px] bg-[#c8c5c2] px-4 py-6 text-center soft-card transition-transform duration-300 hover:-translate-y-1 hover:shadow-[0_16px_28px_rgba(67,63,60,0.18)] sm:px-5 sm:py-8';
 
               const content = (
                 <>
-                  <div className="text-[48px] font-semibold leading-none text-[#f5f4f2]">{item.step}</div>
-                  <h4 className="mt-3 text-[22px] font-semibold text-[#FAFAF9]">{item.title}</h4>
-                  <p className="mt-2 text-[14px] leading-5 text-[#FAFAF9] whitespace-pre-line">{item.desc}</p>
+                  <div className="text-[40px] font-semibold leading-none text-[#f5f4f2] sm:text-[44px] lg:text-[48px]">{item.step}</div>
+                  <h4 className="mt-3 text-base font-semibold text-[#FAFAF9] sm:text-lg lg:text-[22px]">{item.title}</h4>
+                  <p className="mt-2 text-xs leading-5 text-[#FAFAF9] whitespace-pre-line sm:text-sm lg:text-[14px]">{item.desc}</p>
                 </>
               );
 
@@ -253,17 +291,17 @@ export default function PawnerPage() {
         </section>
 
         <footer className="bg-[#2c2a28] text-[#686360]">
-          <div className="mx-auto flex w-full max-w-[1216px] flex-wrap justify-between gap-10 px-6 py-16 lg:px-14">
-            <div className="min-w-[220px]">
+          <div className="mx-auto flex w-full max-w-[1216px] flex-wrap justify-between gap-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:px-14">
+            <div className="min-w-[180px] sm:min-w-[220px]">
               <Image
                 src="/landing/pawnly_foot.png"
                 alt="Pawnly"
                 width={600}
                 height={96}
-                className="h-7 w-auto"
+                className="h-6 w-auto sm:h-7"
               />
             </div>
-            <div className="grid flex-1 grid-cols-2 gap-8 text-xs sm:grid-cols-4">
+            <div className="grid flex-1 grid-cols-2 gap-6 text-xs sm:grid-cols-4 sm:gap-8">
               <div>
                 <h5 className={`${montserrat.className} text-sm font-semibold text-[#d0cfce]`}>Approaches</h5>
                 <ul className="mt-3 space-y-2">
@@ -322,7 +360,7 @@ export default function PawnerPage() {
               </div>
             </div>
           </div>
-          <div className="border-t border-[#c55125] py-6 text-center text-xs text-[#4a4644]">
+          <div className="border-t border-[#c55125] py-4 text-center text-xs text-[#4a4644] sm:py-6">
             Pawnly Platform
           </div>
         </footer>
