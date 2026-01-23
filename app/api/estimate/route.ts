@@ -2,9 +2,58 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null;
+const collectEnvKeys = (values: Array<string | undefined>) => (
+  values
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value))
+);
+
+const OPENAI_KEYS = collectEnvKeys([
+  process.env.OPENAI_API_KEY,
+  process.env.OPENAI_API_KEY_2,
+  process.env.OPENAI_API_KEY_3,
+  process.env.OPENAI_API_KEY_4,
+]);
+
+const openaiClients = OPENAI_KEYS.map((apiKey) => new OpenAI({ apiKey }));
+
+const hasOpenAIKeys = () => openaiClients.length > 0;
+
+const isOpenAIRateLimitError = (error: any): boolean => {
+  const status = error?.status ?? error?.response?.status;
+  if (status === 429) return true;
+  const code = `${error?.code || error?.error?.code || ''}`.toLowerCase();
+  const message = `${error?.message || ''} ${error?.error?.message || ''}`.toLowerCase();
+  return (
+    code.includes('rate_limit') ||
+    code.includes('insufficient_quota') ||
+    message.includes('rate limit') ||
+    message.includes('insufficient quota') ||
+    message.includes('quota') ||
+    message.includes('429')
+  );
+};
+
+async function runWithOpenAIFallback<T>(task: (client: OpenAI) => Promise<T>): Promise<T> {
+  if (!hasOpenAIKeys()) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+  let lastError: any;
+  for (let i = 0; i < openaiClients.length; i++) {
+    const client = openaiClients[i];
+    try {
+      return await task(client);
+    } catch (error) {
+      lastError = error;
+      if (isOpenAIRateLimitError(error) && i < openaiClients.length - 1) {
+        console.warn(`⚠️ OpenAI rate limit hit. Switching to fallback key ${i + 2}.`);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
 
 const MODEL = 'gpt-4.1-mini';
 const PRICE_SEARCH_MODEL = 'gpt-4.1';
@@ -193,7 +242,7 @@ function usdToThb(usd: number, exchangeRate: number): number {
 }
 
 async function fetchWebSearchPrices(productName: string): Promise<WebSearchResult | null> {
-  if (!openai) {
+  if (!hasOpenAIKeys()) {
     return null;
   }
 
@@ -213,7 +262,7 @@ Rules:
 - Keep ${WEB_SEARCH_MIN_ITEMS}-${WEB_SEARCH_MAX_ITEMS} items.
 - Use canonical product URLs and remove tracking parameters when possible.`;
 
-  const runSearch = (maxTokens: number) => openai.responses.create({
+  const runSearch = (maxTokens: number) => runWithOpenAIFallback((client) => client.responses.create({
     model: PRICE_SEARCH_MODEL,
     input: prompt,
     max_output_tokens: maxTokens,
@@ -260,7 +309,7 @@ Rules:
         },
       },
     },
-  });
+  }));
 
   let response = await runSearch(WEB_SEARCH_MAX_OUTPUT_TOKENS);
   if (response?.status === 'incomplete' && response?.incomplete_details?.reason === 'max_output_tokens') {
@@ -293,7 +342,7 @@ async function fetchSerpapiShoppingResults(
     return null;
   }
 
-  if (!openai) {
+  if (!hasOpenAIKeys()) {
     console.warn('⚠️ OPENAI_API_KEY not configured, skipping SerpAPI filtering');
     return null;
   }
@@ -389,7 +438,7 @@ Return JSON only with:
   "keep_item_ids": ["item_1", "item_7"]
 }`;
 
-    const llmResponse = await openai.responses.create({
+    const llmResponse = await runWithOpenAIFallback((client) => client.responses.create({
       model: PRICE_SEARCH_MODEL,
       input: prompt,
       max_output_tokens: SERPAPI_FILTER_MAX_OUTPUT_TOKENS,
@@ -415,7 +464,7 @@ Return JSON only with:
           },
         },
       },
-    });
+    }));
 
     const content = getResponseText(llmResponse);
     const parsed = parseJsonFromText<{ keep_item_ids: string[] }>(content);
@@ -449,7 +498,7 @@ Return JSON only with:
 
 // Agent 1: Normalize input data only
 async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
-  if (!openai) {
+  if (!hasOpenAIKeys()) {
     return {
       productName: `${input.brand} ${input.model}`.trim(),
     };
@@ -494,7 +543,7 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
   "productName": "ชื่อสินค้า"
 }`;
 
-  const response = await openai.responses.create({
+  const response = await runWithOpenAIFallback((client) => client.responses.create({
     model: MODEL,
     input: prompt,
     max_output_tokens: 300,
@@ -514,7 +563,7 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
         },
       },
     },
-  });
+  }));
 
   const content = getResponseText(response);
   const parsed = parseJsonFromText<NormalizedData>(content);
@@ -577,7 +626,7 @@ async function getRepresentativeMarketPrice(
 ): Promise<RepresentativeMarketResult> {
   const fallbackPrice = MIN_ESTIMATE_PRICE;
 
-  if (!openai) {
+  if (!hasOpenAIKeys()) {
     return {
       marketPrice: fallbackPrice,
       analysis: null,
@@ -632,7 +681,7 @@ async function getRepresentativeMarketPrice(
 
 export async function POST(request: NextRequest): Promise<NextResponse<EstimateResponse | { error: string }>> {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!hasOpenAIKeys()) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 500 }
