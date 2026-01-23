@@ -56,44 +56,67 @@ export default function PawnerPage() {
               Join us
             </button>
           </div>
-          <details className="relative lg:hidden">
-            <summary className="flex h-9 w-9 list-none cursor-pointer items-center justify-center rounded-full border border-[#cfcac7] text-[#686360] transition-colors duration-300 hover:border-[#bdb9b6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60">
-              <span className="sr-only">เปิดเมนู</span>
+          <div className="relative lg:hidden">
+            <input id="mobile-menu-pawner" type="checkbox" className="peer sr-only" />
+            <label
+              htmlFor="mobile-menu-pawner"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#cfcac7] text-[#686360] transition-colors duration-300 hover:border-[#bdb9b6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60"
+              aria-label="เปิดเมนู"
+            >
               <span className="flex h-4 w-4 flex-col justify-between">
                 <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
                 <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
                 <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
               </span>
-            </summary>
-            <div className="absolute right-0 z-20 mt-2 w-52 rounded-2xl border border-[#e2e0dd] bg-[#f5f4f2] p-2 text-[#686360] shadow-[0_12px_24px_rgba(67,63,60,0.15)]">
-              <Link
-                href="/"
-                className="block rounded-xl px-3 py-2 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
-              >
-                หน้าหลัก
-              </Link>
-              <div className="rounded-xl bg-[#686360] px-3 py-2 text-sm text-white">
-                ผู้ขอสินเชื่อ
-              </div>
-              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
-                นักลงทุน
-              </button>
-              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
-                จุดรับฝาก
-              </button>
-              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
-                เกี่ยวกับเรา
-              </button>
-              <div className="mt-2 border-t border-[#e2e0dd] pt-2">
-                <button className="w-full rounded-full border border-[#bdb9b6] px-3 py-1.5 text-xs text-[#686360]">
-                  Login
-                </button>
-                <button className="mt-2 w-full rounded-full bg-[#686360] px-3 py-1.5 text-xs text-[#f5f4f2]">
-                  Join us
-                </button>
+            </label>
+            <label
+              htmlFor="mobile-menu-pawner"
+              className="fixed inset-0 z-40 bg-black/40 opacity-0 backdrop-blur-sm transition-opacity duration-300 peer-checked:opacity-100 peer-checked:pointer-events-auto pointer-events-none"
+              aria-hidden="true"
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center opacity-0 transition-all duration-300 peer-checked:opacity-100 peer-checked:pointer-events-auto pointer-events-none">
+              <div className="w-[min(92vw,360px)] rounded-[28px] bg-[#f5f4f2] p-6 shadow-[0_20px_50px_rgba(44,42,40,0.2)] translate-y-4 scale-95 transition-all duration-300 peer-checked:translate-y-0 peer-checked:scale-100">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[#686360]">เมนู</p>
+                  <label
+                    htmlFor="mobile-menu-pawner"
+                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-[#e2e0dd] text-[#686360] transition-colors duration-200 hover:border-[#cfcac7]"
+                    aria-label="ปิดเมนู"
+                  >
+                    <span className="text-lg leading-none">×</span>
+                  </label>
+                </div>
+                <div className="mt-4 space-y-2 text-[#686360]">
+                  <Link
+                    href="/"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
+                    หน้าหลัก
+                  </Link>
+                  <div className="rounded-2xl bg-[#686360] px-4 py-3 text-sm text-white">
+                    ผู้ขอสินเชื่อ
+                  </div>
+                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                    นักลงทุน
+                  </button>
+                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                    จุดรับฝาก
+                  </button>
+                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                    เกี่ยวกับเรา
+                  </button>
+                </div>
+                <div className="mt-5 grid gap-2">
+                  <button className="w-full rounded-full border border-[#bdb9b6] px-4 py-2 text-xs text-[#686360]">
+                    Login
+                  </button>
+                  <button className="w-full rounded-full bg-[#686360] px-4 py-2 text-xs text-[#f5f4f2]">
+                    Join us
+                  </button>
+                </div>
               </div>
             </div>
-          </details>
+          </div>
         </header>
 
         <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-4 sm:gap-12 sm:px-6 sm:pb-20 sm:pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
