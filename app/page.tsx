@@ -60,6 +60,44 @@ export default function Home() {
               Join us
             </button>
           </div>
+          <details className="relative lg:hidden">
+            <summary className="flex h-9 w-9 list-none cursor-pointer items-center justify-center rounded-full border border-[#cfcac7] text-[#686360] transition-colors duration-300 hover:border-[#bdb9b6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60">
+              <span className="sr-only">เปิดเมนู</span>
+              <span className="flex h-4 w-4 flex-col justify-between">
+                <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
+                <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
+                <span className="block h-[2px] w-full rounded-full bg-[#686360]" />
+              </span>
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 w-52 rounded-2xl border border-[#e2e0dd] bg-[#f5f4f2] p-2 text-[#686360] shadow-[0_12px_24px_rgba(67,63,60,0.15)]">
+              <div className="rounded-xl bg-[#686360] px-3 py-2 text-sm text-white">
+                หน้าหลัก
+              </div>
+              <Link
+                href="/pawner"
+                className="block rounded-xl px-3 py-2 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+              >
+                ผู้ขอสินเชื่อ
+              </Link>
+              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                นักลงทุน
+              </button>
+              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                จุดรับฝาก
+              </button>
+              <button className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                เกี่ยวกับเรา
+              </button>
+              <div className="mt-2 border-t border-[#e2e0dd] pt-2">
+                <button className="w-full rounded-full border border-[#bdb9b6] px-3 py-1.5 text-xs text-[#686360]">
+                  Login
+                </button>
+                <button className="mt-2 w-full rounded-full bg-[#686360] px-3 py-1.5 text-xs text-[#f5f4f2]">
+                  Join us
+                </button>
+              </div>
+            </div>
+          </details>
         </header>
 
         <section className="mx-auto grid w-full max-w-[1216px] items-center gap-12 px-6 pb-16 pt-4 lg:grid-cols-[1.1fr_0.9fr] lg:px-14">
