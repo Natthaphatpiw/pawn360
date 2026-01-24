@@ -45,7 +45,9 @@ export default function Home() {
               <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">ผู้ขอสินเชื่อ</button>
             </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
+            <Link href="/investor">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
+            </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
             <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">จุดรับฝาก</button>
             <span className="h-6 w-px bg-[var(--line)]" />
@@ -100,9 +102,12 @@ export default function Home() {
                   >
                     ผู้ขอสินเชื่อ
                   </Link>
-                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                  <Link
+                    href="/investor"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
                     นักลงทุน
-                  </button>
+                  </Link>
                   <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
                     จุดรับฝาก
                   </button>
@@ -143,9 +148,11 @@ export default function Home() {
                   ต้องการเงินทุน (Start Borrowing)
                 </button>
               </Link>
-              <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
-                สนใจลงทุน (Start Investing)
-              </button>
+              <Link href="/investor">
+                <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
+                  สนใจลงทุน (Start Investing)
+                </button>
+              </Link>
             </div>
           </div>
           <div className="fade-up flex justify-center lg:justify-end" style={{ animationDelay: '0.2s' }}>
@@ -210,11 +217,13 @@ export default function Home() {
                 className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
               />
             </Link>
-            <Image
-              src={sub2}
-              alt="Stable investment for investors"
-              className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
-            />
+            <Link href="/investor">
+              <Image
+                src={sub2}
+                alt="Stable investment for investors"
+                className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
+              />
+            </Link>
             <Image
               src={sub3}
               alt="Business partnerships for drop points"
@@ -322,19 +331,19 @@ export default function Home() {
         </section>
 
         <footer className="bg-[#2c2a28] text-[#686360]">
-          <div className="mx-auto flex w-full max-w-[1216px] flex-wrap justify-between gap-10 px-6 py-16 lg:px-14">
-            <div className="min-w-[220px]">
+          <div className="mx-auto flex w-full max-w-[1216px] flex-wrap justify-between gap-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:px-14">
+            <div className="min-w-[180px] sm:min-w-[220px]">
               <Image
                 src="/landing/pawnly_foot.png"
                 alt="Pawnly"
                 width={600}
                 height={96}
-                className="h-8 w-auto"
+                className="h-6 w-auto sm:h-7"
               />
             </div>
-            <div className="grid flex-1 grid-cols-2 gap-8 text-sm sm:grid-cols-4">
+            <div className="grid flex-1 grid-cols-2 gap-6 text-xs sm:grid-cols-4 sm:gap-8">
               <div>
-                <h5 className={`${montserrat.className} text-base font-semibold text-[#d0cfce]`}>Approaches</h5>
+                <h5 className={`${montserrat.className} text-sm font-semibold text-[#d0cfce]`}>Approaches</h5>
                 <ul className="mt-3 space-y-2">
                   <li>หน้าหลัก</li>
                   <li>ผู้ขอสินเชื่อ</li>
@@ -343,14 +352,14 @@ export default function Home() {
                 </ul>
               </div>
               <div>
-                <h5 className={`${montserrat.className} text-base font-semibold text-[#d0cfce]`}>Company</h5>
+                <h5 className={`${montserrat.className} text-sm font-semibold text-[#d0cfce]`}>Company</h5>
                 <ul className="mt-3 space-y-2">
                   <li>เกี่ยวกับเรา</li>
                   <li>ติดต่อเรา</li>
                 </ul>
               </div>
               <div>
-                <h5 className={`${montserrat.className} text-base font-semibold text-[#d0cfce]`}>Follow us</h5>
+                <h5 className={`${montserrat.className} text-sm font-semibold text-[#d0cfce]`}>Follow us</h5>
                 <div className="mt-3 flex gap-2">
                   {[
                     { name: 'Facebook', icon: (
@@ -377,7 +386,7 @@ export default function Home() {
                   ].map((social) => (
                     <div
                       key={social.name}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#686360] text-[#f0efef] hover:bg-[#7a7670] hover:scale-110 hover:shadow-md transition-all duration-300 cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3a3633] text-[#d0cfce] transition-colors duration-300 hover:bg-[#4a4644] cursor-pointer"
                       title={social.name}
                     >
                       {social.icon}
@@ -387,7 +396,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="border-t border-[#c55125] py-6 text-center text-xs text-[#4a4644]">
+          <div className="border-t border-[#c55125] py-4 text-center text-xs text-[#4a4644] sm:py-6">
             Pawnly Platform
           </div>
         </footer>
