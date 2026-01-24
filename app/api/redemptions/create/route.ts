@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { buildPenaltyLiffUrl, getPenaltyRequirement } from '@/lib/services/penalty';
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,6 +47,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
+      );
+    }
+
+    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    if (penaltyRequirement.required) {
+      return NextResponse.json(
+        {
+          error: 'มีค่าปรับค้างชำระ กรุณาชำระค่าปรับก่อนทำรายการ',
+          penaltyRequired: true,
+          penalty: {
+            contractId: contract.contract_id,
+            contractNumber: contract.contract_number,
+            contractStartDate: penaltyRequirement.contractStartDate.toISOString(),
+            contractEndDate: penaltyRequirement.contractEndDate.toISOString(),
+            today: penaltyRequirement.today.toISOString(),
+            daysOverdue: penaltyRequirement.daysOverdue,
+            penaltyAmount: penaltyRequirement.penaltyAmount,
+          },
+          penaltyLiffUrl: buildPenaltyLiffUrl(contract.contract_id),
+        },
+        { status: 409 }
       );
     }
 

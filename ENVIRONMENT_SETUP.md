@@ -27,6 +27,9 @@ MONGODB_DB=pawn
 # LINE Channel Configuration (ตามที่ตั้งค่าใน Vercel)
 LINE_CHANNEL_ACCESS_TOKEN=<REDACTED>
 LINE_CHANNEL_SECRET=<REDACTED>
+# LINE Investor OA
+LINE_CHANNEL_ACCESS_TOKEN_INVEST=<REDACTED>
+LINE_CHANNEL_SECRET_INVEST=<REDACTED>
 
 # Manual Estimate (Admin OA)
 MANUAL_ESTIMATE_ENABLED=true
@@ -43,6 +46,12 @@ NEXT_PUBLIC_LIFF_ID=2008216710-54P86MRY
 
 # สำหรับ register page (ตามที่ผู้ใช้ระบุ)
 NEXT_PUBLIC_LIFF_ID_REGISTER=2008216710-BEZ5XNyd
+
+# สำหรับชำระค่าปรับ
+NEXT_PUBLIC_LIFF_ID_PENALTY_PAYMENT=2008216710-Z54fuL3s
+
+# Cron (optional)
+CRON_SECRET=your_cron_secret
 
 # Rich Menu IDs (ตามที่ตั้งค่าใน Vercel)
 RICH_MENU_ID_NEW_USER=your_new_user_rich_menu_id

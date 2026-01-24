@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
+import { buildPenaltyLiffUrl, getPenaltyRequirement } from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // Investor LINE OA client
@@ -68,6 +69,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    if (penaltyRequirement.required) {
+      return NextResponse.json(
+        {
+          error: 'มีค่าปรับค้างชำระ กรุณาชำระค่าปรับก่อนทำรายการ',
+          penaltyRequired: true,
+          penalty: {
+            contractId: contract.contract_id,
+            contractNumber: contract.contract_number,
+            contractStartDate: penaltyRequirement.contractStartDate.toISOString(),
+            contractEndDate: penaltyRequirement.contractEndDate.toISOString(),
+            today: penaltyRequirement.today.toISOString(),
+            daysOverdue: penaltyRequirement.daysOverdue,
+            penaltyAmount: penaltyRequirement.penaltyAmount,
+          },
+          penaltyLiffUrl: buildPenaltyLiffUrl(contract.contract_id),
+        },
+        { status: 409 }
+      );
+    }
+
     // Check for existing pending request
     const { data: existingRequest } = await supabase
       .from('contract_action_requests')
@@ -132,7 +154,7 @@ export async function POST(request: NextRequest) {
       case 'INTEREST_PAYMENT': {
         const interestToPay = interestAccruedWithFee;
 
-        const newEndDate = new Date(today);
+        const newEndDate = new Date(endDate);
         newEndDate.setDate(newEndDate.getDate() + daysInContract);
 
         requestData = {
