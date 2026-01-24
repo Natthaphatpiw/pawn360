@@ -45,9 +45,13 @@ export default function PawnerPage() {
               <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
             </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">จุดรับฝาก</button>
+            <Link href="/drop-point-page">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">จุดรับฝาก</button>
+            </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">เกี่ยวกับเรา</button>
+            <Link href="/about">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">เกี่ยวกับเรา</button>
+            </Link>
           </nav>
 
           <div className={`${montserrat.className} hidden items-center gap-3 lg:flex`}>
@@ -104,12 +108,18 @@ export default function PawnerPage() {
                   >
                     นักลงทุน
                   </Link>
-                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                  <Link
+                    href="/drop-point-page"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
                     จุดรับฝาก
-                  </button>
-                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                  </Link>
+                  <Link
+                    href="/about"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
                     เกี่ยวกับเรา
-                  </button>
+                  </Link>
                 </div>
                 <div className="mt-5 grid gap-2">
                   <button className="w-full rounded-full border border-[#bdb9b6] px-4 py-2 text-xs text-[#686360]">
@@ -126,19 +136,19 @@ export default function PawnerPage() {
 
         <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-4 sm:gap-12 sm:px-6 sm:pb-20 sm:pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
           <div className="fade-up text-center sm:text-left lg:pt-6">
-            <h1 className="max-w-[520px] text-[46px] font-light leading-[1.45] text-[#686360] sm:text-[46px] lg:text-[48px]">
+            <h1 className="max-w-[520px] text-[34px] font-light leading-[1.4] text-[#686360] sm:text-[46px] lg:text-[48px]">
               เปลี่ยนทรัพย์สินของคุณ
               <br />เป็นเงินทุน... ง่ายๆ
               <br />เพียงปลายนิ้ว
             </h1>
-            <p className="mt-4 max-w-[520px] text-[16px] leading-6 text-[#9a9694] mx-auto sm:mx-0 sm:text-[18px] sm:leading-7">
+            <p className="mt-4 max-w-[520px] text-sm leading-6 text-[#9a9694] mx-auto sm:mx-0 sm:text-[18px] sm:leading-7">
               ไม่ต้องเดินทางไปหน้าร้าน ไม่ต้องรอคิว ประเมินราคาด้วย AI
               <br className="hidden sm:block" />
               และรับเงินโอนผ่านระบบ P2P ที่ปลอดภัยที่สุดบน Line OA
             </p>
             <div className="mt-5 flex flex-wrap justify-center sm:justify-start">
               <Link href="https://lin.ee/yX4oRny" target="_blank" rel="noopener noreferrer">
-                <button className="btn-sheen rounded-full border border-[var(--accent)] px-9 py-4 text-[16px] text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-6 sm:py-1.5">
+                <button className="btn-sheen rounded-full border border-[var(--accent)] px-6 py-2 text-sm text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-9 sm:py-4 sm:text-[16px]">
                   เริ่มเลย!
                 </button>
               </Link>
@@ -172,7 +182,7 @@ export default function PawnerPage() {
               <p className="mt-1 text-xs text-[#8e8a86]">ทำไมต้องพอว์นลี่</p>
             </div>
 
-            <div className="fade-up w-full lg:ml-auto" style={{ animationDelay: '0.4s' }}>
+            <div className="fade-up w-full mx-auto lg:ml-auto" style={{ animationDelay: '0.4s' }}>
               <div className="relative flex flex-col gap-2 w-full max-w-[520px] rounded-[20px] bg-[#d8d6d4] p-3 sm:p-4 soft-card overflow-hidden">
                 <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.7),rgba(216,214,212,0))] blur-2xl opacity-70 glow-pulse" />
                 <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.5),rgba(216,214,212,0))] blur-2xl opacity-60 float-slower" />
