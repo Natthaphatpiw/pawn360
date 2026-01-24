@@ -6,6 +6,27 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const normalizeNumber = (value: unknown) => {
+  const num = typeof value === 'string' ? Number(value) : Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const normalizeInt = (value: unknown) => {
+  const num = normalizeNumber(value);
+  if (num === null) {
+    return null;
+  }
+  return Math.round(num);
+};
+
+const clampInt = (value: unknown, min: number, max: number) => {
+  const num = normalizeInt(value);
+  if (num === null) {
+    return null;
+  }
+  return Math.min(max, Math.max(min, num));
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -43,6 +64,11 @@ export async function POST(request: NextRequest) {
     const customerId = pawnerData.customer_id;
     console.log('✅ Found customerId:', customerId);
 
+    const itemCondition = clampInt(itemData?.condition, 0, 100);
+    const estimatedValue = normalizeNumber(itemData?.estimatedPrice);
+    const aiConditionScore = normalizeNumber(itemData?.aiConditionScore);
+    const aiConfidence = normalizeNumber(itemData?.aiConfidence);
+
     // Create item record
     const itemRecord = {
       customer_id: customerId,
@@ -59,11 +85,11 @@ export async function POST(request: NextRequest) {
       ram: itemData.ram || null,
       storage: itemData.storage || null,
       gpu: itemData.gpu || null,
-      item_condition: itemData.condition,
-      ai_condition_score: itemData.aiConditionScore || null,
+      item_condition: itemCondition,
+      ai_condition_score: aiConditionScore,
       ai_condition_reason: itemData.aiConditionReason || null,
-      estimated_value: itemData.estimatedPrice,
-      ai_confidence: itemData.aiConfidence || null,
+      estimated_value: estimatedValue,
+      ai_confidence: aiConfidence,
       accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
       defects: itemData.defects || null,
       notes: itemData.notes || null,
@@ -113,10 +139,10 @@ export async function POST(request: NextRequest) {
       customer_id: customerId,
       item_id: item.item_id,
       drop_point_id: branchId,
-      requested_amount: loanAmount,
-      requested_duration_days: duration,
+      requested_amount: normalizeNumber(loanAmount),
+      requested_duration_days: normalizeInt(duration),
       delivery_method: deliveryMethodMap[deliveryMethod as keyof typeof deliveryMethodMap] || 'WALK_IN',
-      delivery_fee: deliveryFee,
+      delivery_fee: normalizeNumber(deliveryFee),
       request_status: 'PENDING',
       expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours from now
     };
