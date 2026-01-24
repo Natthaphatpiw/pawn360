@@ -1059,6 +1059,47 @@ CREATE INDEX idx_payments_status ON payments(payment_status);
 CREATE INDEX idx_payments_date ON payments(payment_date DESC);
 CREATE INDEX idx_payments_redemption_id ON payments(redemption_id);
 
+-- Table: penalty_payments (ค่าปรับเกินกำหนด)
+CREATE TABLE penalty_payments (
+  penalty_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  contract_id UUID NOT NULL REFERENCES contracts(contract_id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES pawners(customer_id),
+  investor_id UUID REFERENCES investors(investor_id),
+
+  penalty_date DATE NOT NULL,
+  days_overdue INT NOT NULL,
+  penalty_amount DECIMAL(12,2) NOT NULL,
+
+  status VARCHAR(30) NOT NULL DEFAULT 'PENDING' CHECK (status IN (
+    'PENDING',
+    'SLIP_UPLOADED',
+    'VERIFIED',
+    'REJECTED',
+    'REJECTED_FINAL',
+    'CANCELLED'
+  )),
+
+  slip_url TEXT,
+  slip_uploaded_at TIMESTAMPTZ,
+  slip_amount_detected DECIMAL(12,2),
+  slip_verification_result VARCHAR(50) CHECK (slip_verification_result IN (
+    'MATCHED', 'UNDERPAID', 'OVERPAID', 'UNREADABLE', 'INVALID'
+  )),
+  slip_verification_details JSONB,
+  slip_attempt_count INT DEFAULT 0,
+
+  verified_at TIMESTAMPTZ,
+  paid_through_date DATE,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_penalty_payments_contract_id ON penalty_payments(contract_id);
+CREATE INDEX idx_penalty_payments_penalty_date ON penalty_payments(penalty_date);
+CREATE INDEX idx_penalty_payments_status ON penalty_payments(status);
+CREATE INDEX idx_penalty_payments_created_at ON penalty_payments(created_at DESC);
+
 -- Table: repayment_schedules (ตารางการชำระเงิน)
 CREATE TABLE repayment_schedules (
   schedule_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

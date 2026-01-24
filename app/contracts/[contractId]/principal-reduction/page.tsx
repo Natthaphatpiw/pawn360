@@ -60,6 +60,25 @@ export default function PrincipalReductionPage() {
     }
   }, [contractId, reductionAmount]);
 
+  const redirectToPenalty = (payload?: any) => {
+    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
+      return false;
+    }
+
+    try {
+      const url = new URL(payload.penaltyLiffUrl);
+      if (!url.searchParams.get('contractId')) {
+        url.searchParams.set('contractId', contractId);
+      }
+      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
+      window.location.href = url.toString();
+      return true;
+    } catch (error) {
+      window.location.href = payload.penaltyLiffUrl;
+      return true;
+    }
+  };
+
   const fetchCalculation = async () => {
     try {
       const response = await axios.post('/api/contract-actions/calculate', {
@@ -72,7 +91,10 @@ export default function PrincipalReductionPage() {
         setCalculation(response.data.calculation);
         setContract(response.data.contract);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (redirectToPenalty(error?.response?.data)) {
+        return;
+      }
       console.error('Error fetching calculation:', error);
     } finally {
       setLoading(false);
@@ -110,6 +132,9 @@ export default function PrincipalReductionPage() {
         router.push(`/contracts/${contractId}/principal-reduction/upload?requestId=${response.data.requestId}`);
       }
     } catch (error: any) {
+      if (redirectToPenalty(error?.response?.data)) {
+        return;
+      }
       console.error('Error creating request:', error);
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {

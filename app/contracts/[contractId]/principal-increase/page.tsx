@@ -199,6 +199,25 @@ export default function PrincipalIncreasePage() {
     }
   }, [increaseAmount, contract]);
 
+  const redirectToPenalty = (payload?: any) => {
+    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
+      return false;
+    }
+
+    try {
+      const url = new URL(payload.penaltyLiffUrl);
+      if (!url.searchParams.get('contractId')) {
+        url.searchParams.set('contractId', contractId);
+      }
+      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
+      window.location.href = url.toString();
+      return true;
+    } catch (error) {
+      window.location.href = payload.penaltyLiffUrl;
+      return true;
+    }
+  };
+
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
@@ -240,6 +259,9 @@ export default function PrincipalIncreasePage() {
         setError(null);
       }
     } catch (error: any) {
+      if (redirectToPenalty(error?.response?.data)) {
+        return;
+      }
       console.error('Error calculating:', error);
       setError(error.response?.data?.error || 'ไม่สามารถคำนวณได้');
       setCalculation(null);
@@ -294,6 +316,9 @@ export default function PrincipalIncreasePage() {
         throw new Error(response.data.error);
       }
     } catch (error: any) {
+      if (redirectToPenalty(error?.response?.data)) {
+        return;
+      }
       console.error('Error creating request:', error);
       setError(error.response?.data?.error || error.message || 'เกิดข้อผิดพลาด');
     } finally {

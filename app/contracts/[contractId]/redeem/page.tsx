@@ -84,6 +84,25 @@ export default function RedemptionPaymentPage() {
     }
   }, [contractId]);
 
+  const redirectToPenalty = (payload?: any) => {
+    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
+      return false;
+    }
+
+    try {
+      const url = new URL(payload.penaltyLiffUrl);
+      if (!url.searchParams.get('contractId')) {
+        url.searchParams.set('contractId', contractId);
+      }
+      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
+      window.location.href = url.toString();
+      return true;
+    } catch (error) {
+      window.location.href = payload.penaltyLiffUrl;
+      return true;
+    }
+  };
+
   const fetchContractDetail = async () => {
     try {
       const response = await axios.get(`/api/contracts/detail/${contractId}`);
@@ -162,6 +181,9 @@ export default function RedemptionPaymentPage() {
         router.push(`/contracts/${contractId}/redeem/upload?redemptionId=${response.data.redemptionId}`);
       }
     } catch (error: any) {
+      if (redirectToPenalty(error?.response?.data)) {
+        return;
+      }
       console.error('Error creating redemption:', error);
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
