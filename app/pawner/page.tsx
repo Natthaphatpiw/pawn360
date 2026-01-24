@@ -41,7 +41,9 @@ export default function PawnerPage() {
               ผู้ขอสินเชื่อ
             </button>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
+            <Link href="/investor">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
+            </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
             <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">จุดรับฝาก</button>
             <span className="h-6 w-px bg-[var(--line)]" />
@@ -96,9 +98,12 @@ export default function PawnerPage() {
                   <div className="rounded-2xl bg-[#686360] px-4 py-3 text-sm text-white">
                     ผู้ขอสินเชื่อ
                   </div>
-                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                  <Link
+                    href="/investor"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
                     นักลงทุน
-                  </button>
+                  </Link>
                   <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
                     จุดรับฝาก
                   </button>
@@ -121,19 +126,19 @@ export default function PawnerPage() {
 
         <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-4 sm:gap-12 sm:px-6 sm:pb-20 sm:pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
           <div className="fade-up text-center sm:text-left lg:pt-6">
-            <h1 className="max-w-[520px] text-[28px] font-light leading-[1.45] text-[#686360] sm:text-4xl lg:text-[44px]">
+            <h1 className="max-w-[520px] text-[46px] font-light leading-[1.45] text-[#686360] sm:text-[46px] lg:text-[48px]">
               เปลี่ยนทรัพย์สินของคุณ
               <br />เป็นเงินทุน... ง่ายๆ
               <br />เพียงปลายนิ้ว
             </h1>
-            <p className="mt-4 max-w-[520px] text-sm leading-6 text-[#9a9694] mx-auto sm:mx-0 sm:text-base sm:leading-7">
+            <p className="mt-4 max-w-[520px] text-[16px] leading-6 text-[#9a9694] mx-auto sm:mx-0 sm:text-[18px] sm:leading-7">
               ไม่ต้องเดินทางไปหน้าร้าน ไม่ต้องรอคิว ประเมินราคาด้วย AI
               <br className="hidden sm:block" />
               และรับเงินโอนผ่านระบบ P2P ที่ปลอดภัยที่สุดบน Line OA
             </p>
             <div className="mt-5 flex flex-wrap justify-center sm:justify-start">
               <Link href="https://lin.ee/yX4oRny" target="_blank" rel="noopener noreferrer">
-                <button className="btn-sheen rounded-full border border-[var(--accent)] px-7 py-2 text-xs text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-6 sm:py-1.5">
+                <button className="btn-sheen rounded-full border border-[var(--accent)] px-9 py-4 text-[16px] text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-6 sm:py-1.5">
                   เริ่มเลย!
                 </button>
               </Link>
