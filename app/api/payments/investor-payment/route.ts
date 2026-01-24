@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (contract.funding_status && contract.funding_status !== 'PENDING') {
+    if (contract.funding_status && !['PENDING', 'FUNDED'].includes(contract.funding_status)) {
       return NextResponse.json(
         { error: 'Contract is not eligible for payment submission' },
         { status: 409 }
