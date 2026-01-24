@@ -22,7 +22,7 @@ export default function Home() {
         <div className="pointer-events-none absolute -top-40 right-[-10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle_at_center,rgba(255,181,92,0.35),rgba(245,244,242,0))]" />
         <div className="pointer-events-none absolute top-[20%] left-[-6%] h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle_at_center,rgba(240,160,120,0.25),rgba(245,244,242,0))]" />
 
-        <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-6 py-6 lg:px-14 font-extralight">
+        <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-4 py-4 sm:px-6 sm:py-6 lg:px-14 font-extralight">
           <div className="flex items-center gap-4">
             <Image
               src="/landing/pawnly_logo.png"
@@ -49,9 +49,13 @@ export default function Home() {
               <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">นักลงทุน</button>
             </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">จุดรับฝาก</button>
+            <Link href="/drop-point-page">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">จุดรับฝาก</button>
+            </Link>
             <span className="h-6 w-px bg-[var(--line)]" />
-            <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">เกี่ยวกับเรา</button>
+            <Link href="/about">
+              <button className="px-3 py-1 text-[var(--muted-2)] transition-all duration-300 hover:text-[var(--accent)] hover:scale-105">เกี่ยวกับเรา</button>
+            </Link>
           </nav>
 
           <div className={`${montserrat.className} hidden items-center gap-3 lg:flex`}>
@@ -108,12 +112,18 @@ export default function Home() {
                   >
                     นักลงทุน
                   </Link>
-                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                  <Link
+                    href="/drop-point-page"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
                     จุดรับฝาก
-                  </button>
-                  <button className="w-full rounded-2xl px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-[#efeeed]">
+                  </Link>
+                  <Link
+                    href="/about"
+                    className="block rounded-2xl px-4 py-3 text-sm transition-colors duration-200 hover:bg-[#efeeed]"
+                  >
                     เกี่ยวกับเรา
-                  </button>
+                  </Link>
                 </div>
                 <div className="mt-5 grid gap-2">
                   <button className="w-full rounded-full border border-[#bdb9b6] px-4 py-2 text-xs text-[#686360]">
@@ -128,8 +138,8 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="mx-auto grid w-full max-w-[1216px] items-center gap-12 px-6 pb-16 pt-4 lg:grid-cols-[1.1fr_0.9fr] lg:px-14">
-          <div className="fade-up">
+        <section className="mx-auto grid w-full max-w-[1216px] items-center gap-12 px-4 pb-16 pt-4 sm:px-6 sm:pb-20 lg:grid-cols-[1.1fr_0.9fr] lg:px-14">
+          <div className="fade-up text-center sm:text-left">
             <p className={`${montserrat.className} mb-3 text-xs tracking-[0.3em] text-[#bda9a0]`}>
               Pawnly Platform
             </p>
@@ -138,18 +148,18 @@ export default function Home() {
               <br />ของคุณ ด้วยเทคโนโลยี <span className="text-[var(--accent)] font-bold">AI</span>
               <br />และการเชื่อมต่อที่เหนือกว่า
             </h1>
-            <p className="mt-5 max-w-[620px] text-base text-[var(--muted)] sm:text-lg">
+            <p className="mt-5 max-w-[620px] text-base text-[var(--muted)] sm:text-lg mx-auto sm:mx-0">
               แพลตฟอร์มสินเชื่อมีหลักประกันแบบ P2P ที่ง่ายที่สุด ประเมินราคาแม่นยำด้วย AI
               และดำเนินการผ่าน Line OA 100% ไม่ต้องเสียเวลาเดินทางไปที่ร้าน
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
               <Link href="/pawner">
-                <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
+                <button className="group w-full rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25 sm:w-auto">
                   ต้องการเงินทุน (Start Borrowing)
                 </button>
               </Link>
               <Link href="/investor">
-                <button className="group rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
+                <button className="group w-full rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25 sm:w-auto">
                   สนใจลงทุน (Start Investing)
                 </button>
               </Link>
@@ -161,13 +171,13 @@ export default function Home() {
               alt="Pawnly app previews"
               width={1068}
               height={1068}
-              className="h-auto w-full max-w-[460px] drop-shadow-[0_24px_40px_rgba(67,63,60,0.2)] hover:scale-105 hover:rotate-1 transition-all duration-500 cursor-pointer"
+              className="h-auto w-full max-w-[360px] drop-shadow-[0_24px_40px_rgba(67,63,60,0.2)] hover:scale-105 hover:rotate-1 transition-all duration-500 cursor-pointer sm:max-w-[420px] lg:max-w-[460px]"
               priority
             />
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1216px] px-6 pb-16 lg:px-14">
+        <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 sm:px-6 lg:px-14">
           <div className="relative flex flex-col items-center">
             <div className="fade-up relative z-10 flex w-full justify-center" style={{ animationDelay: '0.3s' }}>
               <div>
@@ -181,7 +191,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="fade-up relative z-0 mx-auto -mt-12 w-full max-w-[980px] rounded-[32px] bg-[#d0cfce] px-6 pb-10 pt-14 text-center text-[#686360] sm:-mt-16 sm:px-12 sm:pt-16 lg:-mt-20">
+            <div className="fade-up relative z-0 mx-auto -mt-10 w-full max-w-[980px] rounded-[32px] bg-[#d0cfce] px-4 pb-10 pt-12 text-center text-[#686360] sm:-mt-16 sm:px-12 sm:pt-16 lg:-mt-20">
             <h2 className="text-2xl font-medium sm:text-3xl lg:text-[40px]">
               What is <span className="text-[var(--accent)]">Pawnly</span>?
             </h2>
@@ -194,14 +204,16 @@ export default function Home() {
             <p className="mt-4 text-sm leading-6 sm:text-base">
             Pawnly คือ แพลตฟอร์มสินเชื่อมีหลักประกันแบบ P2P ที่ทำงานผ่าน Line Official Account (Line OA) เป็นหลัก โดยเน้นการสร้างความสะดวกสบายและความรวดเร็วแก่ ผู้ขอสินเชื่อ (Pawners) และการจัดหาสิ่งอำนวยความสะดวกสำหรับ นักลงทุน (Investors) เพื่อให้สามารถให้สินเชื่อโดยตรงได้ง่ายขึ้น
             </p>
+            <Link href="/about" className="mt-6">
             <button className="mt-6 rounded-full border border-[var(--accent)] bg-transparent px-6 py-2 text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)] hover:text-white hover:shadow-lg hover:shadow-[var(--accent)]/25">
-              เริ่มต้นเลย
+              อ่านเพิ่มเติม
             </button>
+            </Link>
             </div>
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1216px] px-6 pb-16 text-center lg:px-14">
+        <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 text-center sm:px-6 lg:px-14">
           <div className="fade-up">
             <h3 className="text-xl font-medium text-[#686360] sm:text-2xl">Our Three Pillars</h3>
             <p className="mt-1 text-sm text-[#9a9694]">Our services/Solutions</p>
@@ -224,18 +236,20 @@ export default function Home() {
                 className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
               />
             </Link>
-            <Image
-              src={sub3}
-              alt="Business partnerships for drop points"
-              className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
-            />
+            <Link href="/drop-point-page">
+              <Image
+                src={sub3}
+                alt="Business partnerships for drop points"
+                className="h-auto w-full rounded-[28px] shadow-[0_18px_40px_rgba(67,63,60,0.12)] hover:scale-105 hover:shadow-[0_25px_50px_rgba(67,63,60,0.2)] transition-all duration-300 cursor-pointer"
+              />
+            </Link>
           </div>
         </section>
 
-        <section className="bg-[#686360] py-16">
-          <div className="mx-auto w-full max-w-[1216px] px-6 text-center text-[#f5f4f2] lg:px-14">
+        <section className="bg-[#686360] py-12 sm:py-16">
+          <div className="mx-auto w-full max-w-[1216px] px-4 text-center text-[#f5f4f2] sm:px-6 lg:px-14">
             <h3 className="text-xl font-medium sm:text-[45px] leading-[1.5]">Why Pawnly?</h3>
-            <div className="mt-10 grid gap-8 md:grid-cols-3">
+            <div className="mt-8 grid gap-6 sm:mt-10 sm:grid-cols-2 lg:mt-12 lg:grid-cols-3">
               {[
                 {
                   title: 'Safety First',
@@ -281,8 +295,8 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1216px] px-6 pb-20 pt-16 lg:px-14">
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
+        <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 lg:px-14">
+          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-stretch">
             <div className="fade-up overflow-hidden rounded-[28px]">
               <Image
                 src="/landing/com4.png"
@@ -292,7 +306,7 @@ export default function Home() {
                 className="h-full w-full object-cover"
               />
             </div>
-            <div className="fade-up rounded-[28px] bg-white p-8 shadow-[0_18px_40px_rgba(67,63,60,0.12)]">
+            <div className="fade-up rounded-[28px] bg-white p-6 shadow-[0_18px_40px_rgba(67,63,60,0.12)] sm:p-8">
               <h3 className="text-2xl font-medium text-[#686360] sm:text-3xl">Contact us</h3>
               <form className="mt-6 space-y-4">
                 <div>
