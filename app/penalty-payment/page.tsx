@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CheckCircle, ChevronLeft, Upload, X } from 'lucide-react';
 import axios from 'axios';
@@ -23,7 +23,7 @@ interface CompanyBank {
   promptpay_number: string;
 }
 
-export default function PenaltyPaymentPage() {
+function PenaltyPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const contractId = searchParams.get('contractId') || '';
@@ -436,5 +436,21 @@ export default function PenaltyPaymentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
+    </div>
+  );
+}
+
+export default function PenaltyPaymentPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PenaltyPaymentContent />
+    </Suspense>
   );
 }
