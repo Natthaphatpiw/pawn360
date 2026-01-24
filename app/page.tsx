@@ -139,7 +139,7 @@ export default function Home() {
         </header>
 
         <section className="mx-auto grid w-full max-w-[1216px] items-center gap-12 px-4 pb-16 pt-4 sm:px-6 sm:pb-20 lg:grid-cols-[1.1fr_0.9fr] lg:px-14">
-          <div className="fade-up text-center sm:text-left">
+          <div className="fade-up reveal-left text-center sm:text-left">
             <p className={`${montserrat.className} mb-3 text-xs tracking-[0.3em] text-[#bda9a0]`}>
               Pawnly Platform
             </p>
@@ -165,7 +165,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <div className="fade-up flex justify-center lg:justify-end" style={{ animationDelay: '0.2s' }}>
+          <div className="fade-up reveal-right flex justify-center lg:justify-end" style={{ transitionDelay: '0.2s' }}>
             <Image
               src="/landing/com1.png"
               alt="Pawnly app previews"
@@ -179,7 +179,7 @@ export default function Home() {
 
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 sm:px-6 lg:px-14">
           <div className="relative flex flex-col items-center">
-            <div className="fade-up relative z-10 flex w-full justify-center" style={{ animationDelay: '0.3s' }}>
+            <div className="fade-up reveal-scale relative z-10 flex w-full justify-center" style={{ transitionDelay: '0.3s' }}>
               <div>
                 <Image
                   src="/landing/com2.png"
@@ -191,7 +191,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="fade-up relative z-0 mx-auto -mt-10 w-full max-w-[980px] rounded-[32px] bg-[#d0cfce] px-4 pb-10 pt-12 text-center text-[#686360] sm:-mt-16 sm:px-12 sm:pt-16 lg:-mt-20">
+            <div className="fade-up hover-card relative z-0 mx-auto -mt-10 w-full max-w-[980px] rounded-[32px] bg-[#d0cfce] px-4 pb-10 pt-12 text-center text-[#686360] sm:-mt-16 sm:px-12 sm:pt-16 lg:-mt-20">
             <h2 className="text-2xl font-medium sm:text-3xl lg:text-[40px]">
               What is <span className="text-[var(--accent)]">Pawnly</span>?
             </h2>
@@ -220,7 +220,7 @@ export default function Home() {
           </div>
           <div
             className="fade-up mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-            style={{ animationDelay: '0.2s' }}
+            style={{ transitionDelay: '0.2s' }}
           >
             <Link href="/pawner">
               <Image
@@ -264,7 +264,7 @@ export default function Home() {
                   desc: 'All agreements are legally binding and fully transparent. You can monitor your asset status, loan details, and payment schedules in real-time through Line OA.\n ทุกสัญญาจัดทำอย่างถูกต้องตามกฎหมายและมีความโปร่งใสสูงสุด คุณสามารถติดตามสถานะทรัพย์สิน รายละเอียดสินเชื่อ และกำหนดการชำระเงินได้แบบเรียลไทม์ผ่าน Line OA',
                 },
               ].map((item) => (
-                <div key={item.title} className="fade-up rounded-2xl px-4 py-6 transition-all duration-300 hover:scale-[1.02] hover:bg-[#686360]/10 hover:shadow-lg hover:shadow-[#686360]/10 cursor-pointer" style={{ animationDelay: '0.2s' }}>
+                <div key={item.title} className="fade-up rounded-2xl px-4 py-6 transition-all duration-300 hover:scale-[1.02] hover:bg-[#686360]/10 hover:shadow-lg hover:shadow-[#686360]/10 cursor-pointer" style={{ transitionDelay: '0.2s' }}>
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f4f2] text-[#686360]">
                   {item.title === 'Safety First' && (
                     <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -297,7 +297,7 @@ export default function Home() {
 
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 lg:px-14">
           <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-stretch">
-            <div className="fade-up overflow-hidden rounded-[28px]">
+            <div className="fade-up hover-card overflow-hidden rounded-[28px]">
               <Image
                 src="/landing/com4.png"
                 alt="Contact Pawnly"
@@ -306,7 +306,7 @@ export default function Home() {
                 className="h-full w-full object-cover"
               />
             </div>
-            <div className="fade-up rounded-[28px] bg-white p-6 shadow-[0_18px_40px_rgba(67,63,60,0.12)] sm:p-8">
+            <div className="fade-up hover-card rounded-[28px] bg-white p-6 shadow-[0_18px_40px_rgba(67,63,60,0.12)] sm:p-8">
               <h3 className="text-2xl font-medium text-[#686360] sm:text-3xl">Contact us</h3>
               <form className="mt-6 space-y-4">
                 <div>

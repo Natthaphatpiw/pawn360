@@ -17,6 +17,8 @@ export default function AboutPage() {
   return (
     <div className={`${notoSansThai.className} bg-[var(--bg)] text-[var(--ink)]`}>
       <div className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-32 right-[-10%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle_at_center,rgba(196,170,148,0.3),rgba(245,244,242,0))]" />
+        <div className="pointer-events-none absolute top-[34%] left-[-8%] h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle_at_center,rgba(210,178,150,0.22),rgba(245,244,242,0))]" />
         <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-4 py-4 sm:px-6 sm:py-6 lg:px-14">
           <div className="flex items-center gap-4">
             <Link href="/">
@@ -142,17 +144,17 @@ export default function AboutPage() {
         </header>
 
         <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-6 sm:gap-12 sm:px-6 sm:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
-          <div className="fade-up text-center sm:text-left lg:self-center lg:pt-8 lg:pb-10">
+          <div className="fade-up reveal-left text-center sm:text-left lg:self-center lg:pt-8 lg:pb-10">
             <p className="text-xl font-light text-[#686360] sm:text-3xl lg:text-[60px]">About</p>
             <h1 className="mt-2 text-[44px] font-semibold leading-[1.05] text-[var(--accent)] sm:text-[70px] lg:text-[125px]">
               Pawnly
             </h1>
           </div>
-          <div className="fade-up flex flex-col items-center gap-2 sm:items-end sm:gap-3" style={{ animationDelay: '0.2s' }}>
+          <div className="fade-up reveal-right flex flex-col items-center gap-2 sm:items-end sm:gap-3" style={{ transitionDelay: '0.2s' }}>
             <Image
               src={com1About}
               alt="About Pawnly"
-              className="h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] sm:max-w-[380px] lg:max-w-[430px]"
+              className="h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] transition-transform duration-300 hover:scale-105 sm:max-w-[380px] lg:max-w-[430px]"
               priority
             />
           </div>
@@ -163,14 +165,14 @@ export default function AboutPage() {
             <div className="h-px w-full max-w-[320px] bg-[var(--accent)]" />
           </div>
           <div className="mt-12 grid items-center gap-10 sm:gap-12 md:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-            <div className="self-center justify-self-center fade-up text-center sm:text-left" style={{ animationDelay: '0.25s' }}>
+            <div className="self-center justify-self-center fade-up text-center sm:text-left" style={{ transitionDelay: '0.25s' }}>
               <h2 className="text-2xl font-medium text-[#686360] sm:text-3xl lg:text-[32px]">
                 Our <span className="self-center justify-self-center text-[var(--accent)]">Identity</span>
               </h2>
               <p className="mt-1 text-xs leading-6 justify-self-center text-[#8e8a86] sm:text-[16px]">ตัวตนของเรา</p>
             </div>
 
-            <div className="fade-up text-center text-[#686360] sm:text-left" style={{ animationDelay: '0.35s' }}>
+            <div className="fade-up text-center text-[#686360] sm:text-left" style={{ transitionDelay: '0.35s' }}>
               <h3 className="text-sm font-semibold text-[#686360] sm:text-base">
                 Revolutionizing Asset-Backed Lending
               </h3>
@@ -201,7 +203,7 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-10 grid gap-8 text-center sm:mt-12 sm:grid-cols-2 sm:text-left">
-            <div className="fade-up flex flex-col items-center sm:items-start" style={{ animationDelay: '0.2s' }}>
+            <div className="hover-card fade-up flex flex-col items-center sm:items-start" style={{ transitionDelay: '0.2s' }}>
               <div className="self-center justify-self-center mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#5b5754] text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 18h6" />
@@ -217,7 +219,7 @@ export default function AboutPage() {
               </p>
             </div>
 
-            <div className="fade-up flex flex-col items-center sm:items-start" style={{ animationDelay: '0.3s' }}>
+            <div className="hover-card fade-up flex flex-col items-center sm:items-start" style={{ transitionDelay: '0.3s' }}>
               <div className="self-center justify-self-center mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#5b5754] text-white">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 3v18" />
@@ -239,7 +241,7 @@ export default function AboutPage() {
         </div>
 
         <section className="mx-auto w-full max-w-[1216px] px-4 py-16 sm:px-6 sm:py-20 lg:px-14">
-          <div className="mx-auto max-w-[980px] rounded-[32px] bg-[#d0cfce] px-4 py-10 text-center text-[#686360] sm:px-12 sm:py-12">
+          <div className="fade-up hover-card mx-auto max-w-[980px] rounded-[32px] bg-[#d0cfce] px-4 py-10 text-center text-[#686360] sm:px-12 sm:py-12">
             <h3 className="text-lg font-medium sm:text-xl lg:text-[28px]">Our Commitment to Trust</h3>
             <p className="mt-1 text-sm text-[#686360]/90 sm:text-[18px]">คำมั่นสัญญาแห่งความเชื่อมั่น</p>
             <p className="mt-4 text-sm leading-6 text-[#7f7b78]">

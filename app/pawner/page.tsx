@@ -16,6 +16,8 @@ export default function PawnerPage() {
   return (
     <div className={`${notoSansThai.className} bg-[var(--bg)] text-[var(--ink)]`}>
       <div className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-36 right-[-12%] h-[380px] w-[380px] rounded-full bg-[radial-gradient(circle_at_center,rgba(255,186,128,0.32),rgba(245,244,242,0))]" />
+        <div className="pointer-events-none absolute top-[32%] left-[-8%] h-[260px] w-[260px] rounded-full bg-[radial-gradient(circle_at_center,rgba(229,150,110,0.22),rgba(245,244,242,0))]" />
         <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-4 py-4 sm:px-6 sm:py-6 lg:px-14">
           <div className="flex items-center gap-4">
             <Link href="/">
@@ -135,7 +137,7 @@ export default function PawnerPage() {
         </header>
 
         <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-4 sm:gap-12 sm:px-6 sm:pb-20 sm:pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
-          <div className="fade-up text-center sm:text-left lg:pt-6">
+          <div className="fade-up reveal-left text-center sm:text-left lg:pt-6">
             <h1 className="max-w-[520px] text-[34px] font-light leading-[1.4] text-[#686360] sm:text-[46px] lg:text-[48px]">
               เปลี่ยนทรัพย์สินของคุณ
               <br />เป็นเงินทุน... ง่ายๆ
@@ -154,7 +156,7 @@ export default function PawnerPage() {
               </Link>
             </div>
           </div>
-          <div className="fade-up flex flex-col items-center gap-2 sm:gap-3" style={{ animationDelay: '0.2s' }}>
+          <div className="fade-up reveal-right flex flex-col items-center gap-2 sm:gap-3" style={{ transitionDelay: '0.2s' }}>
             <div className="relative float-slow">
               <div className="pointer-events-none absolute -inset-4 rounded-[30px] bg-[radial-gradient(circle_at_top,rgba(255,210,165,0.65),rgba(245,244,242,0))] blur-2xl opacity-70 glow-pulse sm:-inset-6" />
               <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[#f2d3be] blur-2xl opacity-60 float-slower sm:-right-10 sm:-top-8 sm:h-24 sm:w-24" />
@@ -163,7 +165,7 @@ export default function PawnerPage() {
                 alt="Pawner app preview"
                 width={1068}
                 height={1068}
-                className="relative z-10 h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] sm:max-w-[380px] lg:max-w-[430px]"
+                className="relative z-10 h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] transition-transform duration-300 hover:scale-105 sm:max-w-[380px] lg:max-w-[430px]"
                 priority
               />
             </div>
@@ -175,15 +177,15 @@ export default function PawnerPage() {
             <div className="h-px w-full max-w-[360px] bg-[#686360]/50" />
           </div>
           <div className="mt-10 grid items-center gap-8 sm:mt-12 sm:gap-10 md:grid-cols-[0.9fr_1.1fr] md:gap-12 lg:mt-14 lg:gap-16">
-            <div className="fade-up text-center" style={{ animationDelay: '0.3s' }}>
+            <div className="fade-up text-center" style={{ transitionDelay: '0.3s' }}>
               <h2 className="mt-2 text-2xl font-medium text-[#686360] sm:text-3xl lg:text-[32px]">
                 Why <span className="text-[var(--accent)]">Pawnly</span> for You?
               </h2>
               <p className="mt-1 text-xs text-[#8e8a86]">ทำไมต้องพอว์นลี่</p>
             </div>
 
-            <div className="fade-up w-full mx-auto lg:ml-auto" style={{ animationDelay: '0.4s' }}>
-              <div className="relative flex flex-col gap-2 w-full max-w-[520px] rounded-[20px] bg-[#d8d6d4] p-3 sm:p-4 soft-card overflow-hidden">
+            <div className="fade-up w-full mx-auto lg:ml-auto" style={{ transitionDelay: '0.4s' }}>
+              <div className="hover-card relative flex flex-col gap-2 w-full max-w-[520px] rounded-[20px] bg-[#d8d6d4] p-3 sm:p-4 soft-card overflow-hidden">
                 <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.7),rgba(216,214,212,0))] blur-2xl opacity-70 glow-pulse" />
                 <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.5),rgba(216,214,212,0))] blur-2xl opacity-60 float-slower" />
                 {[
@@ -223,7 +225,7 @@ export default function PawnerPage() {
               <div className="h-px w-full max-w-[980px] bg-[#8e8a86]/60" />
             </div>
 
-            <div className="mt-6 grid gap-6 sm:mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div className="fade-up mt-6 grid gap-6 sm:mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               {[
                 { title: 'Expanded Access to Capital', desc: "You're not limited to a single pawn shop's funds; connect with a wider network of investors eager to provide loans for your valuables.\nคุณไม่ได้จำกัดอยู่เพียงเงินทุนของร้านที่ให้บริการแห่งเดียว แต่เชื่อมต่อกับเครือข่ายนักลงทุนที่กว้างขวางขึ้นที่ต้องการให้ สินเชื่อ สำหรับสิ่งของมีค่าของคุณ" },
                 { title: 'Superior Loan Terms', desc: "Receive multiple loan offers from various investors, allowing you to choose the best terms, interest rates, or loan amounts for your needs.\nรับข้อเสนอสินเชื่อต่างๆ จากนักลงทุนหลายราย ซึ่งช่วยให้คุณเลือกเงื่อนไข อัตราดอกเบี้ยหรือจำนวนเงินกู้ที่ดีที่สุดสำหรับความต้องการของคุณได้" },
@@ -287,7 +289,7 @@ export default function PawnerPage() {
             <p className="mt-1 text-[11px] text-[#9a9694] sm:text-xs">4 ขั้นตอนง่ายๆ</p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="fade-up grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { step: '1', title: 'Add Line', desc: 'แอดไลน์ของผู้ขอสินเชื่อ\nและลงทะเบียนง่ายๆ ใน 1 นาที', href: 'https://lin.ee/yX4oRny' },
               { step: '2', title: 'Upload & Appraise', desc: 'ถ่ายรูปทรัพย์สินเพื่อรับการประเมินราคาเบื้องต้นด้วย AI' },
