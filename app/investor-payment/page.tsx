@@ -172,7 +172,7 @@ function InvestorPaymentContent() {
   const isRejected = paymentStatus === 'REJECTED';
   const isPaid = paymentStatus === 'INVESTOR_PAID' || paymentStatus === 'COMPLETED';
   const isConfirmed = contract.contract_status === 'CONFIRMED' || Boolean(contract.payment_confirmed_at);
-  const isFundingClosed = Boolean(fundingStatus && fundingStatus !== 'PENDING');
+  const isFundingClosed = fundingStatus === 'DISBURSED';
   const canSubmit = !isPaid && !isConfirmed && !isFundingClosed && (!hasSlip || isRejected);
 
   if (!canSubmit) {
