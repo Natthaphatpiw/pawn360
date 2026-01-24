@@ -102,6 +102,8 @@ export default function InvestorPage() {
   return (
     <div className={`${notoSansThai.className} bg-[var(--bg)] text-[var(--ink)]`}>
       <div className="relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-32 right-[-10%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle_at_center,rgba(107,186,173,0.28),rgba(245,244,242,0))]" />
+        <div className="pointer-events-none absolute top-[28%] left-[-8%] h-[240px] w-[240px] rounded-full bg-[radial-gradient(circle_at_center,rgba(126,198,178,0.2),rgba(245,244,242,0))]" />
         <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-4 py-4 sm:px-6 sm:py-6 lg:px-14">
           <div className="flex items-center gap-4">
             <Link href="/">
@@ -227,7 +229,7 @@ export default function InvestorPage() {
         </header>
 
         <section className="mx-auto grid w-full max-w-[1216px] items-start gap-10 px-4 pb-16 pt-4 sm:gap-12 sm:px-6 sm:pb-20 sm:pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-14 lg:pb-24">
-          <div className="fade-up text-center sm:text-left lg:pt-6">
+          <div className="fade-up reveal-left text-center sm:text-left lg:pt-6">
             <h1 className="max-w-[520px] text-[34px] font-light leading-[1.4] text-[#686360] sm:text-5xl lg:text-[48px]">
               ลงทุนอย่างมั่นใจ...
               <br />มีทรัพย์สินค้ำประกันทุกรายการ
@@ -248,11 +250,11 @@ export default function InvestorPage() {
               </a>
             </div>
           </div>
-          <div className="fade-up flex flex-col items-center gap-2 sm:items-end sm:gap-3" style={{ animationDelay: '0.2s' }}>
+          <div className="fade-up reveal-right flex flex-col items-center gap-2 sm:items-end sm:gap-3" style={{ transitionDelay: '0.2s' }}>
             <Image
               src={com1Investor}
               alt="Investor app preview"
-              className="h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] sm:max-w-[380px] lg:max-w-[430px]"
+              className="h-auto w-full max-w-[320px] rounded-[24px] shadow-[0_18px_32px_rgba(67,63,60,0.18)] transition-transform duration-300 hover:scale-105 sm:max-w-[380px] lg:max-w-[430px]"
               priority
             />
           </div>
@@ -263,17 +265,17 @@ export default function InvestorPage() {
             <div className="h-px w-full max-w-[320px] bg-[var(--accent)]" />
           </div>
           <div className="mt-12 grid items-center gap-8 sm:gap-10 md:grid-cols-[0.9fr_1.1fr] md:gap-12 lg:gap-16">
-            <div className="fade-up text-center" style={{ animationDelay: '0.3s' }}>
+            <div className="fade-up text-center" style={{ transitionDelay: '0.3s' }}>
               <h2 className="mt-2 text-2xl font-medium text-[#686360] sm:text-3xl lg:text-[32px]">
                 Why <span className="text-[var(--accent)]">Pawnly</span> for You?
               </h2>
               <p className="mt-1 text-xs text-[#8e8a86]">ทำไมต้องพอว์นลี่</p>
             </div>
 
-            <div className="fade-up w-full mx-auto lg:ml-auto" style={{ animationDelay: '0.4s' }}>
+            <div className="fade-up w-full mx-auto lg:ml-auto" style={{ transitionDelay: '0.4s' }}>
               <div className="flex flex-col gap-2 w-full max-w-[520px] rounded-[20px] bg-[#d8d6d4] p-3 sm:p-4 shadow-[0_18px_36px_rgba(67,63,60,0.08)]">
                 {featureItems.map((item) => (
-                  <div key={item.en} className="flex flex-row flex-wrap items-center gap-3 rounded-[14px] bg-[#cfcac7] px-4 py-2.5 sm:flex-nowrap">
+                  <div key={item.en} className="hover-card flex flex-row flex-wrap items-center gap-3 rounded-[14px] bg-[#cfcac7] px-4 py-2.5 sm:flex-nowrap">
                     <div className="flex-none">
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="8" cy="8" r="8" fill="#686360"/>
@@ -301,9 +303,9 @@ export default function InvestorPage() {
               <div className="h-px w-full max-w-[980px] bg-[var(--accent)]" />
             </div>
 
-            <div className="mt-6 grid gap-6 sm:mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div className="fade-up mt-6 grid gap-6 sm:mt-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
               {benefits.map((item) => (
-                <div key={item.title} className="flex flex-col items-center text-center">
+                <div key={item.title} className="hover-card flex flex-col items-center rounded-2xl px-2 py-3 text-center">
                   <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f4f2] text-[#686360] sm:h-12 sm:w-12">
                     {item.icon}
                   </div>
@@ -325,9 +327,9 @@ export default function InvestorPage() {
             <p className="mt-1 text-[16px] text-[#9a9694]">ระดับการลงทุน</p>
           </div>
 
-          <div className="mt-10 grid gap-6 justify-items-center sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="fade-up mt-10 grid gap-6 justify-items-center sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {investmentLevels.map((tier) => (
-              <div key={tier.title} className="flex flex-col items-center gap-3">
+              <div key={tier.title} className="hover-card flex flex-col items-center gap-3">
                 <Image
                   src={tier.image}
                   alt={tier.alt}
@@ -348,7 +350,7 @@ export default function InvestorPage() {
             <p className="mt-1 text-[16px] text-[#9a9694]">ขั้นตอนของนักลงทุน</p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="fade-up grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {journeySteps.map((item) => {
               const card = (
                 <div className="rounded-[20px] bg-[#c8c5c2] px-4 py-6 text-center shadow-[0_14px_26px_rgba(67,63,60,0.12)] transition-transform duration-300 hover:-translate-y-1 sm:px-5 sm:py-8">
