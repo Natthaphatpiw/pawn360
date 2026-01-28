@@ -63,7 +63,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (contract.pawners?.line_id !== lineId) {
+    const pawner = Array.isArray(contract.pawners)
+      ? contract.pawners[0]
+      : contract.pawners;
+
+    if (pawner?.line_id !== lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }

@@ -52,7 +52,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (contract.pawners?.line_id !== lineId) {
+    const pawner = Array.isArray(contract.pawners)
+      ? contract.pawners[0]
+      : contract.pawners;
+    const dropPoint = Array.isArray(contract.drop_points)
+      ? contract.drop_points[0]
+      : contract.drop_points;
+
+    if (pawner?.line_id !== lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -79,8 +86,8 @@ export async function GET(request: NextRequest) {
         contract_id: contract.contract_id,
         contract_number: contract.contract_number,
         item: contract.items,
-        pawner: contract.pawners,
-        drop_point: contract.drop_points,
+        pawner,
+        drop_point: dropPoint,
       },
       loanRequest: loanRequest || null,
       deliveryRequest: deliveryRequest || null,
@@ -135,7 +142,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (contract.pawners?.line_id !== lineId) {
+    const pawner = Array.isArray(contract.pawners)
+      ? contract.pawners[0]
+      : contract.pawners;
+    const dropPoint = Array.isArray(contract.drop_points)
+      ? contract.drop_points[0]
+      : contract.drop_points;
+
+    if (pawner?.line_id !== lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -180,7 +194,7 @@ export async function POST(request: NextRequest) {
       customer_id: contract.customer_id,
       drop_point_id: contract.drop_point_id,
       pawner_line_id: lineId,
-      drop_point_line_id: contract.drop_points?.line_id || null,
+      drop_point_line_id: dropPoint?.line_id || null,
       delivery_fee: loanRequest?.delivery_fee ?? 40,
       status: 'AWAITING_PAYMENT',
       address_house_no: address.houseNo,

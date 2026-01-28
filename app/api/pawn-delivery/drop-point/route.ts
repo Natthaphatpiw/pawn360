@@ -48,7 +48,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (contract.drop_points?.line_id !== lineId) {
+    const dropPoint = Array.isArray(contract.drop_points)
+      ? contract.drop_points[0]
+      : contract.drop_points;
+
+    if (dropPoint?.line_id !== lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -63,7 +67,7 @@ export async function GET(request: NextRequest) {
         contract_number: contract.contract_number,
         item: contract.items,
         pawner: contract.pawners,
-        drop_point: contract.drop_points,
+        drop_point: dropPoint,
       },
     });
   } catch (error: any) {
