@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
@@ -22,7 +22,7 @@ interface ContractData {
   drop_point?: { drop_point_name?: string };
 }
 
-export default function DropPointPickupPage() {
+function DropPointPickupPageContent() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const searchParams = useSearchParams();
 
@@ -188,5 +188,22 @@ export default function DropPointPickupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DropPointPickupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA]">
+          <div className="text-center text-[#365314]">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="mt-2 text-sm">กำลังโหลด...</p>
+          </div>
+        </div>
+      }
+    >
+      <DropPointPickupPageContent />
+    </Suspense>
   );
 }

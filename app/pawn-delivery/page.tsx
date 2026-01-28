@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
@@ -44,7 +44,7 @@ const STATUS_STEPS = [
   'สินค้าถึง Drop Point แล้ว อยู่ในขั้นตอนตรวจสอบ',
 ];
 
-export default function PawnDeliveryPage() {
+function PawnDeliveryPageContent() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const searchParams = useSearchParams();
 
@@ -473,5 +473,22 @@ export default function PawnDeliveryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PawnDeliveryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F5F4F2]">
+          <div className="text-center text-[#686360]">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+            <p className="mt-3 text-sm">กำลังโหลด...</p>
+          </div>
+        </div>
+      }
+    >
+      <PawnDeliveryPageContent />
+    </Suspense>
   );
 }

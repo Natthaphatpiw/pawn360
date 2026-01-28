@@ -3,15 +3,24 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || '',
-});
+const createLineClient = (channelAccessToken?: string, channelSecret?: string) => {
+  if (!channelAccessToken) {
+    return null;
+  }
+  return new Client({
+    channelAccessToken,
+    channelSecret: channelSecret || '',
+  });
+};
 
-const dropPointLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || '',
-});
+const pawnerLineClient = createLineClient(
+  process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  process.env.LINE_CHANNEL_SECRET
+);
+const dropPointLineClient = createLineClient(
+  process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT,
+  process.env.LINE_CHANNEL_SECRET_DROPPOINT
+);
 
 const getPawnerStatusUrl = (contractId: string) => {
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
@@ -191,7 +200,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (pawnerLineId && contract.pawners?.line_id !== pawnerLineId) {
+    const pawner = Array.isArray(contract.pawners)
+      ? contract.pawners[0]
+      : contract.pawners;
+    const dropPoint = Array.isArray(contract.drop_points)
+      ? contract.drop_points[0]
+      : contract.drop_points;
+    const item = Array.isArray(contract.items)
+      ? contract.items[0]
+      : contract.items;
+
+    if (pawnerLineId && pawner?.line_id !== pawnerLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -254,9 +273,9 @@ export async function POST(request: NextRequest) {
 
       const statusUrl = getPawnerStatusUrl(contract.contract_id);
 
-      if (contract.pawners?.line_id) {
+      if (pawner?.line_id && pawnerLineClient) {
         try {
-          await pawnerLineClient.pushMessage(contract.pawners.line_id, {
+          await pawnerLineClient.pushMessage(pawner.line_id, {
             type: 'text',
             text: `ชำระค่าส่งเรียบร้อยแล้ว\n\nDrop Point จะเรียกรถไปรับสินค้าของคุณภายใน 2 ชั่วโมง\nกรุณาเตรียมสินค้าไว้ให้พร้อม\n\nเช็คสถานะการเข้ารับสินค้าได้ที่นี่:\n${statusUrl}`,
           });
@@ -265,9 +284,9 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      if (contract.drop_points?.line_id && process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT) {
+      if (dropPoint?.line_id && dropPointLineClient) {
         try {
-          const itemName = `${contract.items?.brand || ''} ${contract.items?.model || ''}`.trim();
+          const itemName = `${item?.brand || ''} ${item?.model || ''}`.trim();
           const card = buildDropPointPickupCard({
             deliveryRequestId,
             contractNumber: contract.contract_number,
@@ -276,7 +295,7 @@ export async function POST(request: NextRequest) {
             contactPhone: deliveryRequest.contact_phone,
             feeAmount: expectedAmount,
           });
-          await dropPointLineClient.pushMessage(contract.drop_points.line_id, card);
+          await dropPointLineClient.pushMessage(dropPoint.line_id, card);
         } catch (msgError) {
           console.error('Error sending delivery pickup to drop point:', msgError);
         }
