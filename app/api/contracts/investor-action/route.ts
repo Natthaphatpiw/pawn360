@@ -63,6 +63,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { data: loanRequest } = await supabase
+      .from('loan_requests')
+      .select('delivery_method, delivery_fee')
+      .eq('request_id', contract.loan_request_id)
+      .single();
+
     if (action === 'accept') {
       const pinCheck = await requirePinToken('INVESTOR', lineId, pinToken);
       if (!pinCheck.ok) {
@@ -166,7 +172,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Send confirmation message to pawner
-      const confirmationCard = createAcceptedCard(contract);
+      const confirmationCard = createAcceptedCard(contract, loanRequest || null);
       try {
         await pawnerLineClient.pushMessage(contract.pawners.line_id, confirmationCard);
         console.log(`Sent confirmation to pawner ${contract.pawners.line_id}`);
@@ -202,13 +208,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createAcceptedCard(contract: any) {
+function createAcceptedCard(contract: any, loanRequest: { delivery_method?: string | null; delivery_fee?: number | null } | null) {
   const dueDate = new Date(contract.contract_end_date);
   const dueDateString = dueDate.toLocaleDateString('th-TH', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
   });
+
+  const deliveryMethod = loanRequest?.delivery_method || 'WALK_IN';
+  const deliveryFee = Number(loanRequest?.delivery_fee || 40);
+  const isDelivery = deliveryMethod === 'DELIVERY';
+  const deliveryLiffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
+  const deliveryUrl = `https://liff.line.me/${deliveryLiffId}?contractId=${contract.contract_id}`;
 
   const card = {
     type: 'flex',
@@ -318,7 +330,24 @@ function createAcceptedCard(contract: any) {
                 { type: 'text', text: 'ยอดชำระคืน:', color: '#666666', size: 'sm', flex: 2 },
                 { type: 'text', text: `${contract.total_amount.toLocaleString()} บาท`, color: '#9A3412', size: 'md', flex: 5, weight: 'bold' }
               ]
-            }
+            },
+            ...(isDelivery ? [{
+              type: 'separator',
+              margin: 'lg'
+            }, {
+              type: 'text',
+              text: 'Drop Point จะทำการเรียกรถไปรับสินค้าของคุณภายใน 2 ชั่วโมง',
+              size: 'sm',
+              color: '#C0562F',
+              wrap: true,
+              margin: 'md'
+            }, {
+              type: 'text',
+              text: 'กรุณากรอกที่อยู่รับสินค้าและชำระค่าจัดส่งผ่านปุ่มด้านล่าง',
+              size: 'xs',
+              color: '#666666',
+              wrap: true
+            }] : [])
           ]
         }]
       },
@@ -326,7 +355,32 @@ function createAcceptedCard(contract: any) {
         type: 'box',
         layout: 'vertical',
         spacing: 'sm',
-        contents: [{
+        contents: isDelivery ? [
+          {
+            type: 'button',
+            action: {
+              type: 'uri',
+              label: 'กรอกที่อยู่รับสินค้า',
+              uri: deliveryUrl
+            },
+            style: 'primary',
+            color: '#C0562F'
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: `ค่าจัดส่ง ${deliveryFee.toLocaleString()} บาท (ชำระก่อนจัดส่ง)`,
+                size: 'xs',
+                color: '#666666',
+                wrap: true
+              }
+            ]
+          }
+        ] : [{
           type: 'button',
           action: {
             type: 'postback',
