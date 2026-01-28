@@ -31,6 +31,8 @@ export async function GET() {
       district: dp.addr_district,
       province: dp.addr_province,
       postal_code: dp.addr_postcode,
+      latitude: dp.latitude,
+      longitude: dp.longitude,
       phone_number: dp.phone_number,
       google_maps_link: dp.google_map_url,
       map_embed: dp.map_embed,

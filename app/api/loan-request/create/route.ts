@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { haversineDistanceMeters } from '@/lib/services/geo';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Looking for pawner with lineId:', lineId);
     const { data: pawnerData, error: pawnerError } = await supabase
       .from('pawners')
-      .select('customer_id')
+      .select('customer_id, last_location_lat, last_location_lng')
       .eq('line_id', lineId)
       .single();
 
@@ -63,6 +64,50 @@ export async function POST(request: NextRequest) {
 
     const customerId = pawnerData.customer_id;
     console.log('✅ Found customerId:', customerId);
+
+    if (deliveryMethod === 'delivery') {
+      const locationLat = Number(pawnerData.last_location_lat);
+      const locationLng = Number(pawnerData.last_location_lng);
+
+      if (!Number.isFinite(locationLat) || !Number.isFinite(locationLng)) {
+        return NextResponse.json(
+          {
+            error: 'กรุณาอนุญาตตำแหน่งของคุณก่อนใช้บริการจัดส่ง',
+            code: 'LOCATION_REQUIRED'
+          },
+          { status: 400 }
+        );
+      }
+
+      const { data: branchData, error: branchError } = await supabase
+        .from('drop_points')
+        .select('drop_point_id, latitude, longitude')
+        .eq('drop_point_id', branchId)
+        .single();
+
+      if (branchError || !branchData || branchData.latitude == null || branchData.longitude == null) {
+        return NextResponse.json(
+          { error: 'ไม่สามารถตรวจสอบระยะทางกับสาขาที่เลือกได้' },
+          { status: 400 }
+        );
+      }
+
+      const distanceMeters = haversineDistanceMeters(
+        { latitude: locationLat, longitude: locationLng },
+        { latitude: Number(branchData.latitude), longitude: Number(branchData.longitude) }
+      );
+
+      if (distanceMeters > 10000) {
+        return NextResponse.json(
+          {
+            error: 'คุณอยู่ไกลจาก Drop Point เกินกว่าที่กำหนด ขออภัยกรุณาเลือก "ดำเนินการด้วยตัวเอง (Walk-in)" เพื่อนำมาส่งให้ Drop Point ด้วยตัวเอง ขออภัยในความสะดวก ขอบคุณครับ',
+            code: 'DELIVERY_OUT_OF_RANGE',
+            distanceKm: Math.round((distanceMeters / 1000) * 10) / 10
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const itemCondition = clampInt(itemData?.condition, 0, 100);
     const estimatedValue = normalizeNumber(itemData?.estimatedPrice);

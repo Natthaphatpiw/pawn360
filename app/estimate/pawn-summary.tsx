@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ChevronDown, MapPin, Phone, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
+import { haversineDistanceMeters } from '@/lib/services/geo';
 
 interface Branch {
   branch_id: string;
@@ -12,6 +13,8 @@ interface Branch {
   district: string;
   province: string;
   postal_code: string;
+  latitude?: number | null;
+  longitude?: number | null;
   phone_number: string;
   google_maps_link: string;
   map_embed?: string | null;
@@ -65,6 +68,11 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null);
+  const [deliveryEligible, setDeliveryEligible] = useState<boolean | null>(null);
+  const [deliveryLocationRequested, setDeliveryLocationRequested] = useState(false);
   const [suggestedBranch, setSuggestedBranch] = useState<{
     branch_id: string;
     branch_name: string;
@@ -74,6 +82,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const maxLoanAmount = itemData.estimatedPrice;
   const loanAmountNum = parseFloat(loanAmount.replace(/,/g, '')) || 0;
   const deliveryFee = deliveryMethod === 'delivery' ? 40 : 0;
+  const MAX_DELIVERY_DISTANCE_KM = 10;
   const interestRateTotal = 0.03; // total 3% per month
   const interestRatePawner = 0.02; // interest portion 2%
   const feeRate = 0.01; // fee portion 1%
@@ -84,6 +93,18 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const totalRepayment = loanAmountNum + totalInterest + deliveryFee;
 
   const currentBranch = branches.find(b => b.branch_id === selectedBranchId);
+
+  const getBranchDistanceKm = (
+    origin: { latitude: number; longitude: number },
+    branch?: Branch | null
+  ) => {
+    if (!branch || branch.latitude == null || branch.longitude == null) return null;
+    const distanceMeters = haversineDistanceMeters(origin, {
+      latitude: Number(branch.latitude),
+      longitude: Number(branch.longitude),
+    });
+    return Math.round((distanceMeters / 1000) * 10) / 10;
+  };
 
   useEffect(() => {
     checkRegistration();
@@ -97,6 +118,34 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
       setSelectedBranchId(defaultBranchId);
     }
   }, [branches, defaultBranchId, selectedBranchId]);
+
+  useEffect(() => {
+    if (deliveryMethod !== 'delivery') {
+      setDeliveryError(null);
+      setDeliveryDistanceKm(null);
+      setDeliveryEligible(null);
+      return;
+    }
+
+    if (!deliveryLocationRequested && !userLocation) {
+      setDeliveryLocationRequested(true);
+      handleUseLocation({ setDefault: false, context: 'delivery' });
+      return;
+    }
+
+    if (userLocation && currentBranch) {
+      const distanceKm = getBranchDistanceKm(userLocation, currentBranch);
+      setDeliveryDistanceKm(distanceKm);
+      if (distanceKm != null) {
+        setDeliveryEligible(distanceKm <= MAX_DELIVERY_DISTANCE_KM);
+        if (distanceKm > MAX_DELIVERY_DISTANCE_KM) {
+          setDeliveryError('ตำแหน่งของคุณอยู่นอกระยะบริการจัดส่ง (เกิน 10 กม.)');
+        } else {
+          setDeliveryError(null);
+        }
+      }
+    }
+  }, [deliveryMethod, userLocation, currentBranch, deliveryLocationRequested]);
 
   const checkRegistration = async () => {
     try {
@@ -144,7 +193,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     }
   };
 
-  const handleUseLocation = () => {
+  const handleUseLocation = (options?: { setDefault?: boolean; context?: 'manual' | 'delivery' }) => {
     if (!lineId) {
       setLocationMessage('ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่');
       return;
@@ -156,27 +205,50 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
 
     setIsLocating(true);
     setLocationMessage(null);
+    const setDefault = options?.setDefault ?? true;
+    const context = options?.context ?? 'manual';
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const response = await axios.post('/api/pawners/location', {
-            lineId,
+          const currentLocation = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
+          };
+          setUserLocation(currentLocation);
+          const response = await axios.post('/api/pawners/location', {
+            lineId,
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
             accuracy: position.coords.accuracy,
             source: 'liff_geolocation',
-            setDefault: true,
+            setDefault,
           });
 
           const suggested = response.data?.suggestedBranch || null;
-          setSuggestedBranch(suggested);
-          if (suggested?.branch_id) {
-            setSelectedBranchId(suggested.branch_id);
-            setDefaultBranchId(suggested.branch_id);
-            setLocationMessage(`แนะนำสาขา ${suggested.branch_name} ให้แล้ว`);
-          } else {
-            setLocationMessage('ไม่พบสาขาใกล้เคียง กรุณาเลือกเอง');
+          if (context === 'manual') {
+            setSuggestedBranch(suggested);
+            if (suggested?.branch_id) {
+              setSelectedBranchId(suggested.branch_id);
+              setDefaultBranchId(suggested.branch_id);
+              setLocationMessage(`แนะนำสาขา ${suggested.branch_name} ให้แล้ว`);
+            } else {
+              setLocationMessage('ไม่พบสาขาใกล้เคียง กรุณาเลือกเอง');
+            }
+          } else if (context === 'delivery') {
+            const distanceKm = getBranchDistanceKm(currentLocation, currentBranch);
+            setDeliveryDistanceKm(distanceKm);
+            if (distanceKm != null) {
+              setDeliveryEligible(distanceKm <= MAX_DELIVERY_DISTANCE_KM);
+              setDeliveryError(
+                distanceKm > MAX_DELIVERY_DISTANCE_KM
+                  ? 'ตำแหน่งของคุณอยู่นอกระยะบริการจัดส่ง (เกิน 10 กม.)'
+                  : null
+              );
+              setLocationMessage('ตรวจสอบระยะทางสำหรับบริการจัดส่งแล้ว');
+            } else {
+              setLocationMessage('ไม่พบพิกัดสาขา กรุณาเลือกสาขาอื่น');
+            }
           }
         } catch (error) {
           console.error('Location save error:', error);
@@ -225,6 +297,26 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
     if (!selectedBranchId) {
       alert('กรุณาเลือกสาขาที่สะดวก');
       return;
+    }
+    if (deliveryMethod === 'delivery') {
+      if (!userLocation) {
+        setDeliveryError('กรุณาอนุญาตตำแหน่งของคุณก่อนใช้บริการจัดส่ง');
+        alert('กรุณาอนุญาตตำแหน่งของคุณก่อนใช้บริการจัดส่ง');
+        return;
+      }
+      const distanceKm = getBranchDistanceKm(userLocation, currentBranch);
+      if (distanceKm == null) {
+        setDeliveryError('ไม่สามารถตรวจสอบระยะทางกับสาขาที่เลือกได้');
+        alert('ไม่สามารถตรวจสอบระยะทางกับสาขาที่เลือกได้ กรุณาลองใหม่');
+        return;
+      }
+      if (distanceKm > MAX_DELIVERY_DISTANCE_KM) {
+        const message = 'คุณอยู่ไกลจาก Drop Point เกินกว่าที่กำหนด ขออภัยกรุณาเลือก "ดำเนินการด้วยตัวเอง (Walk-in)" เพื่อนำมาส่งให้ Drop Point ด้วยตัวเอง ขออภัยในความสะดวก ขอบคุณครับ';
+        setDeliveryError(message);
+        alert(message);
+        setDeliveryMethod('pickup');
+        return;
+      }
     }
     if (!isRegistered || loanAmountNum === 0) {
       console.log('❌ Validation failed:', { isRegistered, loanAmountNum });
@@ -426,6 +518,15 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
             *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &quot;ดำเนินการด้วยตัวเอง&quot;<br/>
             แล้วเรียกบริการส่งของด้วยตัวเองได้ หรือติดต่อ &quot;ช่วยเหลือ/Support&quot;
           </p>
+          {deliveryMethod === 'delivery' && deliveryDistanceKm != null && (
+            <p className={`text-[11px] mt-2 ${deliveryEligible ? 'text-green-600' : 'text-red-500'}`}>
+              ระยะทางจากตำแหน่งของคุณถึงสาขา ~{deliveryDistanceKm.toFixed(1)} กม.
+              {deliveryEligible === false ? ' (เกิน 10 กม. ไม่สามารถใช้บริการจัดส่งได้)' : ''}
+            </p>
+          )}
+          {deliveryError && (
+            <p className="text-[11px] text-red-500 mt-2">{deliveryError}</p>
+          )}
         </div>
 
         {/* Branch Selection & Info Card */}
@@ -439,7 +540,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
             </div>
             <button
               type="button"
-              onClick={handleUseLocation}
+              onClick={() => handleUseLocation({ setDefault: true, context: 'manual' })}
               disabled={isLocating}
               className="inline-flex items-center gap-1.5 rounded-full border border-[#C0562F] bg-[#FDF4EF] px-3 py-2 text-[11px] font-semibold text-[#C0562F] shadow-sm transition hover:bg-[#FBE8DD] disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
             >

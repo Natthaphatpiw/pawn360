@@ -526,6 +526,27 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
+        const { data: loanRequest } = await supabase
+          .from('loan_requests')
+          .select('delivery_method')
+          .eq('request_id', contract.loan_request_id)
+          .single();
+
+        if (loanRequest?.delivery_method === 'DELIVERY') {
+          const deliveryLiffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
+          const deliveryUrl = `https://liff.line.me/${deliveryLiffId}?contractId=${contract.contract_id}`;
+
+          const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+          if (channelAccessToken && contract.pawners?.line_id) {
+            const client = new Client({ channelAccessToken });
+            await client.pushMessage(contract.pawners.line_id, {
+              type: 'text',
+              text: `คุณเลือกบริการจัดส่งสินค้าผ่าน Drop Point\nกรุณากรอกที่อยู่เพื่อให้รถเข้ารับสินค้าได้ที่ลิงก์นี้:\n${deliveryUrl}`
+            });
+          }
+          return;
+        }
+
         // Idempotency check at database level - check if already confirmed
         if (contract.item_delivery_status === 'PAWNER_CONFIRMED' ||
             contract.item_delivery_status === 'DELIVERED' ||
