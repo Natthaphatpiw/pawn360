@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { refreshImageUrls } from '@/lib/aws/s3';
 
 export async function GET(
   request: NextRequest,
@@ -86,9 +87,27 @@ export async function GET(
       };
     }
 
+    let items = contract.items as any;
+    if (Array.isArray(items)) {
+      items = await Promise.all(
+        items.map(async (item) => ({
+          ...item,
+          image_urls: await refreshImageUrls(item?.image_urls),
+        }))
+      );
+    } else if (items) {
+      items = {
+        ...items,
+        image_urls: await refreshImageUrls(items?.image_urls),
+      };
+    }
+
     return NextResponse.json({
       success: true,
-      contract
+      contract: {
+        ...contract,
+        items,
+      }
     });
 
   } catch (error: any) {

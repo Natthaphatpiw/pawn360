@@ -172,6 +172,7 @@ function DropPointContent() {
 
     const verifyLiffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q';
     const verifyUrl = `https://liff.line.me/${verifyLiffId}?contractId=${encodeURIComponent(contractDetail.contract_id)}`;
+    const canVerify = contractDetail.item_delivery_status !== 'VERIFIED' || !contractDetail.item_verified_at;
 
     return (
       <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6">
@@ -218,7 +219,7 @@ function DropPointContent() {
           />
         </div>
 
-        {contractDetail.item_delivery_status !== 'VERIFIED' && (
+        {canVerify && (
           <button
             onClick={() => {
               window.location.href = verifyUrl;
@@ -227,6 +228,11 @@ function DropPointContent() {
           >
             ตรวจสอบสินค้า
           </button>
+        )}
+        {!canVerify && (
+          <div className="mt-2 text-center text-sm text-gray-500">
+            ตรวจสอบสินค้าเรียบร้อยแล้ว
+          </div>
         )}
       </div>
     );
