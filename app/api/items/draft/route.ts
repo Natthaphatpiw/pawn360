@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { refreshImageUrls } from '@/lib/aws/s3';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -43,8 +44,13 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      const refreshedItem = {
+        ...item,
+        image_urls: await refreshImageUrls(item?.image_urls),
+      };
+
       return NextResponse.json(
-        { success: true, item },
+        { success: true, item: refreshedItem },
         { headers: NO_STORE_HEADERS }
       );
     }
@@ -59,10 +65,17 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const refreshedItems = await Promise.all(
+      (items || []).map(async (draft) => ({
+        ...draft,
+        image_urls: await refreshImageUrls(draft?.image_urls),
+      }))
+    );
+
     return NextResponse.json(
       {
         success: true,
-        items: items || [],
+        items: refreshedItems,
       },
       { headers: NO_STORE_HEADERS }
     );

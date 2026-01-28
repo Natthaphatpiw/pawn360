@@ -109,6 +109,52 @@ export async function getImagePresignedUrl(imageKey: string, expiresIn: number =
   }
 }
 
+const IMAGE_KEY_PREFIXES = ['pawn-items/', 'cont360/'];
+
+const normalizeKey = (value: string) => value.replace(/^\/+/, '');
+
+const isKnownImageKey = (key: string) => IMAGE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+
+const extractImageKey = (value: string): string | null => {
+  if (!value) return null;
+  if (!value.includes('://')) {
+    const rawKey = normalizeKey(value);
+    return isKnownImageKey(rawKey) ? rawKey : null;
+  }
+
+  try {
+    const parsed = new URL(value);
+    const pathKey = normalizeKey(parsed.pathname);
+    if (!pathKey) return null;
+    if (isKnownImageKey(pathKey)) return pathKey;
+    if (parsed.hostname.startsWith(`${BUCKET_NAME}.`) && parsed.hostname.includes('amazonaws.com')) {
+      return pathKey;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+export async function refreshImageUrls(imageUrls?: string[]): Promise<string[]> {
+  if (!imageUrls || imageUrls.length === 0) return imageUrls || [];
+
+  const refreshed = await Promise.all(
+    imageUrls.map(async (url) => {
+      if (!url) return url;
+      const key = extractImageKey(url);
+      if (!key) return url;
+      try {
+        return await getImagePresignedUrl(key);
+      } catch {
+        return url;
+      }
+    })
+  );
+
+  return refreshed;
+}
+
 /**
  * อัปโหลดลายเซ็นไปยัง AWS S3
  * @param contractId - ID ของสัญญา
