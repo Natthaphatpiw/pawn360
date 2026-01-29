@@ -6,6 +6,17 @@ import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { haversineDistanceMeters } from '@/lib/services/geo';
 
+const SERIAL_OPTIONAL_TYPES = new Set([
+  'อุปกรณ์เสริมโทรศัพท์',
+  'กล้อง',
+  'อุปกรณ์คอมพิวเตอร์',
+]);
+
+const isSerialRequiredForType = (itemType?: string) => {
+  if (!itemType) return false;
+  return !SERIAL_OPTIONAL_TYPES.has(itemType);
+};
+
 interface Branch {
   branch_id: string;
   branch_name: string;
@@ -289,7 +300,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   const handleSubmit = async () => {
     console.log('🚀 handleSubmit called in pawn-summary');
     const normalizedSerial = serialNo.trim();
-    const isSerialRequired = itemData.itemType === 'โทรศัพท์มือถือ' || itemData.itemType === 'Apple';
+    const isSerialRequired = isSerialRequiredForType(itemData.itemType);
     if (isSerialRequired && !normalizedSerial) {
       alert('กรุณาระบุหมายเลขเครื่อง/Serial ก่อนดำเนินการ');
       return;
@@ -451,6 +462,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         <div className="mb-6">
           <label className="block font-bold text-gray-800 mb-2">
             {itemData.itemType === 'Apple' ? 'Serial Number / IMEI' : 'หมายเลขซีเรียล'}
+            {isSerialRequiredForType(itemData.itemType) && <span className="text-red-500"> *</span>}
           </label>
           <input
             type="text"
@@ -460,7 +472,9 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
             className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 placeholder:text-gray-300"
           />
           <p className="text-xs text-gray-500 mt-2">
-            สำหรับโทรศัพท์มือถือ/Apple กรุณากรอก IMEI หรือ Serial ให้ครบถ้วน
+            {isSerialRequiredForType(itemData.itemType)
+              ? 'กรุณากรอก IMEI หรือ Serial ให้ครบถ้วนก่อนดำเนินการจำนำ'
+              : 'ถ้ามีหมายเลขซีเรียล สามารถกรอกได้เพื่อความถูกต้องของสัญญา'}
           </p>
         </div>
 

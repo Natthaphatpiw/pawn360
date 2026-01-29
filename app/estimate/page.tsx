@@ -24,14 +24,27 @@ const ITEM_TYPES = [
   { id: 'camera', label: 'กล้องถ่ายรูป(Camera)', value: 'กล้อง' },
   { id: 'apple', label: 'สินค้าของ Apple', value: 'Apple' },
   { id: 'laptop', label: 'คอมพิวเตอร์แล็ปท็อป(Computer laptop)', value: 'โน้ตบุค' },
+  { id: 'computer-hardware', label: 'อุปกรณ์คอมพิวเตอร์(Computer hardware)', value: 'อุปกรณ์คอมพิวเตอร์' },
 ];
 
 // Brand options for each type
 const BRANDS_BY_TYPE: Record<string, string[]> = {
-  'โทรศัพท์มือถือ': ['Apple', 'Samsung', 'Huawei', 'Xiaomi', 'OPPO', 'Vivo', 'Realme', 'OnePlus', 'Google', 'Sony', 'Nokia', 'ASUS', 'อื่นๆ'],
-  'อุปกรณ์เสริมโทรศัพท์': ['Apple', 'Samsung', 'Anker', 'Baseus', 'Belkin', 'JBL', 'Sony', 'อื่นๆ'],
+  'โทรศัพท์มือถือ': ['Samsung', 'Huawei', 'Xiaomi', 'OPPO', 'Vivo', 'Realme', 'OnePlus', 'Google', 'Sony', 'Nokia', 'ASUS', 'อื่นๆ'],
+  'อุปกรณ์เสริมโทรศัพท์': ['Samsung', 'Anker', 'Baseus', 'Belkin', 'JBL', 'Sony', 'อื่นๆ'],
   'กล้อง': ['Canon', 'Nikon', 'Sony', 'Fujifilm', 'Panasonic', 'GoPro', 'DJI', 'อื่นๆ'],
-  'โน้ตบุค': ['Apple', 'Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
+  'โน้ตบุค': ['Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
+  'อุปกรณ์คอมพิวเตอร์': ['Intel', 'AMD', 'NVIDIA', 'ASUS', 'MSI', 'Gigabyte', 'ASRock', 'Corsair', 'Kingston', 'Crucial', 'Seagate', 'WD', 'Samsung', 'Cooler Master', 'Thermaltake', 'NZXT', 'Logitech', 'Razer', 'SteelSeries', 'อื่นๆ'],
+};
+
+const SERIAL_OPTIONAL_TYPES = new Set([
+  'อุปกรณ์เสริมโทรศัพท์',
+  'กล้อง',
+  'อุปกรณ์คอมพิวเตอร์',
+]);
+
+const isSerialRequiredForType = (itemType?: string) => {
+  if (!itemType) return false;
+  return !SERIAL_OPTIONAL_TYPES.has(itemType);
 };
 
 const APPLE_CATEGORIES = [
@@ -917,7 +930,6 @@ function EstimatePageInner() {
         if (!formData.model) return 'กรุณาระบุรุ่น';
         if (!formData.capacity) return 'กรุณาระบุความจุ';
         // serialNo not required for estimation
-        if (!formData.accessories) return 'กรุณาระบุอุปกรณ์เสริม';
         break;
 
       case 'อุปกรณ์เสริมโทรศัพท์':
@@ -943,7 +955,12 @@ function EstimatePageInner() {
         if (!formData.model) return 'กรุณาระบุรุ่น';
         if (!formData.cpu) return 'กรุณาระบุ CPU';
         if (!formData.ram) return 'กรุณาระบุ RAM';
-        if (!formData.storage) return 'กรุณาระบุพื้นที่จัดเก็บ';
+        if (!formData.gpu) return 'กรุณาระบุการ์ดจอ';
+        break;
+
+      case 'อุปกรณ์คอมพิวเตอร์':
+        if (!formData.brand) return 'กรุณาเลือกยี่ห้อ';
+        if (!formData.model) return 'กรุณาระบุรุ่น';
         break;
     }
 
@@ -1407,9 +1424,14 @@ function EstimatePageInner() {
                     <p>*ถ่ายรูปตัวเครื่องรอบด้าน และตำหนิ(ถ้ามี)</p>
                     <p>*ถ่ายหน้า About/Settings ที่แสดง Serial Number</p>
                   </>
-                ) : (
+                ) : isSerialRequiredForType(formData.itemType) ? (
                   <>
                     <p>*กรุณาถ่าย serial number 1 รูป</p>
+                    <p>*หากมีอุปกรณ์เสริมให้ถ่ายอุปกรณ์เสริมด้วย</p>
+                  </>
+                ) : (
+                  <>
+                    <p>*ถ่ายรูปตัวสินค้าให้เห็นรายละเอียดชัดเจน</p>
                     <p>*หากมีอุปกรณ์เสริมให้ถ่ายอุปกรณ์เสริมด้วย</p>
                   </>
                 )}
@@ -1649,18 +1671,7 @@ function EstimatePageInner() {
                       />
                     </div>
                     <div className="mb-4">
-                      <FormLabel thai="พื้นที่จัดเก็บ" eng="Storage" required />
-                      <input
-                        type="text"
-                        name="storage"
-                        value={formData.storage}
-                        onChange={handleInputChange}
-                        placeholder="Storage"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <FormLabel thai="การ์ดจอ" eng="GPU" />
+                      <FormLabel thai="การ์ดจอ" eng="GPU" required />
                       <input
                         type="text"
                         name="gpu"
@@ -1679,7 +1690,7 @@ function EstimatePageInner() {
                     <FormLabel
                       thai="อุปกรณ์เสริม"
                       eng="Accessories"
-                      required={formData.itemType === 'โทรศัพท์มือถือ'}
+                      required={false}
                     />
                     <input
                       type="text"
@@ -2148,7 +2159,7 @@ function EstimatePageInner() {
               <FormLabel
                 thai={formData.itemType === 'Apple' ? 'Serial Number / IMEI' : 'หมายเลขซีเรียล'}
                 eng="Serial no."
-                required={formData.itemType === 'โทรศัพท์มือถือ' || formData.itemType === 'Apple'}
+                required={isSerialRequiredForType(formData.itemType)}
               />
               <input
                 type="text"
@@ -2159,7 +2170,9 @@ function EstimatePageInner() {
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
               <p className="text-xs text-gray-500 mt-2">
-                แนะนำให้กรอกเลขเครื่อง/Serial เพื่อความถูกต้องของสัญญา
+                {isSerialRequiredForType(formData.itemType)
+                  ? 'กรุณากรอกเลขเครื่อง/Serial ให้ครบถ้วนก่อนดำเนินการจำนำ'
+                  : 'ถ้ามีหมายเลขซีเรียล สามารถกรอกได้เพื่อความถูกต้องของสัญญา'}
               </p>
             </div>
 
