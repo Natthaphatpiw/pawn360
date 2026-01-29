@@ -72,8 +72,21 @@ export default function DraftsPage() {
     }
   };
 
+  const parseDraftDate = (value: string) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    const hasTimezone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(trimmed);
+    const normalized = trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T');
+    const withTimezone = hasTimezone ? normalized : `${normalized}Z`;
+    const parsed = new Date(withTimezone);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+    const fallback = new Date(trimmed);
+    return Number.isNaN(fallback.getTime()) ? null : fallback;
+  };
+
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const date = parseDraftDate(dateString);
+    if (!date) return '-';
     const now = new Date();
     const diffInMs = now.getTime() - date.getTime();
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
