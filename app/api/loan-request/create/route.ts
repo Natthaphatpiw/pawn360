@@ -28,6 +28,17 @@ const clampInt = (value: unknown, min: number, max: number) => {
   return Math.min(max, Math.max(min, num));
 };
 
+const SERIAL_OPTIONAL_TYPES = new Set([
+  'อุปกรณ์เสริมโทรศัพท์',
+  'กล้อง',
+  'อุปกรณ์คอมพิวเตอร์',
+]);
+
+const isSerialRequiredForType = (itemType?: string) => {
+  if (!itemType) return false;
+  return !SERIAL_OPTIONAL_TYPES.has(itemType);
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -109,6 +120,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const itemType = itemData?.itemType;
+    const serialValue = typeof itemData?.serialNumber === 'string'
+      ? itemData.serialNumber.trim()
+      : typeof itemData?.serialNo === 'string'
+        ? itemData.serialNo.trim()
+        : '';
+
+    if (isSerialRequiredForType(itemType) && !serialValue) {
+      return NextResponse.json(
+        { error: 'กรุณาระบุหมายเลขเครื่อง/Serial ก่อนดำเนินการ', code: 'SERIAL_REQUIRED' },
+        { status: 400 }
+      );
+    }
+
     const itemCondition = clampInt(itemData?.condition, 0, 100);
     const estimatedValue = normalizeNumber(itemData?.estimatedPrice);
     const aiConditionScore = normalizeNumber(itemData?.aiConditionScore);
@@ -117,11 +142,11 @@ export async function POST(request: NextRequest) {
     // Create item record
     const itemRecord = {
       customer_id: customerId,
-      item_type: itemData.itemType,
+      item_type: itemType,
       brand: itemData.brand,
       model: itemData.model,
       capacity: itemData.capacity || null,
-      serial_number: itemData.serialNumber || itemData.serialNo || null,
+      serial_number: serialValue || null,
       color: itemData.color || null,
       screen_size: itemData.screenSize || null,
       watch_size: itemData.watchSize || null,
