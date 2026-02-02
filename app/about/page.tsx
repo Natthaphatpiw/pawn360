@@ -254,26 +254,37 @@ export default function AboutPage() {
         </section>
 
         <section id="contact-us" className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-2 sm:px-6 sm:pb-20 lg:px-14">
-          <div className="fade-up rounded-[34px] bg-[#d8d6d4] px-8 py-10 text-[#686360] sm:px-14 sm:py-14">
-            <h3 className="text-5xl font-light leading-tight sm:text-6xl">Wanna talk?</h3>
-            <p className="mt-2 text-2xl">คุยกับเรา</p>
-            <p className="mt-8 max-w-[860px] text-2xl leading-relaxed">
-              Speak with our experts. Schedule a consultation at a time that works best for you.
-              Book your session below.
-            </p>
-            <p className="mt-4 max-w-[860px] text-2xl leading-relaxed">
-              ปรึกษาผู้เชี่ยวชาญของเราโดยตรงนัดหมายวันและเวลาที่คุณสะดวกเพื่อพูดคุยรายละเอียด
-              จองเวลาได้ที่นี่
-            </p>
-            <div className="mt-10 flex justify-center sm:justify-start">
-              <a
-                href="https://calendar.google.com/calendar"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-12 py-4 text-xl text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[var(--accent)]/30 cursor-pointer"
-              >
-                Book a date and time
-              </a>
+          <div className="grid gap-8 lg:grid-cols-[1fr_1fr] lg:items-stretch">
+            <div className="fade-up hover-card overflow-hidden rounded-[28px]">
+              <Image
+                src="/landing/com4.png"
+                alt="Contact Pawnly"
+                width={1200}
+                height={936}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div className="fade-up rounded-[34px] bg-[#d8d6d4] px-8 py-10 text-[#686360] sm:px-14 sm:py-14">
+              <h3 className="text-[32px] font-light leading-tight sm:text-6xl">Wanna talk?</h3>
+              <p className="mt-2 text-[16px]">คุยกับเรา</p>
+              <p className="mt-8 max-w-[860px] text-[16px] leading-relaxed">
+                Speak with our experts. Schedule a consultation at a time that works best for you.
+                Book your session below.
+              </p>
+              <p className="mt-4 max-w-[860px] text-[16px] leading-relaxed">
+                ปรึกษาผู้เชี่ยวชาญของเราโดยตรงนัดหมายวันและเวลาที่คุณสะดวกเพื่อพูดคุยรายละเอียด
+                จองเวลาได้ที่นี่
+              </p>
+              <div className="mt-10 flex justify-center sm:justify-start">
+                <a
+                  href="https://calendar.google.com/calendar"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-12 py-4 text-xl text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[var(--accent)]/30 cursor-pointer"
+                >
+                  Book a date and time
+                </a>
+              </div>
             </div>
           </div>
         </section>
@@ -303,7 +314,9 @@ export default function AboutPage() {
                 <h5 className={`${montserrat.className} text-sm font-semibold text-[#d0cfce]`}>Company</h5>
                 <ul className="mt-3 space-y-2">
                   <li>เกี่ยวกับเรา</li>
-                  <li>ติดต่อเรา</li>
+                  <li>
+                    <Link href="https://calendar.google.com/calendar" target="_blank" rel="noopener noreferrer" className="hover:text-[#f5f4f2] transition-colors">ติดต่อเรา</Link>
+                  </li>
                 </ul>
               </div>
               <div>
