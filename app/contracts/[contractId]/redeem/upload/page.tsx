@@ -19,6 +19,13 @@ export default function RedemptionUploadPage() {
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [redemptionDetails, setRedemptionDetails] = useState<any>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const companyBank = {
+    bank_name: 'พร้อมเพย์',
+    bank_account_no: '0626092941',
+    bank_account_name: 'ณัฐภัทร ต้อยจัตุรัส',
+    promptpay_number: '0626092941',
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,6 +40,9 @@ export default function RedemptionUploadPage() {
       const response = await axios.get(`/api/redemptions/${redemptionId}`);
       if (response.data.success) {
         setRedemptionDetails(response.data.redemption);
+        if (response.data.redemption?.payment_slip_url) {
+          setShowSuccess(true);
+        }
       }
     } catch (error) {
       console.error('Error fetching redemption:', error);
@@ -89,8 +99,7 @@ export default function RedemptionUploadPage() {
       });
 
       if (response.data.success) {
-        // Redirect to receipt upload page instead of showing success
-        router.push(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
+        setShowSuccess(true);
       }
     } catch (error: any) {
       console.error('Error uploading slip:', error);
@@ -99,6 +108,32 @@ export default function RedemptionUploadPage() {
       setUploading(false);
     }
   };
+
+  const handleGoToReceipt = () => {
+    router.push(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
+  };
+
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-10 h-10 text-green-500" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งสลิปเรียบร้อย</h1>
+          <p className="text-gray-500 text-sm mb-6">
+            ระบบได้รับหลักฐานการโอนเงินแล้ว
+          </p>
+          <button
+            onClick={handleGoToReceipt}
+            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+          >
+            ไปขั้นถัดไป
+          </button>
+        </div>
+      </div>
+    );
+  }
 
 
   return (
@@ -133,6 +168,15 @@ export default function RedemptionUploadPage() {
             </p>
           </div>
         )}
+
+        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-6 shadow-sm">
+          <div className="text-sm font-bold text-gray-800 mb-2">ข้อมูลบัญชีรับเงิน</div>
+          <div className="text-xs text-gray-600 space-y-1">
+            <p>ธนาคาร: <span className="font-semibold text-gray-800">{companyBank.bank_name}</span></p>
+            <p>เลขบัญชี/พร้อมเพย์: <span className="font-semibold text-[#B85C38]">{companyBank.promptpay_number || companyBank.bank_account_no}</span></p>
+            <p>ชื่อบัญชี: <span className="font-semibold text-gray-800">{companyBank.bank_account_name}</span></p>
+          </div>
+        </div>
 
         {/* Upload Area */}
         <div className="w-full max-w-sm">

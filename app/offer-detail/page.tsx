@@ -37,6 +37,8 @@ function OfferDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
+  const [acceptSuccess, setAcceptSuccess] = useState(false);
+  const [acceptMessage, setAcceptMessage] = useState('');
 
   // Get contractId from either direct param or from liff.state
   let contractId = searchParams.get('contractId');
@@ -122,11 +124,11 @@ function OfferDetailContent() {
       });
 
       if (response.data?.alreadyAccepted) {
-        alert('ข้อเสนอนี้ถูกยอมรับไปแล้ว');
+        setAcceptMessage('ข้อเสนอนี้ถูกยอมรับไปแล้ว');
       } else {
-        alert('ยอมรับข้อเสนอเรียบร้อยแล้ว');
+        setAcceptMessage('รับข้อเสนอเรียบร้อย กรุณารอจุดรับฝากตรวจสอบและยืนยัน');
       }
-      router.push('/register-invest'); // Go back to investor profile
+      setAcceptSuccess(true);
     } catch (error: any) {
       console.error('Error accepting offer:', error);
       if (error.response?.data?.kycRequired) {
@@ -157,30 +159,40 @@ function OfferDetailContent() {
     setPinModalOpen(true);
   };
 
-  const handleDecline = async () => {
-    try {
-      setActionLoading(true);
-      await axios.post('/api/contracts/investor-action', {
-        action: 'decline',
-        contractId
-      });
-
-      alert('ปฏิเสธข้อเสนอเรียบร้อยแล้ว');
-      router.push('/register-invest'); // Go back to investor profile
-    } catch (error: any) {
-      console.error('Error declining offer:', error);
-      alert('เกิดข้อผิดพลาดในการปฏิเสธข้อเสนอ');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
           <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (acceptSuccess) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-lg border border-gray-100">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-3xl">✓</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">รับข้อเสนอเรียบร้อย</h1>
+          <p className="text-gray-600 text-sm mb-6">
+            {acceptMessage || 'กรุณารอจุดรับฝากตรวจสอบและยืนยัน'}
+          </p>
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined' && (window as any).liff?.closeWindow) {
+                (window as any).liff.closeWindow();
+              } else {
+                router.push('/investment');
+              }
+            }}
+            className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-2xl py-4 font-bold transition-colors"
+          >
+            ปิด
+          </button>
         </div>
       </div>
     );
@@ -334,16 +346,6 @@ function OfferDetailContent() {
         >
           <span className="text-base font-bold">ยอมรับ</span>
           <span className="text-[10px] font-light opacity-90">Accept</span>
-        </button>
-
-        {/* Decline Button */}
-        <button
-          onClick={handleDecline}
-          disabled={actionLoading}
-          className="w-full bg-white border border-[#1E3A8A] hover:bg-[#E9EFF6] text-[#1E3A8A] rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
-        >
-          <span className="text-base font-bold">Decline</span>
-          <span className="text-[10px] font-light opacity-90">ปฏิเสธ</span>
         </button>
       </div>
 

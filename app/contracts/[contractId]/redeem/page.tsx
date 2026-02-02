@@ -25,6 +25,16 @@ interface ContractDetail {
     model: string;
     capacity: string | null;
   };
+  customer?: {
+    phone_number?: string | null;
+    addr_house_no?: string | null;
+    addr_village?: string | null;
+    addr_street?: string | null;
+    addr_sub_district?: string | null;
+    addr_district?: string | null;
+    addr_province?: string | null;
+    addr_postcode?: string | null;
+  } | null;
   investor: {
     investor_id: string;
     firstname: string;
@@ -60,6 +70,7 @@ export default function RedemptionPaymentPage() {
 
   // Delivery Options
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('SELF_PICKUP');
+  const [addressMode, setAddressMode] = useState<'registered' | 'other'>('registered');
 
   // Address fields (for SELF_ARRANGE or PLATFORM_ARRANGE)
   const [addressHouseNo, setAddressHouseNo] = useState('');
@@ -83,6 +94,30 @@ export default function RedemptionPaymentPage() {
       fetchContractDetail();
     }
   }, [contractId]);
+
+  useEffect(() => {
+    if (!contract?.customer) return;
+    const hasRegisteredAddress = Boolean(
+      contract.customer.addr_house_no ||
+      contract.customer.addr_street ||
+      contract.customer.addr_district ||
+      contract.customer.addr_province ||
+      contract.customer.addr_postcode
+    );
+    if (hasRegisteredAddress) {
+      setAddressMode('registered');
+      setAddressHouseNo(contract.customer.addr_house_no || '');
+      setAddressVillage(contract.customer.addr_village || '');
+      setAddressStreet(contract.customer.addr_street || '');
+      setAddressSubDistrict(contract.customer.addr_sub_district || '');
+      setAddressDistrict(contract.customer.addr_district || '');
+      setAddressProvince(contract.customer.addr_province || '');
+      setAddressPostcode(contract.customer.addr_postcode || '');
+      setContactPhone(contract.customer.phone_number || '');
+    } else {
+      setAddressMode('other');
+    }
+  }, [contract?.customer]);
 
   const redirectToPenalty = (payload?: any) => {
     if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
@@ -145,7 +180,22 @@ export default function RedemptionPaymentPage() {
       return;
     }
 
-    if (deliveryMethod !== 'SELF_PICKUP' && !addressHouseNo) {
+    const useRegisteredAddress = deliveryMethod === 'PLATFORM_ARRANGE' && addressMode === 'registered';
+    const deliveryAddress = deliveryMethod === 'PLATFORM_ARRANGE'
+      ? {
+        houseNo: useRegisteredAddress ? (contract?.customer?.addr_house_no || '') : addressHouseNo,
+        village: useRegisteredAddress ? (contract?.customer?.addr_village || '') : addressVillage,
+        street: useRegisteredAddress ? (contract?.customer?.addr_street || '') : addressStreet,
+        subDistrict: useRegisteredAddress ? (contract?.customer?.addr_sub_district || '') : addressSubDistrict,
+        district: useRegisteredAddress ? (contract?.customer?.addr_district || '') : addressDistrict,
+        province: useRegisteredAddress ? (contract?.customer?.addr_province || '') : addressProvince,
+        postcode: useRegisteredAddress ? (contract?.customer?.addr_postcode || '') : addressPostcode,
+        contactPhone: useRegisteredAddress ? (contract?.customer?.phone_number || '') : contactPhone,
+        notes: deliveryNotes,
+      }
+      : null;
+
+    if (deliveryMethod === 'PLATFORM_ARRANGE' && !deliveryAddress?.houseNo) {
       alert('กรุณากรอกที่อยู่จัดส่ง');
       return;
     }
@@ -158,17 +208,7 @@ export default function RedemptionPaymentPage() {
         contractId,
         requestType,
         deliveryMethod,
-        deliveryAddress: deliveryMethod !== 'SELF_PICKUP' ? {
-          houseNo: addressHouseNo,
-          village: addressVillage,
-          street: addressStreet,
-          subDistrict: addressSubDistrict,
-          district: addressDistrict,
-          province: addressProvince,
-          postcode: addressPostcode,
-          contactPhone,
-          notes: deliveryNotes,
-        } : null,
+        deliveryAddress,
         principalAmount: contract?.remainingPrincipal || 0,
         interestAmount: contract?.remainingInterest || 0,
         deliveryFee: deliveryMethod === 'PLATFORM_ARRANGE' ? DELIVERY_FEE : 0,
@@ -206,6 +246,20 @@ export default function RedemptionPaymentPage() {
       </div>
     </div>
   );
+
+  const formatRegisteredAddress = () => {
+    if (!contract?.customer) return '-';
+    const parts = [
+      contract.customer.addr_house_no,
+      contract.customer.addr_village,
+      contract.customer.addr_street,
+      contract.customer.addr_sub_district,
+      contract.customer.addr_district,
+      contract.customer.addr_province,
+      contract.customer.addr_postcode,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  };
 
   if (loading) {
     return (
@@ -392,85 +446,121 @@ export default function RedemptionPaymentPage() {
             </div>
           )}
 
-          {/* Address Form (for delivery options) */}
-          {deliveryMethod !== 'SELF_PICKUP' && (
+          {/* Address Form (only for Pawnly arrange delivery) */}
+          {deliveryMethod === 'PLATFORM_ARRANGE' && (
             <div className="mt-6 space-y-4">
               <h3 className="font-bold text-gray-800 text-sm">ที่อยู่จัดส่ง</h3>
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="บ้านเลขที่ *"
-                  value={addressHouseNo}
-                  onChange={(e) => setAddressHouseNo(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-                />
-                <input
-                  type="text"
-                  placeholder="หมู่บ้าน/คอนโด"
-                  value={addressVillage}
-                  onChange={(e) => setAddressVillage(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-                />
+              <div className="space-y-2">
+                <label className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${addressMode === 'registered' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200'}`}>
+                  <input
+                    type="radio"
+                    name="addressMode"
+                    value="registered"
+                    checked={addressMode === 'registered'}
+                    onChange={() => setAddressMode('registered')}
+                    className="mt-1 accent-[#B85C38]"
+                  />
+                  <div>
+                    <p className="font-semibold text-gray-800">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatRegisteredAddress()}</p>
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${addressMode === 'other' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200'}`}>
+                  <input
+                    type="radio"
+                    name="addressMode"
+                    value="other"
+                    checked={addressMode === 'other'}
+                    onChange={() => setAddressMode('other')}
+                    className="mt-1 accent-[#B85C38]"
+                  />
+                  <div>
+                    <p className="font-semibold text-gray-800">ใส่ที่อยู่อื่น</p>
+                    <p className="text-xs text-gray-500 mt-1">กรอกที่อยู่สำหรับรับสินค้าคืน</p>
+                  </div>
+                </label>
               </div>
 
-              <input
-                type="text"
-                placeholder="ถนน/ซอย"
-                value={addressStreet}
-                onChange={(e) => setAddressStreet(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-              />
+              {addressMode === 'other' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="บ้านเลขที่ *"
+                      value={addressHouseNo}
+                      onChange={(e) => setAddressHouseNo(e.target.value)}
+                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="หมู่บ้าน/คอนโด"
+                      value={addressVillage}
+                      onChange={(e) => setAddressVillage(e.target.value)}
+                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="ตำบล/แขวง *"
-                  value={addressSubDistrict}
-                  onChange={(e) => setAddressSubDistrict(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-                />
-                <input
-                  type="text"
-                  placeholder="อำเภอ/เขต *"
-                  value={addressDistrict}
-                  onChange={(e) => setAddressDistrict(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-                />
-              </div>
+                  <input
+                    type="text"
+                    placeholder="ถนน/ซอย"
+                    value={addressStreet}
+                    onChange={(e) => setAddressStreet(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                  />
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="จังหวัด *"
-                  value={addressProvince}
-                  onChange={(e) => setAddressProvince(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-                />
-                <input
-                  type="text"
-                  placeholder="รหัสไปรษณีย์ *"
-                  value={addressPostcode}
-                  onChange={(e) => setAddressPostcode(e.target.value)}
-                  className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="ตำบล/แขวง *"
+                      value={addressSubDistrict}
+                      onChange={(e) => setAddressSubDistrict(e.target.value)}
+                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="อำเภอ/เขต *"
+                      value={addressDistrict}
+                      onChange={(e) => setAddressDistrict(e.target.value)}
+                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    />
+                  </div>
 
-              <input
-                type="tel"
-                placeholder="เบอร์โทรติดต่อ *"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
-              />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="จังหวัด *"
+                      value={addressProvince}
+                      onChange={(e) => setAddressProvince(e.target.value)}
+                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="รหัสไปรษณีย์ *"
+                      value={addressPostcode}
+                      onChange={(e) => setAddressPostcode(e.target.value)}
+                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    />
+                  </div>
 
-              <textarea
-                placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
-                value={deliveryNotes}
-                onChange={(e) => setDeliveryNotes(e.target.value)}
-                rows={2}
-                className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38] resize-none"
-              />
+                  <input
+                    type="tel"
+                    placeholder="เบอร์โทรติดต่อ *"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                  />
+
+                  <textarea
+                    placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
+                    value={deliveryNotes}
+                    onChange={(e) => setDeliveryNotes(e.target.value)}
+                    rows={2}
+                    className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38] resize-none"
+                  />
+                </>
+              )}
             </div>
           )}
         </div>

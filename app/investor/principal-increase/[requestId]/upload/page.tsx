@@ -117,7 +117,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
   };
 
   const handleGoToContracts = () => {
-    router.push('/investor/contracts');
+    router.push('/investment');
   };
 
   if (loading) {
@@ -163,7 +163,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
             onClick={handleGoToContracts}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
-            กลับหน้าสัญญา
+            กลับหน้าการลงทุน
           </button>
         </div>
       </div>
@@ -179,9 +179,9 @@ export default function InvestorPrincipalIncreaseUploadPage() {
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">โอนเงินสำเร็จ</h1>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งหลักฐานการโอนเงินแล้ว</h1>
           <p className="text-gray-500 text-sm mb-6">
-            ระบบได้ส่งการแจ้งเตือนไปยังผู้จำนำให้ยืนยันการรับเงินแล้ว
+            คำขอเพิ่มเงินต้นสำเร็จ
           </p>
 
           {requestDetails && (
@@ -209,7 +209,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
             onClick={handleGoToContracts}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
-            กลับหน้าสัญญา
+            กลับหน้าการลงทุน
           </button>
         </div>
       </div>
@@ -237,7 +237,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
             onClick={handleGoToContracts}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
-            กลับหน้าสัญญา
+            กลับหน้าการลงทุน
           </button>
         </div>
       </div>

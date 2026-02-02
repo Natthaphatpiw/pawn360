@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
-      if (!['DRIVER_SEARCH', 'PAYMENT_VERIFIED'].includes(deliveryRequest.status)) {
+      if (!['DRIVER_SEARCH', 'PAYMENT_VERIFIED', 'AWAITING_PAYMENT', 'PAYMENT_REJECTED', 'SLIP_UPLOADED'].includes(deliveryRequest.status)) {
         return NextResponse.json(
           { error: 'สถานะปัจจุบันไม่สามารถอัปเดตเป็นมีรถมารับงานได้' },
           { status: 400 }

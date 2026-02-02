@@ -218,6 +218,17 @@ export default function PrincipalReductionUploadPage() {
           </div>
         )}
 
+        {companyBank && (
+          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <h3 className="font-bold text-gray-800 text-sm mb-2">โอนเงินไปที่</h3>
+            <div className="bg-[#FFF8F5] rounded-xl p-3 border border-[#F0D4C8]">
+              <p className="text-sm"><span className="text-gray-600">ธนาคาร:</span> <span className="font-bold">{companyBank.bank_name}</span></p>
+              <p className="text-sm"><span className="text-gray-600">เลขบัญชี:</span> <span className="font-bold text-[#B85C38]">{companyBank.bank_account_no}</span></p>
+              <p className="text-sm"><span className="text-gray-600">ชื่อบัญชี:</span> <span className="font-bold">{companyBank.bank_account_name}</span></p>
+            </div>
+          </div>
+        )}
+
         {/* Upload Area */}
         <div className="w-full max-w-sm">
           <input

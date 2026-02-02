@@ -2,7 +2,7 @@ import { LiffProvider } from '@/lib/liff/liff-provider';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'ลงทะเบียน',
+  title: 'สมาชิก',
 };
 
 export default function RegisterLayout({

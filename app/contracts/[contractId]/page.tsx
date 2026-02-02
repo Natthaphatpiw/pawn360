@@ -70,6 +70,8 @@ interface ContractDetail {
   principal_paid: number;
   contract_status: string;
   funding_status: string;
+  payment_status?: string | null;
+  item_delivery_status?: string | null;
   contract_file_url: string | null;
   customer: Customer;
   investor: Investor | null;
@@ -189,6 +191,39 @@ export default function PawnContractDetail() {
     return `${contract.item.brand} ${contract.item.model}`;
   };
 
+  const getDisplayDurationDays = () => {
+    const start = new Date(contract.contract_start_date);
+    const end = new Date(contract.contract_end_date);
+    const startUtc = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+    const endUtc = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+    const diff = Math.round((endUtc - startUtc) / (1000 * 60 * 60 * 24));
+    return Math.max(1, diff);
+  };
+
+  const displayDurationDays = getDisplayDurationDays();
+
+  const getActionBlockedReason = () => {
+    const status = contract.contract_status;
+    const itemStatus = contract.item_delivery_status || '';
+
+    if (['COMPLETED', 'TERMINATED', 'LIQUIDATED', 'DEFAULTED'].includes(status)) {
+      return 'สัญญานี้สิ้นสุดแล้ว ไม่สามารถทำรายการเพิ่มเติมได้';
+    }
+
+    if (!['CONFIRMED', 'EXTENDED'].includes(status)) {
+      return 'สัญญายังไม่พร้อมทำรายการ กรุณารอการยืนยันจากระบบ';
+    }
+
+    if (itemStatus && !['RECEIVED_AT_DROP_POINT', 'VERIFIED'].includes(itemStatus)) {
+      return 'สินค้ายังไม่ถูกส่งถึง Drop Point จึงยังทำรายการไม่ได้';
+    }
+
+    return null;
+  };
+
+  const actionBlockedReason = getActionBlockedReason();
+  const actionsEnabled = !actionBlockedReason;
+
   const rawRate = Number(contract.interest_rate || 0);
   const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
   const feeRate = 0.01;
@@ -209,7 +244,7 @@ export default function PawnContractDetail() {
         />
         <div className="text-center">
           <h1 className="font-bold text-lg text-gray-800">รายการจำนำ</h1>
-          <p className="text-xs text-gray-400">pawn360.com</p>
+          <p className="text-xs text-gray-400">www.pawnly.io</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="w-5 h-5 border border-gray-400 rounded flex items-center justify-center text-[10px] font-bold text-gray-600">
@@ -475,7 +510,7 @@ export default function PawnContractDetail() {
                 </div>
               )}
             />
-            <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
+            <InfoRow label="ระยะเวลา" value={`${displayDurationDays} วัน`} />
             <InfoRow label="วันเริ่มต้น" value={formatDate(contract.contract_start_date)} />
             <InfoRow label="วันสิ้นสุด" value={formatDate(contract.contract_end_date)} />
           </div>
@@ -507,35 +542,61 @@ export default function PawnContractDetail() {
           </div>
         </div>
 
+        {!actionsEnabled && (
+          <div className="mb-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-xs text-orange-700">
+            {actionBlockedReason}
+          </div>
+        )}
+
         {/* 5. Action Buttons Grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <button
-            onClick={() => openModal('redeem')}
-            className="bg-[#7CAB4A] hover:bg-[#689F38] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            onClick={() => actionsEnabled && openModal('redeem')}
+            disabled={!actionsEnabled}
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+              actionsEnabled
+                ? 'bg-[#7CAB4A] hover:bg-[#689F38] text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
             <span className="text-sm font-bold">ไถ่ถอน</span>
             <span className="text-[10px] font-light opacity-90">Redeem</span>
           </button>
 
           <button
-            onClick={() => openModal('interest')}
-            className="bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            onClick={() => actionsEnabled && openModal('interest')}
+            disabled={!actionsEnabled}
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+              actionsEnabled
+                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
             <span className="text-sm font-bold">ต่อดอกเบี้ย</span>
             <span className="text-[10px] font-light opacity-90">Pay interest</span>
           </button>
 
           <button
-            onClick={() => openModal('decrease')}
-            className="bg-[#F4B95F] hover:bg-[#E0A850] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            onClick={() => actionsEnabled && openModal('decrease')}
+            disabled={!actionsEnabled}
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+              actionsEnabled
+                ? 'bg-[#F4B95F] hover:bg-[#E0A850] text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
             <span className="text-sm font-bold">ลดเงินต้น</span>
             <span className="text-[10px] font-light opacity-90">Decrease loan</span>
           </button>
 
           <button
-            onClick={() => openModal('increase')}
-            className="bg-[#E56363] hover:bg-[#D35252] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            onClick={() => actionsEnabled && openModal('increase')}
+            disabled={!actionsEnabled}
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+              actionsEnabled
+                ? 'bg-[#E56363] hover:bg-[#D35252] text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
             <span className="text-sm font-bold">เพิ่มเงินต้น</span>
             <span className="text-[10px] font-light opacity-90">Increase loan</span>

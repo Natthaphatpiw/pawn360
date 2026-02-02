@@ -112,6 +112,7 @@ export default function InvestmentDashboard() {
     let currentValue = 0;
     let currentProfit = 0;
     let accumulatedProfit = 0;
+    let cumulativeValue = 0;
 
     const getTiming = (contract: Contract, referenceDate: Date) => {
       if (!contract.contract_start_date) {
@@ -187,6 +188,7 @@ export default function InvestmentDashboard() {
       }
 
       const principal = Number(contract.loan_principal_amount) || 0;
+      cumulativeValue += principal;
       const investorRate = typeof contract.investor_rate === 'number'
         ? contract.investor_rate
         : 0.015;
@@ -208,6 +210,7 @@ export default function InvestmentDashboard() {
       currentValue,
       currentProfit,
       accumulatedProfit,
+      cumulativeValue,
       notifications: notifications.filter(item => item.statusLabel),
     };
   }, [contracts]);
@@ -360,6 +363,16 @@ export default function InvestmentDashboard() {
             <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Value</span>
           </div>
           <div className="space-y-3">
+            <div className="rounded-xl bg-[#EDE9FE] px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-bold text-[#5B21B6]">ยอดรวมสะสมทั้งหมด</div>
+                <div className="text-[10px] text-[#5B21B6]/70">Cumulative contract value</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-[#5B21B6]/70">THB</div>
+                <div className="text-lg font-bold text-[#5B21B6]">{formatCurrency(analytics.cumulativeValue)}</div>
+              </div>
+            </div>
             <div className="rounded-xl bg-[#BFD1EA] px-4 py-3 flex items-center justify-between">
               <div>
                 <div className="text-sm font-bold text-[#1E3A8A]">มูลค่ารวมปัจจุบัน</div>
