@@ -329,7 +329,7 @@ export default function InvestorPage() {
 
           <div className="fade-up mt-10 grid gap-6 justify-items-center sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {investmentLevels.map((tier) => (
-              <div key={tier.title} className="hover-card flex flex-col items-center gap-3">
+              <div key={tier.title} className="flex flex-col items-center gap-3">
                 <Image
                   src={tier.image}
                   alt={tier.alt}

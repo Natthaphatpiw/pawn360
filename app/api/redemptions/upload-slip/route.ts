@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     const dropPointLineId = redemption.contract?.drop_points?.line_id;
     if (dropPointLineId && dropPointLineClient) {
       try {
-        const notificationCard = createDropPointRedemptionCard(redemption, slipUrl);
+        const notificationCard = createDropPointRedemptionCard(redemption);
         await dropPointLineClient.pushMessage(dropPointLineId, notificationCard);
         console.log(`Sent redemption notification to drop point: ${dropPointLineId}`);
       } catch (msgError) {
@@ -128,11 +128,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createDropPointRedemptionCard(redemption: any, slipUrl: string): FlexMessage {
+function createDropPointRedemptionCard(redemption: any): FlexMessage {
   const contract = redemption.contract;
   const item = contract?.items;
   const pawner = contract?.pawners;
-  const investor = contract?.investors;
 
   const deliveryMethodText = {
     'SELF_PICKUP': 'ลูกค้ามารับเอง',
@@ -166,13 +165,6 @@ function createDropPointRedemptionCard(redemption: any, slipUrl: string): FlexMe
         backgroundColor: '#365314',
         paddingAll: 'lg'
       },
-      hero: {
-        type: 'image',
-        url: slipUrl,
-        size: 'full',
-        aspectRatio: '1:1',
-        aspectMode: 'cover'
-      },
       body: {
         type: 'box',
         layout: 'vertical',
@@ -204,16 +196,6 @@ function createDropPointRedemptionCard(redemption: any, slipUrl: string): FlexMe
             type: 'box',
             layout: 'baseline',
             spacing: 'sm',
-            margin: 'lg',
-            contents: [
-              { type: 'text', text: 'ยอดที่ต้องจ่าย:', color: '#666666', size: 'md', flex: 3 },
-              { type: 'text', text: `${redemption.total_amount?.toLocaleString()} บาท`, color: '#365314', size: 'xl', flex: 4, weight: 'bold' }
-            ]
-          },
-          {
-            type: 'box',
-            layout: 'baseline',
-            spacing: 'sm',
             margin: 'md',
             contents: [
               { type: 'text', text: 'การรับของ:', color: '#666666', size: 'sm', flex: 2 },
@@ -232,16 +214,6 @@ function createDropPointRedemptionCard(redemption: any, slipUrl: string): FlexMe
               { type: 'text', text: 'ข้อมูลผู้จำนำ:', color: '#666666', size: 'xs', margin: 'none' },
               { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', weight: 'bold', margin: 'sm' },
               { type: 'text', text: `โทร: ${pawner?.phone_number || '-'}`, color: '#666666', size: 'xs', margin: 'sm' }
-            ]
-          },
-          {
-            type: 'box',
-            layout: 'vertical',
-            margin: 'lg',
-            contents: [
-              { type: 'text', text: 'โอนไปยัง (นักลงทุน):', color: '#666666', size: 'xs', margin: 'none' },
-              { type: 'text', text: `${investor?.bank_name || ''} ${investor?.bank_account_no || ''}`, color: '#333333', size: 'sm', weight: 'bold', margin: 'sm' },
-              { type: 'text', text: `ชื่อ: ${investor?.bank_account_name || investor?.firstname + ' ' + investor?.lastname}`, color: '#666666', size: 'xs', margin: 'sm' }
             ]
           }
         ]

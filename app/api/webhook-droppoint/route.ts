@@ -305,7 +305,7 @@ function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
           align: 'center'
         }, {
           type: 'text',
-          text: 'รอส่งคืนสินค้าให้ลูกค้า',
+          text: 'กดเมื่อมีผู้มารับสินค้าแล้วเท่านั้น',
           size: 'sm',
           color: '#ffffff',
           align: 'center',
@@ -366,7 +366,7 @@ function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
           type: 'button',
           action: {
             type: 'uri',
-            label: 'ตรวจสอบและยืนยันส่งคืน',
+            label: 'ยืนยันการส่งคืน',
             uri: detailUrl
           },
           style: 'primary',

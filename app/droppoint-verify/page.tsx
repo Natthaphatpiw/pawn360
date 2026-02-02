@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { Camera, Check, X, Upload } from 'lucide-react';
+import { Camera, Check, X } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
@@ -48,6 +48,24 @@ function DropPointVerifyContent() {
   const [bagNumber, setBagNumber] = useState('');
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
+
+  const requiredCheckFields: Array<keyof typeof verificationData> = [
+    'brand_correct',
+    'model_correct',
+    'capacity_correct',
+    'color_match',
+    'functionality_ok',
+    'mdm_lock_status',
+  ];
+
+  const hasIncompleteChecks = requiredCheckFields.some((field) => verificationData[field] === null);
+  const hasAnyMismatch = requiredCheckFields.some((field) => verificationData[field] === false);
+  const expectedConditionScore = Number(contract?.items?.item_condition || 0);
+  const isConditionGapTooHigh = Number.isFinite(expectedConditionScore)
+    ? verificationData.condition_score < (expectedConditionScore - 10)
+    : false;
+  const mustReject = hasAnyMismatch || isConditionGapTooHigh;
+  const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!bagNumber.trim();
 
   useEffect(() => {
     if (contractId) {
@@ -114,6 +132,16 @@ function DropPointVerifyContent() {
   const submitVerification = async (result: 'APPROVED' | 'REJECTED', pinToken: string) => {
     if (!profile?.userId) {
       alert('กรุณาเข้าสู่ระบบ LINE');
+      return;
+    }
+
+    if (result === 'APPROVED' && mustReject) {
+      alert('พบข้อมูลไม่ตรงหรือสภาพต่ำกว่าที่กำหนด ต้องส่งคืนเท่านั้น');
+      return;
+    }
+
+    if (result === 'APPROVED' && hasIncompleteChecks) {
+      alert('กรุณาตรวจสอบข้อมูลให้ครบทุกข้อก่อนยืนยัน');
       return;
     }
 
@@ -331,26 +359,16 @@ function DropPointVerifyContent() {
             <span className="text-gray-500 text-sm">{contract.items?.item_condition}%</span>
           </div>
 
-          <div className="px-1 relative h-6 mb-2">
+          <div className="px-1">
             <input
               type="range"
               min="0"
               max="100"
               value={verificationData.condition_score}
               onChange={(e) => setVerificationData({ ...verificationData, condition_score: parseInt(e.target.value) })}
-              className="w-full absolute z-20 opacity-0 cursor-pointer h-6"
+              className="w-full accent-[#365314]"
             />
-            <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 rounded-full -translate-y-1/2"></div>
-            <div
-              className="absolute top-1/2 left-0 h-1 bg-[#365314] rounded-full -translate-y-1/2"
-              style={{ width: `${verificationData.condition_score}%` }}
-            ></div>
-            <div
-              className="absolute top-1/2 w-6 h-6 bg-white border border-gray-200 rounded-full shadow-md -translate-y-1/2 z-10"
-              style={{ left: `calc(${verificationData.condition_score}% - 12px)` }}
-            ></div>
-
-            <div className="flex justify-between text-[10px] text-gray-400 mt-4 pt-2">
+            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
               <span>0%</span>
               <span>100%</span>
             </div>
@@ -360,6 +378,11 @@ function DropPointVerifyContent() {
             <span className="text-gray-500 text-sm font-medium">สภาพที่ตรวจ</span>
             <span className="text-gray-800 text-sm font-bold">{verificationData.condition_score}%</span>
           </div>
+          {isConditionGapTooHigh && (
+            <p className="text-[11px] text-red-600 mt-2">
+              สภาพต่ำกว่าที่ลูกค้าระบุเกิน 10% ต้องส่งคืนเท่านั้น
+            </p>
+          )}
         </div>
 
         <div className="h-px bg-gray-100 my-4"></div>
@@ -462,26 +485,34 @@ function DropPointVerifyContent() {
             />
             <span className="text-sm text-gray-700 font-medium">ข้อมูลทั้งหมดถูกตรวจสอบเรียบร้อยแล้ว</span>
           </label>
+          {hasIncompleteChecks && (
+            <p className="text-[11px] text-amber-600 mt-2">กรุณาเลือกผลตรวจสอบให้ครบทุกหัวข้อก่อนดำเนินการ</p>
+          )}
+          {mustReject && (
+            <p className="text-[11px] text-red-600 mt-2">พบข้อมูลไม่ตรง ต้องทำรายการส่งคืน</p>
+          )}
         </div>
 
         <div className="space-y-3">
-          <button
-            onClick={() => handleVerificationSubmit('APPROVED')}
-            disabled={submitting || !isConfirmed}
-            className="w-full bg-[#365314] hover:bg-[#2d4610] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
-          >
-            <span className="text-base font-bold">{submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}</span>
-            <span className="text-[10px] font-light opacity-80">Confirm</span>
-          </button>
-
-          <button
-            onClick={() => handleVerificationSubmit('REJECTED')}
-            disabled={submitting}
-            className="w-full bg-white border border-[#EF4444] hover:bg-red-50 text-[#EF4444] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50"
-          >
-            <span className="text-base font-bold">ส่งคืน</span>
-            <span className="text-[10px] font-light opacity-80">Return</span>
-          </button>
+          {mustReject ? (
+            <button
+              onClick={() => handleVerificationSubmit('REJECTED')}
+              disabled={submitting}
+              className="w-full bg-white border border-[#EF4444] hover:bg-red-50 text-[#EF4444] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50"
+            >
+              <span className="text-base font-bold">{submitting ? 'กำลังดำเนินการ...' : 'ส่งคืน'}</span>
+              <span className="text-[10px] font-light opacity-80">Return</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => handleVerificationSubmit('APPROVED')}
+              disabled={submitting || !canApprove}
+              className="w-full bg-[#365314] hover:bg-[#2d4610] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
+            >
+              <span className="text-base font-bold">{submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}</span>
+              <span className="text-[10px] font-light opacity-80">Confirm</span>
+            </button>
+          )}
         </div>
 
         <PinModal
