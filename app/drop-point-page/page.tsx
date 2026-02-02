@@ -158,12 +158,12 @@ export default function DropPointPage() {
           </nav>
 
           <div className={`${montserrat.className} hidden items-center gap-3 lg:flex`}>
-            <button className="rounded-full border border-[#999999] px-4 py-1.5 text-xs text-[#686360]">
-              Login
-            </button>
-            <button className="rounded-full bg-[#686360] px-4 py-1.5 text-xs text-[#f5f4f2]">
-              Join us
-            </button>
+            <a
+              href="#contact-us"
+              className="rounded-full bg-[#686360] px-4 py-1.5 text-xs text-[#f5f4f2] transition-colors hover:bg-[#4f4a47] cursor-pointer"
+            >
+              Talk to us
+            </a>
           </div>
           <div className="relative lg:hidden">
             <input id="mobile-menu-drop" type="checkbox" className="peer sr-only" />
@@ -225,12 +225,12 @@ export default function DropPointPage() {
                   </Link>
                 </div>
                 <div className="mt-5 grid gap-2">
-                  <button className="w-full rounded-full border border-[#bdb9b6] px-4 py-2 text-xs text-[#686360]">
-                    Login
-                  </button>
-                  <button className="w-full rounded-full bg-[#686360] px-4 py-2 text-xs text-[#f5f4f2]">
-                    Join us
-                  </button>
+                  <a
+                    href="#contact-us"
+                    className="w-full rounded-full bg-[#686360] px-4 py-2 text-center text-xs text-[#f5f4f2] transition-colors hover:bg-[#4f4a47] cursor-pointer"
+                  >
+                    Talk to us
+                  </a>
                 </div>
               </div>
             </div>
@@ -249,7 +249,7 @@ export default function DropPointPage() {
               เพื่อรับค่าธรรมเนียมและเพิ่มฐานลูกค้าให้ร้าน
             </p>
             <div className="mt-5 flex flex-wrap justify-center sm:justify-start">
-              <button className="btn-sheen rounded-full border border-[var(--accent)] px-6 py-2 text-sm text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-9 sm:py-4 sm:text-[16px]">
+              <button className="btn-sheen rounded-full border border-[var(--accent)] px-6 py-2 text-sm text-[var(--accent)] shadow-[0_8px_18px_rgba(197,81,37,0.25)] transition-colors duration-300 hover:bg-[var(--accent)] hover:text-white sm:px-9 sm:py-4 sm:text-[16px] cursor-pointer">
                 เริ่มเลย!
               </button>
             </div>
@@ -347,6 +347,31 @@ export default function DropPointPage() {
           </div>
         </section>
 
+        <section id="contact-us" className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-2 sm:px-6 sm:pb-20 lg:px-14">
+          <div className="fade-up rounded-[34px] bg-[#d8d6d4] px-8 py-10 text-[#686360] sm:px-14 sm:py-14">
+            <h3 className="text-5xl font-light leading-tight sm:text-6xl">Wanna talk?</h3>
+            <p className="mt-2 text-2xl">คุยกับเรา</p>
+            <p className="mt-8 max-w-[860px] text-2xl leading-relaxed">
+              Speak with our experts. Schedule a consultation at a time that works best for you.
+              Book your session below.
+            </p>
+            <p className="mt-4 max-w-[860px] text-2xl leading-relaxed">
+              ปรึกษาผู้เชี่ยวชาญของเราโดยตรงนัดหมายวันและเวลาที่คุณสะดวกเพื่อพูดคุยรายละเอียด
+              จองเวลาได้ที่นี่
+            </p>
+            <div className="mt-10 flex justify-center sm:justify-start">
+              <a
+                href="https://calendar.google.com/calendar"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-12 py-4 text-xl text-white transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[var(--accent)]/30 cursor-pointer"
+              >
+                Book a date and time
+              </a>
+            </div>
+          </div>
+        </section>
+
         <footer className="bg-[#2c2a28] text-[#686360]">
           <div className="mx-auto flex w-full max-w-[1216px] flex-wrap justify-between gap-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:px-14">
             <div className="min-w-[180px] sm:min-w-[220px]">
@@ -379,35 +404,38 @@ export default function DropPointPage() {
                 <h5 className={`${montserrat.className} text-sm font-semibold text-[#d0cfce]`}>Follow us</h5>
                 <div className="mt-3 flex gap-2">
                   {[
-                    { name: 'Facebook', icon: (
+                    { name: 'Facebook', href: 'https://www.facebook.com', icon: (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                       </svg>
                     )},
-                    { name: 'YouTube', icon: (
+                    { name: 'YouTube', href: 'https://www.youtube.com', icon: (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                       </svg>
                     )},
-                    { name: 'X', icon: (
+                    { name: 'X', href: 'https://x.com', icon: (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                       </svg>
                     )},
-                    { name: 'Mail', icon: (
+                    { name: 'Mail', href: 'https://mail.google.com', icon: (
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                         <polyline points="22,6 12,13 2,6"/>
                       </svg>
                     )}
                   ].map((social) => (
-                    <div
+                    <a
                       key={social.name}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3a3633] text-[#d0cfce] transition-colors duration-300 hover:bg-[#4a4644] cursor-pointer"
                       title={social.name}
                     >
                       {social.icon}
-                    </div>
+                    </a>
                   ))}
                 </div>
               </div>

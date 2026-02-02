@@ -558,7 +558,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
             const client = new Client({ channelAccessToken });
             await client.pushMessage(contract.pawners.line_id, {
               type: 'text',
-              text: `คุณได้ยืนยันการจำนำไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}`
+              text: `คุณได้ยืนยันการจำนำไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
             });
           }
           return;
@@ -579,7 +579,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `ยืนยันการจำนำเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายใน 24 ชั่วโมง`
+            text: `ยืนยันการจำนำเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
           });
         }
 
