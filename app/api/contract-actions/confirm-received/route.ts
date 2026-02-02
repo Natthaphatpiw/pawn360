@@ -11,6 +11,18 @@ const investorLineClient = new Client({
 });
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
+const msPerDay = 1000 * 60 * 60 * 24;
+
+const toUtcDateOnly = (value: string | Date) => {
+  const source = new Date(value);
+  return new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth(), source.getUTCDate()));
+};
+
+const addUtcDays = (value: Date, days: number) => {
+  const result = new Date(value);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+};
 
 const buildContractNumber = () => (
   `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
@@ -136,18 +148,16 @@ export async function POST(request: NextRequest) {
     const contract = actionRequest.contract;
     const investor = contract?.investors;
     const now = new Date();
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const contractEndDate = new Date(contract.contract_end_date);
-    const contractStartDateOriginal = new Date(contract.contract_start_date);
+    const contractEndDate = toUtcDateOnly(contract.contract_end_date);
+    const contractStartDateOriginal = toUtcDateOnly(contract.contract_start_date);
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
     const rawDurationDays = Number(contract.contract_duration_days || 0)
       || Math.ceil((contractEndDate.getTime() - contractStartDateOriginal.getTime()) / msPerDay);
     const durationDays = Math.max(1, rawDurationDays);
     const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
-    const contractStartDate = now;
-    const contractEndDateNew = new Date(contractStartDate);
-    contractEndDateNew.setDate(contractEndDateNew.getDate() + durationDays);
+    const contractStartDate = new Date(contractEndDate);
+    const contractEndDateNew = addUtcDays(contractStartDate, durationDays);
     const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
 
     const { data: newContract, error: newContractError } = await supabase

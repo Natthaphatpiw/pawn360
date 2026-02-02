@@ -192,6 +192,10 @@ export default function PawnContractDetail() {
   };
 
   const getDisplayDurationDays = () => {
+    const storedDuration = Number(contract.contract_duration_days || 0);
+    if (storedDuration > 0) {
+      return storedDuration;
+    }
     const start = new Date(contract.contract_start_date);
     const end = new Date(contract.contract_end_date);
     const startUtc = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
