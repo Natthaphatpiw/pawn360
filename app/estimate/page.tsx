@@ -5,14 +5,14 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
 import { Camera, ChevronUp, ChevronDown, Check, FileText } from 'lucide-react';
-import { Sarabun } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import imageCompression from 'browser-image-compression';
 import PawnSummary from './pawn-summary';
 import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-const sarabun = Sarabun({
+const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
 });

@@ -3,12 +3,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
-import { Sarabun } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import liff from '@line/liff';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 
-const sarabun = Sarabun({
+const sarabun = Noto_Sans_Thai({
   subsets: ['thai'],
   weight: ['400', '700'],
   display: 'swap',

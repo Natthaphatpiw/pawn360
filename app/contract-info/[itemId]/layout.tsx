@@ -1,7 +1,7 @@
-import { Sarabun } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import type { Metadata } from 'next';
 
-const sarabun = Sarabun({
+const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
 });

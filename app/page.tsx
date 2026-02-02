@@ -1,19 +1,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Montserrat, Noto_Sans_Thai } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import sub1 from '../landind/sub1.png';
 import sub2 from '../landind/sub2.png';
 import sub3 from '../landind/sub3.png';
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ['thai', 'latin'],
   weight: ['200', '300', '400', '500', '600', '700'],
 });
+
+const montserrat = notoSansThai;
 
 export default function Home() {
   return (

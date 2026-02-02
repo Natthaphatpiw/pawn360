@@ -1,17 +1,14 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Montserrat, Noto_Sans_Thai } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import com1DropPoint from '../../landind/com1_droppoint.png';
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
 
 const notoSansThai = Noto_Sans_Thai({
   subsets: ['thai', 'latin'],
   weight: ['200', '300', '400', '500', '600', '700'],
 });
+
+const montserrat = notoSansThai;
 
 const featureItems = [
   {
