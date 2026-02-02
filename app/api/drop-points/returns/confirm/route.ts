@@ -14,6 +14,13 @@ const investorLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
+const dropPointLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT
+  ? new Client({
+      channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT,
+      channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || '',
+    })
+  : null;
+
 const ALLOWED_STATUSES = ['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
 
 export async function POST(request: NextRequest) {
@@ -171,7 +178,7 @@ export async function POST(request: NextRequest) {
         .from('items')
         .update({
           item_status: 'RETURNED',
-        updated_at: nowIso
+          updated_at: nowIso
         })
         .eq('item_id', redemption.contract.items.item_id);
     }
@@ -180,7 +187,7 @@ export async function POST(request: NextRequest) {
       try {
         await pawnerLineClient.pushMessage(redemption.contract.pawners.line_id, {
           type: 'text',
-          text: `ยืนยันการรับสินค้าจาก Drop Point เรียบร้อยแล้ว\n\nสัญญา: ${redemption.contract.contract_number}\nสินค้า: ${redemption.contract.items?.brand} ${redemption.contract.items?.model}\n\nขอบคุณที่ใช้บริการ Pawnly`
+          text: `ส่งคืนเรียบร้อย\n\nสัญญา: ${redemption.contract.contract_number}\nสินค้า: ${redemption.contract.items?.brand} ${redemption.contract.items?.model}\n\nขอบคุณที่ใช้บริการ Pawnly`
         });
       } catch (msgError) {
         console.error('Error sending to pawner:', msgError);
@@ -191,10 +198,21 @@ export async function POST(request: NextRequest) {
       try {
         await investorLineClient.pushMessage(redemption.contract.investors.line_id, {
           type: 'text',
-          text: `การไถ่ถอนเสร็จสิ้นแล้ว\n\nสัญญา: ${redemption.contract.contract_number}\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`
+          text: `ส่งคืนเรียบร้อย\n\nสัญญา: ${redemption.contract.contract_number}\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`
         });
       } catch (msgError) {
         console.error('Error sending to investor:', msgError);
+      }
+    }
+
+    if (dropPointLineClient) {
+      try {
+        await dropPointLineClient.pushMessage(lineId, {
+          type: 'text',
+          text: `ส่งคืนเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}`,
+        });
+      } catch (msgError) {
+        console.error('Error sending to drop point:', msgError);
       }
     }
 

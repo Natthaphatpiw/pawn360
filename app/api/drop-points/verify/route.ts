@@ -91,6 +91,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const requiredBooleanFields = [
+      'brand_correct',
+      'model_correct',
+      'capacity_correct',
+      'color_match',
+      'functionality_ok',
+      'mdm_lock_status',
+    ] as const;
+
+    const hasIncompleteChecks = requiredBooleanFields.some((field) => typeof verificationData?.[field] !== 'boolean');
+    const hasAnyMismatch = requiredBooleanFields.some((field) => verificationData?.[field] === false);
+    const expectedConditionScore = Number(contract.items?.item_condition || 0);
+    const actualConditionScore = Number(verificationData?.condition_score || 0);
+    const isConditionGapTooHigh = Number.isFinite(expectedConditionScore)
+      ? actualConditionScore < (expectedConditionScore - 10)
+      : false;
+
+    if (verificationResult === 'APPROVED' && (hasIncompleteChecks || hasAnyMismatch || isConditionGapTooHigh)) {
+      return NextResponse.json(
+        {
+          error: 'พบข้อมูลไม่ตรงหรือสภาพต่ำกว่าที่กำหนด ต้องส่งคืนเท่านั้น',
+          requiredResult: 'REJECTED',
+          hasIncompleteChecks,
+          hasAnyMismatch,
+          isConditionGapTooHigh,
+        },
+        { status: 400 }
+      );
+    }
+
     // Save verification record
     await supabase
       .from('drop_point_verifications')
