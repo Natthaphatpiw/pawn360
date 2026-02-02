@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
-import { Sarabun } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import Image from 'next/image';
 import html2canvas from 'html2canvas';
 
-const sarabun = Sarabun({
+const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
 });

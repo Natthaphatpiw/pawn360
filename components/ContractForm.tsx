@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Sarabun } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 
-const sarabun = Sarabun({
+const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
 });
@@ -355,10 +355,10 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>สัญญาซื้อขายทรัพย์ (TH)</title>
-        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Noto_Sans_Thai:wght@400;700&display=swap" rel="stylesheet">
         <style>
             body {
-                font-family: 'Sarabun', 'Arial', sans-serif;
+                font-family: 'Noto_Sans_Thai', 'Arial', sans-serif;
                 line-height: 1.8;
                 background-color: #ffffff;
                 color: #333;
@@ -382,7 +382,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                 border: none;
                 border-bottom: 1px solid #000;
                 padding: 2px 4px;
-                font-family: 'Sarabun', 'Arial', sans-serif;
+                font-family: 'Noto_Sans_Thai', 'Arial', sans-serif;
                 font-size: 0.95em;
                 background-color: transparent;
             }

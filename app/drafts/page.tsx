@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { ArrowLeft, Trash2, Clock } from 'lucide-react';
-import { Sarabun } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import { useRouter } from 'next/navigation';
 import ImageCarousel from '@/components/ImageCarousel';
 
-const sarabun = Sarabun({
+const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
 });

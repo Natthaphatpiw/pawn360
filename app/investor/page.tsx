@@ -1,20 +1,17 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Montserrat, Noto_Sans_Thai } from 'next/font/google';
+import { Noto_Sans_Thai } from 'next/font/google';
 import com1Investor from '../../landind/com1_investor.png';
 import com2Investor from '../../landind/com2_investor.png';
 import com3Investor from '../../landind/com3_investor.png';
 import com4Investor from '../../landind/com4_investor.png';
 
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
-
 const notoSansThai = Noto_Sans_Thai({
   subsets: ['thai', 'latin'],
   weight: ['200', '300', '400', '500', '600', '700'],
 });
+
+const montserrat = notoSansThai;
 
 const featureItems = [
   { en: 'List of pawners', th: 'รายชื่อผู้ขอสินเชื่อทั้งหมด' },
