@@ -5,6 +5,9 @@ const resolveStatusLabel = (status?: string) => {
   switch (status) {
     case 'DRIVER_SEARCH':
     case 'PAYMENT_VERIFIED':
+    case 'AWAITING_PAYMENT':
+    case 'PAYMENT_REJECTED':
+    case 'SLIP_UPLOADED':
       return 'drop-point กำลังหารถไปรับของ';
     case 'DRIVER_ASSIGNED':
       return 'มีรถกำลังเข้าไปรับของ';

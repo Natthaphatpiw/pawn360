@@ -37,16 +37,31 @@ export async function GET(request: NextRequest) {
     // Get contract statistics
     const { data: contracts } = await supabase
       .from('contracts')
-      .select('contract_id, contract_status')
+      .select('contract_id, contract_status, funding_status, payment_status, item_delivery_status')
       .eq('customer_id', pawner.customer_id);
 
-    const totalContracts = contracts?.length || 0;
-    const activeContracts = contracts?.filter(
-      c => c.contract_status === 'ACTIVE' || c.contract_status === 'PENDING_SIGNATURE'
-    ).length || 0;
-    const endedContracts = contracts?.filter(
-      c => c.contract_status === 'COMPLETED' || c.contract_status === 'TERMINATED'
-    ).length || 0;
+    const isContractQualified = (contract: any) => {
+      const status = contract.contract_status;
+      const fundingStatus = contract.funding_status;
+      const paymentStatus = contract.payment_status;
+      const itemStatus = contract.item_delivery_status;
+
+      if (['PENDING', 'PENDING_SIGNATURE', 'ACTIVE'].includes(status)) return false;
+      if (fundingStatus === 'PENDING') return false;
+      if (paymentStatus && paymentStatus !== 'COMPLETED') return false;
+      if (!itemStatus || !['RECEIVED_AT_DROP_POINT', 'VERIFIED'].includes(itemStatus)) return false;
+      return true;
+    };
+
+    const qualifiedContracts = (contracts || []).filter(isContractQualified);
+
+    const totalContracts = qualifiedContracts.length;
+    const activeContracts = qualifiedContracts.filter(
+      c => ['CONFIRMED', 'EXTENDED'].includes(c.contract_status)
+    ).length;
+    const endedContracts = qualifiedContracts.filter(
+      c => ['COMPLETED', 'TERMINATED', 'LIQUIDATED', 'DEFAULTED'].includes(c.contract_status)
+    ).length;
 
     return NextResponse.json({
       exists: true,

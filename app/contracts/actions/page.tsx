@@ -87,6 +87,14 @@ export default function ActionStatusListPage() {
   const [requests, setRequests] = useState<ActionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const pendingRequests = requests.filter((req) => ![
+    'COMPLETED',
+    'CANCELLED',
+    'VOIDED',
+    'SLIP_REJECTED_FINAL',
+    'INVESTOR_SLIP_REJECTED_FINAL',
+  ].includes(req.request_status));
+
   useEffect(() => {
     if (liffLoading) return;
 
@@ -147,18 +155,18 @@ export default function ActionStatusListPage() {
           onClick={() => router.push('/contracts')}
         />
         <div>
-          <h1 className="text-xl font-bold text-gray-800">สถานะคำขอทั้งหมด</h1>
-          <p className="text-gray-500 text-xs">Action Status</p>
+          <h1 className="text-xl font-bold text-gray-800">สถานะคำขอ</h1>
+          <p className="text-gray-500 text-xs">Request Status</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3 pb-20 no-scrollbar">
-        {requests.length === 0 ? (
+        {pendingRequests.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">ยังไม่มีคำขอรายการ</p>
+            <p className="text-gray-500">ไม่มีคำขอที่รอดำเนินการ</p>
           </div>
         ) : (
-          requests.map((req) => {
+          pendingRequests.map((req) => {
             const item = req.contract?.items;
             const itemName = item?.capacity
               ? `${item.brand} ${item.model} ${item.capacity}`

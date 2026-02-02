@@ -13,6 +13,14 @@ interface InvestorData {
   auto_invest_enabled?: boolean | null;
   auto_liquidation_enabled?: boolean | null;
   investment_preferences?: any;
+  phone_number?: string | null;
+  addr_house_no?: string | null;
+  addr_village?: string | null;
+  addr_street?: string | null;
+  addr_sub_district?: string | null;
+  addr_district?: string | null;
+  addr_province?: string | null;
+  addr_postcode?: string | null;
 }
 
 type PreferenceState = Record<string, { enabled: boolean; sub: string[] }>;
@@ -117,6 +125,17 @@ export default function CreditLimitPage() {
   const [autoLiquidationEnabled, setAutoLiquidationEnabled] = useState(false);
   const [autoMatchInfoOpen, setAutoMatchInfoOpen] = useState(false);
   const [liquidationInfoOpen, setLiquidationInfoOpen] = useState(false);
+  const [returnAddressMode, setReturnAddressMode] = useState<'registered' | 'custom'>('registered');
+  const [returnAddress, setReturnAddress] = useState({
+    houseNo: '',
+    village: '',
+    street: '',
+    subDistrict: '',
+    district: '',
+    province: '',
+    postcode: '',
+  });
+  const [returnContactPhone, setReturnContactPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,6 +166,24 @@ export default function CreditLimitPage() {
           setPreferences(normalizePreferences(data?.investment_preferences));
           setAutoMatchEnabled(!!data?.auto_invest_enabled);
           setAutoLiquidationEnabled(!!data?.auto_liquidation_enabled);
+          const returnDelivery = data?.investment_preferences?.return_delivery;
+          if (returnDelivery?.mode === 'custom') {
+            setReturnAddressMode('custom');
+            if (returnDelivery.address) {
+              setReturnAddress({
+                houseNo: returnDelivery.address.houseNo || '',
+                village: returnDelivery.address.village || '',
+                street: returnDelivery.address.street || '',
+                subDistrict: returnDelivery.address.subDistrict || '',
+                district: returnDelivery.address.district || '',
+                province: returnDelivery.address.province || '',
+                postcode: returnDelivery.address.postcode || '',
+              });
+            }
+          } else {
+            setReturnAddressMode('registered');
+          }
+          setReturnContactPhone(returnDelivery?.phone || data?.phone_number || '');
         } else {
           setError('ไม่พบข้อมูลผู้ลงทุน');
         }
@@ -167,6 +204,19 @@ export default function CreditLimitPage() {
   const autoMatchAllowed = tier === 'GOLD' || tier === 'PLATINUM';
   const nextTarget = tier === 'SILVER' ? TIER_THRESHOLDS.GOLD : tier === 'GOLD' ? TIER_THRESHOLDS.PLATINUM : null;
   const remainingToNext = nextTarget ? Math.max(0, nextTarget - totalActive) : 0;
+  const registeredAddressLabel = useMemo(() => {
+    if (!investor) return '-';
+    const parts = [
+      investor.addr_house_no,
+      investor.addr_village,
+      investor.addr_street,
+      investor.addr_sub_district,
+      investor.addr_district,
+      investor.addr_province,
+      investor.addr_postcode,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  }, [investor]);
 
   const toggleCategory = (key: string) => {
     setPreferences((prev) => {
@@ -204,15 +254,41 @@ export default function CreditLimitPage() {
       setError('กรุณากรอกวงเงินให้ถูกต้อง');
       return;
     }
+    if (!autoLiquidationEnabled) {
+      if (returnAddressMode === 'registered') {
+        const hasRegistered = Boolean(
+          investor?.addr_house_no ||
+          investor?.addr_street ||
+          investor?.addr_district ||
+          investor?.addr_province ||
+          investor?.addr_postcode
+        );
+        if (!hasRegistered) {
+          setError('ไม่พบที่อยู่ที่ลงทะเบียนไว้ กรุณาใส่ที่อยู่อื่นสำหรับการจัดส่ง');
+          return;
+        }
+      } else {
+        if (!returnAddress.houseNo || !returnAddress.district || !returnAddress.province) {
+          setError('กรุณากรอกที่อยู่สำหรับจัดส่งให้ครบถ้วน');
+          return;
+        }
+      }
+    }
 
     try {
       setSaving(true);
       setError(null);
+      const returnDelivery = autoLiquidationEnabled ? null : {
+        mode: returnAddressMode,
+        address: returnAddressMode === 'custom' ? returnAddress : null,
+        phone: returnContactPhone || investor?.phone_number || '',
+      };
       const response = await axios.put('/api/investors/credit-limit', {
         lineId: profile.userId,
         maxInvestmentAmount: parsed,
         preferences: {
           categories: preferences,
+          return_delivery: returnDelivery,
         },
         autoMatchEnabled,
         autoLiquidationEnabled,
@@ -417,6 +493,113 @@ export default function CreditLimitPage() {
             )}
           </div>
         </div>
+
+        {!autoLiquidationEnabled && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+            <div>
+              <div className="font-semibold text-gray-800">ที่อยู่สำหรับส่งคืนสินค้า</div>
+              <div className="text-xs text-gray-500">ใช้เมื่อปิดการขายทอดตลาดโดย Pawnly</div>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${returnAddressMode === 'registered' ? 'border-[#1E3A8A] bg-[#F5F7FA]' : 'border-gray-200'}`}>
+                <input
+                  type="radio"
+                  name="returnAddressMode"
+                  value="registered"
+                  checked={returnAddressMode === 'registered'}
+                  onChange={() => setReturnAddressMode('registered')}
+                  className="mt-1 accent-[#1E3A8A]"
+                />
+                <div>
+                  <p className="font-semibold text-gray-800">จัดส่งตามที่อยู่ที่ลงทะเบียนไว้</p>
+                  <p className="text-xs text-gray-500 mt-1">{registeredAddressLabel}</p>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${returnAddressMode === 'custom' ? 'border-[#1E3A8A] bg-[#F5F7FA]' : 'border-gray-200'}`}>
+                <input
+                  type="radio"
+                  name="returnAddressMode"
+                  value="custom"
+                  checked={returnAddressMode === 'custom'}
+                  onChange={() => setReturnAddressMode('custom')}
+                  className="mt-1 accent-[#1E3A8A]"
+                />
+                <div>
+                  <p className="font-semibold text-gray-800">ใส่ที่อยู่อื่น</p>
+                  <p className="text-xs text-gray-500 mt-1">กรอกที่อยู่สำหรับส่งคืนสินค้า</p>
+                </div>
+              </label>
+            </div>
+
+            {returnAddressMode === 'custom' && (
+              <div className="space-y-2 text-sm">
+                <input
+                  type="text"
+                  placeholder="บ้านเลขที่ *"
+                  value={returnAddress.houseNo}
+                  onChange={(e) => setReturnAddress((prev) => ({ ...prev, houseNo: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                />
+                <input
+                  type="text"
+                  placeholder="หมู่บ้าน/คอนโด"
+                  value={returnAddress.village}
+                  onChange={(e) => setReturnAddress((prev) => ({ ...prev, village: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                />
+                <input
+                  type="text"
+                  placeholder="ถนน/ซอย"
+                  value={returnAddress.street}
+                  onChange={(e) => setReturnAddress((prev) => ({ ...prev, street: e.target.value }))}
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="ตำบล/แขวง *"
+                    value={returnAddress.subDistrict}
+                    onChange={(e) => setReturnAddress((prev) => ({ ...prev, subDistrict: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  />
+                  <input
+                    type="text"
+                    placeholder="อำเภอ/เขต *"
+                    value={returnAddress.district}
+                    onChange={(e) => setReturnAddress((prev) => ({ ...prev, district: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="จังหวัด *"
+                    value={returnAddress.province}
+                    onChange={(e) => setReturnAddress((prev) => ({ ...prev, province: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  />
+                  <input
+                    type="text"
+                    placeholder="รหัสไปรษณีย์"
+                    value={returnAddress.postcode}
+                    onChange={(e) => setReturnAddress((prev) => ({ ...prev, postcode: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  />
+                </div>
+              </div>
+            )}
+
+            <input
+              type="tel"
+              placeholder="เบอร์ติดต่อสำหรับการจัดส่ง"
+              value={returnContactPhone}
+              onChange={(e) => setReturnContactPhone(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+            />
+          </div>
+        )}
 
         {error && (
           <div className="text-sm text-red-600">

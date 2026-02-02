@@ -115,6 +115,28 @@ export default function PawnerContractList() {
         return { text: 'ใกล้ครบกำหนด', bg: 'bg-[#FFF3E0]', textCol: 'text-[#FF9800]' };
       case 'เสร็จสิ้น':
         return { text: 'เสร็จสิ้น', bg: 'bg-gray-100', textCol: 'text-gray-600' };
+      case 'รอรับนักลงทุน':
+        return { text: 'รอรับนักลงทุน', bg: 'bg-[#E3F2FD]', textCol: 'text-[#1E88E5]' };
+      case 'รอการโอนเงิน':
+        return { text: 'รอการโอนเงิน', bg: 'bg-[#FFF8E1]', textCol: 'text-[#F59E0B]' };
+      case 'รอยืนยันรับเงิน':
+        return { text: 'รอยืนยันรับเงิน', bg: 'bg-[#FFF8E1]', textCol: 'text-[#F59E0B]' };
+      case 'รอส่งสินค้า':
+        return { text: 'รอส่งสินค้า', bg: 'bg-[#F3E8FF]', textCol: 'text-[#7C3AED]' };
+      case 'กำลังนำส่งสินค้า':
+        return { text: 'กำลังนำส่งสินค้า', bg: 'bg-[#E0F2F1]', textCol: 'text-[#00897B]' };
+      case 'กำลังขนส่ง':
+        return { text: 'กำลังขนส่ง', bg: 'bg-[#E0F2F1]', textCol: 'text-[#00897B]' };
+      case 'รอตรวจสอบสินค้า':
+        return { text: 'รอตรวจสอบสินค้า', bg: 'bg-[#E0F7FA]', textCol: 'text-[#00838F]' };
+      case 'ยกเลิก':
+        return { text: 'ยกเลิก', bg: 'bg-gray-100', textCol: 'text-gray-500' };
+      case 'ขายทอดตลาด':
+        return { text: 'ขายทอดตลาด', bg: 'bg-[#FCE4EC]', textCol: 'text-[#AD1457]' };
+      case 'เกินกำหนด':
+        return { text: 'เกินกำหนด', bg: 'bg-[#FFEBEE]', textCol: 'text-[#EF5350]' };
+      case 'ส่งคืน':
+        return { text: 'ส่งคืน', bg: 'bg-gray-100', textCol: 'text-gray-500' };
       default:
         return { text: status, bg: 'bg-gray-100', textCol: 'text-gray-500' };
     }
@@ -245,8 +267,8 @@ export default function PawnerContractList() {
           onClick={() => router.push('/contracts/actions')}
           className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
         >
-          <span className="text-base font-bold">สถานะคำขอทั้งหมด</span>
-          <span className="text-[10px] opacity-70 font-light">Action status</span>
+          <span className="text-base font-bold">สถานะคำขอ</span>
+          <span className="text-[10px] opacity-70 font-light">Request status</span>
         </button>
         {/* Pawn Entry Button */}
         <button

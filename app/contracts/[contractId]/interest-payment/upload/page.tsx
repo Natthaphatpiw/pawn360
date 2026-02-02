@@ -240,8 +240,7 @@ export default function InterestPaymentUploadPage() {
           </div>
         )}
 
-        {/* Bank Info for Retry */}
-        {showRetry && companyBank && (
+        {companyBank && (
           <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
             <h3 className="font-bold text-gray-800 text-sm mb-2">โอนเงินไปที่</h3>
             <div className="bg-[#FFF8F5] rounded-xl p-3 border border-[#F0D4C8]">

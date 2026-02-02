@@ -60,7 +60,7 @@ const buildDropPointPickupCard = (payload: {
           },
           {
             type: 'text',
-            text: 'มีผู้จำนำชำระค่าจัดส่งแล้ว',
+            text: 'พร้อมให้เข้ารับสินค้าแล้ว',
             size: 'sm',
             color: '#ffffff',
             align: 'center',
@@ -99,7 +99,7 @@ const buildDropPointPickupCard = (payload: {
             spacing: 'sm',
             contents: [
               { type: 'text', text: 'ค่าจัดส่ง:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${feeAmount.toLocaleString()} บาท`, color: '#C0562F', size: 'sm', flex: 5, weight: 'bold' },
+              { type: 'text', text: `${feeAmount.toLocaleString()} บาท (บริษัทรับผิดชอบ)`, color: '#C0562F', size: 'sm', flex: 5, weight: 'bold' },
             ],
           },
           {
@@ -277,9 +277,9 @@ export async function POST(request: NextRequest) {
         try {
           await pawnerLineClient.pushMessage(pawner.line_id, {
             type: 'text',
-            text: `ชำระค่าส่งเรียบร้อยแล้ว\n\nDrop Point จะเรียกรถไปรับสินค้าของคุณภายใน 2 ชั่วโมง\nกรุณาเตรียมสินค้าไว้ให้พร้อม\n\nเช็คสถานะการเข้ารับสินค้าได้ที่นี่:\n${statusUrl}`,
-          });
-        } catch (msgError) {
+          text: `ระบบได้รับที่อยู่รับสินค้าแล้ว\n\nDrop Point จะเรียกรถไปรับสินค้าของคุณภายใน 2 ชั่วโมง\nกรุณาเตรียมสินค้าไว้ให้พร้อม\n\nเช็คสถานะการเข้ารับสินค้าได้ที่นี่:\n${statusUrl}`,
+        });
+      } catch (msgError) {
           console.error('Error sending delivery status to pawner:', msgError);
         }
       }

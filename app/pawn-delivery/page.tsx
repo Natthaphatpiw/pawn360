@@ -1,16 +1,27 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
-import { CheckCircle, MapPin, UploadCloud, Loader2 } from 'lucide-react';
+import { CheckCircle, MapPin, Loader2 } from 'lucide-react';
 
 interface ContractData {
   contract_id: string;
   contract_number: string;
   item?: { brand?: string; model?: string };
-  pawner?: { firstname?: string; lastname?: string; phone_number?: string };
+  pawner?: {
+    firstname?: string;
+    lastname?: string;
+    phone_number?: string;
+    addr_house_no?: string | null;
+    addr_village?: string | null;
+    addr_street?: string | null;
+    addr_sub_district?: string | null;
+    addr_district?: string | null;
+    addr_province?: string | null;
+    addr_postcode?: string | null;
+  };
   drop_point?: { drop_point_name?: string; phone_number?: string };
 }
 
@@ -30,13 +41,6 @@ interface DeliveryRequest {
   notes?: string | null;
 }
 
-interface BankAccount {
-  bank_name?: string | null;
-  bank_account_no?: string | null;
-  bank_account_name?: string | null;
-  promptpay_number?: string | null;
-}
-
 const STATUS_STEPS = [
   'drop-point กำลังหารถไปรับของ',
   'มีรถกำลังเข้าไปรับของ',
@@ -51,11 +55,9 @@ function PawnDeliveryPageContent() {
   const [contractId, setContractId] = useState<string>('');
   const [contract, setContract] = useState<ContractData | null>(null);
   const [deliveryRequest, setDeliveryRequest] = useState<DeliveryRequest | null>(null);
-  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
-  const [step, setStep] = useState<'address' | 'payment' | 'status'>('address');
+  const [step, setStep] = useState<'address' | 'status'>('address');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [statusLabel, setStatusLabel] = useState<string>('');
   const [stepIndex, setStepIndex] = useState(0);
   const [statusRequest, setStatusRequest] = useState<DeliveryRequest | null>(null);
@@ -69,13 +71,11 @@ function PawnDeliveryPageContent() {
     province: '',
     postcode: '',
   });
+  const [addressMode, setAddressMode] = useState<'registered' | 'other'>('registered');
   const [contactPhone, setContactPhone] = useState('');
   const [notes, setNotes] = useState('');
 
-  const [slipFile, setSlipFile] = useState<File | null>(null);
-  const [slipPreview, setSlipPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let id = searchParams.get('contractId');
@@ -89,14 +89,25 @@ function PawnDeliveryPageContent() {
     if (id) setContractId(id);
   }, [searchParams]);
 
-  const deliveryFee = useMemo(() => {
-    return deliveryRequest?.delivery_fee ?? 40;
-  }, [deliveryRequest]);
-
   const itemName = useMemo(() => {
     if (!contract?.item) return '-';
     return `${contract.item.brand || ''} ${contract.item.model || ''}`.trim();
   }, [contract]);
+
+  const registeredAddressLabel = useMemo(() => {
+    const pawner = contract?.pawner;
+    if (!pawner) return '-';
+    const parts = [
+      pawner.addr_house_no,
+      pawner.addr_village,
+      pawner.addr_street,
+      pawner.addr_sub_district,
+      pawner.addr_district,
+      pawner.addr_province,
+      pawner.addr_postcode,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  }, [contract?.pawner]);
 
   const fetchRequest = async () => {
     if (!contractId || !profile?.userId) return;
@@ -108,7 +119,7 @@ function PawnDeliveryPageContent() {
       const data = response.data;
       setContract(data.contract || null);
       setDeliveryRequest(data.deliveryRequest || null);
-      setBankAccount(data.bankAccount || null);
+      // no payment step; bank account no longer needed here
 
       if (data.deliveryRequest) {
         setAddress({
@@ -122,13 +133,35 @@ function PawnDeliveryPageContent() {
         });
         setContactPhone(data.deliveryRequest.contact_phone || '');
         setNotes(data.deliveryRequest.notes || '');
+        setAddressMode('other');
+      } else if (data.contract?.pawner) {
+        const pawner = data.contract.pawner;
+        const hasRegisteredAddress = Boolean(
+          pawner.addr_house_no ||
+          pawner.addr_street ||
+          pawner.addr_district ||
+          pawner.addr_province ||
+          pawner.addr_postcode
+        );
+        if (hasRegisteredAddress) {
+          setAddressMode('registered');
+          setAddress({
+            houseNo: pawner.addr_house_no || '',
+            village: pawner.addr_village || '',
+            street: pawner.addr_street || '',
+            subDistrict: pawner.addr_sub_district || '',
+            district: pawner.addr_district || '',
+            province: pawner.addr_province || '',
+            postcode: pawner.addr_postcode || '',
+          });
+          setContactPhone(pawner.phone_number || '');
+        } else {
+          setAddressMode('other');
+        }
       }
 
-      const status = data.deliveryRequest?.status || 'AWAITING_PAYMENT';
-      if (['DRIVER_SEARCH', 'DRIVER_ASSIGNED', 'ITEM_PICKED', 'ARRIVED'].includes(status)) {
+      if (data.deliveryRequest) {
         setStep('status');
-      } else if (data.deliveryRequest) {
-        setStep('payment');
       } else {
         setStep('address');
       }
@@ -167,7 +200,19 @@ function PawnDeliveryPageContent() {
 
   const handleAddressSubmit = async () => {
     if (!contractId || !profile?.userId) return;
-    if (!address.houseNo || !address.district || !address.province) {
+    const useRegisteredAddress = addressMode === 'registered' && contract?.pawner;
+    const resolvedAddress = useRegisteredAddress ? {
+      houseNo: contract?.pawner?.addr_house_no || '',
+      village: contract?.pawner?.addr_village || '',
+      street: contract?.pawner?.addr_street || '',
+      subDistrict: contract?.pawner?.addr_sub_district || '',
+      district: contract?.pawner?.addr_district || '',
+      province: contract?.pawner?.addr_province || '',
+      postcode: contract?.pawner?.addr_postcode || '',
+    } : address;
+    const resolvedContactPhone = useRegisteredAddress ? (contract?.pawner?.phone_number || '') : contactPhone;
+
+    if (!resolvedAddress.houseNo || !resolvedAddress.district || !resolvedAddress.province) {
       setError('กรุณากรอกที่อยู่ให้ครบถ้วน');
       return;
     }
@@ -178,70 +223,18 @@ function PawnDeliveryPageContent() {
       const response = await axios.post('/api/pawn-delivery/request', {
         contractId,
         lineId: profile.userId,
-        address,
-        contactPhone,
+        address: resolvedAddress,
+        contactPhone: resolvedContactPhone,
         notes,
       });
       if (response.data?.deliveryRequestId) {
         await fetchRequest();
-        setStep('payment');
+        setStep('status');
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'บันทึกที่อยู่ไม่สำเร็จ');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleSlipChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setSlipFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setSlipPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleVerifySlip = async () => {
-    if (!slipFile || !deliveryRequest?.delivery_request_id || !profile?.userId) {
-      setError('กรุณาอัปโหลดสลิปก่อน');
-      return;
-    }
-
-    try {
-      setUploading(true);
-      setError(null);
-
-      const formData = new FormData();
-      formData.append('file', slipFile);
-      formData.append('folder', 'delivery-slips');
-
-      const uploadRes = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (!uploadRes.data.url) {
-        throw new Error('อัปโหลดสลิปไม่สำเร็จ');
-      }
-
-      const verifyRes = await axios.post('/api/pawn-delivery/verify-slip', {
-        deliveryRequestId: deliveryRequest.delivery_request_id,
-        slipUrl: uploadRes.data.url,
-        pawnerLineId: profile.userId,
-      });
-
-      if (verifyRes.data.success) {
-        await fetchRequest();
-        setStep('status');
-      } else {
-        setError(verifyRes.data.message || 'ตรวจสอบสลิปไม่สำเร็จ');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'ตรวจสอบสลิปไม่สำเร็จ');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -307,7 +300,40 @@ function PawnDeliveryPageContent() {
         {step === 'address' && (
           <div className="rounded-3xl bg-white p-5 shadow-sm">
             <h2 className="text-base font-bold text-[#686360] mb-4">ที่อยู่สำหรับให้รถรับสินค้า</h2>
+            <div className="space-y-2 mb-4 text-sm">
+              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${addressMode === 'registered' ? 'border-[#C0562F] bg-[#FFF7F2]' : 'border-[#e0dcd8]'}`}>
+                <input
+                  type="radio"
+                  name="addressMode"
+                  value="registered"
+                  checked={addressMode === 'registered'}
+                  onChange={() => setAddressMode('registered')}
+                  className="mt-1 accent-[#C0562F]"
+                />
+                <div>
+                  <p className="font-semibold text-[#686360]">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
+                  <p className="text-xs text-[#9a9694] mt-1">{registeredAddressLabel}</p>
+                </div>
+              </label>
+              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${addressMode === 'other' ? 'border-[#C0562F] bg-[#FFF7F2]' : 'border-[#e0dcd8]'}`}>
+                <input
+                  type="radio"
+                  name="addressMode"
+                  value="other"
+                  checked={addressMode === 'other'}
+                  onChange={() => setAddressMode('other')}
+                  className="mt-1 accent-[#C0562F]"
+                />
+                <div>
+                  <p className="font-semibold text-[#686360]">ใส่ที่อยู่อื่น</p>
+                  <p className="text-xs text-[#9a9694] mt-1">กรอกที่อยู่สำหรับให้รถเข้ารับสินค้า</p>
+                </div>
+              </label>
+            </div>
+
             <div className="space-y-3 text-sm">
+              {addressMode === 'other' && (
+                <>
               <input
                 value={address.houseNo}
                 onChange={(e) => setAddress((prev) => ({ ...prev, houseNo: e.target.value }))}
@@ -363,6 +389,8 @@ function PawnDeliveryPageContent() {
                 className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
                 rows={3}
               />
+                </>
+              )}
             </div>
 
             <button
@@ -372,49 +400,6 @@ function PawnDeliveryPageContent() {
             >
               {saving ? 'กำลังบันทึก...' : 'บันทึกที่อยู่และไปขั้นตอนถัดไป'}
             </button>
-          </div>
-        )}
-
-        {step === 'payment' && (
-          <div className="space-y-4">
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
-              <h2 className="text-base font-bold text-[#686360] mb-2">ชำระค่าจัดส่ง</h2>
-              <p className="text-sm text-[#7f7b78]">ยอดชำระ {deliveryFee.toLocaleString()} บาท</p>
-              <div className="mt-4 rounded-2xl border border-[#e0dcd8] bg-[#faf7f5] p-4 text-xs text-[#7f7b78]">
-                <p>ธนาคาร: {bankAccount?.bank_name || 'พร้อมเพย์'}</p>
-                <p>เลขบัญชี/พร้อมเพย์: {bankAccount?.promptpay_number || bankAccount?.bank_account_no || '-'}</p>
-                <p>ชื่อบัญชี: {bankAccount?.bank_account_name || '-'}</p>
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-[#686360] mb-3">อัปโหลดสลิปการโอนเงิน</h3>
-              <label className="flex h-40 w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#e0dcd8] bg-[#faf7f5] text-xs text-[#9a9694]">
-                {slipPreview ? (
-                  <img src={slipPreview} alt="slip" className="h-full w-full rounded-2xl object-cover" />
-                ) : (
-                  <>
-                    <UploadCloud className="h-6 w-6 mb-2" />
-                    แตะเพื่ออัปโหลดสลิป
-                  </>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleSlipChange}
-                />
-              </label>
-
-              <button
-                onClick={handleVerifySlip}
-                disabled={uploading}
-                className="mt-4 w-full rounded-2xl bg-[#365314] py-3 text-sm font-semibold text-white"
-              >
-                {uploading ? 'กำลังตรวจสอบ...' : 'ยืนยันการชำระเงิน'}
-              </button>
-            </div>
           </div>
         )}
 

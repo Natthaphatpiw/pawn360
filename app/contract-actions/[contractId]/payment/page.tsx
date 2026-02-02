@@ -29,6 +29,12 @@ interface Contract {
 
 export default function PaymentPage({ params }: { params: Promise<{ contractId: string }> }) {
   const [contractId, setContractId] = useState<string>('');
+  const companyBank = {
+    bank_name: 'พร้อมเพย์',
+    bank_account_no: '0626092941',
+    bank_account_name: 'ณัฐภัทร ต้อยจัตุรัส',
+    promptpay_number: '0626092941',
+  };
 
   useEffect(() => {
     const getParams = async () => {
@@ -234,6 +240,16 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
         <div className="space-y-1 text-sm" style={{ color: '#4A4644' }}>
           <p>รหัสสัญญา: {contract.contractNumber}</p>
           <p>{getActionDescription()}</p>
+        </div>
+      </div>
+
+      {/* Company Bank Info */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+        <h3 className="font-bold text-black mb-2">บัญชีรับเงิน</h3>
+        <div className="space-y-1 text-sm" style={{ color: '#4A4644' }}>
+          <p>ธนาคาร: <span className="font-semibold">{companyBank.bank_name}</span></p>
+          <p>เลขบัญชี/พร้อมเพย์: <span className="font-semibold">{companyBank.promptpay_number || companyBank.bank_account_no}</span></p>
+          <p>ชื่อบัญชี: <span className="font-semibold">{companyBank.bank_account_name}</span></p>
         </div>
       </div>
 

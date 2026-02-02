@@ -239,7 +239,7 @@ export default function PawnerRegister() {
 
           {/* Contract List Button */}
           <button
-            onClick={() => router.push('/pawner/list-item')}
+            onClick={() => router.push('/contracts')}
             className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
             <span className="text-base font-bold">รายการจำนำ</span>

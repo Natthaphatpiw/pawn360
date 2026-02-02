@@ -69,6 +69,24 @@ export async function GET(request: NextRequest) {
         )
       `)
       .in('contract_id', contractIds)
+      .in('request_status', [
+        'PENDING',
+        'AWAITING_PAYMENT',
+        'SLIP_UPLOADED',
+        'SLIP_VERIFIED',
+        'SLIP_REJECTED',
+        'AWAITING_SIGNATURE',
+        'PENDING_INVESTOR_APPROVAL',
+        'AWAITING_INVESTOR_APPROVAL',
+        'INVESTOR_APPROVED',
+        'INVESTOR_REJECTED',
+        'AWAITING_INVESTOR_PAYMENT',
+        'INVESTOR_SLIP_UPLOADED',
+        'INVESTOR_SLIP_VERIFIED',
+        'INVESTOR_SLIP_REJECTED',
+        'INVESTOR_TRANSFERRED',
+        'AWAITING_PAWNER_CONFIRM'
+      ])
       .order('created_at', { ascending: false });
 
     if (requestsError) {

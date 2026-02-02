@@ -1,6 +1,155 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getCompanyBankAccount } from '@/lib/services/slip-verification';
+import { Client, FlexMessage } from '@line/bot-sdk';
+
+const createLineClient = (channelAccessToken?: string, channelSecret?: string) => {
+  if (!channelAccessToken) {
+    return null;
+  }
+  return new Client({
+    channelAccessToken,
+    channelSecret: channelSecret || '',
+  });
+};
+
+const pawnerLineClient = createLineClient(
+  process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  process.env.LINE_CHANNEL_SECRET
+);
+const dropPointLineClient = createLineClient(
+  process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT,
+  process.env.LINE_CHANNEL_SECRET_DROPPOINT
+);
+
+const getPawnerStatusUrl = (contractId: string) => {
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
+  return `https://liff.line.me/${liffId}?contractId=${encodeURIComponent(contractId)}`;
+};
+
+const getDropPointUrl = (deliveryRequestId: string) => {
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_PICKUP || '2008651088-cx00A4cZ';
+  return `https://liff.line.me/${liffId}?deliveryRequestId=${encodeURIComponent(deliveryRequestId)}`;
+};
+
+const buildDropPointPickupCard = (payload: {
+  deliveryRequestId: string;
+  contractNumber: string;
+  itemName: string;
+  addressFull: string;
+  contactPhone?: string | null;
+  feeAmount: number;
+}) => {
+  const { deliveryRequestId, contractNumber, itemName, addressFull, contactPhone, feeAmount } = payload;
+  return {
+    type: 'flex',
+    altText: 'รับงานไปรับสินค้า',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: 'รับงานไปรับสินค้า',
+            weight: 'bold',
+            size: 'lg',
+            color: '#ffffff',
+            align: 'center',
+          },
+          {
+            type: 'text',
+            text: 'พร้อมให้เข้ารับสินค้าแล้ว',
+            size: 'sm',
+            color: '#ffffff',
+            align: 'center',
+            margin: 'sm',
+          },
+        ],
+        backgroundColor: '#365314',
+        paddingAll: 'lg',
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'สัญญา:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: contractNumber, color: '#333333', size: 'sm', flex: 5, weight: 'bold' },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: itemName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'ค่าจัดส่ง:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: `${feeAmount.toLocaleString()} บาท (บริษัทรับผิดชอบ)`, color: '#C0562F', size: 'sm', flex: 5, weight: 'bold' },
+            ],
+          },
+          {
+            type: 'separator',
+            margin: 'lg',
+          },
+          {
+            type: 'text',
+            text: 'ที่อยู่รับสินค้า',
+            size: 'sm',
+            weight: 'bold',
+            color: '#333333',
+            margin: 'md',
+          },
+          {
+            type: 'text',
+            text: addressFull || '-',
+            size: 'sm',
+            color: '#555555',
+            wrap: true,
+          },
+          {
+            type: 'text',
+            text: contactPhone ? `โทร: ${contactPhone}` : 'โทร: -',
+            size: 'sm',
+            color: '#555555',
+            margin: 'sm',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'uri',
+              label: 'อัปเดตสถานะรับของ',
+              uri: getDropPointUrl(deliveryRequestId),
+            },
+            style: 'primary',
+            color: '#365314',
+          },
+        ],
+      },
+    },
+  } as FlexMessage;
+};
 
 const buildAddressFull = (address: Record<string, string | undefined>) => {
   const parts = [
@@ -39,7 +188,19 @@ export async function GET(request: NextRequest) {
         customer_id,
         drop_point_id,
         items:item_id (brand, model),
-        pawners:customer_id (line_id, firstname, lastname, phone_number),
+        pawners:customer_id (
+          line_id,
+          firstname,
+          lastname,
+          phone_number,
+          addr_house_no,
+          addr_village,
+          addr_street,
+          addr_sub_district,
+          addr_district,
+          addr_province,
+          addr_postcode
+        ),
         drop_points:drop_point_id (drop_point_name, phone_number, line_id)
       `)
       .eq('contract_id', contractId)
@@ -126,9 +287,11 @@ export async function POST(request: NextRequest) {
       .from('contracts')
       .select(`
         contract_id,
+        contract_number,
         loan_request_id,
         customer_id,
         drop_point_id,
+        items:item_id (brand, model),
         pawners:customer_id (line_id),
         drop_points:drop_point_id (line_id)
       `)
@@ -187,8 +350,11 @@ export async function POST(request: NextRequest) {
 
     const addressFull = buildAddressFull(address);
     const now = new Date().toISOString();
+    const inProgressStatuses = ['DRIVER_SEARCH', 'DRIVER_ASSIGNED', 'ITEM_PICKED', 'ARRIVED'];
+    const shouldNotify = !existingRequest || !inProgressStatuses.includes(existingRequest.status);
+    const nextStatus = shouldNotify ? 'DRIVER_SEARCH' : existingRequest?.status;
 
-    const payload = {
+    const payload: any = {
       contract_id: contract.contract_id,
       loan_request_id: contract.loan_request_id,
       customer_id: contract.customer_id,
@@ -196,7 +362,7 @@ export async function POST(request: NextRequest) {
       pawner_line_id: lineId,
       drop_point_line_id: dropPoint?.line_id || null,
       delivery_fee: loanRequest?.delivery_fee ?? 40,
-      status: 'AWAITING_PAYMENT',
+      status: nextStatus,
       address_house_no: address.houseNo,
       address_village: address.village || null,
       address_street: address.street || null,
@@ -209,6 +375,9 @@ export async function POST(request: NextRequest) {
       notes: notes || null,
       updated_at: now,
     };
+    if (shouldNotify) {
+      payload.payment_verified_at = now;
+    }
 
     let result;
 
@@ -233,6 +402,53 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to save delivery request' },
         { status: 500 }
       );
+    }
+
+    if (shouldNotify) {
+      try {
+        await supabase
+          .from('contracts')
+          .update({
+            item_delivery_status: 'PENDING',
+            updated_at: now,
+          })
+          .eq('contract_id', contract.contract_id);
+      } catch (updateError) {
+        console.error('Failed to update contract delivery status:', updateError);
+      }
+
+      const item = Array.isArray(contract.items)
+        ? contract.items[0]
+        : contract.items;
+      const itemName = `${item?.brand || ''} ${item?.model || ''}`.trim() || '-';
+
+      if (pawnerLineClient) {
+        try {
+          const statusUrl = getPawnerStatusUrl(contract.contract_id);
+          await pawnerLineClient.pushMessage(lineId, {
+            type: 'text',
+            text: `ระบบได้รับที่อยู่รับสินค้าแล้ว\n\nDrop Point จะเรียกรถไปรับสินค้าของคุณภายใน 2 ชั่วโมง\nกรุณาเตรียมสินค้าไว้ให้พร้อม\n\nเช็คสถานะการเข้ารับสินค้าได้ที่นี่:\n${statusUrl}`,
+          });
+        } catch (msgError) {
+          console.error('Error sending delivery status to pawner:', msgError);
+        }
+      }
+
+      if (dropPoint?.line_id && dropPointLineClient) {
+        try {
+          const card = buildDropPointPickupCard({
+            deliveryRequestId: result.data.delivery_request_id,
+            contractNumber: contract.contract_number,
+            itemName,
+            addressFull: addressFull || '',
+            contactPhone: contactPhone || null,
+            feeAmount: Number(loanRequest?.delivery_fee ?? 40),
+          });
+          await dropPointLineClient.pushMessage(dropPoint.line_id, card);
+        } catch (msgError) {
+          console.error('Error sending delivery pickup to drop point:', msgError);
+        }
+      }
     }
 
     return NextResponse.json({

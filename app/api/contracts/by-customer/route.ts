@@ -52,6 +52,8 @@ export async function GET(request: NextRequest) {
         principal_paid,
         contract_status,
         funding_status,
+        payment_status,
+        item_delivery_status,
         items:item_id (
           item_id,
           item_type,
@@ -71,34 +73,58 @@ export async function GET(request: NextRequest) {
       throw contractsError;
     }
 
+    const getDueStatus = (remainingDays: number) => {
+      if (remainingDays < 0) return 'ครบกำหนด';
+      if (remainingDays <= 7) return 'ใกล้ครบกำหนด';
+      return 'ปกติ';
+    };
+
+    const getDisplayStatus = (contract: any, remainingDays: number) => {
+      const status = contract.contract_status;
+      const fundingStatus = contract.funding_status;
+      const paymentStatus = contract.payment_status;
+      const itemStatus = contract.item_delivery_status;
+
+      if (status === 'TERMINATED') return 'ยกเลิก';
+      if (status === 'COMPLETED') return 'เสร็จสิ้น';
+      if (status === 'LIQUIDATED') return 'ขายทอดตลาด';
+      if (status === 'DEFAULTED') return 'เกินกำหนด';
+
+      if (status === 'PENDING' || status === 'PENDING_SIGNATURE' || fundingStatus === 'PENDING') {
+        return 'รอรับนักลงทุน';
+      }
+
+      if (status === 'ACTIVE') {
+        if (fundingStatus === 'FUNDED' && paymentStatus !== 'COMPLETED') {
+          return 'รอการโอนเงิน';
+        }
+        if (paymentStatus === 'COMPLETED') {
+          return 'รอยืนยันรับเงิน';
+        }
+        return 'รอการดำเนินการ';
+      }
+
+      if (status === 'CONFIRMED' || status === 'EXTENDED') {
+        if (!itemStatus || itemStatus === 'PENDING') return 'รอส่งสินค้า';
+        if (itemStatus === 'PAWNER_CONFIRMED') return 'กำลังนำส่งสินค้า';
+        if (['IN_TRANSIT', 'DRIVER_ASSIGNED', 'DRIVER_SEARCH', 'ITEM_PICKED'].includes(itemStatus)) {
+          return 'กำลังขนส่ง';
+        }
+        if (itemStatus === 'RECEIVED_AT_DROP_POINT') return 'รอตรวจสอบสินค้า';
+        if (itemStatus === 'VERIFIED') return getDueStatus(remainingDays);
+        if (itemStatus === 'RETURNED') return 'ส่งคืน';
+      }
+
+      return getDueStatus(remainingDays);
+    };
+
     // Calculate remaining days and status for each contract
     const contractsWithStatus = contracts?.map(contract => {
       const endDate = new Date(contract.contract_end_date);
       const today = new Date();
       const diffTime = endDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      let displayStatus = 'ปกติ'; // Active/Normal
-      if (diffDays < 0) {
-        displayStatus = 'ครบกำหนด'; // Due/Overdue
-      } else if (diffDays <= 7) {
-        displayStatus = 'ใกล้ครบกำหนด'; // Near Due
-      }
-
-      // Override with contract status
-      if (contract.contract_status === 'PENDING' || contract.contract_status === 'PENDING_SIGNATURE') {
-        displayStatus = 'รอการดำเนินการ';
-      } else if (contract.contract_status === 'CONFIRMED') {
-        displayStatus = 'กำลังดำเนินการ';
-      } else if (contract.contract_status === 'COMPLETED') {
-        displayStatus = 'เสร็จสิ้น';
-      } else if (contract.contract_status === 'DEFAULTED') {
-        displayStatus = 'เกินกำหนด';
-      } else if (contract.contract_status === 'LIQUIDATED') {
-        displayStatus = 'ชำระหนี้แล้ว';
-      } else if (contract.contract_status === 'TERMINATED') {
-        displayStatus = 'ยกเลิก';
-      }
+      const displayStatus = getDisplayStatus(contract, diffDays);
 
       return {
         ...contract,
