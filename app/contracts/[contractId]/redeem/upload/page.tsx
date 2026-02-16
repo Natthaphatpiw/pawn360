@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Upload, X, CheckCircle } from 'lucide-react';
+import { ChevronLeft, Upload, X } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 
@@ -19,7 +19,6 @@ export default function RedemptionUploadPage() {
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [redemptionDetails, setRedemptionDetails] = useState<any>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
   const companyBank = {
     bank_name: 'พร้อมเพย์',
     bank_account_no: '0626092941',
@@ -41,7 +40,7 @@ export default function RedemptionUploadPage() {
       if (response.data.success) {
         setRedemptionDetails(response.data.redemption);
         if (response.data.redemption?.payment_slip_url) {
-          setShowSuccess(true);
+          router.replace(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
         }
       }
     } catch (error) {
@@ -99,7 +98,7 @@ export default function RedemptionUploadPage() {
       });
 
       if (response.data.success) {
-        setShowSuccess(true);
+        router.replace(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
       }
     } catch (error: any) {
       console.error('Error uploading slip:', error);
@@ -108,33 +107,6 @@ export default function RedemptionUploadPage() {
       setUploading(false);
     }
   };
-
-  const handleGoToReceipt = () => {
-    router.push(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
-  };
-
-  if (showSuccess) {
-    return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งสลิปเรียบร้อย</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            ระบบได้รับหลักฐานการโอนเงินแล้ว
-          </p>
-          <button
-            onClick={handleGoToReceipt}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
-          >
-            ไปขั้นถัดไป
-          </button>
-        </div>
-      </div>
-    );
-  }
-
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">

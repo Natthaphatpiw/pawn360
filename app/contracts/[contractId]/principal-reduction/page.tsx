@@ -129,7 +129,17 @@ export default function PrincipalReductionPage() {
       });
 
       if (response.data.success) {
-        router.push(`/contracts/${contractId}/principal-reduction/upload?requestId=${response.data.requestId}`);
+        const nextRequestId = response.data.requestId;
+        if (!nextRequestId) {
+          throw new Error('Missing requestId');
+        }
+
+        if (response.data.resumeStep === 'SIGN') {
+          router.push(`/contracts/${contractId}/principal-reduction/sign?requestId=${nextRequestId}`);
+          return;
+        }
+
+        router.push(`/contracts/${contractId}/principal-reduction/upload?requestId=${nextRequestId}`);
       }
     } catch (error: any) {
       if (redirectToPenalty(error?.response?.data)) {

@@ -6,6 +6,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const MIN_REQUESTED_AMOUNT = 1000;
+
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 const normalizeNumber = (value: unknown) => {
   const num = typeof value === 'string' ? Number(value) : Number(value);
@@ -49,6 +53,7 @@ export async function POST(request: NextRequest) {
       deliveryMethod,
       deliveryFee,
       branchId,
+      userLocation,
       duration,
       interestRate,
       totalInterest,
@@ -74,11 +79,73 @@ export async function POST(request: NextRequest) {
     }
 
     const customerId = pawnerData.customer_id;
+    const resolvedRequestedAmount = normalizeNumber(loanAmount);
     console.log('✅ Found customerId:', customerId);
 
+    if (resolvedRequestedAmount === null || resolvedRequestedAmount < MIN_REQUESTED_AMOUNT) {
+      return NextResponse.json(
+        {
+          error: `วงเงินจำนำขั้นต่ำ ${MIN_REQUESTED_AMOUNT.toLocaleString()} บาท`,
+          code: 'MIN_LOAN_AMOUNT',
+        },
+        { status: 400 }
+      );
+    }
+
+    const branchInput = typeof branchId === 'string' ? branchId.trim() : '';
+    if (!branchInput) {
+      return NextResponse.json(
+        { error: 'กรุณาเลือกสาขาก่อนดำเนินการ' },
+        { status: 400 }
+      );
+    }
+
+    let resolvedBranch: { drop_point_id: string; latitude: number | null; longitude: number | null } | null = null;
+
+    if (isUuid(branchInput)) {
+      const { data: branchById, error: branchByIdError } = await supabase
+        .from('drop_points')
+        .select('drop_point_id, latitude, longitude')
+        .eq('drop_point_id', branchInput)
+        .single();
+
+      if (!branchByIdError && branchById) {
+        resolvedBranch = branchById;
+      }
+    }
+
+    if (!resolvedBranch) {
+      const { data: branchByCode, error: branchByCodeError } = await supabase
+        .from('drop_points')
+        .select('drop_point_id, latitude, longitude')
+        .eq('drop_point_code', branchInput)
+        .single();
+
+      if (!branchByCodeError && branchByCode) {
+        resolvedBranch = branchByCode;
+      }
+    }
+
+    if (!resolvedBranch) {
+      return NextResponse.json(
+        { error: 'ไม่พบสาขาที่เลือก กรุณาเลือกสาขาใหม่' },
+        { status: 400 }
+      );
+    }
+
+    const resolvedBranchId = resolvedBranch.drop_point_id;
+
     if (deliveryMethod === 'delivery') {
-      const locationLat = Number(pawnerData.last_location_lat);
-      const locationLng = Number(pawnerData.last_location_lng);
+      const locationLat = Number(
+        typeof userLocation?.latitude === 'number'
+          ? userLocation.latitude
+          : pawnerData.last_location_lat
+      );
+      const locationLng = Number(
+        typeof userLocation?.longitude === 'number'
+          ? userLocation.longitude
+          : pawnerData.last_location_lng
+      );
 
       if (!Number.isFinite(locationLat) || !Number.isFinite(locationLng)) {
         return NextResponse.json(
@@ -90,22 +157,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { data: branchData, error: branchError } = await supabase
-        .from('drop_points')
-        .select('drop_point_id, latitude, longitude')
-        .eq('drop_point_id', branchId)
-        .single();
-
-      if (branchError || !branchData || branchData.latitude == null || branchData.longitude == null) {
+      if (resolvedBranch.latitude == null || resolvedBranch.longitude == null) {
         return NextResponse.json(
-          { error: 'ไม่สามารถตรวจสอบระยะทางกับสาขาที่เลือกได้' },
+          { error: 'สาขาที่เลือกยังไม่พร้อมให้บริการจัดส่ง กรุณาเลือกสาขาอื่นหรือเลือก Walk-in' },
           { status: 400 }
         );
       }
 
       const distanceMeters = haversineDistanceMeters(
         { latitude: locationLat, longitude: locationLng },
-        { latitude: Number(branchData.latitude), longitude: Number(branchData.longitude) }
+        { latitude: Number(resolvedBranch.latitude), longitude: Number(resolvedBranch.longitude) }
       );
 
       if (distanceMeters > 10000) {
@@ -208,8 +269,8 @@ export async function POST(request: NextRequest) {
     const loanRequestRecord = {
       customer_id: customerId,
       item_id: item.item_id,
-      drop_point_id: branchId,
-      requested_amount: normalizeNumber(loanAmount),
+      drop_point_id: resolvedBranchId,
+      requested_amount: resolvedRequestedAmount,
       requested_duration_days: normalizeInt(duration),
       delivery_method: deliveryMethodMap[deliveryMethod as keyof typeof deliveryMethodMap] || 'WALK_IN',
       delivery_fee: normalizeNumber(deliveryFee),

@@ -91,6 +91,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   } | null>(null);
 
   const maxLoanAmount = itemData.estimatedPrice;
+  const MIN_LOAN_AMOUNT = 1000;
   const loanAmountNum = parseFloat(loanAmount.replace(/,/g, '')) || 0;
   const deliveryFee = deliveryMethod === 'delivery' ? 40 : 0;
   const MAX_DELIVERY_DISTANCE_KM = 10;
@@ -317,8 +318,9 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
       }
       const distanceKm = getBranchDistanceKm(userLocation, currentBranch);
       if (distanceKm == null) {
-        setDeliveryError('ไม่สามารถตรวจสอบระยะทางกับสาขาที่เลือกได้');
-        alert('ไม่สามารถตรวจสอบระยะทางกับสาขาที่เลือกได้ กรุณาลองใหม่');
+        const message = 'สาขาที่เลือกไม่มีพิกัดสำหรับตรวจสอบระยะทาง กรุณาเลือกสาขาอื่นหรือเลือก Walk-in';
+        setDeliveryError(message);
+        alert(message);
         return;
       }
       if (distanceKm > MAX_DELIVERY_DISTANCE_KM) {
@@ -334,6 +336,11 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
       return;
     }
 
+    if (loanAmountNum < MIN_LOAN_AMOUNT) {
+      alert(`วงเงินขั้นต่ำ ${MIN_LOAN_AMOUNT.toLocaleString('en-US')} บาท`);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const submissionData = {
@@ -346,6 +353,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         deliveryMethod,
         deliveryFee,
         branchId: selectedBranchId,
+        userLocation: deliveryMethod === 'delivery' ? userLocation : null,
         duration: parseInt(duration),
         interestRate: interestRateTotal,
         totalInterest,
@@ -367,7 +375,11 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
       onSuccess(response.data.loanRequestId, response.data.itemId);
     } catch (error) {
       console.error('Error submitting loan request:', error);
-      alert('เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');
+      } else {
+        alert('เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -506,7 +518,9 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
             />
             <span className="absolute right-4 top-4.5 text-gray-400 text-sm">THB</span>
           </div>
-          <p className="text-gray-500 text-xs mt-2 text-right">วงเงินสูงสุด {maxLoanAmount.toLocaleString('en-US')} บาท</p>
+          <p className="text-gray-500 text-xs mt-2 text-right">
+            วงเงินขั้นต่ำ {MIN_LOAN_AMOUNT.toLocaleString('en-US')} บาท • สูงสุด {maxLoanAmount.toLocaleString('en-US')} บาท
+          </p>
         </div>
 
         <div className="h-px bg-gray-200 my-6"></div>
@@ -697,9 +711,9 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           {/* Continue */}
           <button
             onClick={handleSubmit}
-            disabled={!isRegistered || isSubmitting || loanAmountNum === 0}
+            disabled={!isRegistered || isSubmitting || loanAmountNum < MIN_LOAN_AMOUNT}
             className={`w-full rounded-2xl py-3 flex flex-col items-center justify-center shadow-md transition-all active:scale-[0.98] ${
-              isRegistered && loanAmountNum > 0
+              isRegistered && loanAmountNum >= MIN_LOAN_AMOUNT
                 ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}

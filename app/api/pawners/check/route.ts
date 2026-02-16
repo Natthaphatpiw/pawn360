@@ -46,10 +46,21 @@ export async function GET(request: NextRequest) {
       const paymentStatus = contract.payment_status;
       const itemStatus = contract.item_delivery_status;
 
-      if (['PENDING', 'PENDING_SIGNATURE', 'ACTIVE'].includes(status)) return false;
       if (fundingStatus === 'PENDING') return false;
       if (paymentStatus && paymentStatus !== 'COMPLETED') return false;
-      if (!itemStatus || !['RECEIVED_AT_DROP_POINT', 'VERIFIED'].includes(itemStatus)) return false;
+
+      if (['COMPLETED', 'TERMINATED', 'LIQUIDATED', 'DEFAULTED'].includes(status)) {
+        return true;
+      }
+
+      if (!['CONFIRMED', 'EXTENDED', 'ACTIVE'].includes(status)) {
+        return false;
+      }
+
+      if (!itemStatus || !['RECEIVED_AT_DROP_POINT', 'VERIFIED', 'RETURNED'].includes(itemStatus)) {
+        return false;
+      }
+
       return true;
     };
 

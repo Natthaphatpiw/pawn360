@@ -44,7 +44,17 @@ export default function InterestPaymentUploadPage() {
     try {
       const response = await axios.get(`/api/contract-actions/${requestId}`);
       if (response.data.success) {
-        setRequestDetails(response.data.request);
+        const request = response.data.request;
+        setRequestDetails(request);
+
+        if (request?.request_status === 'AWAITING_SIGNATURE' || request?.request_status === 'SLIP_VERIFIED') {
+          router.replace(`/contracts/${contractId}/interest-payment/sign?requestId=${requestId}`);
+          return;
+        }
+
+        if (request?.request_status === 'COMPLETED') {
+          router.replace('/contracts');
+        }
       }
     } catch (error) {
       console.error('Error fetching request:', error);
@@ -137,7 +147,7 @@ export default function InterestPaymentUploadPage() {
   };
 
   const handleProceedToSign = () => {
-    router.push(`/contracts/${contractId}/interest-payment/sign?requestId=${requestId}`);
+    router.replace(`/contracts/${contractId}/interest-payment/sign?requestId=${requestId}`);
   };
 
   const handleGoBack = () => {

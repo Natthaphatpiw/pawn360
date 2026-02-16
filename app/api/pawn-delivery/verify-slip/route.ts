@@ -151,6 +151,100 @@ const buildDropPointPickupCard = (payload: {
   } as FlexMessage;
 };
 
+const buildPawnerStatusCard = (payload: {
+  contractNumber: string;
+  itemName: string;
+  statusUrl: string;
+}) => {
+  const { contractNumber, itemName, statusUrl } = payload;
+  return {
+    type: 'flex',
+    altText: 'ติดตามสถานะการเข้ารับสินค้า',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: 'รับข้อมูลเรียบร้อย',
+            weight: 'bold',
+            size: 'lg',
+            color: '#ffffff',
+            align: 'center',
+          },
+          {
+            type: 'text',
+            text: 'Drop Point กำลังประสานรถเข้ารับสินค้า',
+            size: 'sm',
+            color: '#ffffff',
+            align: 'center',
+            margin: 'sm',
+            wrap: true,
+          },
+        ],
+        backgroundColor: '#C0562F',
+        paddingAll: 'lg',
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'text',
+            text: 'กรุณาเตรียมสินค้าไว้ให้พร้อม รถจะเข้ารับภายใน 2 ชั่วโมง',
+            size: 'sm',
+            color: '#444444',
+            wrap: true,
+          },
+          {
+            type: 'separator',
+            margin: 'md',
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'สัญญา:', size: 'sm', color: '#666666', flex: 2 },
+              { type: 'text', text: contractNumber, size: 'sm', color: '#333333', weight: 'bold', flex: 5, wrap: true },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            contents: [
+              { type: 'text', text: 'สินค้า:', size: 'sm', color: '#666666', flex: 2 },
+              { type: 'text', text: itemName || '-', size: 'sm', color: '#333333', weight: 'bold', flex: 5, wrap: true },
+            ],
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'uri',
+              label: 'ดูสถานะการเข้ารับ',
+              uri: statusUrl,
+            },
+            style: 'primary',
+            color: '#C0562F',
+          },
+        ],
+      },
+    },
+  } as FlexMessage;
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -275,11 +369,14 @@ export async function POST(request: NextRequest) {
 
       if (pawner?.line_id && pawnerLineClient) {
         try {
-          await pawnerLineClient.pushMessage(pawner.line_id, {
-            type: 'text',
-          text: `ระบบได้รับที่อยู่รับสินค้าแล้ว\n\nDrop Point จะเรียกรถไปรับสินค้าของคุณภายใน 2 ชั่วโมง\nกรุณาเตรียมสินค้าไว้ให้พร้อม\n\nเช็คสถานะการเข้ารับสินค้าได้ที่นี่:\n${statusUrl}`,
-        });
-      } catch (msgError) {
+          const itemName = `${item?.brand || ''} ${item?.model || ''}`.trim();
+          const card = buildPawnerStatusCard({
+            contractNumber: contract.contract_number,
+            itemName: itemName || '-',
+            statusUrl,
+          });
+          await pawnerLineClient.pushMessage(pawner.line_id, card);
+        } catch (msgError) {
           console.error('Error sending delivery status to pawner:', msgError);
         }
       }

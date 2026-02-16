@@ -71,6 +71,15 @@ export default function PawnerRegister() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const navigateToLiff = (liffId: string | undefined, fallbackPath: string) => {
+    const trimmed = (liffId || '').trim();
+    if (trimmed) {
+      window.location.href = `https://liff.line.me/${trimmed}`;
+      return;
+    }
+    router.push(fallbackPath);
+  };
+
   // Check if user exists in database and KYC status
   useEffect(() => {
     if (liffLoading) return;
@@ -230,7 +239,7 @@ export default function PawnerRegister() {
 
           {/* Pawn Entry Button */}
           <button
-            onClick={() => router.push('/estimate')}
+            onClick={() => navigateToLiff(process.env.NEXT_PUBLIC_LIFF_ID_PAWN, '/estimate')}
             className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
           >
             <span className="text-base font-bold">จำนำสินค้า</span>
@@ -239,7 +248,7 @@ export default function PawnerRegister() {
 
           {/* Contract List Button */}
           <button
-            onClick={() => router.push('/contracts')}
+            onClick={() => navigateToLiff(process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS, '/contracts')}
             className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
             <span className="text-base font-bold">รายการจำนำ</span>

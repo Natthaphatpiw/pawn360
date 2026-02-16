@@ -80,18 +80,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for existing pending redemption
-    const { data: existingRedemption } = await supabase
+    const activeStatuses = ['PENDING', 'SLIP_UPLOADED', 'AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
+    const { data: existingRedemptions } = await supabase
       .from('redemption_requests')
-      .select('redemption_id')
+      .select('redemption_id, request_status, created_at')
       .eq('contract_id', contractId)
-      .in('request_status', ['PENDING', 'SLIP_UPLOADED', 'AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'])
-      .single();
+      .in('request_status', activeStatuses)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
+    const existingRedemption = existingRedemptions?.[0];
     if (existingRedemption) {
-      return NextResponse.json(
-        { error: 'There is already a pending redemption request for this contract' },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: true,
+        resumed: true,
+        redemptionId: existingRedemption.redemption_id,
+        requestStatus: existingRedemption.request_status,
+        message: 'มีคำขอไถ่ถอนเดิมอยู่แล้ว ระบบจะพาไปดำเนินการต่อ',
+      });
     }
 
     // Build delivery address string
