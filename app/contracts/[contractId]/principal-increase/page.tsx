@@ -311,7 +311,17 @@ export default function PrincipalIncreasePage() {
       });
 
       if (response.data.success) {
-        router.push(`/contracts/${contractId}/principal-increase/upload?requestId=${response.data.requestId}`);
+        const nextRequestId = response.data.requestId;
+        if (!nextRequestId) {
+          throw new Error('Missing requestId');
+        }
+
+        if (response.data.resumeStep === 'WAITING') {
+          router.push(`/contracts/${contractId}/principal-increase/waiting?requestId=${nextRequestId}`);
+          return;
+        }
+
+        router.push(`/contracts/${contractId}/principal-increase/upload?requestId=${nextRequestId}`);
       } else {
         throw new Error(response.data.error);
       }

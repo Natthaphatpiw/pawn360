@@ -33,8 +33,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch contracts with item details (include active/pending contracts)
-    const activeStatuses = ['PENDING', 'PENDING_SIGNATURE', 'ACTIVE', 'CONFIRMED', 'EXTENDED'];
+    // Fetch contracts with item details
+    const visibleStatuses = [
+      'PENDING',
+      'PENDING_SIGNATURE',
+      'ACTIVE',
+      'CONFIRMED',
+      'EXTENDED',
+      'COMPLETED',
+      'TERMINATED',
+      'LIQUIDATED',
+      'DEFAULTED',
+    ];
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
@@ -66,7 +76,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('customer_id', pawner.customer_id)
-      .in('contract_status', activeStatuses)
+      .in('contract_status', visibleStatuses)
       .order('created_at', { ascending: false });
 
     if (contractsError) {
@@ -74,7 +84,7 @@ export async function GET(request: NextRequest) {
     }
 
     const getDueStatus = (remainingDays: number) => {
-      if (remainingDays < 0) return 'ครบกำหนด';
+      if (remainingDays <= 0) return 'ครบกำหนด';
       if (remainingDays <= 7) return 'ใกล้ครบกำหนด';
       return 'ปกติ';
     };
@@ -91,7 +101,7 @@ export async function GET(request: NextRequest) {
       if (status === 'DEFAULTED') return 'เกินกำหนด';
 
       if (status === 'PENDING' || status === 'PENDING_SIGNATURE' || fundingStatus === 'PENDING') {
-        return 'รอรับนักลงทุน';
+        return 'รอสถานะคำขอ';
       }
 
       if (status === 'ACTIVE') {
@@ -101,11 +111,11 @@ export async function GET(request: NextRequest) {
         if (paymentStatus === 'COMPLETED') {
           return 'รอยืนยันรับเงิน';
         }
-        return 'รอการดำเนินการ';
+        return 'รอสถานะคำขอ';
       }
 
       if (status === 'CONFIRMED' || status === 'EXTENDED') {
-        if (!itemStatus || itemStatus === 'PENDING') return 'รอส่งสินค้า';
+        if (!itemStatus || itemStatus === 'PENDING') return 'รอนำส่งสินค้า';
         if (itemStatus === 'PAWNER_CONFIRMED') return 'กำลังนำส่งสินค้า';
         if (['IN_TRANSIT', 'DRIVER_ASSIGNED', 'DRIVER_SEARCH', 'ITEM_PICKED'].includes(itemStatus)) {
           return 'กำลังขนส่ง';
@@ -118,10 +128,25 @@ export async function GET(request: NextRequest) {
       return getDueStatus(remainingDays);
     };
 
-    // Calculate remaining days and status for each contract
+    const shouldShowInContractList = (contract: any) => {
+      const status = contract.contract_status;
+      const fundingStatus = contract.funding_status;
+      const paymentStatus = contract.payment_status;
+
+      // รายการที่ยังรอรับนักลงทุน/รอคำขอ ให้ไปอยู่หน้า "สถานะคำขอ"
+      if (status === 'PENDING' || status === 'PENDING_SIGNATURE') return false;
+      if (fundingStatus === 'PENDING') return false;
+      if (status === 'ACTIVE' && paymentStatus !== 'COMPLETED') return false;
+
+      return true;
+    };
+
+    // Calculate remaining days and status for each visible contract
     const contractsWithStatus = contracts?.map(contract => {
       const endDate = new Date(contract.contract_end_date);
+      endDate.setHours(0, 0, 0, 0);
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const diffTime = endDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const displayStatus = getDisplayStatus(contract, diffDays);
@@ -131,7 +156,7 @@ export async function GET(request: NextRequest) {
         remainingDays: diffDays,
         displayStatus
       };
-    }) || [];
+    }).filter(shouldShowInContractList) || [];
 
     return NextResponse.json({
       success: true,

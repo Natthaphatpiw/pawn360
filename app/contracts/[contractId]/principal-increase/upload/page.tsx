@@ -44,7 +44,17 @@ export default function PrincipalIncreaseUploadPage() {
     try {
       const response = await axios.get(`/api/contract-actions/${requestId}`);
       if (response.data.success) {
-        setRequestDetails(response.data.request);
+        const request = response.data.request;
+        setRequestDetails(request);
+
+        if (['SLIP_VERIFIED', 'PENDING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_APPROVAL', 'INVESTOR_APPROVED', 'AWAITING_INVESTOR_PAYMENT', 'INVESTOR_SLIP_UPLOADED', 'INVESTOR_SLIP_VERIFIED', 'INVESTOR_TRANSFERRED', 'AWAITING_PAWNER_CONFIRM'].includes(request?.request_status)) {
+          router.replace(`/contracts/${contractId}/principal-increase/waiting?requestId=${requestId}`);
+          return;
+        }
+
+        if (request?.request_status === 'COMPLETED') {
+          router.replace('/contracts');
+        }
       }
     } catch (error) {
       console.error('Error fetching request:', error);

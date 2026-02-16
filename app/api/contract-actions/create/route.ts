@@ -10,6 +10,42 @@ const investorLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
+const ACTIVE_REQUEST_STATUSES = [
+  'PENDING',
+  'AWAITING_PAYMENT',
+  'SLIP_UPLOADED',
+  'SLIP_REJECTED',
+  'AWAITING_SIGNATURE',
+  'PENDING_INVESTOR_APPROVAL',
+  'AWAITING_INVESTOR_APPROVAL',
+  'INVESTOR_APPROVED',
+  'AWAITING_INVESTOR_PAYMENT',
+  'INVESTOR_SLIP_UPLOADED',
+  'INVESTOR_SLIP_VERIFIED',
+  'INVESTOR_TRANSFERRED',
+  'AWAITING_PAWNER_CONFIRM',
+];
+
+const getResumeStep = (actionType: string, requestStatus: string) => {
+  if (actionType === 'INTEREST_PAYMENT' || actionType === 'PRINCIPAL_REDUCTION') {
+    if (['AWAITING_PAYMENT', 'SLIP_REJECTED', 'SLIP_UPLOADED'].includes(requestStatus)) {
+      return 'UPLOAD_SLIP';
+    }
+    if (['SLIP_VERIFIED', 'AWAITING_SIGNATURE'].includes(requestStatus)) {
+      return 'SIGN';
+    }
+  }
+
+  if (actionType === 'PRINCIPAL_INCREASE') {
+    if (['AWAITING_PAYMENT', 'SLIP_REJECTED', 'SLIP_UPLOADED'].includes(requestStatus)) {
+      return 'UPLOAD_SLIP';
+    }
+    return 'WAITING';
+  }
+
+  return null;
+};
+
 // สร้าง action request ใหม่
 export async function POST(request: NextRequest) {
   try {
@@ -91,17 +127,32 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for existing pending request
-    const { data: existingRequest } = await supabase
+    const { data: existingRequests } = await supabase
       .from('contract_action_requests')
-      .select('request_id')
+      .select('request_id, request_type, request_status, created_at')
       .eq('contract_id', contractId)
-      .in('request_status', ['PENDING', 'AWAITING_PAYMENT', 'SLIP_UPLOADED', 'AWAITING_SIGNATURE', 'AWAITING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_PAYMENT', 'AWAITING_PAWNER_CONFIRM'])
-      .single();
+      .in('request_status', ACTIVE_REQUEST_STATUSES)
+      .order('created_at', { ascending: false });
 
-    if (existingRequest) {
+    const existingSameType = (existingRequests || []).find(
+      (req: any) => req.request_type === actionType
+    );
+    if (existingSameType) {
+      const resumeStep = getResumeStep(actionType, existingSameType.request_status);
+      return NextResponse.json({
+        success: true,
+        resumed: true,
+        requestId: existingSameType.request_id,
+        requestStatus: existingSameType.request_status,
+        resumeStep,
+        message: 'มีคำขอเดิมอยู่แล้ว ดำเนินการต่อจากคำขอเดิมได้ทันที',
+      });
+    }
+
+    if ((existingRequests || []).length > 0) {
       return NextResponse.json(
-        { error: 'มีคำขอที่รอดำเนินการอยู่แล้ว กรุณารอจนกว่าจะเสร็จสิ้น' },
-        { status: 400 }
+        { error: 'มีคำขออื่นที่รอดำเนินการอยู่แล้ว กรุณาให้คำขอเดิมเสร็จสิ้นก่อน' },
+        { status: 409 }
       );
     }
 

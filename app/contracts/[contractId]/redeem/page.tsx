@@ -217,8 +217,19 @@ export default function RedemptionPaymentPage() {
       });
 
       if (response.data.success) {
+        const redemptionId = response.data.redemptionId;
+        if (!redemptionId) {
+          throw new Error('Missing redemptionId');
+        }
+
+        const resumedStatus = response.data.requestStatus;
+        if (['SLIP_UPLOADED', 'AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'].includes(resumedStatus)) {
+          router.push(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
+          return;
+        }
+
         // Navigate to upload page with redemption ID
-        router.push(`/contracts/${contractId}/redeem/upload?redemptionId=${response.data.redemptionId}`);
+        router.push(`/contracts/${contractId}/redeem/upload?redemptionId=${redemptionId}`);
       }
     } catch (error: any) {
       if (redirectToPenalty(error?.response?.data)) {

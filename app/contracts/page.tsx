@@ -123,6 +123,8 @@ export default function PawnerContractList() {
         return { text: 'รอยืนยันรับเงิน', bg: 'bg-[#FFF8E1]', textCol: 'text-[#F59E0B]' };
       case 'รอส่งสินค้า':
         return { text: 'รอส่งสินค้า', bg: 'bg-[#F3E8FF]', textCol: 'text-[#7C3AED]' };
+      case 'รอนำส่งสินค้า':
+        return { text: 'รอนำส่งสินค้า', bg: 'bg-[#F3E8FF]', textCol: 'text-[#7C3AED]' };
       case 'กำลังนำส่งสินค้า':
         return { text: 'กำลังนำส่งสินค้า', bg: 'bg-[#E0F2F1]', textCol: 'text-[#00897B]' };
       case 'กำลังขนส่ง':

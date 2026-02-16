@@ -117,7 +117,17 @@ export default function InterestPaymentPage() {
       });
 
       if (response.data.success) {
-        router.push(`/contracts/${contractId}/interest-payment/upload?requestId=${response.data.requestId}`);
+        const nextRequestId = response.data.requestId;
+        if (!nextRequestId) {
+          throw new Error('Missing requestId');
+        }
+
+        if (response.data.resumeStep === 'SIGN') {
+          router.push(`/contracts/${contractId}/interest-payment/sign?requestId=${nextRequestId}`);
+          return;
+        }
+
+        router.push(`/contracts/${contractId}/interest-payment/upload?requestId=${nextRequestId}`);
       }
     } catch (error: any) {
       if (redirectToPenalty(error?.response?.data)) {

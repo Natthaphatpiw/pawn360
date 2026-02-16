@@ -80,7 +80,7 @@ export async function GET(
     const msPerDay = 1000 * 60 * 60 * 24;
 
     const getDueStatus = (remainingDays: number) => {
-      if (remainingDays < 0) return 'ครบกำหนด';
+      if (remainingDays <= 0) return 'ครบกำหนด';
       if (remainingDays <= 7) return 'ใกล้ครบกำหนด';
       return 'ปกติ';
     };
@@ -111,7 +111,7 @@ export async function GET(
       }
 
       if (status === 'CONFIRMED' || status === 'EXTENDED') {
-        if (!itemStatus || itemStatus === 'PENDING') return 'รอส่งสินค้า';
+        if (!itemStatus || itemStatus === 'PENDING') return 'รอนำส่งสินค้า';
         if (itemStatus === 'PAWNER_CONFIRMED') return 'กำลังนำส่งสินค้า';
         if (['IN_TRANSIT', 'DRIVER_ASSIGNED', 'DRIVER_SEARCH', 'ITEM_PICKED'].includes(itemStatus)) {
           return 'กำลังขนส่ง';
@@ -126,6 +126,7 @@ export async function GET(
 
     // Calculate remaining days
     const endDate = new Date(contract.contract_end_date);
+    endDate.setHours(0, 0, 0, 0);
     const startDate = new Date(contract.contract_start_date);
     startDate.setHours(0, 0, 0, 0);
     const today = new Date();

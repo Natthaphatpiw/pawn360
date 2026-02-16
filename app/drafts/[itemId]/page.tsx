@@ -81,18 +81,18 @@ export default function DraftDetailPage() {
 
   const checkRegistration = async () => {
     try {
-      const response = await axios.get(`/api/users/check?lineId=${profile?.userId}`);
-      setIsRegistered(response.data.exists);
+      const response = await axios.get(`/api/pawners/check?lineId=${profile?.userId}`);
+      setIsRegistered(Boolean(response.data?.exists));
     } catch (error) {
       console.error('Error checking registration:', error);
+      setIsRegistered(false);
     }
   };
 
   const handleContinueToContract = () => {
     if (!isRegistered) {
-      // Redirect to registration
       const liffIdRegister = process.env.NEXT_PUBLIC_LIFF_ID_REGISTER || '2008216710-BEZ5XNyd';
-      window.location.href = `https://liff.line.me/${liffIdRegister}/register?returnTo=/drafts/${itemId}`;
+      window.location.href = `https://liff.line.me/${liffIdRegister}`;
       return;
     }
 
@@ -340,7 +340,7 @@ export default function DraftDetailPage() {
             ) : (
               <>
                 <CheckCircle className="w-5 h-5" />
-                {isRegistered ? 'ดำเนินการจำนำต่อ' : 'ลงทะเบียนเพื่อจำนำ'}
+                {isRegistered ? 'ดำเนินการต่อ' : 'ลงทะเบียนเพื่อจำนำ'}
               </>
             )}
           </button>

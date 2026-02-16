@@ -83,14 +83,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Create contract record
+    const requestedDurationRaw = Number(loanRequest.requested_duration_days || 0);
+    const requestedDurationDays =
+      Number.isFinite(requestedDurationRaw) && requestedDurationRaw > 0
+        ? Math.round(requestedDurationRaw)
+        : 30;
     const contractStartDate = new Date();
-    const contractEndDate = new Date();
-    contractEndDate.setDate(contractStartDate.getDate() + loanRequest.requested_duration_days);
+    contractStartDate.setUTCHours(0, 0, 0, 0);
+    const contractEndDate = new Date(contractStartDate);
+    contractEndDate.setUTCDate(contractEndDate.getUTCDate() + requestedDurationDays);
 
     const monthlyInterestRate = 0.02; // 2% per month (pawner interest)
     const platformFeeRate = 0.01; // 1% per month (fixed fee for full term)
-    const interestAmount = loanRequest.requested_amount * monthlyInterestRate * (loanRequest.requested_duration_days / 30);
-    const platformFeeAmount = loanRequest.requested_amount * platformFeeRate * (loanRequest.requested_duration_days / 30);
+    const interestAmount = loanRequest.requested_amount * monthlyInterestRate * (requestedDurationDays / 30);
+    const platformFeeAmount = loanRequest.requested_amount * platformFeeRate * (requestedDurationDays / 30);
     const totalAmount = loanRequest.requested_amount + interestAmount + platformFeeAmount;
 
     const contractRecord = {
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
       loan_request_id: loanRequest.request_id,
       contract_start_date: contractStartDate.toISOString(),
       contract_end_date: contractEndDate.toISOString(),
-      contract_duration_days: loanRequest.requested_duration_days,
+      contract_duration_days: requestedDurationDays,
       loan_principal_amount: loanRequest.requested_amount,
       interest_rate: monthlyInterestRate, // Pawner interest rate (2%)
       interest_amount: interestAmount, // Interest amount for full term (2%)
