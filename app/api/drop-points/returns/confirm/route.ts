@@ -26,7 +26,7 @@ const ALLOWED_STATUSES = ['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { redemptionId, lineId, returnPhotos, pinToken } = body;
+    const { redemptionId, lineId, returnPhotos, bagNumber, pinToken } = body;
 
     if (!redemptionId || !lineId) {
       return NextResponse.json(
@@ -43,6 +43,14 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(returnPhotos) || returnPhotos.length < 2 || returnPhotos.some((url) => typeof url !== 'string' || !url)) {
       return NextResponse.json(
         { error: 'Return photos are required (2 images)' },
+        { status: 400 }
+      );
+    }
+
+    const resolvedBagNumber = String(bagNumber || '').trim().toUpperCase();
+    if (!resolvedBagNumber) {
+      return NextResponse.json(
+        { error: 'Bag number is required' },
         { status: 400 }
       );
     }
@@ -69,6 +77,12 @@ export async function POST(request: NextRequest) {
         contract:contract_id (
           contract_id,
           contract_number,
+          contract_start_date,
+          contract_end_date,
+          contract_duration_days,
+          loan_principal_amount,
+          investor_rate,
+          investor_id,
           drop_point_id,
           platform_fee_amount,
           items:item_id (
@@ -136,7 +150,7 @@ export async function POST(request: NextRequest) {
     const principal = Number(redemption.contract?.loan_principal_amount || 0);
     const interestEarned = Math.round(principal * investorRate * (daysElapsed / 30) * 100) / 100;
     const platformFee = Number(redemption.contract?.platform_fee_amount) || 0;
-    const netProfit = Math.max(0, interestEarned);
+    const netProfit = Math.max(0, interestEarned - platformFee);
     const { error: updateError } = await supabase
       .from('redemption_requests')
       .update({
@@ -172,6 +186,52 @@ export async function POST(request: NextRequest) {
         updated_at: nowIso
       })
       .eq('contract_id', redemption.contract?.contract_id);
+
+    const { error: bagAssignmentError } = await supabase
+      .from('drop_point_bag_assignments')
+      .upsert({
+        drop_point_id: dropPoint.drop_point_id,
+        contract_id: redemption.contract?.contract_id,
+        item_id: redemption.contract?.items?.item_id,
+        bag_number: resolvedBagNumber,
+        assigned_by_line_id: lineId,
+        assigned_at: nowIso,
+      }, { onConflict: 'contract_id' });
+
+    if (bagAssignmentError) {
+      console.error('Error saving return bag assignment:', bagAssignmentError);
+      return NextResponse.json(
+        { error: 'Failed to save bag assignment' },
+        { status: 500 }
+      );
+    }
+
+    const { error: releaseBoxError } = await supabase
+      .from('drop_point_storage_boxes')
+      .update({
+        box_status: 'AVAILABLE',
+        contract_id: null,
+        item_id: null,
+        customer_id: null,
+        contract_number: null,
+        item_brand: null,
+        item_model: null,
+        item_type: null,
+        item_snapshot: {},
+        assigned_by_line_id: null,
+        occupied_at: null,
+        released_at: nowIso,
+        last_updated_at: nowIso,
+      })
+      .eq('contract_id', redemption.contract?.contract_id);
+
+    if (releaseBoxError && releaseBoxError.code !== 'PGRST205') {
+      console.error('Error releasing storage box:', releaseBoxError);
+      return NextResponse.json(
+        { error: 'Failed to release storage box' },
+        { status: 500 }
+      );
+    }
 
     if (redemption.contract?.items?.item_id) {
       await supabase

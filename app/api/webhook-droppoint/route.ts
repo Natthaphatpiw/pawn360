@@ -202,7 +202,7 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       return;
     }
 
-    if (redemption.request_status === 'AMOUNT_VERIFIED' || redemption.request_status === 'COMPLETED') {
+    if (redemption.request_status !== 'SLIP_UPLOADED') {
       const dpClient = getDropPointLineClient();
       if (!dpClient) throw new Error('DropPoint LINE client not configured');
       await dpClient.replyMessage(replyToken, {
@@ -216,23 +216,42 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
     const investor = redemption.contract?.investors;
     const dropPoint = redemption.contract?.drop_points;
 
-    // Update redemption status to AMOUNT_VERIFIED
-    await supabase
+    const nowIso = new Date().toISOString();
+
+    // Update redemption status to AMOUNT_VERIFIED (guard against duplicate postbacks)
+    const { data: updatedRows, error: verifyUpdateError } = await supabase
       .from('redemption_requests')
       .update({
         request_status: 'AMOUNT_VERIFIED',
         verified_by_line_id: dropPointLineId,
         verified_by_drop_point_id: dropPoint?.drop_point_id,
-        verified_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        verified_at: nowIso,
+        updated_at: nowIso,
       })
-      .eq('redemption_id', redemptionId);
+      .eq('redemption_id', redemptionId)
+      .eq('request_status', 'SLIP_UPLOADED')
+      .select('redemption_id');
+
+    if (verifyUpdateError) {
+      console.error('Error verifying redemption amount:', verifyUpdateError);
+      return;
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      const dpClient = getDropPointLineClient();
+      if (!dpClient) throw new Error('DropPoint LINE client not configured');
+      await dpClient.replyMessage(replyToken, {
+        type: 'text',
+        text: 'รายการนี้ถูกตรวจสอบไปแล้ว'
+      });
+      return;
+    }
 
     await supabase
       .from('contracts')
       .update({
         redemption_status: 'IN_PROGRESS',
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       })
       .eq('contract_id', redemption.contract_id);
 
@@ -269,9 +288,24 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       }
     }
 
+    const { data: storageBox, error: storageBoxError } = await supabase
+      .from('drop_point_storage_boxes')
+      .select('box_code')
+      .eq('contract_id', redemption.contract_id)
+      .order('last_updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (storageBoxError && storageBoxError.code !== 'PGRST205') {
+      console.error('Error fetching storage box for return card:', storageBoxError);
+    }
+
     const dpClient = getDropPointLineClient();
     if (!dpClient) throw new Error('DropPoint LINE client not configured');
-    const returnCard = createDropPointReturnConfirmCard(redemption);
+    const returnCard = createDropPointReturnConfirmCard({
+      ...redemption,
+      storage_box_code: storageBox?.box_code || null,
+    });
     await dpClient.replyMessage(replyToken, returnCard);
 
     console.log(`Redemption ${redemptionId} amount verified by drop point`);
@@ -285,6 +319,7 @@ function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
   const item = redemption.contract?.items;
   const pawner = redemption.contract?.pawners;
   const dropPoint = redemption.contract?.drop_points;
+  const storageBoxCode = redemption.storage_box_code || null;
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
   const detailUrl = `https://liff.line.me/${liffId}?redemptionId=${redemption.redemption_id}`;
 
@@ -355,7 +390,17 @@ function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
               { type: 'text', text: 'จุดรับฝาก:', color: '#666666', size: 'sm', flex: 2 },
               { type: 'text', text: dropPoint?.drop_point_name || '-', color: '#333333', size: 'sm', flex: 5 }
             ]
-          }
+          },
+          ...(storageBoxCode ? [{
+            type: 'box' as const,
+            layout: 'baseline' as const,
+            spacing: 'sm' as const,
+            margin: 'md' as const,
+            contents: [
+              { type: 'text' as const, text: 'กล่อง:', color: '#666666', size: 'sm' as const, flex: 2 },
+              { type: 'text' as const, text: storageBoxCode, color: '#365314', size: 'sm' as const, flex: 5, weight: 'bold' as const }
+            ]
+          }] : [])
         ]
       },
       footer: {
@@ -399,7 +444,7 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       return;
     }
 
-    if (['CANCELLED', 'COMPLETED', 'AMOUNT_MISMATCH'].includes(redemption.request_status)) {
+    if (redemption.request_status !== 'SLIP_UPLOADED') {
       const dpClient = getDropPointLineClient();
       if (!dpClient) throw new Error('DropPoint LINE client not configured');
       await dpClient.replyMessage(replyToken, {
@@ -413,20 +458,33 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
     const dropPoint = redemption.contract?.drop_points;
 
     // Update redemption status to CANCELLED
-    const { error: cancelError } = await supabase
+    const nowIso = new Date().toISOString();
+    const { data: cancelledRows, error: cancelError } = await supabase
       .from('redemption_requests')
       .update({
         request_status: 'CANCELLED',
-        verified_at: new Date().toISOString(),
+        verified_at: nowIso,
         verified_by_line_id: dropPointLineId,
         verified_by_drop_point_id: dropPoint?.drop_point_id,
         verification_notes: 'Amount verification failed',
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       })
-      .eq('redemption_id', redemptionId);
+      .eq('redemption_id', redemptionId)
+      .eq('request_status', 'SLIP_UPLOADED')
+      .select('redemption_id');
 
     if (cancelError) {
       console.error('Error cancelling redemption:', cancelError);
+      return;
+    }
+
+    if (!cancelledRows || cancelledRows.length === 0) {
+      const dpClient = getDropPointLineClient();
+      if (!dpClient) throw new Error('DropPoint LINE client not configured');
+      await dpClient.replyMessage(replyToken, {
+        type: 'text',
+        text: 'รายการนี้ถูกตรวจสอบไปแล้ว'
+      });
       return;
     }
 
@@ -435,7 +493,7 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       .from('contracts')
       .update({
         redemption_status: 'NONE',
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       })
       .eq('contract_id', redemption.contract_id);
 

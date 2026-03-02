@@ -60,7 +60,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
       });
 
       if (response.data.success) {
-        router.push('/investor/contracts');
+        router.push('/investment');
       } else {
         throw new Error(response.data.error);
       }
@@ -91,10 +91,10 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
           <h1 className="text-xl font-bold text-gray-800 mb-2">เกิดข้อผิดพลาด</h1>
           <p className="text-gray-500 text-sm mb-6">{error}</p>
           <button
-            onClick={() => router.push('/investor/contracts')}
+            onClick={() => router.push('/investment')}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
-            กลับหน้าสัญญา
+            กลับหน้าการลงทุน
           </button>
         </div>
       </div>
@@ -118,10 +118,10 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             คำขอเพิ่มเงินต้นนี้ได้รับการดำเนินการแล้ว
           </p>
           <button
-            onClick={() => router.push('/investor/contracts')}
+            onClick={() => router.push('/investment')}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
-            กลับหน้าสัญญา
+            กลับหน้าการลงทุน
           </button>
         </div>
       </div>
@@ -140,10 +140,10 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             คุณได้ปฏิเสธคำขอเพิ่มเงินต้นนี้แล้ว
           </p>
           <button
-            onClick={() => router.push('/investor/contracts')}
+            onClick={() => router.push('/investment')}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
-            กลับหน้าสัญญา
+            กลับหน้าการลงทุน
           </button>
         </div>
       </div>

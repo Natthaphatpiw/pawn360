@@ -6,7 +6,6 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
-import { getPinSession } from '@/lib/security/pin-session';
 
 const INVESTOR_TIER_THRESHOLDS = {
   GOLD: 400_000,
@@ -144,12 +143,6 @@ function OfferDetailContent() {
   const handleAccept = async () => {
     if (!profile?.userId) {
       alert('กรุณาเข้าสู่ระบบ LINE');
-      return;
-    }
-
-    const session = getPinSession('INVESTOR', profile.userId);
-    if (session?.token) {
-      await submitAccept(session.token);
       return;
     }
 

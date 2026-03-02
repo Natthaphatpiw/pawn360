@@ -22,6 +22,7 @@ type Contract = {
   contract_duration_days?: number;
   loan_principal_amount?: number;
   interest_amount?: number;
+  interest_rate?: number;
   platform_fee_rate?: number;
   investor_rate?: number;
   items?: ContractItem;
@@ -58,6 +59,21 @@ const formatCurrency = (value: number) => value.toLocaleString('en-US', {
 });
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
+
+const resolveNetInvestorRate = (contract: Contract) => {
+  if (typeof contract.investor_rate === 'number' && Number.isFinite(contract.investor_rate)) {
+    return Math.max(contract.investor_rate, 0);
+  }
+
+  const grossRate = typeof contract.interest_rate === 'number'
+    ? contract.interest_rate
+    : 0;
+  const feeRate = typeof contract.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.01;
+
+  return Math.max(grossRate - feeRate, 0);
+};
 
 export default function InvestmentDashboard() {
   const { profile, isLoading: liffLoading } = useLiff();
@@ -161,9 +177,7 @@ export default function InvestmentDashboard() {
         const { daysInContract, daysElapsed } = getTiming(contract, now);
         if (daysInContract > 0) {
           const principal = Number(contract.loan_principal_amount) || 0;
-          const investorRate = typeof contract.investor_rate === 'number'
-            ? contract.investor_rate
-            : 0.015;
+          const investorRate = resolveNetInvestorRate(contract);
           unrealized = round2(principal * investorRate * (daysElapsed / 30));
         }
       }
@@ -189,9 +203,7 @@ export default function InvestmentDashboard() {
 
       const principal = Number(contract.loan_principal_amount) || 0;
       cumulativeValue += principal;
-      const investorRate = typeof contract.investor_rate === 'number'
-        ? contract.investor_rate
-        : 0.015;
+      const investorRate = resolveNetInvestorRate(contract);
       const referenceDate = isEnded && contract.completed_at
         ? new Date(contract.completed_at)
         : now;

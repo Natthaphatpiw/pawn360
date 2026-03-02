@@ -5,6 +5,27 @@ import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { ChevronLeft, Download, FileText } from 'lucide-react';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
+
+const resolveNetInvestorRate = (contract: {
+  investor_rate?: number | null;
+  interest_rate?: number | null;
+  platform_fee_rate?: number | null;
+}) => {
+  if (typeof contract.investor_rate === 'number' && Number.isFinite(contract.investor_rate)) {
+    return Math.max(contract.investor_rate, 0);
+  }
+
+  const grossRate = typeof contract.interest_rate === 'number'
+    ? contract.interest_rate
+    : 0;
+  const feeRate = typeof contract.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.01;
+
+  return Math.max(grossRate - feeRate, 0);
+};
 
 function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const router = useRouter();
@@ -12,11 +33,23 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
 
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (liffLoading || !profile?.userId || !contractId) return;
-    fetchContractDetails();
+    const session = getPinSession('INVESTOR', profile.userId);
+    if (session?.token) {
+      setPinVerified(true);
+      fetchContractDetails();
+      return;
+    }
+
+    setPinVerified(false);
+    setPinModalOpen(true);
+    setLoading(false);
   }, [liffLoading, profile?.userId, contractId]);
 
   const fetchContractDetails = async () => {
@@ -63,6 +96,39 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
     </div>
   );
 
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      const response = await fetch(`/api/contracts/pawn-ticket/${contractId}?viewer=investor&format=pdf`);
+
+      if (!response.ok) {
+        let message = 'ไม่สามารถสร้าง PDF ได้';
+        try {
+          const payload = await response.json();
+          message = payload?.error || message;
+        } catch {
+          // Ignore JSON parse failures and use default message.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${contract?.contract_number || `pawn-ticket-${contractId}`}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (downloadError: any) {
+      console.error('Error downloading PDF:', downloadError);
+      alert(downloadError.message || 'ไม่สามารถดาวน์โหลด PDF ได้');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   if (liffLoading || loading) {
     return (
       <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
@@ -70,6 +136,40 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
           <p className="mt-4 text-gray-600">กำลังโหลด...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!pinVerified) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
+          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูสัญญา</h2>
+          <p className="text-sm text-gray-500 mt-2">
+            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายละเอียดสัญญา
+          </p>
+          <button
+            type="button"
+            onClick={() => setPinModalOpen(true)}
+            className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white"
+          >
+            ยืนยัน PIN
+          </button>
+        </div>
+
+        {profile?.userId && (
+          <PinModal
+            open={pinModalOpen}
+            role="INVESTOR"
+            lineId={profile.userId}
+            onClose={() => setPinModalOpen(false)}
+            onVerified={() => {
+              setPinVerified(true);
+              setPinModalOpen(false);
+              fetchContractDetails();
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -106,9 +206,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const platformFeeAmount = Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
     ? platformFeeRaw
     : Math.round(principal * platformFeeRate * (durationDays / 30) * 100) / 100;
-  const investorRate = typeof contract.investor_rate === 'number'
-    ? contract.investor_rate
-    : 0.015;
+  const investorRate = resolveNetInvestorRate(contract);
   const investorRatePercent = investorRate * 100;
   const investorReward = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 
@@ -203,21 +301,18 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
           <span className="text-[10px] opacity-70 font-light">See contract</span>
         </button>
 
-        {/* Download PDF (if exists) */}
-        {contract.signed_contract_url && (
-          <a
-            href={contract.signed_contract_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-[#E9EFF6] hover:bg-[#DCE4F0] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-2">
-              <Download className="w-5 h-5" />
-              <span className="text-base font-bold">ดาวน์โหลด PDF</span>
-            </div>
-            <span className="text-[10px] opacity-70 font-light">Download PDF</span>
-          </a>
-        )}
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={downloadingPdf}
+          className="w-full bg-[#E9EFF6] hover:bg-[#DCE4F0] text-[#1E3A8A] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98] disabled:opacity-60"
+        >
+          <div className="flex items-center gap-2">
+            <Download className="w-5 h-5" />
+            <span className="text-base font-bold">{downloadingPdf ? 'กำลังสร้าง PDF...' : 'ดาวน์โหลด PDF'}</span>
+          </div>
+          <span className="text-[10px] opacity-70 font-light">Download PDF</span>
+        </button>
       </div>
 
     </div>

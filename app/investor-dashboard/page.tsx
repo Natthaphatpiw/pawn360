@@ -5,20 +5,52 @@ import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { Wallet, ChevronRight } from 'lucide-react';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
+
+const resolveNetInvestorRate = (contract: {
+  investor_rate?: number | null;
+  interest_rate?: number | null;
+  platform_fee_rate?: number | null;
+}) => {
+  if (typeof contract.investor_rate === 'number' && Number.isFinite(contract.investor_rate)) {
+    return Math.max(contract.investor_rate, 0);
+  }
+
+  const grossRate = typeof contract.interest_rate === 'number'
+    ? contract.interest_rate
+    : 0;
+  const feeRate = typeof contract.platform_fee_rate === 'number'
+    ? contract.platform_fee_rate
+    : 0.01;
+
+  return Math.max(grossRate - feeRate, 0);
+};
 
 function InvestorDashboardContent() {
   const router = useRouter();
   const { profile, isLoading: liffLoading } = useLiff();
 
   const [loading, setLoading] = useState(true);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
   const [investor, setInvestor] = useState<any>(null);
   const [myContracts, setMyContracts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (profile?.userId) {
+    if (!profile?.userId) return;
+
+    const session = getPinSession('INVESTOR', profile.userId);
+    if (session?.token) {
+      setPinVerified(true);
       fetchInvestorData();
+      return;
     }
-  }, [profile]);
+
+    setPinVerified(false);
+    setPinModalOpen(true);
+    setLoading(false);
+  }, [profile?.userId]);
 
   const fetchInvestorData = async () => {
     try {
@@ -78,6 +110,40 @@ function InvestorDashboardContent() {
     );
   }
 
+  if (!pinVerified) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
+          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+          <p className="text-sm text-gray-500 mt-2">
+            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการจำนำของคุณ
+          </p>
+          <button
+            type="button"
+            onClick={() => setPinModalOpen(true)}
+            className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white"
+          >
+            ยืนยัน PIN
+          </button>
+        </div>
+
+        {profile?.userId && (
+          <PinModal
+            open={pinModalOpen}
+            role="INVESTOR"
+            lineId={profile.userId}
+            onClose={() => setPinModalOpen(false)}
+            onVerified={() => {
+              setPinVerified(true);
+              setPinModalOpen(false);
+              fetchInvestorData();
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 flex flex-col relative pb-6">
 
@@ -117,9 +183,7 @@ function InvestorDashboardContent() {
             const daysRemaining = getDaysRemaining(contract.contract_end_date);
             const principal = Number(contract.loan_principal_amount || 0);
             const durationDays = Number(contract.contract_duration_days || 0);
-            const investorRate = typeof contract.investor_rate === 'number'
-              ? contract.investor_rate
-              : 0.015;
+            const investorRate = resolveNetInvestorRate(contract);
             const investorRatePercent = investorRate * 100;
             const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 

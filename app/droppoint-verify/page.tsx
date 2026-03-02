@@ -45,7 +45,7 @@ function DropPointVerifyContent() {
 
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [bagNumber, setBagNumber] = useState('');
+  const [storageBoxCode, setStorageBoxCode] = useState('');
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
@@ -65,7 +65,7 @@ function DropPointVerifyContent() {
     ? verificationData.condition_score < (expectedConditionScore - 10)
     : false;
   const mustReject = hasAnyMismatch || isConditionGapTooHigh;
-  const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!bagNumber.trim();
+  const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!storageBoxCode.trim();
 
   useEffect(() => {
     if (contractId) {
@@ -150,8 +150,8 @@ function DropPointVerifyContent() {
       return;
     }
 
-    if (result === 'APPROVED' && !bagNumber.trim()) {
-      alert('กรุณากรอกหมายเลขถุงสินค้า');
+    if (result === 'APPROVED' && !storageBoxCode.trim()) {
+      alert('กรุณากรอกหมายเลขกล่องเก็บของ');
       return;
     }
 
@@ -162,10 +162,11 @@ function DropPointVerifyContent() {
         contractId,
         lineId: profile.userId,
         verificationResult: result,
-        bagNumber: bagNumber.trim(),
+        storageBoxCode: storageBoxCode.trim().toUpperCase(),
         verificationData: {
           ...verificationData,
-          verification_result: result
+          verification_result: result,
+          storage_box_code: storageBoxCode.trim().toUpperCase(),
         },
         pinToken
       });
@@ -446,17 +447,19 @@ function DropPointVerifyContent() {
           </div>
         </div>
 
-        {/* Bag Number */}
+        {/* Storage Box */}
         <div className="mb-6">
-          <label className="font-bold text-gray-700 text-sm mb-2 block">หมายเลขถุงสินค้า</label>
+          <label className="font-bold text-gray-700 text-sm mb-2 block">หมายเลขกล่องเก็บของ / สแกน QR code</label>
           <input
             type="text"
-            placeholder="กรอกหมายเลขถุงสินค้า"
-            value={bagNumber}
-            onChange={(e) => setBagNumber(e.target.value)}
+            placeholder="เช่น DP001123456"
+            value={storageBoxCode}
+            inputMode="text"
+            autoCapitalize="characters"
+            onChange={(e) => setStorageBoxCode(e.target.value.toUpperCase())}
             className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#365314] text-sm text-gray-600 bg-white"
           />
-          <p className="text-[10px] text-gray-400 mt-2">จำเป็นต้องกรอกก่อนยืนยัน</p>
+          <p className="text-[10px] text-gray-400 mt-2">พิมพ์รหัสกล่อง หรือสแกน QR code แล้วให้รหัสมาอยู่ในช่องนี้ก่อนยืนยัน</p>
         </div>
 
         {/* Remarks */}

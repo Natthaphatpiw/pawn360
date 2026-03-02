@@ -63,6 +63,27 @@ export async function GET(
       throw contractsError;
     }
 
+    const contractIds = (contracts || []).map((contract) => contract.contract_id);
+    let storageBoxByContractId: Record<string, string> = {};
+
+    if (contractIds.length > 0) {
+      const { data: storageBoxes, error: storageBoxesError } = await supabase
+        .from('drop_point_storage_boxes')
+        .select('contract_id, box_code')
+        .in('contract_id', contractIds);
+
+      if (storageBoxesError && storageBoxesError.code !== 'PGRST205') {
+        throw storageBoxesError;
+      }
+
+      storageBoxByContractId = (storageBoxes || []).reduce<Record<string, string>>((acc, row) => {
+        if (row.contract_id && row.box_code) {
+          acc[row.contract_id] = row.box_code;
+        }
+        return acc;
+      }, {});
+    }
+
     const formatted = (contracts || []).map((contract) => {
       const statusGroup = INCOMING_STATUSES.includes(contract.item_delivery_status)
         ? 'INCOMING'
@@ -85,7 +106,8 @@ export async function GET(
         ...contract,
         statusGroup,
         displayStatus,
-        displayDate
+        displayDate,
+        storage_box_code: storageBoxByContractId[contract.contract_id] || null,
       };
     });
 

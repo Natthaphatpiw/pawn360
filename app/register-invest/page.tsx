@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 interface InvestorData {
   investor_id: string;
@@ -86,6 +88,8 @@ export default function InvestorRegister() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [investorData, setInvestorData] = useState<InvestorData | null>(null);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
   const [tierModalOpen, setTierModalOpen] = useState(false);
   const [formData, setFormData] = useState<RegisterFormData>({
     firstname: '',
@@ -135,6 +139,13 @@ export default function InvestorRegister() {
           const investor = response.data.investor;
           // Always show profile; UI will gate actions by kyc_status
           setInvestorData(investor);
+          const session = getPinSession('INVESTOR', profile.userId);
+          if (session?.token) {
+            setPinVerified(true);
+          } else {
+            setPinVerified(false);
+            setPinModalOpen(true);
+          }
         }
       } catch (error: any) {
         console.error('Error checking investor:', error);
@@ -219,6 +230,39 @@ export default function InvestorRegister() {
 
   // If user exists, show profile page
   if (investorData) {
+    if (!pinVerified) {
+      return (
+        <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
+            <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูข้อมูลสมาชิก</h2>
+            <p className="text-sm text-gray-500 mt-2">
+              เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูข้อมูลบัญชีผู้ลงทุน
+            </p>
+            <button
+              type="button"
+              onClick={() => setPinModalOpen(true)}
+              className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white"
+            >
+              ยืนยัน PIN
+            </button>
+          </div>
+
+          {profile?.userId && (
+            <PinModal
+              open={pinModalOpen}
+              role="INVESTOR"
+              lineId={profile.userId}
+              onClose={() => setPinModalOpen(false)}
+              onVerified={() => {
+                setPinVerified(true);
+                setPinModalOpen(false);
+              }}
+            />
+          )}
+        </div>
+      );
+    }
+
     const currentLimit = investorData.stats.currentInvestedAmount ?? investorData.stats.totalInvestedAmount;
     const maxLimit = investorData.max_investment_amount || 0;
     const investorTier = (investorData.investor_tier || 'SILVER').toUpperCase();
