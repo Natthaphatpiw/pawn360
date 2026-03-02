@@ -13,6 +13,7 @@ type RedemptionItem = {
   redemption_id: string;
   request_status: string;
   displayDate?: string;
+  storage_box_code?: string | null;
   contract?: {
     contract_id: string;
     contract_number: string;
@@ -56,6 +57,8 @@ type RedemptionDetail = {
       phone_number?: string;
     };
   };
+  storage_box_code?: string | null;
+  storage_box_assigned_at?: string | null;
   bag_number?: string | null;
 };
 
@@ -76,6 +79,7 @@ function DropPointReturnsContent() {
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [returnPhotos, setReturnPhotos] = useState<Array<string | null>>([null, null]);
+  const [returnBagNumber, setReturnBagNumber] = useState('');
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const returnPhotoInputRef1 = useRef<HTMLInputElement>(null);
   const returnPhotoInputRef2 = useRef<HTMLInputElement>(null);
@@ -109,6 +113,7 @@ function DropPointReturnsContent() {
       });
     }
     setReturnPhotos(nextPhotos);
+    setReturnBagNumber(detail.bag_number || '');
   }, [detail]);
 
   const fetchList = async (lineId: string) => {
@@ -139,6 +144,10 @@ function DropPointReturnsContent() {
 
   const submitConfirmReturn = async (pinToken: string) => {
     if (!detail || confirming || !profile?.userId) return;
+    if (!returnBagNumber.trim()) {
+      alert('กรุณากรอกหมายเลขถุงก่อนยืนยันการส่งคืน');
+      return;
+    }
     if (!returnPhotos[0] || !returnPhotos[1]) {
       alert('กรุณาถ่ายรูปให้ครบ 2 รูปก่อนยืนยันการส่งคืน');
       return;
@@ -148,6 +157,7 @@ function DropPointReturnsContent() {
       const response = await axios.post('/api/drop-points/returns/confirm', {
         redemptionId: detail.redemption_id,
         lineId: profile.userId,
+        bagNumber: returnBagNumber.trim().toUpperCase(),
         returnPhotos: returnPhotos.filter((photo): photo is string => Boolean(photo)),
         pinToken
       });
@@ -317,10 +327,27 @@ function DropPointReturnsContent() {
             สินค้า: {detail.contract?.items?.brand} {detail.contract?.items?.model}
           </div>
           <div className="text-sm text-gray-700">รหัสสัญญา: {detail.contract?.contract_number}</div>
+          {detail.storage_box_code && (
+            <div className="text-sm text-gray-700">หมายเลขกล่องเก็บของ: {detail.storage_box_code}</div>
+          )}
           {detail.bag_number && (
-            <div className="text-sm text-gray-700">รหัสถุงสินค้า: {detail.bag_number}</div>
+            <div className="text-sm text-gray-700">หมายเลขถุงล่าสุด: {detail.bag_number}</div>
           )}
           <div className="text-sm text-gray-700">วิธีส่งคืน: {deliveryMethodText}</div>
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">หมายเลขถุง / สแกน QR code</h2>
+          <input
+            type="text"
+            placeholder="กรอกหมายเลขถุงก่อนส่งคืน"
+            value={returnBagNumber}
+            inputMode="text"
+            autoCapitalize="characters"
+            onChange={(e) => setReturnBagNumber(e.target.value.toUpperCase())}
+            className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#365314]"
+          />
+          <p className="text-[10px] text-gray-400 mt-2">พิมพ์รหัสถุง หรือสแกน QR code แล้วให้รหัสมาอยู่ในช่องนี้ก่อนกดยืนยัน</p>
         </div>
 
         <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm">
@@ -377,7 +404,7 @@ function DropPointReturnsContent() {
 
         <button
           onClick={handleConfirmReturn}
-          disabled={confirming || uploadingIndex !== null || !returnPhotos[0] || !returnPhotos[1]}
+          disabled={confirming || uploadingIndex !== null || !returnBagNumber.trim() || !returnPhotos[0] || !returnPhotos[1]}
           className="w-full bg-[#0F6C2F] text-white rounded-2xl py-4 font-bold shadow-sm hover:bg-[#0B5A27] transition-colors disabled:opacity-60"
         >
           {confirming ? 'กำลังยืนยัน...' : 'ยืนยันการส่งคืน'}
@@ -424,6 +451,11 @@ function DropPointReturnsContent() {
                 <div className="text-xs text-gray-500">
                   วันที่ยืนยันยอด: {formatDate(item.displayDate)}
                 </div>
+                {item.storage_box_code && (
+                  <div className="text-[11px] text-gray-600 mt-1">
+                    กล่อง: <span className="font-semibold">{item.storage_box_code}</span>
+                  </div>
+                )}
               </div>
               <span className="text-xs font-bold text-[#F59E0B] bg-[#FEF3C7] px-3 py-1 rounded-full">
                 รอคืนของ

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { refreshImageUrls } from '@/lib/aws/s3';
 
 export async function GET(
   request: NextRequest,
@@ -70,6 +71,24 @@ export async function GET(
       );
     }
 
+    let storageBox: { box_code?: string | null; occupied_at?: string | null; last_updated_at?: string | null } | null = null;
+    const { data: storageBoxData, error: storageBoxError } = await supabase
+      .from('drop_point_storage_boxes')
+      .select('box_code, occupied_at, last_updated_at')
+      .eq('contract_id', redemption.contract?.contract_id)
+      .order('last_updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (storageBoxError && storageBoxError.code !== 'PGRST205') {
+      console.error('Error fetching storage box for redemption:', storageBoxError);
+      throw storageBoxError;
+    }
+
+    if (storageBoxData) {
+      storageBox = storageBoxData;
+    }
+
     const { data: bag } = await supabase
       .from('drop_point_bag_assignments')
       .select('bag_number, assigned_at')
@@ -78,10 +97,36 @@ export async function GET(
       .limit(1)
       .maybeSingle();
 
+    let contractPayload = redemption.contract as any;
+    if (contractPayload?.items) {
+      const itemPayload = Array.isArray(contractPayload.items)
+        ? await Promise.all(contractPayload.items.map(async (item: any) => ({
+            ...item,
+            image_urls: await refreshImageUrls(item?.image_urls),
+          })))
+        : {
+            ...contractPayload.items,
+            image_urls: await refreshImageUrls(contractPayload.items?.image_urls),
+          };
+
+      contractPayload = {
+        ...contractPayload,
+        items: itemPayload,
+      };
+    }
+
+    const refreshedReturnPhotos = await refreshImageUrls(
+      Array.isArray(redemption.drop_point_return_photos) ? redemption.drop_point_return_photos : []
+    );
+
     return NextResponse.json({
       success: true,
       redemption: {
         ...redemption,
+        contract: contractPayload,
+        drop_point_return_photos: refreshedReturnPhotos,
+        storage_box_code: storageBox?.box_code || null,
+        storage_box_assigned_at: storageBox?.occupied_at || storageBox?.last_updated_at || null,
         bag_number: bag?.bag_number || null,
         bag_assigned_at: bag?.assigned_at || null
       }

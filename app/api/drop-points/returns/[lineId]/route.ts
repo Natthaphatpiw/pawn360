@@ -66,10 +66,41 @@ export async function GET(
       throw redemptionError;
     }
 
-    const formatted = (redemptions || []).map((redemption) => ({
+    const normalizedRedemptions = (redemptions || []).map((redemption) => ({
+      ...redemption,
+      contract: Array.isArray(redemption.contract) ? redemption.contract[0] : redemption.contract,
+    }));
+
+    const contractIds = normalizedRedemptions
+      .map((redemption) => redemption.contract?.contract_id)
+      .filter((value): value is string => Boolean(value));
+    let storageBoxByContractId: Record<string, string> = {};
+
+    if (contractIds.length > 0) {
+      const { data: storageBoxes, error: storageBoxesError } = await supabase
+        .from('drop_point_storage_boxes')
+        .select('contract_id, box_code')
+        .in('contract_id', contractIds);
+
+      if (storageBoxesError && storageBoxesError.code !== 'PGRST205') {
+        throw storageBoxesError;
+      }
+
+      storageBoxByContractId = (storageBoxes || []).reduce<Record<string, string>>((acc, row) => {
+        if (row.contract_id && row.box_code) {
+          acc[row.contract_id] = row.box_code;
+        }
+        return acc;
+      }, {});
+    }
+
+    const formatted = normalizedRedemptions.map((redemption) => ({
       ...redemption,
       displayStatus: 'รอคืนของ',
-      displayDate: redemption.verified_at || redemption.updated_at || redemption.created_at
+      displayDate: redemption.verified_at || redemption.updated_at || redemption.created_at,
+      storage_box_code: redemption.contract?.contract_id
+        ? storageBoxByContractId[redemption.contract.contract_id] || null
+        : null,
     }));
 
     return NextResponse.json({

@@ -1,5 +1,293 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const buildTicketPdfHtml = (ticketData: any) => {
+  const items = Array.isArray(ticketData?.items) ? ticketData.items : [];
+  const itemsHtml = items.length > 0
+    ? items.map((item: any, index: number) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(item?.description || '-')}</td>
+          <td>${escapeHtml(item?.serial || '-')}</td>
+        </tr>
+      `).join('')
+    : `
+      <tr>
+        <td>1</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+    `;
+
+  return `<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pawn Ticket ${escapeHtml(ticketData?.ticketNo || '')}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: "Noto Sans Thai", "Helvetica Neue", Arial, sans-serif;
+        color: #1f2937;
+        background: #f3f4f6;
+      }
+      .page {
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #dbe3ef;
+        border-radius: 24px;
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #1e3a8a, #244caa);
+        color: #ffffff;
+        padding: 28px 32px;
+      }
+      .header-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-start;
+      }
+      .brand {
+        font-size: 26px;
+        font-weight: 700;
+      }
+      .muted {
+        font-size: 12px;
+        opacity: 0.9;
+      }
+      .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .content {
+        padding: 28px 32px 32px;
+      }
+      .section {
+        margin-bottom: 22px;
+      }
+      .section-title {
+        margin: 0 0 12px;
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e3a8a;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      .card {
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        padding: 16px;
+        background: #fafafa;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+      .row:last-child { margin-bottom: 0; }
+      .label { color: #6b7280; }
+      .value {
+        font-weight: 600;
+        text-align: right;
+        white-space: pre-wrap;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th, td {
+        border: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        vertical-align: top;
+      }
+      th {
+        background: #eff6ff;
+        color: #1e3a8a;
+        text-align: left;
+        font-weight: 700;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .summary-card {
+        border-radius: 18px;
+        padding: 14px 16px;
+        background: #eef4ff;
+        border: 1px solid #d7e4ff;
+      }
+      .summary-card.total {
+        background: #e7f8ee;
+        border-color: #c7efd5;
+      }
+      .summary-label {
+        font-size: 12px;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+      .summary-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1e3a8a;
+      }
+      .summary-card.total .summary-value { color: #166534; }
+      .note {
+        font-size: 11px;
+        color: #4b5563;
+        line-height: 1.7;
+      }
+      .footer {
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+      .signature {
+        height: 72px;
+        border-bottom: 1px dashed #9ca3af;
+        margin-bottom: 8px;
+      }
+      .signature-label {
+        font-size: 11px;
+        color: #6b7280;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="header">
+        <div class="header-row">
+          <div>
+            <div class="brand">${escapeHtml(ticketData?.shopName || 'Pawnly')}</div>
+            <div class="muted">${escapeHtml(ticketData?.branch || '-')}</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="badge">ตั๋วจำนำ / Pawn Ticket</div>
+            <div class="muted" style="margin-top: 10px;">เลขที่ ${escapeHtml(ticketData?.ticketNo || '-')}</div>
+            <div class="muted">เล่มที่ ${escapeHtml(ticketData?.bookNo || '-')}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="section">
+          <div class="grid">
+            <div class="card">
+              <div class="row"><span class="label">วันที่ทำรายการ</span><span class="value">${escapeHtml(ticketData?.date || '-')}</span></div>
+              <div class="row"><span class="label">วันครบกำหนด</span><span class="value">${escapeHtml(ticketData?.dueDate || '-')}</span></div>
+            </div>
+            <div class="card">
+              <div class="row"><span class="label">สถานะ</span><span class="value">${escapeHtml(ticketData?.contractStatus || '-')}</span></div>
+              <div class="row"><span class="label">ระยะเวลา</span><span class="value">${escapeHtml(ticketData?.contractDuration || 0)} วัน</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">ข้อมูลคู่สัญญา</div>
+          <div class="grid">
+            <div class="card">
+              <div class="row"><span class="label">ผู้จำนำ</span><span class="value">${escapeHtml(ticketData?.pawner?.name || '-')}</span></div>
+              <div class="row"><span class="label">เลขบัตรประชาชน</span><span class="value">${escapeHtml(ticketData?.pawner?.idCard || '-')}</span></div>
+              <div class="row"><span class="label">โทรศัพท์</span><span class="value">${escapeHtml(ticketData?.pawner?.phone || '-')}</span></div>
+              <div class="row"><span class="label">ที่อยู่</span><span class="value">${escapeHtml(ticketData?.pawner?.address || '-')}</span></div>
+            </div>
+            <div class="card">
+              <div class="row"><span class="label">ผู้ลงทุน</span><span class="value">${escapeHtml(ticketData?.investor?.name || '-')}</span></div>
+              <div class="row"><span class="label">เลขบัตรประชาชน</span><span class="value">${escapeHtml(ticketData?.investor?.idCard || '-')}</span></div>
+              <div class="row"><span class="label">โทรศัพท์</span><span class="value">${escapeHtml(ticketData?.investor?.phone || '-')}</span></div>
+              <div class="row"><span class="label">ที่อยู่</span><span class="value">${escapeHtml(ticketData?.investor?.address || '-')}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">ทรัพย์สินค้ำประกัน</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 56px;">ลำดับ</th>
+                <th>รายละเอียด</th>
+                <th style="width: 180px;">Serial</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-title">สรุปยอด</div>
+          <div class="summary">
+            <div class="summary-card">
+              <div class="summary-label">เงินต้น</div>
+              <div class="summary-value">${escapeHtml(ticketData?.amount || '0.00')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">ดอกเบี้ยรวม</div>
+              <div class="summary-value">${escapeHtml(ticketData?.interestAmount || '0.00')}</div>
+            </div>
+            <div class="summary-card total">
+              <div class="summary-label">รวมรับคืน</div>
+              <div class="summary-value">${escapeHtml(ticketData?.totalAmount || '0.00')}</div>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 12px;">
+            <div class="row"><span class="label">อัตราดอกเบี้ย</span><span class="value">${escapeHtml(ticketData?.interestRate || '-')}</span></div>
+            <div class="row"><span class="label">จำนวนเงิน (ตัวอักษร)</span><span class="value">${escapeHtml(ticketData?.amountText || '-')}</span></div>
+          </div>
+        </div>
+
+        <div class="section note">
+          ผู้จำนำตกลงชำระคืนเงินต้นพร้อมดอกเบี้ยภายในกำหนด และผู้ลงทุนตกลงรับสิทธิในทรัพย์สินค้ำประกันตามเงื่อนไขของแพลตฟอร์มเมื่อเกิดการผิดนัดชำระ.
+        </div>
+
+        <div class="footer">
+          <div>
+            <div class="signature"></div>
+            <div class="signature-label">ลงชื่อผู้จำนำ</div>
+          </div>
+          <div>
+            <div class="signature"></div>
+            <div class="signature-label">ลงชื่อผู้ลงทุน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>`;
+};
 
 export async function GET(
   request: NextRequest,
@@ -9,6 +297,7 @@ export async function GET(
     const { contractId } = await context.params;
     const { searchParams } = new URL(request.url);
     const viewer = searchParams.get('viewer') || 'public';
+    const format = (searchParams.get('format') || 'json').toLowerCase();
 
     if (!contractId) {
       return NextResponse.json(
@@ -286,6 +575,52 @@ export async function GET(
       contractStatus: contract.contract_status,
       pawnTicketUrl: contract.pawn_ticket_url || null
     };
+
+    if (format === 'pdf') {
+      try {
+        const html = buildTicketPdfHtml(ticketData);
+        const browser = await puppeteer.launch({
+          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+          executablePath: await chromium.executablePath(),
+          headless: true,
+        });
+        let pdfBuffer: Uint8Array;
+
+        try {
+          const page = await browser.newPage();
+          await page.setViewport({ width: 1240, height: 1754 });
+          await page.setContent(html, { waitUntil: 'domcontentloaded' });
+          pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: {
+              top: '16px',
+              right: '16px',
+              bottom: '16px',
+              left: '16px',
+            },
+          });
+        } finally {
+          await browser.close();
+        }
+
+        const pdfArrayBuffer = Uint8Array.from(pdfBuffer).buffer;
+
+        return new NextResponse(pdfArrayBuffer, {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${ticketData.ticketNo || contractId}.pdf"`,
+            'Cache-Control': 'no-store',
+          },
+        });
+      } catch (pdfError: any) {
+        console.error('Error generating pawn ticket PDF:', pdfError);
+        return NextResponse.json(
+          { error: 'ไม่สามารถสร้างไฟล์ PDF ได้' },
+          { status: 500 }
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,

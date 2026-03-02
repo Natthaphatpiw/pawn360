@@ -19,7 +19,7 @@ const pawnerLineClient = new Client({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, lineId, verificationResult, verificationData, bagNumber, pinToken } = body;
+    const { contractId, lineId, verificationResult, verificationData, storageBoxCode, bagNumber, pinToken } = body;
 
     if (!contractId || !lineId || !verificationResult) {
       return NextResponse.json(
@@ -75,11 +75,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resolvedBagNumber = String(bagNumber || verificationData?.bag_number || '').trim();
+    const resolvedStorageBoxCode = String(
+      storageBoxCode
+      || verificationData?.storage_box_code
+      || bagNumber
+      || verificationData?.bag_number
+      || ''
+    ).trim().toUpperCase();
 
-    if (verificationResult === 'APPROVED' && !resolvedBagNumber) {
+    if (verificationResult === 'APPROVED' && !resolvedStorageBoxCode) {
       return NextResponse.json(
-        { error: 'Bag number is required for approval' },
+        { error: 'กรุณากรอกหมายเลขกล่องเก็บของ' },
         { status: 400 }
       );
     }
@@ -142,21 +148,77 @@ export async function POST(request: NextRequest) {
       });
 
     if (verificationResult === 'APPROVED') {
-      const { error: bagError } = await supabase
-        .from('drop_point_bag_assignments')
-        .upsert({
-          drop_point_id: dropPoint.drop_point_id,
+      const { data: storageBox, error: storageBoxError } = await supabase
+        .from('drop_point_storage_boxes')
+        .select('box_code, drop_point_id, contract_id, box_status')
+        .eq('box_code', resolvedStorageBoxCode)
+        .maybeSingle();
+
+      if (storageBoxError) {
+        console.error('Error loading storage box:', storageBoxError);
+        return NextResponse.json(
+          {
+            error: storageBoxError.code === 'PGRST205'
+              ? 'ยังไม่ได้สร้างตารางกล่องเก็บสินค้า (drop_point_storage_boxes)'
+              : 'ไม่สามารถตรวจสอบหมายเลขกล่องเก็บของได้'
+          },
+          { status: storageBoxError.code === 'PGRST205' ? 500 : 400 }
+        );
+      }
+
+      if (!storageBox) {
+        return NextResponse.json(
+          { error: 'ไม่พบหมายเลขกล่องเก็บของนี้ในระบบ' },
+          { status: 400 }
+        );
+      }
+
+      if (storageBox.drop_point_id !== dropPoint.drop_point_id) {
+        return NextResponse.json(
+          { error: 'หมายเลขกล่องนี้ไม่ใช่ของสาขาที่คุณรับผิดชอบ' },
+          { status: 403 }
+        );
+      }
+
+      if (storageBox.contract_id && storageBox.contract_id !== contractId) {
+        return NextResponse.json(
+          { error: 'กล่องเก็บของนี้ถูกใช้งานอยู่ กรุณาเลือกกล่องอื่น' },
+          { status: 409 }
+        );
+      }
+
+      const nowIso = new Date().toISOString();
+      const { error: storageUpdateError } = await supabase
+        .from('drop_point_storage_boxes')
+        .update({
+          box_status: 'OCCUPIED',
           contract_id: contractId,
           item_id: contract.item_id,
-          bag_number: resolvedBagNumber,
+          customer_id: contract.customer_id,
+          contract_number: contract.contract_number,
+          item_brand: contract.items?.brand || null,
+          item_model: contract.items?.model || null,
+          item_type: contract.items?.item_type || null,
+          item_snapshot: {
+            item_id: contract.item_id,
+            item_type: contract.items?.item_type || null,
+            brand: contract.items?.brand || null,
+            model: contract.items?.model || null,
+            capacity: contract.items?.capacity || null,
+            item_condition: contract.items?.item_condition ?? null,
+            serial_number: contract.items?.serial_number || null,
+          },
           assigned_by_line_id: lineId,
-          assigned_at: new Date().toISOString(),
-        }, { onConflict: 'contract_id' });
+          occupied_at: nowIso,
+          released_at: null,
+          last_updated_at: nowIso,
+        })
+        .eq('box_code', resolvedStorageBoxCode);
 
-      if (bagError) {
-        console.error('Error saving bag assignment:', bagError);
+      if (storageUpdateError) {
+        console.error('Error saving storage box assignment:', storageUpdateError);
         return NextResponse.json(
-          { error: 'Failed to save bag assignment' },
+          { error: 'ไม่สามารถบันทึกหมายเลขกล่องเก็บของได้' },
           { status: 500 }
         );
       }
@@ -233,7 +295,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: verificationResult === 'APPROVED' ? 'Verification approved' : 'Verification rejected'
+      message: verificationResult === 'APPROVED' ? 'Verification approved' : 'Verification rejected',
+      storageBoxCode: verificationResult === 'APPROVED' ? resolvedStorageBoxCode : null,
     });
 
   } catch (error: any) {

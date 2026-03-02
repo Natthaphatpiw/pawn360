@@ -106,7 +106,31 @@ export async function POST(request: NextRequest) {
     const dropPointLineId = redemption.contract?.drop_points?.line_id;
     if (dropPointLineId && dropPointLineClient) {
       try {
+        const { data: storageBox, error: storageBoxError } = await supabase
+          .from('drop_point_storage_boxes')
+          .select('box_code')
+          .eq('contract_id', redemption.contract_id)
+          .order('last_updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (storageBoxError && storageBoxError.code !== 'PGRST205') {
+          console.error('Error fetching storage box for redemption card:', storageBoxError);
+        }
+
         const notificationCard = createDropPointRedemptionCard(redemption);
+        if (storageBox?.box_code) {
+          (notificationCard.contents as any).body.contents.splice(3, 0, {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'กล่อง:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: storageBox.box_code, color: '#365314', size: 'sm', flex: 5, weight: 'bold' }
+            ]
+          });
+        }
         await dropPointLineClient.pushMessage(dropPointLineId, notificationCard);
         console.log(`Sent redemption notification to drop point: ${dropPointLineId}`);
       } catch (msgError) {

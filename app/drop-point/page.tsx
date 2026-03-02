@@ -26,6 +26,7 @@ type ContractListItem = {
   item_delivery_status: string;
   displayStatus: string;
   displayDate?: string;
+  storage_box_code?: string | null;
   statusGroup?: 'INCOMING' | 'ARRIVED' | 'UNKNOWN';
   items?: ContractItem;
 };
@@ -38,8 +39,8 @@ type ContractDetail = {
   item_verified_at?: string;
   created_at?: string;
   updated_at?: string;
-  bag_number?: string | null;
-  bag_assigned_at?: string | null;
+  storage_box_code?: string | null;
+  storage_box_assigned_at?: string | null;
   items?: {
     item_id?: string;
     brand?: string;
@@ -193,9 +194,9 @@ function DropPointContent() {
           <div className="text-sm text-gray-500">
             วันส่งมา: {formatDate(contractDetail.item_received_at || contractDetail.item_verified_at || contractDetail.updated_at || contractDetail.created_at)}
           </div>
-          {contractDetail.bag_number && (
+          {contractDetail.storage_box_code && (
             <div className="text-sm text-gray-700 mt-2">
-              หมายเลขถุงสินค้า: <span className="font-bold">{contractDetail.bag_number}</span>
+              หมายเลขกล่องเก็บของ: <span className="font-bold">{contractDetail.storage_box_code}</span>
             </div>
           )}
         </div>
@@ -291,6 +292,11 @@ function DropPointContent() {
                     <div className="text-xs text-gray-500">
                       วันที่ส่งมา: {formatDate(contract.displayDate)}
                     </div>
+                    {contract.storage_box_code && (
+                      <div className="text-[11px] text-gray-600 mt-1">
+                        กล่อง: <span className="font-semibold">{contract.storage_box_code}</span>
+                      </div>
+                    )}
                   </div>
                   <span className="text-xs font-bold text-[#F59E0B] bg-[#FEF3C7] px-3 py-1 rounded-full">
                     กำลังมา
@@ -325,6 +331,11 @@ function DropPointContent() {
                     <div className="text-xs text-gray-500">
                       วันที่ส่งมา: {formatDate(contract.displayDate)}
                     </div>
+                    {contract.storage_box_code && (
+                      <div className="text-[11px] text-gray-600 mt-1">
+                        กล่อง: <span className="font-semibold">{contract.storage_box_code}</span>
+                      </div>
+                    )}
                   </div>
                   <span className="text-xs font-bold text-[#22C55E] bg-[#DCFCE7] px-3 py-1 rounded-full">
                     ถึงแล้ว

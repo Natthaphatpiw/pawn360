@@ -79,13 +79,23 @@ export async function GET(
       );
     }
 
-    const { data: bag } = await supabase
-      .from('drop_point_bag_assignments')
-      .select('bag_number, assigned_at')
+    let storageBox: { box_code?: string | null; occupied_at?: string | null; last_updated_at?: string | null } | null = null;
+    const { data: storageBoxData, error: storageBoxError } = await supabase
+      .from('drop_point_storage_boxes')
+      .select('box_code, occupied_at, last_updated_at')
       .eq('contract_id', contractId)
-      .order('assigned_at', { ascending: false })
+      .order('last_updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (storageBoxError && storageBoxError.code !== 'PGRST205') {
+      console.error('Error fetching storage box:', storageBoxError);
+      throw storageBoxError;
+    }
+
+    if (storageBoxData) {
+      storageBox = storageBoxData;
+    }
 
     let items = contract.items as any;
     if (Array.isArray(items)) {
@@ -107,8 +117,8 @@ export async function GET(
       contract: {
         ...contract,
         items,
-        bag_number: bag?.bag_number || null,
-        bag_assigned_at: bag?.assigned_at || null
+        storage_box_code: storageBox?.box_code || null,
+        storage_box_assigned_at: storageBox?.occupied_at || storageBox?.last_updated_at || null
       }
     });
   } catch (error: any) {
