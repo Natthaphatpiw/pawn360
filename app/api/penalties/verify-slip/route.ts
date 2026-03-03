@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { verifyPaymentSlip } from '@/lib/services/slip-verification';
+import { getCompanyBankAccount, verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { toDateString } from '@/lib/services/penalty';
 import { Client } from '@line/bot-sdk';
 
@@ -86,7 +86,13 @@ export async function POST(request: NextRequest) {
     }
 
     const expectedAmount = Number(payment.penalty_amount || 0);
-    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount);
+    const companyBank = await getCompanyBankAccount();
+    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
+      receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
+      receiverPromptpay: companyBank.promptpay_number || null,
+      receiverName: companyBank.account_name || companyBank.bank_account_name || null,
+      useSlipOkLogCheck: true,
+    });
 
     const updateData: any = {
       slip_url: slipUrl,

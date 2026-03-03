@@ -153,9 +153,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify slip with AI
+    const contract = actionRequest.contract;
+    const pawner = contract?.pawners;
+
+    // Verify slip before applying the principal increase
     const expectedAmount = actionRequest.increase_amount;
-    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount);
+    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
+      receiverAccountNo: actionRequest.pawner_bank_account_no || pawner?.bank_account_no || null,
+      receiverPromptpay: pawner?.promptpay_number || null,
+      receiverName: actionRequest.pawner_bank_account_name || pawner?.bank_account_name || null,
+      useSlipOkLogCheck: false,
+    });
 
     // Save verification result
     await saveSlipVerification(
@@ -173,11 +181,9 @@ export async function POST(request: NextRequest) {
       investor_slip_uploaded_at: new Date().toISOString(),
       investor_slip_amount_detected: verificationResult.detectedAmount,
       investor_slip_verification_result: verificationResult.result,
+      investor_slip_verification_details: verificationResult.rawResponse,
       investor_slip_attempt_count: attemptCount,
     };
-
-    const contract = actionRequest.contract;
-    const pawner = contract?.pawners;
 
     // Handle verification result
     if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {

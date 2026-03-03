@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // Pawner LINE OA client
@@ -93,6 +94,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const verificationResult = await verifyPaymentSlip(paymentSlipUrl, Number(amount), {
+      receiverAccountNo: contract.pawners?.bank_account_no || null,
+      receiverPromptpay: contract.pawners?.promptpay_number || null,
+      receiverName: contract.pawners?.bank_account_name || `${contract.pawners?.firstname || ''} ${contract.pawners?.lastname || ''}`.trim() || null,
+      useSlipOkLogCheck: false,
+    });
+
+    if (verificationResult.result !== 'MATCHED' && verificationResult.result !== 'OVERPAID') {
+      return NextResponse.json(
+        {
+          error: verificationResult.message,
+          result: verificationResult.result,
+          detectedAmount: verificationResult.detectedAmount,
+        },
+        { status: 400 }
+      );
+    }
+
     // Create payment record
     // payment_type: Valid values are PRINCIPAL, INTEREST, FULL_REPAYMENT, PARTIAL_REPAYMENT, LATE_FEE, EXTENSION_FEE
     // payment_status: Valid values are PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
@@ -106,7 +125,15 @@ export async function POST(request: NextRequest) {
         payment_method: 'BANK_TRANSFER',
         payment_status: 'PENDING',
         paid_by_investor_id: investor.investor_id,
-        payment_slip_url: paymentSlipUrl
+        payment_slip_url: paymentSlipUrl,
+        metadata: {
+          slipVerification: {
+            result: verificationResult.result,
+            detectedAmount: verificationResult.detectedAmount,
+            provider: verificationResult.rawResponse?.provider || null,
+            details: verificationResult.rawResponse || null,
+          },
+        },
       })
       .select()
       .single();

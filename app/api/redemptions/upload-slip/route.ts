@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { getCompanyBankAccount, saveSlipVerification, verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // Drop Point LINE OA client
@@ -7,6 +8,11 @@ const dropPointLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT ? ne
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT,
   channelSecret: process.env.LINE_CHANNEL_SECRET_DROPPOINT || ''
 }) : null;
+
+const getDropPointReturnUrl = (redemptionId: string) => {
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
+  return `https://liff.line.me/${liffId}?redemptionId=${encodeURIComponent(redemptionId)}`;
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,14 +80,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update redemption with slip URL
+    const contract = redemption.contract;
+    const pawner = contract?.pawners;
+
+    if (pawnerLineId && pawner?.line_id && pawner.line_id !== pawnerLineId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
+    }
+
+    const expectedAmount = Number(redemption.total_amount || contract?.total_amount || 0);
+    const companyBank = await getCompanyBankAccount();
+    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
+      receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
+      receiverPromptpay: companyBank.promptpay_number || null,
+      receiverName: companyBank.account_name || companyBank.bank_account_name || null,
+      useSlipOkLogCheck: true,
+    });
+
+    const { count: previousAttempts } = await supabase
+      .from('slip_verifications')
+      .select('verification_id', { count: 'exact', head: true })
+      .eq('redemption_id', redemptionId);
+
+    await saveSlipVerification(
+      null,
+      redemptionId,
+      slipUrl,
+      expectedAmount,
+      verificationResult,
+      (previousAttempts || 0) + 1,
+    );
+
+    const baseUpdateData: any = {
+      payment_slip_url: slipUrl,
+      payment_slip_uploaded_at: new Date().toISOString(),
+      actual_amount_received: verificationResult.detectedAmount,
+      amount_difference: verificationResult.difference,
+      mismatch_type: verificationResult.result === 'UNDERPAID'
+        ? 'UNDERPAID'
+        : (verificationResult.result === 'OVERPAID' ? 'OVERPAID' : null),
+      verification_notes: verificationResult.message,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (verificationResult.result !== 'MATCHED' && verificationResult.result !== 'OVERPAID') {
+      await supabase
+        .from('redemption_requests')
+        .update({
+          ...baseUpdateData,
+          request_status: 'PENDING',
+        })
+        .eq('redemption_id', redemptionId);
+
+      return NextResponse.json(
+        {
+          error: verificationResult.message,
+          result: verificationResult.result,
+          detectedAmount: verificationResult.detectedAmount,
+          expectedAmount,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Update redemption after successful slip verification
     const { error: updateError } = await supabase
       .from('redemption_requests')
       .update({
-        payment_slip_url: slipUrl,
-        payment_slip_uploaded_at: new Date().toISOString(),
-        request_status: 'SLIP_UPLOADED',
-        updated_at: new Date().toISOString(),
+        ...baseUpdateData,
+        request_status: 'AMOUNT_VERIFIED',
+        verified_at: new Date().toISOString(),
       })
       .eq('redemption_id', redemptionId);
 
@@ -118,7 +188,7 @@ export async function POST(request: NextRequest) {
           console.error('Error fetching storage box for redemption card:', storageBoxError);
         }
 
-        const notificationCard = createDropPointRedemptionCard(redemption);
+        const notificationCard = createDropPointRedemptionCard(redemption, getDropPointReturnUrl(redemptionId));
         if (storageBox?.box_code) {
           (notificationCard.contents as any).body.contents.splice(3, 0, {
             type: 'box',
@@ -141,6 +211,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Slip uploaded successfully',
+      result: verificationResult.result,
     });
 
   } catch (error: any) {
@@ -152,7 +223,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createDropPointRedemptionCard(redemption: any): FlexMessage {
+function createDropPointRedemptionCard(redemption: any, returnUrl: string): FlexMessage {
   const contract = redemption.contract;
   const item = contract?.items;
   const pawner = contract?.pawners;
@@ -180,7 +251,7 @@ function createDropPointRedemptionCard(redemption: any): FlexMessage {
           align: 'center'
         }, {
           type: 'text',
-          text: 'กรุณาตรวจสอบยอดเงิน',
+          text: 'ระบบตรวจสอบสลิปเรียบร้อยแล้ว',
           size: 'sm',
           color: '#ffffff',
           align: 'center',
@@ -250,21 +321,12 @@ function createDropPointRedemptionCard(redemption: any): FlexMessage {
           {
             type: 'button',
             action: {
-              type: 'postback',
-              label: 'ยอดครบถ้วนถูกต้อง',
-              data: `action=redemption_amount_correct&redemptionId=${redemption.redemption_id}`
+              type: 'uri',
+              label: 'เปิดรายการส่งคืน',
+              uri: returnUrl,
             },
             style: 'primary',
             color: '#365314'
-          },
-          {
-            type: 'button',
-            action: {
-              type: 'postback',
-              label: 'ยอดไม่ถูกต้อง',
-              data: `action=redemption_amount_incorrect&redemptionId=${redemption.redemption_id}`
-            },
-            style: 'secondary'
           }
         ]
       }
