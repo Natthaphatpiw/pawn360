@@ -81,9 +81,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify slip with AI
+    const companyBank = await getCompanyBankAccount();
+
+    // Verify slip with SlipOK (falls back to legacy OCR until SlipOK env is configured)
     const expectedAmount = actionRequest.total_amount;
-    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount);
+    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
+      receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
+      receiverPromptpay: companyBank.promptpay_number || null,
+      receiverName: companyBank.account_name || companyBank.bank_account_name || null,
+      useSlipOkLogCheck: true,
+    });
 
     // Save verification result
     await saveSlipVerification(
@@ -240,7 +247,6 @@ export async function POST(request: NextRequest) {
           }
         );
 
-        const companyBank = await getCompanyBankAccount();
         const shortAmount = Math.abs(verificationResult.difference || 0);
 
         return NextResponse.json({
