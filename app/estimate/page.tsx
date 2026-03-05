@@ -1002,6 +1002,25 @@ function EstimatePageInner() {
     return urls;
   };
 
+  const hashImagesForEstimateCache = async (files: File[]): Promise<string[]> => {
+    if (!files.length) return [];
+
+    const hasSubtleCrypto = Boolean(globalThis.crypto?.subtle);
+    if (!hasSubtleCrypto) {
+      return files.map((file) => `${file.name}:${file.size}:${file.lastModified}`);
+    }
+
+    return Promise.all(
+      files.map(async (file) => {
+        const buffer = await file.arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', buffer);
+        return Array.from(new Uint8Array(digest))
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join('');
+      })
+    );
+  };
+
   // Analyze condition with AI
   const handleAnalyzeAndEstimate = async () => {
     const validationError = validateForm();
@@ -1141,6 +1160,9 @@ function EstimatePageInner() {
       ensureNotCanceled(signal);
       updateProcessingStatus(60, 'อัปโหลดรูปภาพ', 'กำลังอัปโหลดรูปภาพเพื่อประเมินราคา');
 
+      const imageHashes = await hashImagesForEstimateCache(compressedImages);
+      ensureNotCanceled(signal);
+
       // Step 2: Upload images
       console.log('📤 Starting image upload...');
       const uploadedUrls = await uploadImages(compressedImages, signal);
@@ -1188,6 +1210,7 @@ function EstimatePageInner() {
         defects: formData.defects,
         note: [formData.note, appleExtraLines].filter(Boolean).join('\n'),
         images: uploadedUrls,
+        imageHashes,
         lineId: profile.userId,
         // Additional fields based on item type
         ...(formData.itemType === 'กล้อง' && { lenses: formData.lenses?.filter(l => l.trim() !== '') }),
