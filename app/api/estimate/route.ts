@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import crypto from 'crypto';
+import { Redis } from '@upstash/redis';
 import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
 
 const collectEnvKeys = (values: Array<string | undefined>) => (
@@ -67,6 +69,17 @@ const SERPAPI_FILTER_MAX_OUTPUT_TOKENS = 600;
 const USE_TH_WEIGHTS = false;
 const TH_WEIGHT = 2;
 const NON_TH_WEIGHT = 1;
+const ESTIMATE_CACHE_VERSION = 'v1';
+const resolvePositiveInt = (value: string | undefined, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+};
+const ESTIMATE_CACHE_TTL_SECONDS = resolvePositiveInt(process.env.ESTIMATE_CACHE_TTL_SECONDS, 60 * 60 * 24 * 30);
+const IMAGE_HASH_CACHE_TTL_SECONDS = resolvePositiveInt(process.env.ESTIMATE_IMAGE_HASH_CACHE_TTL_SECONDS, 60 * 60 * 24 * 30);
+const ESTIMATE_CACHE_KEY_PREFIX = `estimate:global:${ESTIMATE_CACHE_VERSION}`;
+const IMAGE_HASH_CACHE_KEY_PREFIX = `estimate:image-hash:${ESTIMATE_CACHE_VERSION}`;
+
+let redisClient: Redis | null | undefined;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -102,6 +115,7 @@ interface EstimateRequest {
   defects?: string;
   note?: string;
   images: string[];
+  imageHashes?: string[];
   lineId: string;
   appleCategory?: string;
   appleSpecs?: string;
@@ -200,6 +214,169 @@ function parseJsonFromText<T>(text: string): T | null {
       return null;
     }
   }
+}
+
+function getRedisClient() {
+  if (redisClient !== undefined) {
+    return redisClient;
+  }
+
+  const hasUrl = Boolean(process.env.KV_REST_API_URL);
+  const hasToken = Boolean(process.env.KV_REST_API_TOKEN || process.env.KV_REST_API_READ_ONLY_TOKEN);
+
+  if (!hasUrl || !hasToken) {
+    redisClient = null;
+    return redisClient;
+  }
+
+  try {
+    redisClient = Redis.fromEnv();
+  } catch (error) {
+    console.warn('⚠️ Failed to initialize Upstash Redis client:', error);
+    redisClient = null;
+  }
+
+  return redisClient;
+}
+
+const normalizeCacheString = (value?: string | null) => {
+  const normalized = (value || '').trim().replace(/\s+/g, ' ');
+  return normalized ? normalized.toLowerCase() : null;
+};
+
+const normalizeCacheNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.round(value * 100000) / 100000;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) {
+      return Math.round(parsed * 100000) / 100000;
+    }
+  }
+  return null;
+};
+
+const normalizeCacheStringArray = (values?: string[] | null, sort = false) => {
+  const normalized = (values || [])
+    .map((value) => normalizeCacheString(value))
+    .filter((value): value is string => Boolean(value));
+  return sort ? [...normalized].sort() : normalized;
+};
+
+const hashValue = (value: string) => crypto.createHash('sha256').update(value).digest('hex');
+
+const normalizeImageUrlForHashCache = (imageUrl: string) => {
+  try {
+    const parsed = new URL(imageUrl);
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    const [base] = imageUrl.split('?');
+    return base || imageUrl;
+  }
+};
+
+async function getImageContentHash(imageUrl: string): Promise<string> {
+  const normalizedUrl = normalizeImageUrlForHashCache(imageUrl);
+  const redis = getRedisClient();
+  const cacheLookupKey = `${IMAGE_HASH_CACHE_KEY_PREFIX}:${hashValue(normalizedUrl)}`;
+
+  if (redis) {
+    try {
+      const cachedHash = await redis.get<string>(cacheLookupKey);
+      if (typeof cachedHash === 'string' && cachedHash) {
+        return cachedHash;
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to read image hash cache:', error);
+    }
+  }
+
+  let contentHash: string;
+  try {
+    if (imageUrl.startsWith('data:')) {
+      contentHash = hashValue(imageUrl);
+    } else {
+      const response = await fetch(imageUrl, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image (${response.status})`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      contentHash = crypto.createHash('sha256').update(buffer).digest('hex');
+    }
+  } catch (error) {
+    console.warn('⚠️ Failed to hash image content. Falling back to URL hash:', error);
+    contentHash = `url:${hashValue(normalizedUrl)}`;
+  }
+
+  if (redis) {
+    try {
+      await redis.set(cacheLookupKey, contentHash, { ex: IMAGE_HASH_CACHE_TTL_SECONDS });
+    } catch (error) {
+      console.warn('⚠️ Failed to write image hash cache:', error);
+    }
+  }
+
+  return contentHash;
+}
+
+async function resolveImageHashesForCache(input: EstimateRequest): Promise<string[]> {
+  const providedHashes = normalizeCacheStringArray(input.imageHashes, false);
+  if (providedHashes.length > 0 && providedHashes.length === input.images.length) {
+    return [...providedHashes].sort();
+  }
+
+  const calculated = await Promise.all((input.images || []).map((url) => getImageContentHash(url)));
+  return calculated.sort();
+}
+
+function buildEstimateCachePayload(input: EstimateRequest, imageHashes: string[]) {
+  return {
+    version: ESTIMATE_CACHE_VERSION,
+    itemType: normalizeCacheString(input.itemType),
+    brand: normalizeCacheString(input.brand),
+    model: normalizeCacheString(input.model),
+    capacity: normalizeCacheString(input.capacity),
+    serialNo: normalizeCacheString(input.serialNo),
+    accessories: normalizeCacheString(input.accessories),
+    condition: normalizeCacheNumber(input.condition),
+    pawnerCondition: normalizeCacheNumber(input.pawnerCondition),
+    aiCondition: normalizeCacheNumber(input.aiCondition),
+    defects: normalizeCacheString(input.defects),
+    note: normalizeCacheString(input.note),
+    appleCategory: normalizeCacheString(input.appleCategory),
+    appleSpecs: normalizeCacheString(input.appleSpecs),
+    color: normalizeCacheString(input.color),
+    screenSize: normalizeCacheString(input.screenSize),
+    watchSize: normalizeCacheString(input.watchSize),
+    watchConnectivity: normalizeCacheString(input.watchConnectivity),
+    cpu: normalizeCacheString(input.cpu),
+    ram: normalizeCacheString(input.ram),
+    storage: normalizeCacheString(input.storage),
+    gpu: normalizeCacheString(input.gpu),
+    lenses: normalizeCacheStringArray(input.lenses, true),
+    imageHashes,
+  };
+}
+
+function buildEstimateCacheKey(input: EstimateRequest, imageHashes: string[]) {
+  const payload = buildEstimateCachePayload(input, imageHashes);
+  const payloadString = JSON.stringify(payload);
+  const digest = hashValue(payloadString);
+  return `${ESTIMATE_CACHE_KEY_PREFIX}:${digest}`;
+}
+
+function isCachedEstimateResponse(value: any): value is EstimateResponse {
+  return Boolean(
+    value &&
+    value.success === true &&
+    typeof value.estimatedPrice === 'number' &&
+    typeof value.marketPrice === 'number' &&
+    typeof value.pawnPrice === 'number' &&
+    typeof value.condition === 'number'
+  );
 }
 
 function isSerpapiEnabled(): boolean {
@@ -681,19 +858,42 @@ async function getRepresentativeMarketPrice(
 
 export async function POST(request: NextRequest): Promise<NextResponse<EstimateResponse | { error: string }>> {
   try {
-    if (!hasOpenAIKeys()) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
-      );
-    }
-
     const body: EstimateRequest = await request.json();
 
     if (!body.itemType || !body.brand || !body.model || !body.lineId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(body.images) || body.images.length === 0) {
+      return NextResponse.json(
+        { error: 'Missing required image data' },
+        { status: 400 }
+      );
+    }
+
+    const imageHashes = await resolveImageHashesForCache(body);
+    const globalCacheKey = buildEstimateCacheKey(body, imageHashes);
+    const redis = getRedisClient();
+
+    if (redis) {
+      try {
+        const cached = await redis.get<EstimateResponse>(globalCacheKey);
+        if (isCachedEstimateResponse(cached)) {
+          console.log('⚡ Global estimate cache hit:', globalCacheKey);
+          return NextResponse.json(cached);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to read estimate cache:', error);
+      }
+    }
+
+    if (!hasOpenAIKeys()) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 500 }
       );
     }
 
@@ -735,7 +935,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
     const remainder = clampPrice % 1000;
     const finalPrice = clampPrice - remainder + (remainder >= 500 ? 500 : 0);
 
-    return NextResponse.json({
+    const estimateResponsePayload: EstimateResponse = {
       success: true,
       estimatedPrice: finalPrice,
       condition: normalizedCondition,
@@ -750,7 +950,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
         pawnPrice: `ราคาจำนำ = ${marketPrice.toLocaleString()} × 0.6 = ${pawnPrice.toLocaleString()} บาท`,
         finalPrice: `ราคาประเมิน = ${pawnPrice.toLocaleString()} × สภาพ ${(normalizedCondition * 100).toFixed(0)}% = ${finalPrice.toLocaleString()} บาท`,
       },
-    });
+    };
+
+    if (redis) {
+      try {
+        await redis.set(globalCacheKey, estimateResponsePayload, { ex: ESTIMATE_CACHE_TTL_SECONDS });
+      } catch (error) {
+        console.warn('⚠️ Failed to write estimate cache:', error);
+      }
+    }
+
+    return NextResponse.json(estimateResponsePayload);
 
   } catch (error: any) {
     console.error('Error in AI estimation:', error);
