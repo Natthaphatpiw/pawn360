@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const role = normalizeRole(body?.role);
-    const lineId = body?.lineId as string | undefined;
+    const lineId = typeof body?.lineId === 'string' ? body.lineId.trim() : '';
 
     if (!role || !lineId) {
       return NextResponse.json(
@@ -16,6 +16,15 @@ export async function POST(request: NextRequest) {
 
     const result = await getPinStatus(role, lineId);
     if (!result.ok) {
+      if (result.status === 404) {
+        return NextResponse.json({
+          success: false,
+          registered: false,
+          pinSet: false,
+          pinSetupRequired: true,
+          ...result.payload,
+        });
+      }
       return NextResponse.json(result.payload, { status: result.status });
     }
 
