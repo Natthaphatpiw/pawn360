@@ -6,7 +6,8 @@ export async function GET(
   context: { params: Promise<{ lineId: string }> }
 ) {
   try {
-    const { lineId } = await context.params;
+    const { lineId: rawLineId } = await context.params;
+    const lineId = (rawLineId || '').trim();
 
     if (!lineId) {
       return NextResponse.json(
@@ -24,14 +25,16 @@ export async function GET(
       .single();
 
     if (error || !dropPoint) {
-      return NextResponse.json(
-        { error: 'Drop point not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        success: false,
+        registered: false,
+        dropPoint: null,
+      });
     }
 
     return NextResponse.json({
       success: true,
+      registered: true,
       dropPoint
     });
 

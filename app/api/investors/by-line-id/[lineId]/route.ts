@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const params = await context.params;
-    const { lineId } = params;
+    const lineId = (params.lineId || '').trim();
 
     if (!lineId) {
       return NextResponse.json(
@@ -25,14 +25,16 @@ export async function GET(
       .single();
 
     if (error || !investor) {
-      return NextResponse.json(
-        { error: 'ไม่พบข้อมูลผู้ใช้' },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        success: false,
+        registered: false,
+        investor: null,
+      });
     }
 
     return NextResponse.json({
       success: true,
+      registered: true,
       investor
     });
 
