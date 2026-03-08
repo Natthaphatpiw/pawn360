@@ -6,12 +6,23 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { X, Upload } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 function InvestorPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const redirectToInvestorVerification = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER,
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST,
+      ],
+      fallbackPath: '/ekyc-invest',
+    });
+  };
 
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +58,7 @@ function InvestorPaymentContent() {
     } catch (error: any) {
       console.error('Error fetching contract:', error);
       if (error.response?.data?.kycRequired) {
-        router.replace('/ekyc-invest');
+        redirectToInvestorVerification();
         return;
       }
       setError(error.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');

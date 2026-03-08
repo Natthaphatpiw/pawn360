@@ -11,6 +11,8 @@ export default function EKYCInvestLayout({
   children: React.ReactNode;
 }) {
   // Use investor LIFF ID (same as register-invest)
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER || '2008641671-O4zZnvW9';
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER
+    || process.env.NEXT_PUBLIC_LIFF_ID_INVEST
+    || '2008641671-O4zZnvW9';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }

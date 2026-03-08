@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { ChevronLeft, Package, Clock } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 type DropPoint = {
   drop_point_id: string;
@@ -77,6 +78,7 @@ function DropPointContent() {
   const [contracts, setContracts] = useState<ContractListItem[]>([]);
   const [contractDetail, setContractDetail] = useState<ContractDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const shouldShowRegisterButton = (error || '').toLowerCase().includes('drop point not found');
 
   let contractId = searchParams.get('contractId');
   if (!contractId) {
@@ -149,6 +151,22 @@ function DropPointContent() {
       <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-600 mb-4">{error}</p>
+          {shouldShowRegisterButton && (
+            <button
+              onClick={() =>
+                openLiffEntry({
+                  liffIdCandidates: [
+                    process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT,
+                    process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_REGISTER,
+                  ],
+                  fallbackPath: '/register-droppoint',
+                })
+              }
+              className="bg-[#365314] text-white px-5 py-2 rounded-lg text-sm"
+            >
+              ไปหน้าลงทะเบียน Drop Point
+            </button>
+          )}
         </div>
       </div>
     );

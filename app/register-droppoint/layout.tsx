@@ -15,6 +15,8 @@ export default function RegisterDropPointLayout({
   // Drop Point LINE Login LIFF ID
   // Channel ID = 2008651088, LIFF ID = 2008651088-Ajw69zLb
   // Endpoint: https://pawnly.io/register-droppoint
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT || '2008651088-Ajw69zLb';
+  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT
+    || process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_REGISTER
+    || '2008651088-Ajw69zLb';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }

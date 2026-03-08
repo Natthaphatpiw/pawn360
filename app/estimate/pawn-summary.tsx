@@ -5,6 +5,7 @@ import { ChevronDown, MapPin, Phone, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { haversineDistanceMeters } from '@/lib/services/geo';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 const SERIAL_OPTIONAL_TYPES = new Set([
   'อุปกรณ์เสริมโทรศัพท์',
@@ -427,11 +428,13 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
   };
 
   const handleRegister = () => {
-    if (kycStatus && kycStatus !== 'VERIFIED') {
-      window.location.href = '/ekyc';
-    } else {
-      window.location.href = '/register';
-    }
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_REGISTER,
+        process.env.NEXT_PUBLIC_LIFF_ID,
+      ],
+      fallbackPath: kycStatus && kycStatus !== 'VERIFIED' ? '/ekyc' : '/register',
+    });
   };
 
   if (isLoading) {
