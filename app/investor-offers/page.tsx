@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { Search, ArrowLeft } from 'lucide-react';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 const INVESTOR_TIER_THRESHOLDS = {
   GOLD: 400_000,
@@ -27,6 +28,16 @@ function InvestorOffersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
+
+  const redirectToInvestorVerification = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER,
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST,
+      ],
+      fallbackPath: '/ekyc-invest',
+    });
+  };
 
   const [loading, setLoading] = useState(true);
   const [investor, setInvestor] = useState<any>(null);
@@ -116,7 +127,7 @@ function InvestorOffersContent() {
 
             const handleViewOffer = () => {
               if (kycStatus !== 'VERIFIED') {
-                router.push('/ekyc-invest');
+                redirectToInvestorVerification();
                 return;
               }
               router.push(`/offer-detail?contractId=${offer.contract_id}`);

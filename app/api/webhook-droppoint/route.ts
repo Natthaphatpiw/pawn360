@@ -22,6 +22,10 @@ const investorLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
+const dropPointRegisterLiffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT
+  || process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_REGISTER
+  || '2008651088-Ajw69zLb';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -96,7 +100,7 @@ async function handleFollow(event: WebhookEvent & { type: 'follow' }) {
           action: {
             type: 'uri',
             label: 'ลงทะเบียน Drop Point',
-            uri: `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT || '2008651088-Ajw69zLb'}`
+            uri: `https://liff.line.me/${dropPointRegisterLiffId}`
           },
           style: 'primary',
           color: '#365314'
@@ -123,7 +127,7 @@ async function handleTextMessage(event: MessageEvent & { message: TextEventMessa
   if (text === 'ลงทะเบียน' || text === 'register') {
     const registerMessage = {
       type: 'text' as const,
-      text: `กรุณาลงทะเบียนที่ลิงก์นี้:\nhttps://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT || '2008651088-Ajw69zLb'}`
+      text: `กรุณาลงทะเบียนที่ลิงก์นี้:\nhttps://liff.line.me/${dropPointRegisterLiffId}`
     };
     const dpClient = getDropPointLineClient();
     if (!dpClient) throw new Error('DropPoint LINE client not configured');

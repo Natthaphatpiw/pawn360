@@ -6,6 +6,7 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 const INVESTOR_TIER_THRESHOLDS = {
   GOLD: 400_000,
@@ -28,6 +29,16 @@ function OfferDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useLiff();
+
+  const redirectToInvestorVerification = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER,
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST,
+      ],
+      fallbackPath: '/ekyc-invest',
+    });
+  };
 
   const [contract, setContract] = useState<any>(null);
   const [investor, setInvestor] = useState<any>(null);
@@ -72,7 +83,7 @@ function OfferDetailContent() {
       console.error('Error fetching contract:', error);
       console.error('Error details:', error.response?.data);
       if (error.response?.data?.kycRequired) {
-        router.replace('/ekyc-invest');
+        redirectToInvestorVerification();
         return;
       }
       setError(error.response?.data?.error || 'ไม่สามารถโหลดรายละเอียดข้อเสนอได้');
@@ -87,13 +98,13 @@ function OfferDetailContent() {
       const status = response.data.investor?.kyc_status;
       setInvestor(response.data.investor);
       if (status !== 'VERIFIED') {
-        router.replace('/ekyc-invest');
+        redirectToInvestorVerification();
         return;
       }
       fetchContractDetails();
     } catch (error) {
       console.error('Error checking investor KYC:', error);
-      router.replace('/ekyc-invest');
+      redirectToInvestorVerification();
     }
   };
 
@@ -131,7 +142,7 @@ function OfferDetailContent() {
     } catch (error: any) {
       console.error('Error accepting offer:', error);
       if (error.response?.data?.kycRequired) {
-        router.replace('/ekyc-invest');
+        redirectToInvestorVerification();
         return;
       }
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาดในการยอมรับข้อเสนอ');

@@ -7,6 +7,7 @@ import axios from 'axios';
 import { ChevronLeft, Download, FileText } from 'lucide-react';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 const resolveNetInvestorRate = (contract: {
   investor_rate?: number | null;
@@ -30,6 +31,16 @@ const resolveNetInvestorRate = (contract: {
 function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const router = useRouter();
   const { profile, isLoading: liffLoading } = useLiff();
+
+  const redirectToInvestorVerification = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER,
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST,
+      ],
+      fallbackPath: '/ekyc-invest',
+    });
+  };
 
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +71,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
     } catch (error: any) {
       console.error('Error fetching contract:', error);
       if (error.response?.data?.kycRequired) {
-        router.replace('/ekyc-invest');
+        redirectToInvestorVerification();
         return;
       }
       setError(error.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
