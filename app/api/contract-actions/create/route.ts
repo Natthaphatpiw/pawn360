@@ -426,7 +426,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
           },
           {
             type: 'text',
-            text: `${item?.brand || ''} ${item?.model || ''}`,
+            text: `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`,
             size: 'sm',
             color: '#666666',
             margin: 'sm'
@@ -446,7 +446,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
                 spacing: 'sm',
                 contents: [
                   { type: 'text', text: 'ผู้ขอสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
-                  { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
+                  { type: 'text', text: `${[pawner?.firstname, pawner?.lastname].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
                 ]
               },
               {

@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
+    if (verificationResult.result === 'MATCHED') {
       updateData.status = 'VERIFIED';
       updateData.verified_at = new Date().toISOString();
       updateData.paid_through_date = toDateString(new Date());

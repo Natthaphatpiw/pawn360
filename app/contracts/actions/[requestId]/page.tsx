@@ -98,7 +98,7 @@ export default function ActionStatusDetailPage() {
   const item = contract?.items;
   const itemName = item?.capacity
     ? `${item.brand} ${item.model} ${item.capacity}`
-    : `${item?.brand || ''} ${item?.model || ''}`.trim();
+    : `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim();
 
   const amount = request.request_type === 'PRINCIPAL_INCREASE'
     ? request.increase_amount

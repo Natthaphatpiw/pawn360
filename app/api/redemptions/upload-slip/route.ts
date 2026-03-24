@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (verificationResult.result !== 'MATCHED' && verificationResult.result !== 'OVERPAID') {
+    if (verificationResult.result !== 'MATCHED') {
       await supabase
         .from('redemption_requests')
         .update({
@@ -325,7 +325,7 @@ function createDropPointRedemptionCard(redemption: any, returnUrl: string): Flex
             spacing: 'sm',
             contents: [
               { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${item?.brand || ''} ${item?.model || ''}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
           {
@@ -362,7 +362,7 @@ function createDropPointRedemptionCard(redemption: any, returnUrl: string): Flex
             margin: 'lg',
             contents: [
               { type: 'text', text: 'ข้อมูลผู้ขอสินเชื่อ:', color: '#666666', size: 'xs', margin: 'none' },
-              { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', weight: 'bold', margin: 'sm' },
+              { type: 'text', text: `${[pawner?.firstname, pawner?.lastname].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', weight: 'bold', margin: 'sm' },
               { type: 'text', text: `โทร: ${pawner?.phone_number || '-'}`, color: '#666666', size: 'xs', margin: 'sm' }
             ]
           }

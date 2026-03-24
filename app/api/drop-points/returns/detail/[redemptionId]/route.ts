@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshImageUrls } from '@/lib/aws/s3';
 
+const ALLOWED_DETAIL_STATUSES = new Set(['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT', 'COMPLETED']);
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ redemptionId: string }> }
@@ -40,6 +42,8 @@ export async function GET(
         contract:contract_id (
           contract_id,
           contract_number,
+          contract_status,
+          item_delivery_status,
           drop_point_id,
           items:item_id (
             item_id,
@@ -68,6 +72,23 @@ export async function GET(
       return NextResponse.json(
         { error: 'Redemption not found' },
         { status: 404 }
+      );
+    }
+
+    if (!ALLOWED_DETAIL_STATUSES.has(String(redemption.request_status || ''))) {
+      return NextResponse.json(
+        { error: 'รายการนี้ไม่อยู่ในสถานะที่สามารถเปิดดูได้แล้ว' },
+        { status: 410 }
+      );
+    }
+
+    if (
+      ['COMPLETED', 'TERMINATED'].includes(String(redemption.contract?.contract_status || ''))
+      && redemption.request_status !== 'COMPLETED'
+    ) {
+      return NextResponse.json(
+        { error: 'รายการนี้สิ้นสุดไปแล้ว' },
+        { status: 410 }
       );
     }
 

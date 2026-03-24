@@ -261,18 +261,8 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 
     // Send message to pawner based on delivery method
     if (pawner?.line_id) {
-      let pawnerMessage = '';
-      if (redemption.delivery_method === 'SELF_PICKUP') {
-        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nกรุณามารับสินค้าที่ ${dropPoint?.drop_point_name || 'จุดรับฝาก'}\nเบอร์ติดต่อ: ${dropPoint?.phone_number || 'ไม่ระบุ'}\n\nโปรดแสดงหลักฐานการโอนเงินให้เจ้าหน้าที่`;
-      } else {
-        pawnerMessage = `ยอดเงินถูกต้องแล้ว\n\nสินค้า: ${redemption.contract?.items?.brand} ${redemption.contract?.items?.model}\n\nทาง ${dropPoint?.drop_point_name || 'จุดรับฝาก'} กำลังเตรียมการส่งสินค้าให้คุณ\nหากต้องการสอบถามเพิ่มเติม โทร: ${dropPoint?.phone_number || 'ไม่ระบุ'}`;
-      }
-
       try {
-        await pawnerLineClient.pushMessage(pawner.line_id, {
-          type: 'text',
-          text: pawnerMessage
-        });
+        await pawnerLineClient.pushMessage(pawner.line_id, createPawnerItemReadyCard(redemption));
       } catch (msgError) {
         console.error('Error sending to pawner:', msgError);
       }
@@ -363,7 +353,7 @@ function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
             spacing: 'sm',
             contents: [
               { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${item?.brand || ''} ${item?.model || ''}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
           {
@@ -373,7 +363,7 @@ function createDropPointReturnConfirmCard(redemption: any): FlexMessage {
             margin: 'md',
             contents: [
               { type: 'text', text: 'ลูกค้า:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', flex: 5 }
+              { type: 'text', text: `${[pawner?.firstname, pawner?.lastname].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', flex: 5 }
             ]
           },
           {
@@ -620,7 +610,7 @@ function createPawnerItemReadyCard(redemption: any): FlexMessage {
             spacing: 'sm',
             contents: [
               { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${item?.brand || ''} ${item?.model || ''}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
           {
@@ -662,11 +652,19 @@ function createPawnerItemReadyCard(redemption: any): FlexMessage {
           type: 'button',
           action: {
             type: 'postback',
-            label: 'ยืนยันได้รับของแล้ว',
+            label: 'ได้รับของคืนแล้ว',
             data: `action=pawner_confirm_received&redemptionId=${redemption.redemption_id}`
           },
           style: 'primary',
           color: '#B85C38'
+        }, {
+          type: 'button',
+          action: {
+            type: 'postback',
+            label: 'ยังไม่ได้รับของ',
+            data: `action=pawner_report_not_received&redemptionId=${redemption.redemption_id}`
+          },
+          style: 'secondary'
         }]
       }
     }

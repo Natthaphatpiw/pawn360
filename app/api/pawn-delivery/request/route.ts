@@ -514,7 +514,7 @@ export async function POST(request: NextRequest) {
       const item = Array.isArray(contract.items)
         ? contract.items[0]
         : contract.items;
-      const itemName = `${item?.brand || ''} ${item?.model || ''}`.trim() || '-';
+      const itemName = `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim() || '-';
 
       if (pawnerLineClient) {
         try {

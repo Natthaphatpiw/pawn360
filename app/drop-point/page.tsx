@@ -130,11 +130,6 @@ function DropPointContent() {
     [contracts]
   );
 
-  const arrivedContracts = useMemo(
-    () => contracts.filter((contract) => contract.statusGroup === 'ARRIVED'),
-    [contracts]
-  );
-
   if (liffLoading || loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
@@ -325,44 +320,6 @@ function DropPointContent() {
           )}
         </div>
 
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Package className="w-4 h-4 text-[#22C55E]" />
-            <h2 className="text-sm font-bold text-gray-700">ถึงแล้ว</h2>
-          </div>
-          {arrivedContracts.length === 0 ? (
-            <div className="bg-white rounded-2xl p-4 text-sm text-gray-500 text-center">
-              ไม่มีรายการถึงแล้ว
-            </div>
-          ) : (
-            arrivedContracts.map((contract) => (
-              <button
-                key={contract.contract_id}
-                onClick={() => router.push(`/drop-point?contractId=${contract.contract_id}`)}
-                className="w-full bg-white rounded-2xl p-4 mb-3 text-left shadow-sm"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-base font-bold text-gray-800">
-                      {contract.items?.brand} {contract.items?.model}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      วันที่ส่งมา: {formatDate(contract.displayDate)}
-                    </div>
-                    {contract.storage_box_code && (
-                      <div className="text-[11px] text-gray-600 mt-1">
-                        กล่อง: <span className="font-semibold">{contract.storage_box_code}</span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-bold text-[#22C55E] bg-[#DCFCE7] px-3 py-1 rounded-full">
-                    ถึงแล้ว
-                  </span>
-                </div>
-              </button>
-            ))
-          )}
-        </div>
       </div>
     </div>
   );

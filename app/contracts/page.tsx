@@ -36,6 +36,8 @@ interface Contract {
   displayStatus: string;
 }
 
+const ENDED_CONTRACT_STATUSES = new Set(['COMPLETED', 'TERMINATED', 'LIQUIDATED']);
+
 export default function PawnerContractList() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
@@ -136,7 +138,8 @@ export default function PawnerContractList() {
       case 'ขายทอดตลาด':
         return { text: 'ขายทอดตลาด', bg: 'bg-[#FCE4EC]', textCol: 'text-[#AD1457]' };
       case 'เกินกำหนด':
-        return { text: 'เกินกำหนด', bg: 'bg-[#FFEBEE]', textCol: 'text-[#EF5350]' };
+      case 'เลยกำหนด':
+        return { text: 'เลยกำหนด', bg: 'bg-[#FFEBEE]', textCol: 'text-[#EF5350]' };
       case 'ส่งคืน':
         return { text: 'ส่งคืน', bg: 'bg-gray-100', textCol: 'text-gray-500' };
       default:
@@ -145,11 +148,17 @@ export default function PawnerContractList() {
   };
 
   const getItemName = (item: ContractItem) => {
-    if (item.capacity) {
-      return `${item.brand} ${item.model} ${item.capacity}`;
-    }
-    return `${item.brand} ${item.model}`;
+    const baseName = [item.brand, item.model].filter(Boolean).join(' ').trim();
+    return [baseName, item.capacity].filter(Boolean).join(' ').trim() || 'รายการสินเชื่อ';
   };
+
+  const visibleContracts = contracts.filter((contract) => {
+    if (ENDED_CONTRACT_STATUSES.has(contract.contract_status)) {
+      return false;
+    }
+
+    return contract.displayStatus !== 'ส่งคืน';
+  });
 
   if (liffLoading || loading) {
     return (
@@ -216,18 +225,18 @@ export default function PawnerContractList() {
           </p>
         </div>
         <div className="text-gray-400 text-xs font-light mb-1">
-          ทั้งหมด {contracts.length} รายการ
+          ทั้งหมด {visibleContracts.length} รายการ
         </div>
       </div>
 
       {/* List Container */}
       <div className="flex-1 overflow-y-auto space-y-3 pb-24 no-scrollbar">
-        {contracts.length === 0 ? (
+        {visibleContracts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">ไม่มีรายการสัญญาสินเชื่อ</p>
+            <p className="text-gray-500">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
           </div>
         ) : (
-          contracts.map((contract) => {
+          visibleContracts.map((contract) => {
             const status = getStatusBadge(contract.displayStatus);
             return (
               <div
