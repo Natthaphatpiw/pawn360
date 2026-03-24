@@ -305,12 +305,6 @@ export default function InvestorRegister() {
                 className="object-cover"
                 priority
               />
-              <div className="absolute inset-0 flex items-end justify-between px-4 pb-3 text-white">
-                <div>
-                  <div className="text-sm opacity-80">Current tier</div>
-                  <div className="text-xl font-bold">{TIER_LABELS[investorTier]}</div>
-                </div>
-              </div>
             </div>
           </button>
 

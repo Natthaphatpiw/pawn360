@@ -30,27 +30,43 @@ type Contract = {
 
 const CATEGORY_CONFIG = [
   { key: 'mobile', label: 'Mobile', color: '#3B82F6' },
+  { key: 'apple', label: 'Apple', color: '#6366F1' },
   { key: 'laptop', label: 'Laptop', color: '#EF4444' },
   { key: 'camera', label: 'Camera', color: '#F59E0B' },
   { key: 'accessory', label: 'Mobile Acc.', color: '#22C55E' },
+  { key: 'hardware', label: 'Hardware', color: '#14B8A6' },
+  { key: 'other', label: 'Other', color: '#6B7280' },
 ];
 
 const ENDED_STATUSES = ['COMPLETED', 'TERMINATED'];
 
 const mapCategory = (itemType?: string) => {
-  switch (itemType) {
-    case 'โทรศัพท์มือถือ':
-    case 'Apple':
-      return 'mobile';
-    case 'โน้ตบุค':
-      return 'laptop';
-    case 'กล้อง':
-      return 'camera';
-    case 'อุปกรณ์เสริมโทรศัพท์':
-      return 'accessory';
-    default:
-      return 'mobile';
+  const normalized = String(itemType || '').trim().toLowerCase();
+
+  if (!normalized) {
+    return 'other';
   }
+
+  if (normalized === 'apple' || normalized.includes('iphone') || normalized.includes('ipad') || normalized.includes('macbook')) {
+    return 'apple';
+  }
+  if (normalized.includes('โทรศัพท์มือถือ') || normalized.includes('mobile') || normalized.includes('phone')) {
+    return 'mobile';
+  }
+  if (normalized.includes('โน้ตบุค') || normalized.includes('laptop') || normalized.includes('notebook')) {
+    return 'laptop';
+  }
+  if (normalized.includes('กล้อง') || normalized.includes('camera')) {
+    return 'camera';
+  }
+  if (normalized.includes('อุปกรณ์เสริมโทรศัพท์') || normalized.includes('accessory')) {
+    return 'accessory';
+  }
+  if (normalized.includes('อุปกรณ์คอมพิวเตอร์') || normalized.includes('computer hardware') || normalized.includes('hardware')) {
+    return 'hardware';
+  }
+
+  return 'other';
 };
 
 const formatCurrency = (value: number) => value.toLocaleString('en-US', {
@@ -112,15 +128,21 @@ export default function InvestmentDashboard() {
   const analytics = useMemo(() => {
     const allCounts: Record<string, number> = {
       mobile: 0,
+      apple: 0,
       laptop: 0,
       camera: 0,
       accessory: 0,
+      hardware: 0,
+      other: 0,
     };
     const currentCounts: Record<string, number> = {
       mobile: 0,
+      apple: 0,
       laptop: 0,
       camera: 0,
       accessory: 0,
+      hardware: 0,
+      other: 0,
     };
 
     const now = new Date();
@@ -162,7 +184,7 @@ export default function InvestmentDashboard() {
       let statusLabel = '';
       let statusColor = '';
       if (daysRemaining < 0) {
-        statusLabel = 'เกินกำหนด';
+        statusLabel = 'เลยกำหนด';
         statusColor = 'bg-[#FCE7E7] text-[#E06666]';
       } else if (daysRemaining === 0) {
         statusLabel = 'ครบกำหนด';

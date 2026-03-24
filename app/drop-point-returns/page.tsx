@@ -8,6 +8,7 @@ import { ChevronLeft, CheckCircle, Camera, QrCode, RefreshCw } from 'lucide-reac
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 type RedemptionItem = {
   redemption_id: string;
@@ -67,6 +68,15 @@ function formatDate(dateString?: string) {
   if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('th-TH');
 }
+
+const openReturnList = () => {
+  openLiffEntry({
+    liffIdCandidates: [
+      process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN,
+    ],
+    fallbackPath: '/drop-point-returns',
+  });
+};
 
 function DropPointReturnsContent() {
   const router = useRouter();
@@ -255,7 +265,7 @@ function DropPointReturnsContent() {
           <h2 className="text-xl font-bold text-gray-800 mb-2">ส่งคืนเรียบร้อย</h2>
           <p className="text-sm text-gray-500 mb-6">ระบบบันทึกการส่งคืนสินค้าเรียบร้อยแล้ว</p>
           <button
-            onClick={() => router.push('/drop-point-returns')}
+            onClick={openReturnList}
             className="w-full bg-[#365314] text-white rounded-2xl py-3 font-bold hover:bg-[#2d4610] transition-colors"
           >
             กลับไปหน้ารายการ
@@ -301,7 +311,7 @@ function DropPointReturnsContent() {
     return (
       <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 pb-24">
         <button
-          onClick={() => router.push('/drop-point-returns')}
+          onClick={openReturnList}
           className="flex items-center text-[#365314] mb-4"
         >
           <ChevronLeft className="w-5 h-5" />

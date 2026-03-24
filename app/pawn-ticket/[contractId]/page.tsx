@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Home } from 'lucide-react';
 import axios from 'axios';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 export default function PawnTicketPage() {
   const router = useRouter();
@@ -30,6 +31,15 @@ export default function PawnTicketPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoHome = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_REGISTER,
+      ],
+      fallbackPath: '/register',
+    });
   };
 
   if (loading) {
@@ -232,7 +242,7 @@ export default function PawnTicketPage() {
       {/* Footer Action Buttons */}
       <div className="w-full max-w-sm mt-6 space-y-3">
         <button
-          onClick={() => router.push('/dashboard')}
+          onClick={handleGoHome}
           className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-2xl py-3 flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
         >
           <Home className="w-5 h-5" />

@@ -238,7 +238,7 @@ function buildAmountResult(
 
   if (difference > 0) {
     return {
-      success: true,
+      success: false,
       result: 'OVERPAID',
       detectedAmount,
       expectedAmount,

@@ -26,7 +26,6 @@ const resolveInvestorTier = (total: number) => {
 
 function InvestorOffersContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
 
   const redirectToInvestorVerification = () => {
@@ -43,6 +42,9 @@ function InvestorOffersContent() {
   const [investor, setInvestor] = useState<any>(null);
   const [marketOffers, setMarketOffers] = useState<any[]>([]);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
+
+  const formatItemName = (item?: { brand?: string | null; model?: string | null }) =>
+    [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'รายการขอสินเชื่อ';
 
   useEffect(() => {
     if (profile?.userId) {
@@ -81,6 +83,12 @@ function InvestorOffersContent() {
     );
   }
 
+  const visibleOffers = marketOffers.filter((offer) => (
+    !offer?.investor_id
+    && offer?.funding_status === 'PENDING'
+    && ['PENDING', 'PENDING_SIGNATURE'].includes(String(offer?.contract_status || ''))
+  ));
+
   return (
     <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 flex flex-col pb-8">
 
@@ -94,7 +102,7 @@ function InvestorOffersContent() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="text-gray-400 text-xs font-light">
-            {marketOffers.length} ข้อเสนอ
+            {visibleOffers.length} ข้อเสนอ
           </div>
         </div>
         <div>
@@ -109,13 +117,13 @@ function InvestorOffersContent() {
 
       {/* List Content */}
       <div className="flex-1 overflow-y-auto space-y-3">
-        {marketOffers.length === 0 ? (
+        {visibleOffers.length === 0 ? (
           <div className="text-center py-10 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p>ไม่มีข้อเสนอใหม่ในขณะนี้</p>
           </div>
         ) : (
-          marketOffers.map((offer) => {
+          visibleOffers.map((offer) => {
             const principal = Number(offer.loan_principal_amount || 0);
             const durationDays = Number(offer.contract_duration_days || 0);
             const currentTotal = Number(investor?.total_active_principal || 0);
@@ -130,7 +138,12 @@ function InvestorOffersContent() {
                 redirectToInvestorVerification();
                 return;
               }
-              router.push(`/offer-detail?contractId=${offer.contract_id}`);
+              openLiffEntry({
+                liffIdCandidates: [
+                  process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL,
+                ],
+                fallbackPath: `/offer-detail?contractId=${offer.contract_id}`,
+              });
             };
 
             return (
@@ -145,7 +158,7 @@ function InvestorOffersContent() {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-800 text-base leading-tight">
-                        {offer.items?.brand} {offer.items?.model}
+                        {formatItemName(offer.items)}
                       </h3>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">

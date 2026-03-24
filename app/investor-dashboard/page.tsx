@@ -87,7 +87,7 @@ function InvestorDashboardContent() {
       case 'COMPLETED':
         return { text: 'เสร็จสิ้น', color: 'bg-[#DBEAFE] text-[#1E40AF]' };
       case 'DEFAULTED':
-        return { text: 'เกินกำหนด', color: 'bg-[#FEE2E2] text-[#991B1B]' };
+        return { text: 'เลยกำหนด', color: 'bg-[#FEE2E2] text-[#991B1B]' };
       case 'TERMINATED':
         return { text: 'ยกเลิก', color: 'bg-gray-100 text-gray-600' };
       default:
@@ -147,7 +147,7 @@ function InvestorDashboardContent() {
             <span className="text-gray-400 text-[10px]">ครบกำหนด:</span>
             <span className="text-gray-600 text-[10px] text-right">
               {new Date(contract.contract_end_date).toLocaleDateString('th-TH')}
-              {daysRemaining > 0 ? ` (อีก ${daysRemaining} วัน)` : daysRemaining === 0 ? ' (วันนี้)' : ` (เกิน ${Math.abs(daysRemaining)} วัน)`}
+              {daysRemaining > 0 ? ` (อีก ${daysRemaining} วัน)` : daysRemaining === 0 ? ' (วันนี้)' : ` (เลย ${Math.abs(daysRemaining)} วัน)`}
             </span>
           </div>
         </div>

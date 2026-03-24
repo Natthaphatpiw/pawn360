@@ -143,7 +143,7 @@ export async function GET(
     });
 
     const entries = [...contractEntries, ...redemptionEntries]
-      .filter((entry) => entry.date)
+      .filter((entry) => entry.date && entry.status !== 'กำลังมา')
       .sort((a, b) => new Date(b.date as string).getTime() - new Date(a.date as string).getTime());
 
     return NextResponse.json({

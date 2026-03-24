@@ -163,6 +163,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { data: duplicateBagAssignment, error: duplicateBagAssignmentError } = await supabase
+      .from('drop_point_bag_assignments')
+      .select('contract_id, bag_number')
+      .eq('bag_number', resolvedBagNumber)
+      .maybeSingle();
+
+    if (duplicateBagAssignmentError) {
+      console.error('Error checking duplicate bag assignment:', duplicateBagAssignmentError);
+      return NextResponse.json(
+        { error: 'Failed to verify bag number' },
+        { status: 500 }
+      );
+    }
+
+    if (
+      duplicateBagAssignment?.contract_id &&
+      duplicateBagAssignment.contract_id !== redemption.contract?.contract_id
+    ) {
+      return NextResponse.json(
+        { error: `หมายเลขถุง ${resolvedBagNumber} ถูกใช้กับรายการอื่นแล้ว` },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
     const nowIso = now.toISOString();
     const msPerDay = 1000 * 60 * 60 * 24;
@@ -277,10 +301,11 @@ export async function POST(request: NextRequest) {
 
     if (redemption.contract?.pawners?.line_id) {
       try {
-        await pawnerLineClient.pushMessage(redemption.contract.pawners.line_id, {
-          type: 'text',
-          text: `ส่งคืนเรียบร้อย\n\nสัญญา: ${redemption.contract.contract_number}\nสินค้า: ${redemption.contract.items?.brand} ${redemption.contract.items?.model}\n\nขอบคุณที่ใช้บริการ Pawnly`
-        });
+        await pawnerLineClient.pushMessage(redemption.contract.pawners.line_id, createPawnerReturnAcknowledgementCard({
+          redemptionId,
+          redemption,
+          bagNumber: resolvedBagNumber,
+        }));
       } catch (msgError) {
         console.error('Error sending to pawner:', msgError);
       }
@@ -324,4 +349,137 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function createPawnerReturnAcknowledgementCard(params: {
+  redemptionId: string;
+  redemption: any;
+  bagNumber: string;
+}) {
+  const { redemptionId, redemption, bagNumber } = params;
+  const itemName = [redemption.contract?.items?.brand, redemption.contract?.items?.model]
+    .filter(Boolean)
+    .join(' ')
+    .trim() || 'สินค้า';
+
+  return {
+    type: 'flex' as const,
+    altText: 'สินค้าถูกส่งคืนแล้ว กรุณายืนยันการรับของ',
+    contents: {
+      type: 'bubble' as const,
+      header: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        contents: [
+          {
+            type: 'text' as const,
+            text: 'สินค้าถูกส่งคืนแล้ว',
+            weight: 'bold' as const,
+            size: 'lg' as const,
+            color: '#ffffff',
+            align: 'center' as const,
+          },
+          {
+            type: 'text' as const,
+            text: 'กรุณาถ่ายรูปสินค้าที่ได้รับคืนทุกครั้ง',
+            size: 'sm' as const,
+            color: '#ffffff',
+            align: 'center' as const,
+            margin: 'sm' as const,
+            wrap: true,
+          },
+        ],
+        backgroundColor: '#B85C38',
+        paddingAll: 'lg',
+      },
+      body: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        spacing: 'md' as const,
+        contents: [
+          {
+            type: 'box' as const,
+            layout: 'baseline' as const,
+            spacing: 'sm' as const,
+            contents: [
+              { type: 'text' as const, text: 'สัญญา:', color: '#666666', size: 'sm' as const, flex: 2 },
+              { type: 'text' as const, text: redemption.contract?.contract_number || '-', color: '#333333', size: 'sm' as const, flex: 5, weight: 'bold' as const },
+            ],
+          },
+          {
+            type: 'box' as const,
+            layout: 'baseline' as const,
+            spacing: 'sm' as const,
+            contents: [
+              { type: 'text' as const, text: 'สินค้า:', color: '#666666', size: 'sm' as const, flex: 2 },
+              { type: 'text' as const, text: itemName, color: '#333333', size: 'sm' as const, flex: 5, weight: 'bold' as const, wrap: true },
+            ],
+          },
+          {
+            type: 'box' as const,
+            layout: 'baseline' as const,
+            spacing: 'sm' as const,
+            contents: [
+              { type: 'text' as const, text: 'หมายเลขถุง:', color: '#666666', size: 'sm' as const, flex: 2 },
+              { type: 'text' as const, text: bagNumber, color: '#B85C38', size: 'sm' as const, flex: 5, weight: 'bold' as const },
+            ],
+          },
+          {
+            type: 'separator' as const,
+            margin: 'md' as const,
+          },
+          {
+            type: 'text' as const,
+            text: '1. ถ่ายรูปสินค้าก่อนแกะซองให้ชัดเจน',
+            size: 'sm' as const,
+            color: '#333333',
+            wrap: true,
+          },
+          {
+            type: 'text' as const,
+            text: '2. ถ่ายรูปสินค้าหลังแกะซองให้ชัดเจน',
+            size: 'sm' as const,
+            color: '#333333',
+            wrap: true,
+          },
+          {
+            type: 'text' as const,
+            text: 'หากไม่กดปุ่มภายใน 48 ชั่วโมง ระบบจะถือว่าได้รับสินค้าแล้วโดยอัตโนมัติ',
+            size: 'xs' as const,
+            color: '#666666',
+            wrap: true,
+            margin: 'md' as const,
+          },
+        ],
+      },
+      footer: {
+        type: 'box' as const,
+        layout: 'vertical' as const,
+        spacing: 'sm' as const,
+        contents: [
+          {
+            type: 'button' as const,
+            style: 'primary' as const,
+            color: '#B85C38',
+            action: {
+              type: 'postback' as const,
+              label: 'ได้รับของคืนแล้ว',
+              data: `action=pawner_confirm_received&redemptionId=${redemptionId}`,
+              displayText: 'ได้รับของคืนแล้ว',
+            },
+          },
+          {
+            type: 'button' as const,
+            style: 'secondary' as const,
+            action: {
+              type: 'postback' as const,
+              label: 'ยังไม่ได้รับของ',
+              data: `action=pawner_report_not_received&redemptionId=${redemptionId}`,
+              displayText: 'ยังไม่ได้รับของ',
+            },
+          },
+        ],
+      },
+    },
+  };
 }

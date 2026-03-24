@@ -46,6 +46,8 @@ export async function GET(
         contract:contract_id (
           contract_id,
           contract_number,
+          contract_status,
+          item_delivery_status,
           drop_point_id,
           items:item_id (
             brand,
@@ -96,14 +98,19 @@ export async function GET(
       }, {});
     }
 
-    const formatted = normalizedRedemptions.map((redemption) => ({
+    const formatted = normalizedRedemptions
+      .filter((redemption) => (
+        !['COMPLETED', 'TERMINATED'].includes(String(redemption.contract?.contract_status || ''))
+        && redemption.contract?.item_delivery_status !== 'RETURNED'
+      ))
+      .map((redemption) => ({
       ...redemption,
       displayStatus: 'รอคืนของ',
       displayDate: redemption.verified_at || redemption.updated_at || redemption.created_at,
       storage_box_code: redemption.contract?.contract_id
         ? storageBoxByContractId[redemption.contract.contract_id] || null
         : null,
-    }));
+      }));
 
     return NextResponse.json({
       success: true,

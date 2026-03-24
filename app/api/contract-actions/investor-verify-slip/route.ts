@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Handle verification result
-    if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
+    if (verificationResult.result === 'MATCHED') {
       const now = new Date();
       const contractEndDate = toUtcDateOnly(contract.contract_end_date);
       const contractStartDateOriginal = toUtcDateOnly(contract.contract_start_date);

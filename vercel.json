@@ -3,6 +3,10 @@
     {
       "path": "/api/contracts/process-ticket-queue",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/redemptions/auto-confirm-received",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

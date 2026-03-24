@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
+    if (verificationResult.result === 'MATCHED') {
       updatePayload.status = 'DRIVER_SEARCH';
       updatePayload.payment_verified_at = new Date().toISOString();
 
@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
 
       if (pawner?.line_id && pawnerLineClient) {
         try {
-          const itemName = `${item?.brand || ''} ${item?.model || ''}`.trim();
+          const itemName = `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim();
           const card = buildPawnerStatusCard({
             contractNumber: contract.contract_number,
             itemName: itemName || '-',
@@ -389,7 +389,7 @@ export async function POST(request: NextRequest) {
 
       if (dropPoint?.line_id && dropPointLineClient) {
         try {
-          const itemName = `${item?.brand || ''} ${item?.model || ''}`.trim();
+          const itemName = `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim();
           const card = buildDropPointPickupCard({
             deliveryRequestId,
             contractNumber: contract.contract_number,

@@ -170,7 +170,7 @@ export default function ActionStatusListPage() {
             const item = req.contract?.items;
             const itemName = item?.capacity
               ? `${item.brand} ${item.model} ${item.capacity}`
-              : `${item?.brand || ''} ${item?.model || ''}`.trim();
+              : `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim();
             const amount = getAmountLabel(req);
             return (
               <div

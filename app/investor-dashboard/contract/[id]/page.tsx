@@ -87,7 +87,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
       case 'COMPLETED':
         return { text: 'เสร็จสิ้น', color: 'text-[#1E40AF]' };
       case 'DEFAULTED':
-        return { text: 'เกินกำหนด', color: 'text-[#991B1B]' };
+        return { text: 'เลยกำหนด', color: 'text-[#991B1B]' };
       default:
         return { text: status, color: 'text-gray-600' };
     }
@@ -247,7 +247,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
         <h2 className="text-lg font-bold text-gray-800 mb-3">รายละเอียดสัญญา</h2>
         <div className="space-y-1 text-sm">
           <InfoRow label="หมายเลขสัญญา" value={contract.contract_number || '-'} />
-          <InfoRow label="สินค้า" value={`${contract.items?.brand || ''} ${contract.items?.model || ''}`} />
+          <InfoRow label="สินค้า" value={`${[contract.items?.brand, contract.items?.model].filter(Boolean).join(' ') || '-'}`} />
           <InfoRow label="สถานะ" value={badge.text} valueColor={badge.color} />
           <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString() || 0} บาท`} />
           <InfoRow

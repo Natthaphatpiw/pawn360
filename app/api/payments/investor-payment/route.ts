@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       useSlipOkLogCheck: false,
     });
 
-    if (verificationResult.result !== 'MATCHED' && verificationResult.result !== 'OVERPAID') {
+    if (verificationResult.result !== 'MATCHED') {
       return NextResponse.json(
         {
           error: verificationResult.message,

@@ -886,8 +886,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
         }
 
         // Idempotency check - check if already confirmed
-        if (redemption.request_status === 'PAWNER_CONFIRMED' ||
-            redemption.request_status === 'COMPLETED') {
+        if (redemption.request_status === 'PAWNER_CONFIRMED' || redemption.pawner_confirmed_at) {
           console.log(`Redemption ${redemptionId} already confirmed (status: ${redemption.request_status}), skipping`);
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken) {
@@ -991,6 +990,25 @@ async function handlePostbackEvent(event: WebhookEvent) {
       } catch (error) {
         console.error('Error processing pawner_confirm_received:', error);
       }
+    }
+
+    if (action === 'pawner_report_not_received') {
+      const redemptionId = params.get('redemptionId');
+      if (!redemptionId) {
+        console.error('No redemptionId in pawner_report_not_received postback');
+        return;
+      }
+
+      const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+      if (!channelAccessToken) {
+        return;
+      }
+
+      const client = new Client({ channelAccessToken });
+      await client.pushMessage(userId, {
+        type: 'text',
+        text: 'หากยังไม่ได้รับของคืนกรุณาติดต่อเจ้าหน้าที่ช่วยเหลือ ภายใน 48 ชั่วโมง',
+      });
     }
 
     // Investor confirms they received payment
@@ -1126,7 +1144,7 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
             spacing: 'sm',
             contents: [
               { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${item?.brand || ''} ${item?.model || ''}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
           {
