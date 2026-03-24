@@ -54,6 +54,14 @@ interface ContractDetail {
 
 type DeliveryMethod = 'SELF_PICKUP' | 'SELF_ARRANGE' | 'PLATFORM_ARRANGE';
 
+interface PenaltyInfo {
+  penaltyRequired: boolean;
+  penalty?: {
+    daysOverdue: number;
+    penaltyAmount: number;
+  } | null;
+}
+
 export default function RedemptionPaymentPage() {
   const router = useRouter();
   const params = useParams();
@@ -67,6 +75,7 @@ export default function RedemptionPaymentPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [penaltyInfo, setPenaltyInfo] = useState<PenaltyInfo | null>(null);
 
   // Delivery Options
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('SELF_PICKUP');
@@ -119,30 +128,25 @@ export default function RedemptionPaymentPage() {
     }
   }, [contract?.customer]);
 
-  const redirectToPenalty = (payload?: any) => {
-    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
-      return false;
-    }
-
-    try {
-      const url = new URL(payload.penaltyLiffUrl);
-      if (!url.searchParams.get('contractId')) {
-        url.searchParams.set('contractId', contractId);
-      }
-      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
-      window.location.href = url.toString();
-      return true;
-    } catch (error) {
-      window.location.href = payload.penaltyLiffUrl;
-      return true;
-    }
-  };
-
   const fetchContractDetail = async () => {
     try {
       const response = await axios.get(`/api/contracts/detail/${contractId}`);
       if (response.data.success) {
         setContract(response.data.contract);
+      }
+
+      const penaltyResponse = await axios.get('/api/penalties/status', {
+        params: {
+          contractId,
+          lineId: profile?.userId,
+        },
+      });
+
+      if (penaltyResponse.data?.success) {
+        setPenaltyInfo({
+          penaltyRequired: Boolean(penaltyResponse.data.penaltyRequired),
+          penalty: penaltyResponse.data.penalty || null,
+        });
       }
     } catch (error) {
       console.error('Error fetching contract:', error);
@@ -164,6 +168,9 @@ export default function RedemptionPaymentPage() {
     let total = contract.remainingAmount;
     if (deliveryMethod === 'PLATFORM_ARRANGE') {
       total += DELIVERY_FEE;
+    }
+    if (penaltyInfo?.penaltyRequired) {
+      total += Number(penaltyInfo.penalty?.penaltyAmount || 0);
     }
     return total;
   };
@@ -232,9 +239,6 @@ export default function RedemptionPaymentPage() {
         router.push(`/contracts/${contractId}/redeem/upload?redemptionId=${redemptionId}`);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error creating redemption:', error);
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
@@ -372,6 +376,14 @@ export default function RedemptionPaymentPage() {
           <DetailRow label="เงินต้น" value={`${contract.remainingPrincipal.toLocaleString()} บาท`} />
           <DetailRow label="ดอกเบี้ย (2%)" value={`${interestOnly.toLocaleString()} บาท`} />
           <DetailRow label="ค่าธรรมเนียม (1%)" value={`${feeAmount.toLocaleString()} บาท`} />
+          {penaltyInfo?.penaltyRequired && (
+            <>
+              <DetailRow label="ค่าปรับเกินกำหนด" value={`${Number(penaltyInfo.penalty?.penaltyAmount || 0).toLocaleString()} บาท`} highlight />
+              <p className="text-xs text-[#B85C38] mt-1">
+                เกินกำหนดแล้ว {penaltyInfo.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+              </p>
+            </>
+          )}
           {deliveryMethod === 'PLATFORM_ARRANGE' && (
             <DetailRow label="ค่าจัดส่ง" value={`${DELIVERY_FEE.toLocaleString()} บาท`} />
           )}

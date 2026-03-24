@@ -242,7 +242,7 @@ export default function PawnerRegister() {
             onClick={() => navigateToLiff(process.env.NEXT_PUBLIC_LIFF_ID_PAWN, '/estimate')}
             className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
           >
-            <span className="text-base font-bold">จำนำสินค้า</span>
+            <span className="text-base font-bold">ขอสินเชื่อ</span>
             <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
           </button>
 
@@ -251,7 +251,7 @@ export default function PawnerRegister() {
             onClick={() => navigateToLiff(process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS, '/contracts')}
             className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
           >
-            <span className="text-base font-bold">รายการจำนำ</span>
+            <span className="text-base font-bold">รายการขอสินเชื่อ</span>
             <span className="text-[10px] opacity-80 font-light">Contract list</span>
           </button>
 

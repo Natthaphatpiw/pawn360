@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import axios from 'axios';
 import PinModal from '@/components/PinModal';
@@ -27,6 +27,10 @@ export default function ContractAgreementStep({
   const signatureRef = useRef<SignatureCanvas>(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
   const submitWithPin = async (pinToken: string) => {
     try {
@@ -99,32 +103,32 @@ export default function ContractAgreementStep({
 
         {/* Legal Content */}
         <div className="bg-gray-50 rounded-xl p-6 mb-6 max-h-96 overflow-y-auto text-sm text-gray-700 leading-relaxed">
-          <h2 className="font-bold text-lg mb-4 text-gray-800">สัญญาจำนำ P2P</h2>
+          <h2 className="font-bold text-lg mb-4 text-gray-800">สัญญาสินเชื่อ P2P</h2>
 
           <p className="mb-4">
-            ข้าพเจ้าได้อ่านและเข้าใจเงื่อนไขในการจำนำสินค้าผ่านแพลตฟอร์ม P2P เรียบร้อยแล้ว
+            ข้าพเจ้าได้อ่านและเข้าใจเงื่อนไขในการขอสินเชื่อโดยใช้สินค้าค้ำประกันผ่านแพลตฟอร์ม P2P เรียบร้อยแล้ว
             และยอมรับในเงื่อนไขดังต่อไปนี้:
           </p>
 
           <ol className="list-decimal list-inside space-y-2 mb-4">
-            <li>สินค้าที่นำมาจำนำเป็นของข้าพเจ้าเอง และไม่มีข้อพิพาททางกฎหมาย</li>
+            <li>สินค้าที่นำมาใช้เป็นหลักประกันเป็นของข้าพเจ้าเอง และไม่มีข้อพิพาททางกฎหมาย</li>
             <li>ข้าพเจ้าจะปฏิบัติตามเงื่อนไขการชำระดอกเบี้ยและการไถ่ถอนสินค้า</li>
             <li>ในกรณีที่ไม่ชำระดอกเบี้ยหรือไถ่ถอนภายในกำหนด สินค้าจะตกเป็นของผู้ให้กู้</li>
             <li>ข้าพเจ้ายอมรับในการใช้ข้อมูลส่วนบุคคลตามนโยบายความเป็นส่วนตัว</li>
             <li>ข้าพเจ้ายอมรับในเงื่อนไขและข้อกำหนดของแพลตฟอร์ม Pawnly</li>
           </ol>
 
-          <h3 className="font-bold mb-2">เงื่อนไขการจำนำ:</h3>
+          <h3 className="font-bold mb-2">เงื่อนไขการขอสินเชื่อ:</h3>
           <ul className="list-disc list-inside space-y-1 mb-4">
             <li>อัตราดอกเบี้ยคำนวณแบบรายวัน</li>
-            <li>ค่าธรรมเนียมการจำนำ 1% ของวงเงิน (คำนวณจากวงเงินเริ่มต้นของสัญญา)</li>
+            <li>ค่าธรรมเนียมการขอสินเชื่อ 1% ของวงเงิน (คำนวณจากวงเงินเริ่มต้นของสัญญา)</li>
             <li>ระยะเวลาในการไถ่ถอนสินค้าตามที่กำหนด</li>
             <li>การผิดนัดชำระจะมีค่าปรับเพิ่มเติม</li>
           </ul>
 
           <h3 className="font-bold mb-2">นโยบายความเป็นส่วนตัว:</h3>
           <p className="mb-4">
-            ข้อมูลส่วนบุคคลของข้าพเจ้าจะถูกใช้เพื่อวัตถุประสงค์ในการจำนำและการให้บริการ
+            ข้อมูลส่วนบุคคลของข้าพเจ้าจะถูกใช้เพื่อวัตถุประสงค์ในการขอสินเชื่อและการให้บริการ
             เท่านั้น และจะไม่ถูกเปิดเผยให้บุคคลที่สามโดยไม่ได้รับความยินยอม
           </p>
 
@@ -152,7 +156,7 @@ export default function ContractAgreementStep({
 
         {/* Signature Section */}
         <div className="mb-6">
-          <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้จำนำ</h3>
+          <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้ขอสินเชื่อ</h3>
           <p className="text-xs text-gray-500 mb-3">เซ็นลายเซ็นในช่องด้านล่าง</p>
 
           <div className="border-2 border-gray-300 rounded-lg p-3 bg-white">

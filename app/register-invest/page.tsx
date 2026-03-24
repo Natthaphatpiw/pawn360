@@ -310,9 +310,6 @@ export default function InvestorRegister() {
                   <div className="text-sm opacity-80">Current tier</div>
                   <div className="text-xl font-bold">{TIER_LABELS[investorTier]}</div>
                 </div>
-                <div className="text-right text-xs opacity-80">
-                  {autoMatchAllowed ? 'Auto matching available' : 'Auto matching locked'}
-                </div>
               </div>
             </div>
           </button>
@@ -469,7 +466,7 @@ export default function InvestorRegister() {
                 <div className={`rounded-2xl border px-4 py-3 ${investorTier === 'SILVER' ? 'border-[#CBD6EA] bg-[#F5F7FA]' : 'border-gray-200'}`}>
                   <div className="font-semibold text-gray-800">Silver</div>
                   <div className="text-xs text-gray-500">เริ่มต้น • ผลตอบแทน 1.50%/เดือน (18%/ปี)</div>
-                  <div className="text-xs text-gray-500 mt-1">รับข้อเสนอจำนำทั่วไป</div>
+                  <div className="text-xs text-gray-500 mt-1">รับข้อเสนอสินเชื่อทั่วไป</div>
                 </div>
                 <div className={`rounded-2xl border px-4 py-3 ${investorTier === 'GOLD' ? 'border-[#C9A33B] bg-[#FFF8E7]' : 'border-gray-200'}`}>
                   <div className="font-semibold text-gray-800">Gold</div>

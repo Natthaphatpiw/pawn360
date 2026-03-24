@@ -65,9 +65,9 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('Error uploading pawn ticket:', error);
+    console.error('Error uploading loan contract:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to upload pawn ticket' },
+      { error: error.message || 'Failed to upload loan contract' },
       { status: 500 }
     );
   }

@@ -19,12 +19,15 @@ export default function RedemptionUploadPage() {
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [redemptionDetails, setRedemptionDetails] = useState<any>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
   const companyBank = {
     bank_name: 'พร้อมเพย์',
     bank_account_no: '0626092941',
     bank_account_name: 'ณัฐภัทร ต้อยจัตุรัส',
     promptpay_number: '0626092941',
   };
+  const penaltyAmount = Number(redemptionDetails?.penalty_amount || redemptionDetails?.payment_breakdown?.penaltyAmount || 0);
+  const baseAmount = Number(redemptionDetails?.base_amount || redemptionDetails?.payment_breakdown?.baseAmount || 0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,7 +43,7 @@ export default function RedemptionUploadPage() {
       if (response.data.success) {
         setRedemptionDetails(response.data.redemption);
         if (response.data.redemption?.payment_slip_url) {
-          router.replace(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
+          setShowSuccess(true);
         }
       }
     } catch (error) {
@@ -98,7 +101,7 @@ export default function RedemptionUploadPage() {
       });
 
       if (response.data.success) {
-        router.replace(`/contracts/${contractId}/redeem/receipt?redemptionId=${redemptionId}`);
+        setShowSuccess(true);
       }
     } catch (error: any) {
       console.error('Error uploading slip:', error);
@@ -107,6 +110,26 @@ export default function RedemptionUploadPage() {
       setUploading(false);
     }
   };
+
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-[#F2F2F2] font-sans flex items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#E8F5E9] text-3xl text-[#2E7D32]">
+            ✓
+          </div>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งหลักฐานการชำระเงินแล้ว</h1>
+          <p className="text-sm text-gray-500 mb-6">ระบบบันทึกคำขอไถ่ถอนเรียบร้อยแล้ว กรุณารอจุดรับฝากดำเนินการส่งคืนสินค้า</p>
+          <button
+            onClick={() => router.replace('/contracts')}
+            className="w-full rounded-2xl bg-[#B85C38] py-4 font-bold text-white"
+          >
+            กลับไปหน้าสัญญา
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -129,6 +152,20 @@ export default function RedemptionUploadPage() {
         {/* Payment Summary */}
         {redemptionDetails && (
           <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-6 shadow-sm">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-600 text-sm">ยอดหลักของรายการ:</span>
+              <span className="font-medium text-gray-800">
+                {baseAmount.toLocaleString()} บาท
+              </span>
+            </div>
+            {penaltyAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-600 text-sm">ค่าปรับเกินกำหนด:</span>
+                <span className="font-medium text-[#B85C38]">
+                  {penaltyAmount.toLocaleString()} บาท
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-600 text-sm">ยอดชำระ:</span>
               <span className="font-bold text-[#B85C38] text-lg">

@@ -29,7 +29,7 @@ const statusLabel: Record<string, string> = {
   INVESTOR_SLIP_REJECTED: 'สลิปนักลงทุนไม่ผ่าน',
   INVESTOR_SLIP_REJECTED_FINAL: 'สลิปนักลงทุนไม่ผ่าน (ปิดงาน)',
   INVESTOR_TRANSFERRED: 'นักลงทุนโอนแล้ว',
-  AWAITING_PAWNER_CONFIRM: 'รอผู้จำนำยืนยัน',
+  AWAITING_PAWNER_CONFIRM: 'รอผู้ขอสินเชื่อยืนยัน',
   COMPLETED: 'เสร็จสิ้น',
   CANCELLED: 'ยกเลิก',
   VOIDED: 'โมฆะ',

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Check, Clock, Bell } from 'lucide-react';
 
 interface ContractSuccessProps {
@@ -8,6 +9,10 @@ interface ContractSuccessProps {
 }
 
 export default function ContractSuccess({ contractId, onBackToHome }: ContractSuccessProps) {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
 
@@ -23,7 +28,7 @@ export default function ContractSuccess({ contractId, onBackToHome }: ContractSu
 
         {/* Main Title */}
         <h1 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">
-          สร้างสัญญาเรียบร้อยแล้ว!
+          สร้างสัญญาสินเชื่อเรียบร้อยแล้ว!
         </h1>
 
         {/* Contract ID */}

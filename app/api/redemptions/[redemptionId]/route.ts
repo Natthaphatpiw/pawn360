@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { getPenaltyRequirement, roundCurrency } from '@/lib/services/penalty';
 
 export async function GET(
   request: NextRequest,
@@ -24,6 +25,10 @@ export async function GET(
         contract:contract_id (
           contract_id,
           contract_number,
+          contract_start_date,
+          contract_end_date,
+          customer_id,
+          investor_id,
           loan_principal_amount,
           interest_amount,
           total_amount,
@@ -66,6 +71,22 @@ export async function GET(
         { error: 'Redemption not found' },
         { status: 404 }
       );
+    }
+
+    if (redemption?.request_status === 'PENDING') {
+      const penaltyRequirement = await getPenaltyRequirement(supabase, redemption.contract);
+      const baseAmount = Number(redemption.principal_amount || 0)
+        + Number(redemption.interest_amount || 0)
+        + Number(redemption.delivery_fee || 0);
+      const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+      redemption.base_amount = baseAmount;
+      redemption.penalty_amount = penaltyAmount;
+      redemption.total_amount = roundCurrency(baseAmount + penaltyAmount);
+      redemption.payment_breakdown = {
+        baseAmount,
+        penaltyAmount,
+        totalAmount: redemption.total_amount,
+      };
     }
 
     return NextResponse.json({

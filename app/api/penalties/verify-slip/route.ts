@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         try {
           await investorLineClient.pushMessage(investor.line_id, {
             type: 'text',
-            text: `ผู้จำนำได้ชำระค่าปรับแล้ว\nสัญญาเลขที่ ${contract?.contract_number || ''}`.trim(),
+            text: `ผู้ขอสินเชื่อได้ชำระค่าปรับแล้ว\nสัญญาเลขที่ ${contract?.contract_number || ''}`.trim(),
           });
         } catch (lineError) {
           console.error('Error sending penalty notification to investor:', lineError);

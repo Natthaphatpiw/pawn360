@@ -271,7 +271,7 @@ export default function InvestmentDashboard() {
         <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
           <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
           <p className="text-sm text-gray-500 mt-2">
-            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการจำนำของคุณ
+            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการขอสินเชื่อของคุณ
           </p>
           <button
             type="button"

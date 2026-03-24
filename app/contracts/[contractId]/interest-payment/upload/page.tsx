@@ -155,6 +155,8 @@ export default function InterestPaymentUploadPage() {
   };
 
   const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.total_amount;
+  const penaltyAmount = Number(requestDetails?.penalty_amount || requestDetails?.payment_breakdown?.penaltyAmount || 0);
+  const baseAmount = Number(requestDetails?.base_amount || requestDetails?.payment_breakdown?.baseAmount || requestDetails?.interest_to_pay || 0);
 
   // Show voided state
   if (showVoided) {
@@ -264,6 +266,16 @@ export default function InterestPaymentUploadPage() {
         {/* Payment Summary */}
         {requestDetails && (
           <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-gray-600 text-sm">ดอกเบี้ยและค่าธรรมเนียม:</span>
+              <span className="font-medium text-gray-800">{baseAmount.toLocaleString()} บาท</span>
+            </div>
+            {penaltyAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-600 text-sm">ค่าปรับเกินกำหนด:</span>
+                <span className="font-medium text-[#B85C38]">{penaltyAmount.toLocaleString()} บาท</span>
+              </div>
+            )}
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-600 text-sm">ยอดที่ต้องชำระ:</span>
               <span className="font-bold text-[#B85C38] text-lg">

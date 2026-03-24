@@ -270,7 +270,7 @@ function DropPointContent() {
             const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
             window.location.href = `https://liff.line.me/${liffId}`;
           }}
-          className="flex-1 bg-white border border-gray-200 rounded-2xl py-2 text-sm font-semibold text-[#365314]"
+          className="flex-1 rounded-2xl bg-[#365314] py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#2d4610] transition-colors"
         >
           รายการส่งคืน
         </button>
@@ -279,7 +279,7 @@ function DropPointContent() {
             const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_HISTORY || '2008651088-97dWJEQB';
             window.location.href = `https://liff.line.me/${liffId}`;
           }}
-          className="flex-1 bg-white border border-gray-200 rounded-2xl py-2 text-sm font-semibold text-gray-600"
+          className="flex-1 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
         >
           ประวัติ
         </button>

@@ -199,25 +199,6 @@ export default function PrincipalIncreasePage() {
     }
   }, [increaseAmount, contract]);
 
-  const redirectToPenalty = (payload?: any) => {
-    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
-      return false;
-    }
-
-    try {
-      const url = new URL(payload.penaltyLiffUrl);
-      if (!url.searchParams.get('contractId')) {
-        url.searchParams.set('contractId', contractId);
-      }
-      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
-      window.location.href = url.toString();
-      return true;
-    } catch (error) {
-      window.location.href = payload.penaltyLiffUrl;
-      return true;
-    }
-  };
-
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
@@ -259,9 +240,6 @@ export default function PrincipalIncreasePage() {
         setError(null);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error calculating:', error);
       setError(error.response?.data?.error || 'ไม่สามารถคำนวณได้');
       setCalculation(null);
@@ -326,9 +304,6 @@ export default function PrincipalIncreasePage() {
         throw new Error(response.data.error);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error creating request:', error);
       setError(error.response?.data?.error || error.message || 'เกิดข้อผิดพลาด');
     } finally {
@@ -351,6 +326,7 @@ export default function PrincipalIncreasePage() {
   const interestFirstPart = calculation?.interestFirstPart ?? calculation?.interestForPeriod ?? 0;
   const interestRemaining = calculation?.interestRemaining ?? calculation?.newInterestForRemaining ?? 0;
   const feeAmount = calculation?.feeAmount ?? 0;
+  const interestAccruedOnly = Number(calculation?.interestAccrued || Math.max(0, interestFirstPart - feeAmount));
   const round2 = (value: number) => Math.round(value * 100) / 100;
   const originalTotalInterest = calculation
     ? round2(calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysInContract + feeAmount)
@@ -360,6 +336,9 @@ export default function PrincipalIncreasePage() {
     : 0;
   const payTodayAmount = interestFirstPart;
   const payEndAmount = interestRemaining;
+  const penaltyAmount = calculation?.penaltyRequired
+    ? Number(calculation?.penaltyAmount || calculation?.penalty?.penaltyAmount || 0)
+    : 0;
   const rawRate = Number(contract?.interest_rate || 0);
   const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
   const feeRate = 0.01;
@@ -505,7 +484,7 @@ export default function PrincipalIncreasePage() {
         {/* Calculation Result */}
         {calculation && (
           <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <h3 className="font-bold text-gray-800 mb-3">สรุปการคำนวณ</h3>
+            <h3 className="font-bold text-gray-800 mb-3">รายการที่ต้องชำระ</h3>
 
             <div className="space-y-3 text-sm">
               <div className="bg-[#FFF8F5] rounded-xl p-3">
@@ -526,8 +505,8 @@ export default function PrincipalIncreasePage() {
               <div className="bg-blue-50 rounded-xl p-3">
                 <h4 className="font-bold text-blue-800 mb-2">ดอกเบี้ยตามช่วงเวลา</h4>
                 <div className="flex justify-between mb-1">
-                  <span className="text-blue-700">ดอกเบี้ยถึงวันนี้ (รวมค่าธรรมเนียม):</span>
-                  <span className="font-bold text-blue-800">{interestFirstPart.toLocaleString()} บาท</span>
+                  <span className="text-blue-700">ดอกเบี้ยถึงวันนี้:</span>
+                  <span className="font-bold text-blue-800">{interestAccruedOnly.toLocaleString()} บาท</span>
                 </div>
                 <div className="flex justify-between mb-1">
                   <span className="text-blue-700">ค่าธรรมเนียมคงที่:</span>
@@ -545,6 +524,17 @@ export default function PrincipalIncreasePage() {
                   <span className="text-blue-700">ดอกเบี้ยรวมหลังทำรายการ:</span>
                   <span className="font-bold text-blue-800">{totalInterestAfterAction.toLocaleString()} บาท</span>
                 </div>
+                {penaltyAmount > 0 && (
+                  <>
+                    <div className="flex justify-between mt-2 pt-2 border-t border-blue-200">
+                      <span className="text-blue-700">ค่าปรับเกินกำหนด:</span>
+                      <span className="font-bold text-[#B85C38]">{penaltyAmount.toLocaleString()} บาท</span>
+                    </div>
+                    <p className="text-[11px] text-[#B85C38] mt-1">
+                      เกินกำหนดแล้ว {calculation?.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                    </p>
+                  </>
+                )}
               </div>
 
               <div className="bg-amber-50 rounded-xl p-3">
@@ -553,7 +543,7 @@ export default function PrincipalIncreasePage() {
                   ต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ (รวมค่าธรรมเนียม) ทันที เพื่อปรับยอดเงินต้นใหม่
                 </p>
                 <p className="text-[11px] text-amber-700 mt-2">
-                  ยอดดอกเบี้ยที่ต้องชำระวันนี้: {payTodayAmount.toLocaleString()} บาท
+                  ยอดที่ต้องชำระวันนี้: {Number(calculation?.totalToPay || payTodayAmount).toLocaleString()} บาท
                 </p>
               </div>
 
@@ -628,14 +618,14 @@ export default function PrincipalIncreasePage() {
             <li>นักลงทุนมีสิทธิ์ปฏิเสธคำขอได้</li>
             <li>หลังจากนักลงทุนอนุมัติ เงินจะโอนเข้าบัญชีที่ระบุ</li>
             <li>ดอกเบี้ยจะคำนวณใหม่ตามเงินต้นที่เพิ่มขึ้น</li>
-            <li>การไม่ชำระดอกเบี้ยหรือไถ่ถอนตามกำหนดจะทำให้สูญเสียสิทธิ์ในทรัพย์จำนำ</li>
+            <li>การไม่ชำระดอกเบี้ยหรือไถ่ถอนตามกำหนดจะทำให้สูญเสียสิทธิ์ในทรัพย์สินประกัน</li>
           </ul>
         </div>
 
         {/* Signature Section */}
         {calculation && (
           <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้จำนำ</h3>
+            <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้ขอสินเชื่อ</h3>
             <p className="text-xs text-gray-500 mb-3">
               กรุณาเซ็นลายเซ็นเพื่อยืนยันการขอเพิ่มเงินต้น
             </p>

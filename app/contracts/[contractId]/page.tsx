@@ -247,7 +247,7 @@ export default function PawnContractDetail() {
           onClick={() => router.back()}
         />
         <div className="text-center">
-          <h1 className="font-bold text-lg text-gray-800">รายการจำนำ</h1>
+          <h1 className="font-bold text-lg text-gray-800">รายการขอสินเชื่อ</h1>
           <p className="text-xs text-gray-400">www.pawnly.io</p>
         </div>
         <div className="flex items-center gap-3">
@@ -629,7 +629,7 @@ export default function PawnContractDetail() {
             onClick={() => router.push(`/pawn-ticket/${contractId}`)}
             className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
           >
-            <span className="text-sm font-bold">ดูตั๋วจำนำ</span>
+            <span className="text-sm font-bold">ดูสัญญาสินเชื่อ</span>
             <span className="text-[10px] opacity-80 font-light">Pawn ticket</span>
           </button>
 

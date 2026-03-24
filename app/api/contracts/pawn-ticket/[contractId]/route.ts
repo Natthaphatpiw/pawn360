@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ const escapeHtml = (value: unknown) => String(value ?? '')
 
 const buildTicketPdfHtml = (ticketData: any) => {
   const items = Array.isArray(ticketData?.items) ? ticketData.items : [];
+  const pawnerSignatureUrl = ticketData?.pawner?.signatureUrl ? escapeHtml(ticketData.pawner.signatureUrl) : '';
   const itemsHtml = items.length > 0
     ? items.map((item: any, index: number) => `
         <tr>
@@ -31,11 +33,15 @@ const buildTicketPdfHtml = (ticketData: any) => {
       </tr>
     `;
 
+  const pawnerSignatureHtml = pawnerSignatureUrl
+    ? `<img src="${pawnerSignatureUrl}" alt="Pawner signature" style="max-height: 64px; max-width: 100%; object-fit: contain;" />`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="th">
   <head>
     <meta charset="utf-8" />
-    <title>Pawn Ticket ${escapeHtml(ticketData?.ticketNo || '')}</title>
+    <title>Loan Contract ${escapeHtml(ticketData?.ticketNo || '')}</title>
     <style>
       * { box-sizing: border-box; }
       body {
@@ -192,7 +198,7 @@ const buildTicketPdfHtml = (ticketData: any) => {
             <div class="muted">${escapeHtml(ticketData?.branch || '-')}</div>
           </div>
           <div style="text-align: right;">
-            <div class="badge">ตั๋วจำนำ / Pawn Ticket</div>
+            <div class="badge">สัญญาสินเชื่อ / Loan Contract</div>
             <div class="muted" style="margin-top: 10px;">เลขที่ ${escapeHtml(ticketData?.ticketNo || '-')}</div>
             <div class="muted">เล่มที่ ${escapeHtml(ticketData?.bookNo || '-')}</div>
           </div>
@@ -217,7 +223,7 @@ const buildTicketPdfHtml = (ticketData: any) => {
           <div class="section-title">ข้อมูลคู่สัญญา</div>
           <div class="grid">
             <div class="card">
-              <div class="row"><span class="label">ผู้จำนำ</span><span class="value">${escapeHtml(ticketData?.pawner?.name || '-')}</span></div>
+              <div class="row"><span class="label">ผู้ขอสินเชื่อ</span><span class="value">${escapeHtml(ticketData?.pawner?.name || '-')}</span></div>
               <div class="row"><span class="label">เลขบัตรประชาชน</span><span class="value">${escapeHtml(ticketData?.pawner?.idCard || '-')}</span></div>
               <div class="row"><span class="label">โทรศัพท์</span><span class="value">${escapeHtml(ticketData?.pawner?.phone || '-')}</span></div>
               <div class="row"><span class="label">ที่อยู่</span><span class="value">${escapeHtml(ticketData?.pawner?.address || '-')}</span></div>
@@ -270,13 +276,13 @@ const buildTicketPdfHtml = (ticketData: any) => {
         </div>
 
         <div class="section note">
-          ผู้จำนำตกลงชำระคืนเงินต้นพร้อมดอกเบี้ยภายในกำหนด และผู้ลงทุนตกลงรับสิทธิในทรัพย์สินค้ำประกันตามเงื่อนไขของแพลตฟอร์มเมื่อเกิดการผิดนัดชำระ.
+          ผู้ขอสินเชื่อตกลงชำระคืนเงินต้นพร้อมดอกเบี้ยภายในกำหนด และผู้ลงทุนตกลงรับสิทธิในทรัพย์สินค้ำประกันตามเงื่อนไขของแพลตฟอร์มเมื่อเกิดการผิดนัดชำระ.
         </div>
 
         <div class="footer">
           <div>
-            <div class="signature"></div>
-            <div class="signature-label">ลงชื่อผู้จำนำ</div>
+            <div class="signature">${pawnerSignatureHtml}</div>
+            <div class="signature-label">ลงชื่อผู้ขอสินเชื่อ</div>
           </div>
           <div>
             <div class="signature"></div>
@@ -308,7 +314,7 @@ export async function GET(
 
     const supabase = supabaseAdmin();
 
-    // Fetch complete contract data for pawn ticket
+    // Fetch complete contract data for loan contract
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
       .select(`
@@ -498,7 +504,7 @@ export async function GET(
       idCard: formatNationalId(contract.pawner?.national_id || ''),
       address: formatAddress(contract.pawner || {}),
       phone: contract.pawner?.phone_number || '',
-      signatureUrl: contract.pawner?.signature_url || null
+      signatureUrl: contract.signed_contract_url || contract.pawner?.signature_url || null
     };
 
     const investorFull = {
@@ -548,6 +554,8 @@ export async function GET(
     const feeAmount = Math.round(principalBase * feeRate * durationMonths * 100) / 100;
     const totalInterest = interestOnly + feeAmount;
 
+    const notesPayload = splitItemNotesAndPasscode(contract.items?.notes);
+
     const ticketData = {
       shopName: 'Pawnly',
       branch: contract.drop_points?.drop_point_name || 'สำนักงานใหญ่',
@@ -571,6 +579,7 @@ export async function GET(
       interestAmount: totalInterest?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
       interestAmountInterest: interestOnly?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
       interestAmountFee: feeAmount?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
+      itemNotes: notesPayload.publicNotes || contract.items?.defects || '',
       contractDuration: contract.contract_duration_days || 0,
       contractStatus: contract.contract_status,
       pawnTicketUrl: contract.pawn_ticket_url || null
@@ -614,7 +623,7 @@ export async function GET(
           },
         });
       } catch (pdfError: any) {
-        console.error('Error generating pawn ticket PDF:', pdfError);
+        console.error('Error generating loan contract PDF:', pdfError);
         return NextResponse.json(
           { error: 'ไม่สามารถสร้างไฟล์ PDF ได้' },
           { status: 500 }
@@ -629,7 +638,7 @@ export async function GET(
     });
 
   } catch (error: any) {
-    console.error('Error fetching pawn ticket data:', error);
+    console.error('Error fetching loan contract data:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }

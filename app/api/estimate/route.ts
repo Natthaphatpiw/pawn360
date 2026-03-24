@@ -947,7 +947,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
         marketPrice: representative.analysis
           ? `ราคาตัวแทน (low-but-fair) จาก web_search ${representative.sourceCounts.web} รายการ${representative.sourceCounts.serpapi > 0 ? ` + SerpAPI ${representative.sourceCounts.serpapi} รายการ` : ''}${representative.usedWeights ? ' | ให้น้ำหนักตลาดไทย' : ''}`
           : 'ราคาตัวแทนจากข้อมูลตลาดไม่เพียงพอ',
-        pawnPrice: `ราคาจำนำ = ${marketPrice.toLocaleString()} × 0.6 = ${pawnPrice.toLocaleString()} บาท`,
+        pawnPrice: `วงเงินสินเชื่อ = ${marketPrice.toLocaleString()} × 0.6 = ${pawnPrice.toLocaleString()} บาท`,
         finalPrice: `ราคาประเมิน = ${pawnPrice.toLocaleString()} × สภาพ ${(normalizedCondition * 100).toFixed(0)}% = ${finalPrice.toLocaleString()} บาท`,
       },
     };

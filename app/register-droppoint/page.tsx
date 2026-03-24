@@ -209,7 +209,7 @@ function RegisterDropPointContent() {
       {/* Header */}
       <div className="bg-[#365314] text-white p-6 pb-10">
         <h1 className="text-xl font-bold text-center">ลงทะเบียน Drop Point</h1>
-        <p className="text-sm text-center opacity-80 mt-1">สมัครเป็นจุดรับ-ส่งสินค้าจำนำ</p>
+        <p className="text-sm text-center opacity-80 mt-1">สมัครเป็นจุดรับ-ส่งสินทรัพย์ที่ขอสินเชื่อ</p>
       </div>
 
       {/* Form */}

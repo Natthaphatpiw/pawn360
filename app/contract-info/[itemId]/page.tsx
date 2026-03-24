@@ -89,7 +89,7 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
         // Fetch item and customer data
         const response = await axios.get(`/api/pawn-requests/${itemId}`);
         if (!response.data) {
-          throw new Error('ไม่พบข้อมูลคำขอจำนำ');
+          throw new Error('ไม่พบข้อมูลคำขอสินเชื่อ');
         }
         setItem(response.data.item);
         setCustomer(response.data.customer);
@@ -270,7 +270,7 @@ export default function ContractInfoPage({ params }: { params: Promise<{ itemId:
 
         {/* Footer Note */}
         <div className="text-center mt-4 text-xs text-gray-500">
-          ข้อมูลสัญญาจำนำ
+          ข้อมูลสัญญาสินเชื่อ
         </div>
       </div>
     </div>

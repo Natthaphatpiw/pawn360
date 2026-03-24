@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
-import { buildPenaltyLiffUrl, getPenaltyRequirement } from '@/lib/services/penalty';
+import { ensurePenaltyPaymentRecord, getPenaltyRequirement } from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // Investor LINE OA client
@@ -106,24 +106,9 @@ export async function POST(request: NextRequest) {
     }
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
     if (penaltyRequirement.required) {
-      return NextResponse.json(
-        {
-          error: 'มีค่าปรับค้างชำระ กรุณาชำระค่าปรับก่อนทำรายการ',
-          penaltyRequired: true,
-          penalty: {
-            contractId: contract.contract_id,
-            contractNumber: contract.contract_number,
-            contractStartDate: penaltyRequirement.contractStartDate.toISOString(),
-            contractEndDate: penaltyRequirement.contractEndDate.toISOString(),
-            today: penaltyRequirement.today.toISOString(),
-            daysOverdue: penaltyRequirement.daysOverdue,
-            penaltyAmount: penaltyRequirement.penaltyAmount,
-          },
-          penaltyLiffUrl: buildPenaltyLiffUrl(contract.contract_id),
-        },
-        { status: 409 }
-      );
+      await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
     }
 
     // Check for existing pending request
@@ -158,6 +143,18 @@ export async function POST(request: NextRequest) {
 
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const msPerDay = 1000 * 60 * 60 * 24;
+    const getRenewedContractWindow = (durationDays: number) => {
+      const normalizedDuration = Math.max(1, durationDays);
+      const now = new Date();
+      const contractStartDate = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+      ));
+      const contractEndDate = new Date(contractStartDate);
+      contractEndDate.setUTCDate(contractEndDate.getUTCDate() + normalizedDuration - 1);
+      return { contractStartDate, contractEndDate };
+    };
 
     // Calculate details (count start date as day 1)
     const startDate = new Date(contract.contract_start_date);
@@ -204,15 +201,13 @@ export async function POST(request: NextRequest) {
     switch (actionType) {
       case 'INTEREST_PAYMENT': {
         const interestToPay = interestAccruedWithFee;
-
-        const newEndDate = new Date(endDate);
-        newEndDate.setDate(newEndDate.getDate() + daysInContract);
+        const renewedWindow = getRenewedContractWindow(daysInContract);
 
         requestData = {
           ...requestData,
           interest_to_pay: interestToPay,
-          total_amount: interestToPay,
-          new_end_date: newEndDate.toISOString().split('T')[0],
+          total_amount: round2(interestToPay + penaltyAmount),
+          new_end_date: renewedWindow.contractEndDate.toISOString().split('T')[0],
         };
         break;
       }
@@ -237,7 +232,7 @@ export async function POST(request: NextRequest) {
           reduction_amount: reductionAmt,
           interest_for_period: interestForPeriod,
           total_to_pay_reduction: totalToPay,
-          total_amount: totalToPay,
+          total_amount: round2(totalToPay + penaltyAmount),
           principal_after_reduction: principalAfterReduction,
           new_interest_for_remaining: newInterestForRemaining,
         };
@@ -301,7 +296,7 @@ export async function POST(request: NextRequest) {
           interest_for_period: interestForPeriod,
           principal_after_increase: principalAfterIncrease,
           new_interest_for_remaining_increase: newInterestForRemaining,
-          total_amount: totalToPayNow,
+          total_amount: round2(totalToPayNow + penaltyAmount),
           pawner_signature_url: pawnerSignatureUrl,
           pawner_bank_name: pawnerBankAccount.bank_name,
           pawner_bank_account_no: pawnerBankAccount.bank_account_no,
@@ -450,7 +445,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
                 layout: 'baseline',
                 spacing: 'sm',
                 contents: [
-                  { type: 'text', text: 'ผู้จำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                  { type: 'text', text: 'ผู้ขอสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
                   { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
                 ]
               },

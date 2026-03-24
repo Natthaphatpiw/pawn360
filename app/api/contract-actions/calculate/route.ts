@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { buildPenaltyLiffUrl, getPenaltyRequirement } from '@/lib/services/penalty';
+import { getPenaltyRequirement, serializePenaltyRequirement } from '@/lib/services/penalty';
 
 // คำนวณรายละเอียดสำหรับ action ต่างๆ
 export async function POST(request: NextRequest) {
@@ -37,28 +37,23 @@ export async function POST(request: NextRequest) {
     }
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
-    if (penaltyRequirement.required) {
-      return NextResponse.json(
-        {
-          error: 'มีค่าปรับค้างชำระ กรุณาชำระค่าปรับก่อนทำรายการ',
-          penaltyRequired: true,
-          penalty: {
-            contractId: contract.contract_id,
-            contractNumber: contract.contract_number,
-            contractStartDate: penaltyRequirement.contractStartDate.toISOString(),
-            contractEndDate: penaltyRequirement.contractEndDate.toISOString(),
-            today: penaltyRequirement.today.toISOString(),
-            daysOverdue: penaltyRequirement.daysOverdue,
-            penaltyAmount: penaltyRequirement.penaltyAmount,
-          },
-          penaltyLiffUrl: buildPenaltyLiffUrl(contract.contract_id),
-        },
-        { status: 409 }
-      );
-    }
+    const penalty = serializePenaltyRequirement(contract, penaltyRequirement);
+    const penaltyAmount = penaltyRequirement.required ? penaltyRequirement.penaltyAmount : 0;
 
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const msPerDay = 1000 * 60 * 60 * 24;
+    const getRenewedContractWindow = (durationDays: number) => {
+      const normalizedDuration = Math.max(1, durationDays);
+      const now = new Date();
+      const contractStartDate = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+      ));
+      const contractEndDate = new Date(contractStartDate);
+      contractEndDate.setUTCDate(contractEndDate.getUTCDate() + normalizedDuration - 1);
+      return { contractStartDate, contractEndDate };
+    };
 
     // Calculate dates (count start date as day 1)
     const startDate = new Date(contract.contract_start_date);
@@ -104,6 +99,9 @@ export async function POST(request: NextRequest) {
       interestAccruedWithFee,
       contractStartDate: contract.contract_start_date,
       contractEndDate: contract.contract_end_date,
+      penaltyRequired: penaltyRequirement.required,
+      penalty,
+      penaltyAmount,
     };
 
     switch (actionType) {
@@ -113,17 +111,17 @@ export async function POST(request: NextRequest) {
         // Full period interest = principal * monthly rate * (contract days / 30)
         const interestToPay = interestAccruedWithFee;
 
-        // New end date = current end date + contract duration days
-        const newEndDate = new Date(endDate);
-        newEndDate.setDate(newEndDate.getDate() + daysInContract);
+        const renewedWindow = getRenewedContractWindow(daysInContract);
 
         calculation = {
           ...calculation,
           interestToPay,
-          totalToPay: interestToPay,
-          newEndDate: newEndDate.toISOString().split('T')[0],
+          baseTotalToPay: interestToPay,
+          totalToPay: round2(interestToPay + penaltyAmount),
+          newStartDate: renewedWindow.contractStartDate.toISOString().split('T')[0],
+          newEndDate: renewedWindow.contractEndDate.toISOString().split('T')[0],
           extensionDays: daysInContract,
-          description: `ต่อดอกเบี้ยจำนวน ${interestToPay.toLocaleString()} บาท ขยายสัญญาไปถึงวันที่ ${newEndDate.toLocaleDateString('th-TH')}`,
+          description: `ต่อดอกเบี้ยจำนวน ${interestToPay.toLocaleString()} บาท สัญญาใหม่เริ่มวันที่ ${renewedWindow.contractStartDate.toLocaleDateString('th-TH')} และครบกำหนดวันที่ ${renewedWindow.contractEndDate.toLocaleDateString('th-TH')}`,
         };
         break;
       }
@@ -160,7 +158,8 @@ export async function POST(request: NextRequest) {
           interestFirstPart: interestForPeriod,
           interestRemaining: newInterestForRemaining,
           interestTotalIfPayLater,
-          totalToPay: totalToPayNow,
+          baseTotalToPay: totalToPayNow,
+          totalToPay: round2(totalToPayNow + penaltyAmount),
           totalToPayNow,
           principalAfterReduction,
           newInterestForRemaining,
@@ -220,6 +219,8 @@ export async function POST(request: NextRequest) {
           newInterestForRemaining,
           interestIncrease,
           maxIncrease,
+          baseTotalToPay: interestForPeriod,
+          totalToPay: round2(interestForPeriod + penaltyAmount),
           amountToReceive: increaseAmountValue, // จำนวนที่ pawner จะได้รับจาก investor
           description: `เพิ่มเงินต้น ${increaseAmountValue.toLocaleString()} บาท\nดอกเบี้ยช่วงแรก ${interestForPeriod.toLocaleString()} บาท\nดอกเบี้ยช่วงที่เหลือ ${newInterestForRemaining.toLocaleString()} บาท`,
         };
@@ -236,6 +237,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       calculation,
+      penaltyRequired: penaltyRequirement.required,
+      penalty,
       contract: {
         contract_id: contract.contract_id,
         contract_number: contract.contract_number,

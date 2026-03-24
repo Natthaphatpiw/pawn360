@@ -110,7 +110,7 @@ async function handleStoreFollowEvent(event: WebhookEvent) {
     const client = getStoreClient();
     await client.pushMessage(userId, {
       type: 'text',
-      text: 'ยินดีต้อนรับสู่ระบบจัดการร้านจำนำ\n\nกรุณาลงทะเบียนร้านค้าผ่านเมนูด้านล่าง'
+      text: 'ยินดีต้อนรับสู่ระบบจัดการจุดรับฝาก\n\nกรุณาลงทะเบียนร้านค้าผ่านเมนูด้านล่าง'
     });
   } catch (error) {
     console.error('Error handling store follow event:', error);

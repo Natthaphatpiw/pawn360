@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 /**
- * API to trigger automatic pawn ticket generation when contract status becomes CONFIRMED
+ * API to trigger automatic loan contract generation when contract status becomes CONFIRMED
  * This will be called by Supabase webhook or database trigger
  */
 export async function POST(request: NextRequest) {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Check if pawn ticket already exists
+    // Check if loan contract already exists
     if (contract.contract_file_url) {
       console.log('[Auto-Generate] Pawn ticket already exists:', contract.contract_file_url);
       return NextResponse.json({
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate pawn ticket URL for frontend to access
+    // Generate loan contract URL for frontend to access
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawnly.io';
     const ticketUrl = `${baseUrl}/pawn-ticket/${contractId}`;
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[Auto-Generate] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to auto-generate pawn ticket' },
+      { error: error.message || 'Failed to auto-generate loan contract' },
       { status: 500 }
     );
   }

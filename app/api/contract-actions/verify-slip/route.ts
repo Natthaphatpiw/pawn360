@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { verifyPaymentSlip, saveSlipVerification, logContractAction, getCompanyBankAccount } from '@/lib/services/slip-verification';
+import { getPenaltyRequirement, markPenaltyPaymentVerified, roundCurrency } from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // LINE clients
@@ -81,10 +82,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const contract = actionRequest.contract;
+    const pawner = contract?.pawners;
+    const investor = contract?.investors;
+    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    const baseAmount = getBaseAmountForActionRequest(actionRequest);
+    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+    const expectedAmount = roundCurrency(baseAmount + penaltyAmount);
+
+    if (expectedAmount !== Number(actionRequest.total_amount || 0)) {
+      await supabase
+        .from('contract_action_requests')
+        .update({
+          total_amount: expectedAmount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('request_id', requestId);
+    }
+
     const companyBank = await getCompanyBankAccount();
 
     // Verify slip with SlipOK (falls back to legacy OCR until SlipOK env is configured)
-    const expectedAmount = actionRequest.total_amount;
     const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
       receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
       receiverPromptpay: companyBank.promptpay_number || null,
@@ -112,10 +130,6 @@ export async function POST(request: NextRequest) {
       slip_attempt_count: attemptCount,
     };
 
-    const contract = actionRequest.contract;
-    const pawner = contract?.pawners;
-    const investor = contract?.investors;
-
     // Handle verification result
     if (verificationResult.result === 'MATCHED' || verificationResult.result === 'OVERPAID') {
       // Success - proceed to next step
@@ -142,6 +156,16 @@ export async function POST(request: NextRequest) {
         .from('contract_action_requests')
         .update(updateData)
         .eq('request_id', requestId);
+
+      if (penaltyRequirement.required) {
+        await markPenaltyPaymentVerified(supabase, contract, penaltyRequirement, {
+          slipUrl,
+          detectedAmount: verificationResult.detectedAmount,
+          verificationResult: verificationResult.result,
+          verificationDetails: verificationResult.rawResponse,
+          attemptCount,
+        });
+      }
 
       if (isPrincipalIncrease && investor?.line_id) {
         try {
@@ -317,6 +341,19 @@ function getActionTypeName(type: string): string {
   return names[type] || type;
 }
 
+function getBaseAmountForActionRequest(actionRequest: any): number {
+  switch (actionRequest.request_type) {
+    case 'INTEREST_PAYMENT':
+      return Number(actionRequest.interest_to_pay || 0);
+    case 'PRINCIPAL_REDUCTION':
+      return Number(actionRequest.total_to_pay_reduction || 0);
+    case 'PRINCIPAL_INCREASE':
+      return Number(actionRequest.interest_for_period || 0);
+    default:
+      return Number(actionRequest.total_amount || 0);
+  }
+}
+
 function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMessage {
   const item = contract?.items;
   const pawner = contract?.pawners;
@@ -390,7 +427,7 @@ function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMess
                 layout: 'baseline',
                 spacing: 'sm',
                 contents: [
-                  { type: 'text', text: 'ผู้จำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                  { type: 'text', text: 'ผู้ขอสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
                   { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', flex: 3, weight: 'bold' }
                 ]
               },

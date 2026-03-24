@@ -58,17 +58,20 @@ interface PawnSummaryProps {
     lenses?: Array<{ brand: string; model: string }>;
     defects?: string;
     notes?: string;
+    devicePasscode?: string;
   };
   lineId: string;
+  draftItemId?: string | null;
   onBack: () => void;
   onSuccess: (loanRequestId: string, itemId: string) => void;
 }
 
-export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: PawnSummaryProps) {
+export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onSuccess }: PawnSummaryProps) {
   console.log('🎯 PawnSummary component rendered with:', { itemData, lineId });
 
   const [loanAmount, setLoanAmount] = useState<string>('');
   const [serialNo, setSerialNo] = useState<string>(itemData.serialNo || '');
+  const [devicePasscode, setDevicePasscode] = useState<string>(itemData.devicePasscode || '');
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('pickup');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [defaultBranchId, setDefaultBranchId] = useState<string | null>(null);
@@ -349,7 +352,9 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         itemData: {
           ...itemData,
           serialNo: normalizedSerial || undefined,
+          devicePasscode: devicePasscode.trim() || undefined,
         },
+        draftItemId,
         loanAmount: loanAmountNum,
         deliveryMethod,
         deliveryFee,
@@ -403,6 +408,7 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
         accessories: itemData.appleAccessories?.join(', ') || null,
         defects: itemData.defects,
         notes: itemData.notes,
+        devicePasscode: devicePasscode.trim() || undefined,
         imageUrls: itemData.images,
         conditionResult: {
           score: itemData.aiConditionScore,
@@ -488,8 +494,27 @@ export default function PawnSummary({ itemData, lineId, onBack, onSuccess }: Paw
           />
           <p className="text-xs text-gray-500 mt-2">
             {isSerialRequiredForType(itemData.itemType)
-              ? 'กรุณากรอก IMEI หรือ Serial ให้ครบถ้วนก่อนดำเนินการจำนำ'
+              ? 'กรุณากรอก IMEI หรือ Serial ให้ครบถ้วนก่อนดำเนินการขอสินเชื่อ'
               : 'ถ้ามีหมายเลขซีเรียล สามารถกรอกได้เพื่อความถูกต้องของสัญญา'}
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block font-bold text-gray-800 mb-2">
+            รหัสล็อกเครื่อง <span className="text-gray-400 font-medium">(ถ้ามี)</span>
+          </label>
+          <input
+            type="text"
+            value={devicePasscode}
+            onChange={(e) => setDevicePasscode(e.target.value)}
+            placeholder="เช่น 1234 หรือ ABCD1234"
+            className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 placeholder:text-gray-300"
+          />
+          <p className="text-xs text-gray-500 mt-2">
+            หากมีการตั้งรหัสล็อกเครื่องไว้ กรุณานำออกหรือแจ้งในช่องกรอก
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            รหัสของคุณจะถูกเก็บเป็นความลับ นอกจากพนักงานตรวจเครื่อง
           </p>
         </div>
 

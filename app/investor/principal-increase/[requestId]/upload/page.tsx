@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, Upload, X, AlertTriangle, CheckCircle, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 export default function InvestorPrincipalIncreaseUploadPage() {
   const router = useRouter();
@@ -23,6 +24,16 @@ export default function InvestorPrincipalIncreaseUploadPage() {
   const [loading, setLoading] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGoToContracts = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_INVESTMENT,
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST_DASHBOARD,
+      ],
+      fallbackPath: '/investment',
+    });
+  };
 
   useEffect(() => {
     if (requestId) {
@@ -114,10 +125,6 @@ export default function InvestorPrincipalIncreaseUploadPage() {
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleGoToContracts = () => {
-    router.push('/investment');
   };
 
   if (loading) {

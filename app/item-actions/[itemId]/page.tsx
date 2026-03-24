@@ -109,7 +109,7 @@ export default function ItemActionsPage() {
 
   const handleContinue = () => {
     if (!selectedStore) {
-      setError('กรุณาเลือกร้านจำนำ');
+      setError('กรุณาเลือกจุดรับฝาก');
       return;
     }
 
@@ -216,14 +216,14 @@ export default function ItemActionsPage() {
           {/* Store Selection */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              ร้านจำนำ*
+              จุดรับฝาก*
             </label>
             <select
               value={selectedStore}
               onChange={(e) => handleStoreSelect(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">เลือกร้านจำนำ</option>
+              <option value="">เลือกจุดรับฝาก</option>
               {stores.map(store => (
                 <option key={store._id} value={store._id}>
                   {store.storeName}
@@ -235,7 +235,7 @@ export default function ItemActionsPage() {
           {/* Pawn Duration */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              ระยะเวลาที่ต้องการจำนำ*
+              ระยะเวลาที่ต้องการขอสินเชื่อ*
             </label>
             <select
               value={pawnDuration}

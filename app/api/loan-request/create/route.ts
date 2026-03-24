@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { haversineDistanceMeters } from '@/lib/services/geo';
+import { buildItemNotesWithPasscode } from '@/lib/utils/item-private-notes';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
       interestRate,
       totalInterest,
       totalRepayment,
+      draftItemId,
     } = body;
 
     // Get customer_id from lineId
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (resolvedRequestedAmount === null || resolvedRequestedAmount < MIN_REQUESTED_AMOUNT) {
       return NextResponse.json(
         {
-          error: `วงเงินจำนำขั้นต่ำ ${MIN_REQUESTED_AMOUNT.toLocaleString()} บาท`,
+          error: `วงเงินขอสินเชื่อขั้นต่ำ ${MIN_REQUESTED_AMOUNT.toLocaleString()} บาท`,
           code: 'MIN_LOAN_AMOUNT',
         },
         { status: 400 }
@@ -223,7 +225,7 @@ export async function POST(request: NextRequest) {
       ai_confidence: aiConfidence,
       accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
       defects: itemData.defects || null,
-      notes: itemData.notes || null,
+      notes: buildItemNotesWithPasscode(itemData.notes, itemData.devicePasscode),
       image_urls: itemData.images,
       item_status: 'PENDING',
     };
@@ -297,8 +299,21 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Loan request created with ID:', loanRequest.request_id);
 
+    if (typeof draftItemId === 'string' && draftItemId.trim()) {
+      const { error: deleteDraftError } = await supabase
+        .from('items')
+        .delete()
+        .eq('item_id', draftItemId.trim())
+        .eq('line_id', lineId)
+        .eq('item_status', 'DRAFT');
+
+      if (deleteDraftError) {
+        console.error('Error deleting consumed draft:', deleteDraftError);
+      }
+    }
+
     console.log('✅ Loan request created successfully:', {
-      loanRequestId: loanRequest.loan_request_id,
+      loanRequestId: loanRequest.request_id,
       itemId: item.item_id,
       loanRequest: loanRequest,
       item: item

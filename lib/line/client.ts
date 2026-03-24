@@ -53,7 +53,7 @@ export async function sendNegotiationMessage(
     const client = getLineClient();
     await client.pushMessage(userId, {
       type: 'flex',
-      altText: 'การแก้ไขเงื่อนไขการจำนำ',
+      altText: 'การแก้ไขเงื่อนไขการขอสินเชื่อ',
       contents: {
         type: 'bubble',
         header: {
@@ -62,7 +62,7 @@ export async function sendNegotiationMessage(
           contents: [
             {
               type: 'text',
-              text: 'การแก้ไขเงื่อนไขการจำนำ',
+              text: 'การแก้ไขเงื่อนไขการขอสินเชื่อ',
               weight: 'bold',
               size: 'lg',
               color: '#ffffff',
@@ -99,7 +99,7 @@ export async function sendNegotiationMessage(
                   contents: [
                     {
                       type: 'text',
-                      text: '1. ราคาจำนำ',
+                      text: '1. วงเงินสินเชื่อ',
                       color: '#666666',
                       size: 'sm',
                       flex: 0,
@@ -246,7 +246,7 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
     const client = getLineClient();
     await client.pushMessage(userId, {
       type: 'flex',
-      altText: 'รายการจำนำสร้างเรียบร้อยแล้ว - ดู QR Code',
+      altText: 'คำขอสินเชื่อสร้างเรียบร้อยแล้ว - ดู QR Code',
       contents: {
         type: 'bubble',
         hero: {
@@ -267,7 +267,7 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
           contents: [
             {
               type: 'text',
-              text: 'รายการจำนำสร้างเรียบร้อยแล้ว',
+              text: 'คำขอสินเชื่อสร้างเรียบร้อยแล้ว',
               weight: 'bold',
               size: 'xl',
               color: '#c2410c',
@@ -391,7 +391,7 @@ export async function sendContractCompletionNotification(
 
     const flexMessage = {
       type: 'flex',
-      altText: `สัญญาจำนำเลขที่ ${contractNumber} สร้างเรียบร้อยแล้ว`,
+      altText: `สัญญาสินเชื่อเลขที่ ${contractNumber} สร้างเรียบร้อยแล้ว`,
       contents: {
         type: 'bubble',
         header: {
@@ -400,7 +400,7 @@ export async function sendContractCompletionNotification(
           contents: [
             {
               type: 'text',
-              text: itemData.brand ? `${itemData.brand} ${itemData.model || ''}` : 'สินค้าจำนำ',
+              text: itemData.brand ? `${itemData.brand} ${itemData.model || ''}` : 'สินทรัพย์ที่ขอสินเชื่อ',
               weight: 'bold',
               size: 'lg',
               color: '#ffffff',
@@ -416,7 +416,7 @@ export async function sendContractCompletionNotification(
           contents: [
             {
               type: 'text',
-              text: 'สัญญาจำนำสร้างเรียบร้อยแล้ว',
+              text: 'สัญญาสินเชื่อสร้างเรียบร้อยแล้ว',
               size: 'md',
               color: '#c2410c',
               weight: 'bold',
@@ -637,7 +637,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
       // Build changes list if there are changes
       if (hasChanges) {
         if (modifications.original.amount !== modifications.new.amount) {
-          changesList.push(`ราคาจำนำ: ${modifications.original.amount.toLocaleString()} → ${modifications.new.amount.toLocaleString()} บาท`);
+          changesList.push(`วงเงินสินเชื่อ: ${modifications.original.amount.toLocaleString()} → ${modifications.new.amount.toLocaleString()} บาท`);
         }
         if (modifications.original.days !== modifications.new.days) {
           changesList.push(`ระยะเวลา: ${modifications.original.days} → ${modifications.new.days} วัน`);
@@ -649,9 +649,9 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
     }
 
     const headerText = isContractCreation ? 'ยืนยันการสร้างสัญญา' : (hasChanges ? 'มีการแก้ไขสัญญา' : 'ยืนยันสัญญา');
-    const altText = isContractCreation ? `การสร้างสัญญาจำนำ` : (hasChanges ? `การแก้ไขสัญญา` : `ยืนยันสัญญา`);
+    const altText = isContractCreation ? `การสร้างสัญญาสินเชื่อ` : (hasChanges ? `การแก้ไขสัญญา` : `ยืนยันสัญญา`);
     const modificationText = isContractCreation
-      ? 'การสร้างสัญญาจำนำใหม่'
+      ? 'การสร้างสัญญาสินเชื่อใหม่'
       : (hasChanges && changesList.length > 0)
         ? changesList.join('\n• ')
         : 'ใช้เงื่อนไขตามที่เสนอ (ไม่มีการแก้ไข)';
@@ -727,7 +727,7 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
                   layout: 'baseline',
                   spacing: 'sm',
                   contents: [
-                    { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: 'วงเงินสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
                     { type: 'text', text: `${pawnPrice.toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
@@ -816,7 +816,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
 
     const flexMessage = {
       type: 'flex',
-      altText: `สัญญาจำนำสำเร็จ - ${contractData.contractNumber}`,
+      altText: `สัญญาสินเชื่อสำเร็จ - ${contractData.contractNumber}`,
       contents: {
         type: 'bubble',
         header: {
@@ -825,7 +825,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
           contents: [
             {
               type: 'text',
-              text: 'สัญญาจำนำสำเร็จ',
+              text: 'สัญญาสินเชื่อสำเร็จ',
               weight: 'bold',
               size: 'lg',
               color: '#ffffff',
@@ -841,7 +841,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
           contents: [
             {
               type: 'text',
-              text: 'สัญญาจำนำของคุณสร้างเรียบร้อยแล้ว',
+              text: 'สัญญาสินเชื่อของคุณสร้างเรียบร้อยแล้ว',
               weight: 'bold',
               size: 'md',
               margin: 'lg',
@@ -876,7 +876,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
                   layout: 'baseline',
                   spacing: 'sm',
                   contents: [
-                    { type: 'text', text: 'ราคาจำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                    { type: 'text', text: 'วงเงินสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
                     { type: 'text', text: `${(contractData.pawnPrice || contractData.pawnedPrice || 0).toLocaleString()} บาท`, wrap: true, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
                   ]
                 },
@@ -902,7 +902,7 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
             },
             {
               type: 'text',
-              text: 'ขอบคุณที่ใช้บริการ! คุณสามารถติดตามสถานะสัญญาและจัดการการจำนำได้ผ่านระบบของเรา',
+              text: 'ขอบคุณที่ใช้บริการ! คุณสามารถติดตามสถานะสัญญาและจัดการการขอสินเชื่อได้ผ่านระบบของเรา',
               size: 'sm',
               color: '#666666',
               wrap: true,

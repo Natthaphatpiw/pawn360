@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 /**
- * API to process pawn ticket generation queue
+ * API to process loan contract generation queue
  * This should be called by a cron job or scheduled function
  *
  * Since we can't use Puppeteer on Vercel, this API will:
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
                 messages: [
                   {
                     type: 'text',
-                    text: `สัญญาจำนำของคุณเสร็จสมบูรณ์แล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nคลิกเพื่อดูตั๋วจำนำ:\n${pawnerTicketUrl}\n\nกรุณาบันทึกตั๋วจำนำไว้เพื่อใช้อ้างอิง`
+                    text: `สัญญาสินเชื่อของคุณเสร็จสมบูรณ์แล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nคลิกเพื่อดูสัญญาสินเชื่อ:\n${pawnerTicketUrl}\n\nกรุณาบันทึกสัญญาสินเชื่อไว้เพื่อใช้อ้างอิง`
                   }
                 ]
               })

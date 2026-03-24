@@ -80,7 +80,7 @@ export interface Item {
   _id?: ObjectId;
   lineId: string; // LINE User ID ของลูกค้า
 
-  // ข้อมูลสินค้าที่จำนำ
+  // ข้อมูลสินทรัพย์ที่ใช้ขอสินเชื่อ
   brand: string;
   model: string;
   type: string;
@@ -91,7 +91,7 @@ export interface Item {
   accessories: string;
   images: Array<string>;
 
-  // ข้อมูลสัญญาจำนำ
+  // ข้อมูลสัญญาสินเชื่อ
   status: 'pending' | 'active' | 'redeemed' | 'lost' | 'sold' | 'temporary';
   currentContractId?: ObjectId;
   contractHistory?: Array<ObjectId>;

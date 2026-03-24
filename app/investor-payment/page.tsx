@@ -136,7 +136,7 @@ function InvestorPaymentContent() {
       });
 
       if (response.data.success) {
-        alert('ส่งหลักฐานการชำระเงินเรียบร้อยแล้ว รอการยืนยันจากผู้จำนำ');
+        alert('ส่งหลักฐานการชำระเงินเรียบร้อยแล้ว รอการยืนยันจากผู้ขอสินเชื่อ');
         // Close LIFF
         if (typeof window !== 'undefined' && window.liff) {
           window.liff.closeWindow();
@@ -189,7 +189,7 @@ function InvestorPaymentContent() {
   if (!canSubmit) {
     let blockedMessage = 'สัญญานี้อยู่ในสถานะที่ไม่สามารถส่งสลิปได้';
     if (isPaid || hasSlip) {
-      blockedMessage = 'คุณได้ส่งหลักฐานการชำระเงินแล้ว กรุณารอผู้จำนำยืนยัน';
+      blockedMessage = 'คุณได้ส่งหลักฐานการชำระเงินแล้ว กรุณารอผู้ขอสินเชื่อยืนยัน';
     } else if (isConfirmed) {
       blockedMessage = 'รายการนี้ได้รับการยืนยันแล้ว';
     } else if (isFundingClosed) {
@@ -228,7 +228,7 @@ function InvestorPaymentContent() {
 
       {isRejected && (
         <div className="w-full max-w-sm bg-[#FFF4E5] text-[#B45309] border border-[#FCD34D] rounded-2xl p-4 mb-4 text-sm">
-          ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน กรุณาตรวจสอบและส่งสลิปใหม่อีกครั้ง
+          ผู้ขอสินเชื่อแจ้งว่ายังไม่ได้รับเงิน กรุณาตรวจสอบและส่งสลิปใหม่อีกครั้ง
         </div>
       )}
 
@@ -245,7 +245,7 @@ function InvestorPaymentContent() {
             <span className="font-medium">{contract.items?.brand} {contract.items?.model}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-500">วงเงินจำนำ</span>
+            <span className="text-gray-500">วงเงินสินเชื่อ</span>
             <span className="font-bold text-[#1E3A8A]">{contract.loan_principal_amount?.toLocaleString()} บาท</span>
           </div>
         </div>
@@ -296,9 +296,10 @@ function InvestorPaymentContent() {
           <input
             type="text"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full p-4 bg-white border border-gray-300 rounded-xl text-xl text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#1E3A8A]"
+            readOnly
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-xl text-gray-800 focus:outline-none"
           />
+          <p className="mt-2 text-xs text-gray-500">ยอดนี้ล็อกตามวงเงินที่ลูกค้าขอ ไม่สามารถแก้ไขได้</p>
         </div>
 
         {/* Upload Area */}

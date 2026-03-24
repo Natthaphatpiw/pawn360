@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { getPenaltyRequirement, roundCurrency } from '@/lib/services/penalty';
 
 export async function GET(
   request: NextRequest,
@@ -53,6 +54,20 @@ export async function GET(
       }
     }
 
+    if (['AWAITING_PAYMENT', 'SLIP_REJECTED'].includes(actionRequest.request_status)) {
+      const penaltyRequirement = await getPenaltyRequirement(supabase, actionRequest.contract);
+      const baseAmount = getBaseAmountForActionRequest(actionRequest);
+      const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+      actionRequest.base_amount = baseAmount;
+      actionRequest.penalty_amount = penaltyAmount;
+      actionRequest.total_amount = roundCurrency(baseAmount + penaltyAmount);
+      actionRequest.payment_breakdown = {
+        baseAmount,
+        penaltyAmount,
+        totalAmount: actionRequest.total_amount,
+      };
+    }
+
     return NextResponse.json({
       success: true,
       request: actionRequest,
@@ -64,5 +79,18 @@ export async function GET(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+function getBaseAmountForActionRequest(actionRequest: any): number {
+  switch (actionRequest.request_type) {
+    case 'INTEREST_PAYMENT':
+      return Number(actionRequest.interest_to_pay || 0);
+    case 'PRINCIPAL_REDUCTION':
+      return Number(actionRequest.total_to_pay_reduction || 0);
+    case 'PRINCIPAL_INCREASE':
+      return Number(actionRequest.interest_for_period || 0);
+    default:
+      return Number(actionRequest.total_amount || 0);
   }
 }

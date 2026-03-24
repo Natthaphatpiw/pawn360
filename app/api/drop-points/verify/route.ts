@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, FlexMessage } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
+import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 // Investor LINE OA client
 const investorLineClient = new Client({
@@ -127,6 +128,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (verificationResult === 'APPROVED' && (!Array.isArray(verificationData?.verification_photos) || verificationData.verification_photos.length === 0)) {
+      return NextResponse.json(
+        { error: 'กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูปก่อนยืนยัน' },
+        { status: 400 }
+      );
+    }
+
     // Save verification record
     await supabase
       .from('drop_point_verifications')
@@ -187,6 +195,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const notesPayload = splitItemNotesAndPasscode(contract.items?.notes);
       const nowIso = new Date().toISOString();
       const { error: storageUpdateError } = await supabase
         .from('drop_point_storage_boxes')
@@ -207,6 +216,7 @@ export async function POST(request: NextRequest) {
             capacity: contract.items?.capacity || null,
             item_condition: contract.items?.item_condition ?? null,
             serial_number: contract.items?.serial_number || null,
+            device_passcode: notesPayload.devicePasscode,
           },
           assigned_by_line_id: lineId,
           occupied_at: nowIso,
@@ -326,7 +336,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
           align: 'center'
         }, {
           type: 'text',
-          text: 'กรุณาโอนเงินให้ผู้จำนำ',
+          text: 'กรุณาโอนเงินให้ผู้ขอสินเชื่อ',
           size: 'sm',
           color: '#ffffff',
           align: 'center',

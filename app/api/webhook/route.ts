@@ -558,7 +558,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
             const client = new Client({ channelAccessToken });
             await client.pushMessage(contract.pawners.line_id, {
               type: 'text',
-              text: `คุณได้ยืนยันการจำนำไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
+              text: `คุณได้ยืนยันการขอสินเชื่อไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
             });
           }
           return;
@@ -579,7 +579,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `ยืนยันการจำนำเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
+            text: `ยืนยันการขอสินเชื่อเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
           });
         }
 
@@ -677,7 +677,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}\n\nสัญญาจำนำเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
+            text: `ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}\n\nสัญญาสินเชื่อเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
           });
         }
 
@@ -688,7 +688,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
             if (!invClient) throw new Error('Investor LINE client not configured');
             await invClient.pushMessage(contract.investors.line_id, {
               type: 'text',
-              text: `ผู้จำนำยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาจำนำเริ่มต้นเรียบร้อยแล้ว`
+              text: `ผู้ขอสินเชื่อยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาสินเชื่อเริ่มต้นเรียบร้อยแล้ว`
             });
           } catch (invError) {
             console.error('Error sending to investor:', invError);
@@ -835,7 +835,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
             if (!invClient) throw new Error('Investor LINE client not configured');
             await invClient.pushMessage(contract.investors.line_id, {
               type: 'text',
-              text: `ผู้จำนำแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานการโอนเงินใหม่อีกครั้ง`
+              text: `ผู้ขอสินเชื่อแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานการโอนเงินใหม่อีกครั้ง`
             });
             console.log(`Sent notification to investor ${contract.investors.line_id}`);
           } catch (invError) {
@@ -1107,7 +1107,7 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
           align: 'center'
         }, {
           type: 'text',
-          text: 'ผู้จำนำยืนยันรับของแล้ว',
+          text: 'ผู้ขอสินเชื่อยืนยันรับของแล้ว',
           size: 'sm',
           color: '#ffffff',
           align: 'center',
@@ -1327,7 +1327,7 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
             spacing: 'sm',
             margin: 'lg',
             contents: [
-              { type: 'text', text: 'ผู้จำนำ:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: 'ผู้ขอสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
               { type: 'text', text: `${contract.pawners?.firstname} ${contract.pawners?.lastname}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },

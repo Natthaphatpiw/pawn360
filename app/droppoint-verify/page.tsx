@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { Camera, Check, X } from 'lucide-react';
+import { Camera, Check, QrCode, X } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
@@ -65,18 +65,20 @@ function DropPointVerifyContent() {
     ? verificationData.condition_score < (expectedConditionScore - 10)
     : false;
   const mustReject = hasAnyMismatch || isConditionGapTooHigh;
-  const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!storageBoxCode.trim();
+  const hasVerificationPhotos = verificationData.verification_photos.length > 0;
+  const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!storageBoxCode.trim() && hasVerificationPhotos;
 
   useEffect(() => {
-    if (contractId) {
+    if (contractId && profile?.userId) {
       fetchContractDetails();
     }
-  }, [contractId]);
+  }, [contractId, profile?.userId]);
 
   const fetchContractDetails = async () => {
+    if (!profile?.userId || !contractId) return;
     try {
       setLoading(true);
-      const response = await axios.get(`/api/contracts/${contractId}`);
+      const response = await axios.get(`/api/drop-points/contracts/detail/${contractId}?lineId=${profile.userId}`);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);
@@ -89,6 +91,12 @@ function DropPointVerifyContent() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (verificationData.verification_photos.length >= 5) {
+      alert('อัปโหลดรูปได้สูงสุด 5 รูป');
+      e.target.value = '';
+      return;
+    }
 
     try {
       setUploadingPhoto(true);
@@ -152,6 +160,11 @@ function DropPointVerifyContent() {
 
     if (result === 'APPROVED' && !storageBoxCode.trim()) {
       alert('กรุณากรอกหมายเลขกล่องเก็บของ');
+      return;
+    }
+
+    if (result === 'APPROVED' && !hasVerificationPhotos) {
+      alert('กรุณาถ่ายรูปสินค้าก่อนกดยืนยัน');
       return;
     }
 
@@ -296,6 +309,12 @@ function DropPointVerifyContent() {
             <span className="font-bold text-gray-700 w-24">หมายเลขสัญญา</span>
             <span className="text-gray-600">{contract.contract_number}</span>
           </div>
+          {contract.items?.device_passcode && (
+            <div className="flex">
+              <span className="font-bold text-gray-700 w-24">รหัสล็อกเครื่อง</span>
+              <span className="text-gray-600">{contract.items.device_passcode}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -424,7 +443,7 @@ function DropPointVerifyContent() {
             {/* Add Photo Button */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPhoto}
+              disabled={uploadingPhoto || verificationData.verification_photos.length >= 5}
               className="aspect-video bg-[#F2F2F2] rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
               {uploadingPhoto ? (
@@ -445,20 +464,31 @@ function DropPointVerifyContent() {
               className="hidden"
             />
           </div>
+          <p className="text-[10px] text-gray-400 mt-2">ถ่ายรูปได้สูงสุด 5 รูป และต้องมีอย่างน้อย 1 รูปก่อนกดยืนยัน</p>
         </div>
 
         {/* Storage Box */}
         <div className="mb-6">
           <label className="font-bold text-gray-700 text-sm mb-2 block">หมายเลขกล่องเก็บของ / สแกน QR code</label>
-          <input
-            type="text"
-            placeholder="เช่น DP001123456"
-            value={storageBoxCode}
-            inputMode="text"
-            autoCapitalize="characters"
-            onChange={(e) => setStorageBoxCode(e.target.value.toUpperCase())}
-            className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#365314] text-sm text-gray-600 bg-white"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="เช่น DP001123456"
+              value={storageBoxCode}
+              inputMode="text"
+              autoCapitalize="characters"
+              onChange={(e) => setStorageBoxCode(e.target.value.toUpperCase())}
+              className="flex-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#365314] text-sm text-gray-600 bg-white"
+            />
+            <button
+              type="button"
+              onClick={() => alert('ฟีเจอร์สแกน QR ผ่านกล้องกำลังเตรียมเปิดใช้งาน กรุณาพิมพ์รหัสหรือใช้เครื่องสแกนภายนอกก่อน')}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-[#365314] bg-white"
+            >
+              <QrCode className="w-4 h-4" />
+              สแกน
+            </button>
+          </div>
           <p className="text-[10px] text-gray-400 mt-2">พิมพ์รหัสกล่อง หรือสแกน QR code แล้วให้รหัสมาอยู่ในช่องนี้ก่อนยืนยัน</p>
         </div>
 
@@ -490,6 +520,9 @@ function DropPointVerifyContent() {
           </label>
           {hasIncompleteChecks && (
             <p className="text-[11px] text-amber-600 mt-2">กรุณาเลือกผลตรวจสอบให้ครบทุกหัวข้อก่อนดำเนินการ</p>
+          )}
+          {!hasVerificationPhotos && !mustReject && (
+            <p className="text-[11px] text-amber-600 mt-2">กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูปก่อนกดยืนยัน</p>
           )}
           {mustReject && (
             <p className="text-[11px] text-red-600 mt-2">พบข้อมูลไม่ตรง ต้องทำรายการส่งคืน</p>

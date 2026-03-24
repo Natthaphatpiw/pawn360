@@ -5,6 +5,8 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { ChevronLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -182,6 +184,8 @@ export default function InterestPaymentSignPage() {
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   useEffect(() => {
     if (requestId) {
@@ -204,7 +208,7 @@ export default function InterestPaymentSignPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const submitWithPin = async (pinToken: string) => {
     if (!termsAccepted || !signature || !requestId) {
       return;
     }
@@ -232,6 +236,7 @@ export default function InterestPaymentSignPage() {
         requestId,
         signatureUrl: uploadRes.data.url,
         pawnerLineId: profile?.userId,
+        pinToken,
       });
 
       if (response.data.success) {
@@ -245,6 +250,24 @@ export default function InterestPaymentSignPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (!profile?.userId) {
+      setError('กรุณาเข้าสู่ระบบ LINE');
+      return;
+    }
+
+    const session = getPinSession('PAWNER', profile.userId);
+    if (session?.token) {
+      await submitWithPin(session.token);
+      return;
+    }
+
+    pendingActionRef.current = async (token: string) => {
+      await submitWithPin(token);
+    };
+    setPinModalOpen(true);
   };
 
   const handleGoToContracts = () => {
@@ -400,16 +423,16 @@ export default function InterestPaymentSignPage() {
             <p className="font-bold text-gray-800">สัญญาต่อดอกเบี้ย</p>
             <p>
               ข้าพเจ้ายืนยันว่าได้ชำระดอกเบี้ยตามจำนวนที่กำหนดเรียบร้อยแล้ว
-              และยินยอมให้ต่ออายุสัญญาจำนำตามเงื่อนไขดังนี้:
+              และยินยอมให้ต่ออายุสัญญาสินเชื่อตามเงื่อนไขดังนี้:
             </p>
             <ul className="list-disc list-inside space-y-1">
               <li>เงินต้นคงเดิมตามสัญญาเดิม</li>
               <li>อัตราดอกเบี้ยคงเดิมตามสัญญาเดิม</li>
               <li>ระยะเวลาสัญญาขยายออกไปตามจำนวนวันที่กำหนด</li>
-              <li>หากไม่ชำระดอกเบี้ยหรือไถ่ถอนภายในกำหนด ทรัพย์จำนำจะตกเป็นของผู้รับจำนำ</li>
+              <li>หากไม่ชำระดอกเบี้ยหรือไถ่ถอนภายในกำหนด ทรัพย์สินประกันอาจถูกดำเนินการตามเงื่อนไขของผู้ให้สินเชื่อ</li>
             </ul>
             <p className="font-bold text-red-600 mt-2">
-              คำเตือน: การไม่ชำระดอกเบี้ยหรือไถ่ถอนตามกำหนดจะทำให้ท่านสูญเสียสิทธิ์ในทรัพย์จำนำ
+              คำเตือน: การไม่ชำระดอกเบี้ยหรือไถ่ถอนตามกำหนดจะทำให้ท่านสูญเสียสิทธิ์ในทรัพย์สินประกัน
             </p>
           </div>
 
@@ -428,7 +451,7 @@ export default function InterestPaymentSignPage() {
 
         {/* Signature Section */}
         <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้จำนำ</h3>
+          <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้ขอสินเชื่อ</h3>
 
           {signature ? (
             <div className="space-y-3">
@@ -483,6 +506,18 @@ export default function InterestPaymentSignPage() {
           </button>
         </div>
       </div>
+
+      <PinModal
+        open={pinModalOpen}
+        role="PAWNER"
+        lineId={profile?.userId || ''}
+        onClose={() => setPinModalOpen(false)}
+        onVerified={(token) => {
+          setPinModalOpen(false);
+          pendingActionRef.current?.(token);
+          pendingActionRef.current = null;
+        }}
+      />
     </div>
   );
 }

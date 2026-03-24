@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
           drop_point_name
         )
       `)
-      .eq('contract_status', 'PENDING')
+      .in('contract_status', ['PENDING', 'PENDING_SIGNATURE'])
       .eq('funding_status', 'PENDING')
       .is('investor_id', null)
       .order('created_at', { ascending: false });

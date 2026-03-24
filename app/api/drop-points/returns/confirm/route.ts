@@ -22,6 +22,7 @@ const dropPointLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT
   : null;
 
 const ALLOWED_STATUSES = ['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
+const BAG_NUMBER_REGEX = /^[A-Z0-9-]{4,32}$/;
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,6 +52,13 @@ export async function POST(request: NextRequest) {
     if (!resolvedBagNumber) {
       return NextResponse.json(
         { error: 'Bag number is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!BAG_NUMBER_REGEX.test(resolvedBagNumber)) {
+      return NextResponse.json(
+        { error: 'หมายเลขถุงไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' },
         { status: 400 }
       );
     }
@@ -128,6 +136,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Redemption is not in a returnable state' },
         { status: 409 }
+      );
+    }
+
+    const { data: existingBagAssignment, error: existingBagAssignmentError } = await supabase
+      .from('drop_point_bag_assignments')
+      .select('bag_number')
+      .eq('contract_id', redemption.contract?.contract_id)
+      .maybeSingle();
+
+    if (existingBagAssignmentError) {
+      console.error('Error checking existing bag assignment:', existingBagAssignmentError);
+      return NextResponse.json(
+        { error: 'Failed to verify bag assignment' },
+        { status: 500 }
+      );
+    }
+
+    if (
+      existingBagAssignment?.bag_number &&
+      existingBagAssignment.bag_number !== resolvedBagNumber
+    ) {
+      return NextResponse.json(
+        { error: `หมายเลขถุงไม่ตรงกับข้อมูลเดิม (${existingBagAssignment.bag_number})` },
+        { status: 400 }
       );
     }
 

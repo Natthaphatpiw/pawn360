@@ -327,7 +327,7 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
       isOpen: true,
       type,
       title: type === 'seller' ? 'เซ็นชื่อผู้ขาย' : 'เซ็นชื่อผู้ซื้อ',
-      placeholder: type === 'seller' ? 'ชื่อผู้จำนำ' : 'ชื่อพนักงาน'
+      placeholder: type === 'seller' ? 'ชื่อผู้ขอสินเชื่อ' : 'ชื่อพนักงาน'
     });
   };
 
@@ -666,7 +666,7 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
                 <input
                   type="text"
                   className="border-b border-gray-400 bg-transparent px-1 py-0.5 min-w-[200px] focus:outline-none focus:border-blue-500"
-                  placeholder="ชื่อผู้จำนำ"
+                  placeholder="ชื่อผู้ขอสินเชื่อ"
                   value={signatures.seller.name}
                   onChange={(e) => setSignatures(prev => ({ ...prev, seller: { ...prev.seller, name: e.target.value } }))}
                 />

@@ -80,6 +80,7 @@ function InvestorDashboardContent() {
       case 'CONFIRMED':
         return { text: 'กำลังดำเนินการ', color: 'bg-[#D1FAE5] text-[#065F46]' };
       case 'ACTIVE':
+      case 'EXTENDED':
         return { text: 'ปกติ', color: 'bg-[#D1FAE5] text-[#065F46]' };
       case 'PENDING_SIGNATURE':
         return { text: 'รอลงนาม', color: 'bg-[#FEF3C7] text-[#92400E]' };
@@ -87,6 +88,8 @@ function InvestorDashboardContent() {
         return { text: 'เสร็จสิ้น', color: 'bg-[#DBEAFE] text-[#1E40AF]' };
       case 'DEFAULTED':
         return { text: 'เกินกำหนด', color: 'bg-[#FEE2E2] text-[#991B1B]' };
+      case 'TERMINATED':
+        return { text: 'ยกเลิก', color: 'bg-gray-100 text-gray-600' };
       default:
         return { text: status, color: 'bg-gray-100 text-gray-600' };
     }
@@ -97,6 +100,66 @@ function InvestorDashboardContent() {
     const now = new Date();
     const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     return diff;
+  };
+
+  const activeContracts = myContracts.filter((contract) => !['COMPLETED', 'TERMINATED'].includes(contract.contract_status));
+  const completedContracts = myContracts.filter((contract) => ['COMPLETED', 'TERMINATED'].includes(contract.contract_status));
+
+  const renderContractCard = (contract: any) => {
+    const badge = getStatusBadge(contract.contract_status);
+    const daysRemaining = getDaysRemaining(contract.contract_end_date);
+    const principal = Number(contract.loan_principal_amount || 0);
+    const durationDays = Number(contract.contract_duration_days || 0);
+    const investorRate = resolveNetInvestorRate(contract);
+    const investorRatePercent = investorRate * 100;
+    const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
+
+    return (
+      <div
+        key={contract.contract_id}
+        onClick={() => router.push(`/investor-dashboard/contract/${contract.contract_id}`)}
+        className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
+      >
+        <div className="flex justify-between items-start gap-3 mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-2 h-2 rounded-full bg-[#1E3A8A] shrink-0"></div>
+            <h3 className="font-bold text-gray-800 text-base truncate">
+              {contract.items?.brand} {contract.items?.model}
+            </h3>
+          </div>
+          <span className={`${badge.color} shrink-0 whitespace-nowrap text-[10px] font-bold px-2.5 py-1 rounded-full`}>
+            {badge.text}
+          </span>
+        </div>
+
+        <div className="pl-4 border-l-2 border-gray-100 ml-1 my-3 space-y-1">
+          <div className="flex justify-between text-sm gap-3">
+            <span className="text-gray-500 text-xs">เงินต้น:</span>
+            <span className="font-bold text-gray-700 text-right">{contract.loan_principal_amount?.toLocaleString()} บาท</span>
+          </div>
+          <div className="flex justify-between text-sm gap-3">
+            <span className="text-gray-500 text-xs">ดอกเบี้ยรับ:</span>
+            <span className="font-bold text-[#1E3A8A] text-right">
+              +{investorInterest.toLocaleString()} บาท ({investorRatePercent.toFixed(2)}%)
+            </span>
+          </div>
+          <div className="flex justify-between text-sm pt-1 gap-3">
+            <span className="text-gray-400 text-[10px]">ครบกำหนด:</span>
+            <span className="text-gray-600 text-[10px] text-right">
+              {new Date(contract.contract_end_date).toLocaleDateString('th-TH')}
+              {daysRemaining > 0 ? ` (อีก ${daysRemaining} วัน)` : daysRemaining === 0 ? ' (วันนี้)' : ` (เกิน ${Math.abs(daysRemaining)} วัน)`}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-3">
+          <button className="flex-1 py-2 bg-[#E9EFF6] text-[#1E3A8A] rounded-lg text-xs font-bold flex items-center justify-center gap-1">
+            ดูสัญญา
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
   };
 
   if (liffLoading || loading) {
@@ -116,7 +179,7 @@ function InvestorDashboardContent() {
         <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
           <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
           <p className="text-sm text-gray-500 mt-2">
-            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการจำนำของคุณ
+            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการสินเชื่อของคุณ
           </p>
           <button
             type="button"
@@ -178,62 +241,31 @@ function InvestorDashboardContent() {
             </button>
           </div>
         ) : (
-          myContracts.map((contract) => {
-            const badge = getStatusBadge(contract.contract_status);
-            const daysRemaining = getDaysRemaining(contract.contract_end_date);
-            const principal = Number(contract.loan_principal_amount || 0);
-            const durationDays = Number(contract.contract_duration_days || 0);
-            const investorRate = resolveNetInvestorRate(contract);
-            const investorRatePercent = investorRate * 100;
-            const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
-
-            return (
-              <div
-                key={contract.contract_id}
-                onClick={() => router.push(`/investor-dashboard/contract/${contract.contract_id}`)}
-                className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-[#1E3A8A]"></div>
-                    <h3 className="font-bold text-gray-800 text-base">
-                      {contract.items?.brand} {contract.items?.model}
-                    </h3>
-                  </div>
-                  <span className={`${badge.color} text-[10px] font-bold px-2.5 py-1 rounded-full`}>
-                    {badge.text}
-                  </span>
-                </div>
-
-                <div className="pl-4 border-l-2 border-gray-100 ml-1 my-3 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 text-xs">เงินต้น:</span>
-                    <span className="font-bold text-gray-700">{contract.loan_principal_amount?.toLocaleString()} บาท</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500 text-xs">ดอกเบี้ยรับ:</span>
-                    <span className="font-bold text-[#1E3A8A]">
-                      +{investorInterest.toLocaleString()} บาท ({investorRatePercent.toFixed(2)}%)
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm pt-1">
-                    <span className="text-gray-400 text-[10px]">ครบกำหนด:</span>
-                    <span className="text-gray-600 text-[10px]">
-                      {new Date(contract.contract_end_date).toLocaleDateString('th-TH')}
-                      {daysRemaining > 0 ? ` (อีก ${daysRemaining} วัน)` : daysRemaining === 0 ? ' (วันนี้)' : ` (เกิน ${Math.abs(daysRemaining)} วัน)`}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 mt-3">
-                  <button className="flex-1 py-2 bg-[#E9EFF6] text-[#1E3A8A] rounded-lg text-xs font-bold flex items-center justify-center gap-1">
-                    ดูสัญญา
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
-                </div>
+          <>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-700">สัญญาที่ยังดำเนินการอยู่</h2>
+                <span className="text-xs text-gray-400">{activeContracts.length} รายการ</span>
               </div>
-            );
-          })
+              {activeContracts.length === 0 ? (
+                <div className="bg-white rounded-2xl p-4 text-sm text-gray-500 text-center">ไม่มีสัญญาที่กำลังดำเนินการ</div>
+              ) : (
+                activeContracts.map(renderContractCard)
+              )}
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-gray-700">สัญญาที่จบแล้ว</h2>
+                <span className="text-xs text-gray-400">{completedContracts.length} รายการ</span>
+              </div>
+              {completedContracts.length === 0 ? (
+                <div className="bg-white rounded-2xl p-4 text-sm text-gray-500 text-center">ยังไม่มีสัญญาที่จบแล้ว</div>
+              ) : (
+                completedContracts.map(renderContractCard)
+              )}
+            </div>
+          </>
         )}
       </div>
 

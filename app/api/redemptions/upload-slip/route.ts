@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getCompanyBankAccount, saveSlipVerification, verifyPaymentSlip } from '@/lib/services/slip-verification';
+import { getPenaltyRequirement, markPenaltyPaymentVerified, roundCurrency } from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
 // Drop Point LINE OA client
@@ -36,6 +37,10 @@ export async function POST(request: NextRequest) {
         contract:contract_id (
           contract_id,
           contract_number,
+          contract_start_date,
+          contract_end_date,
+          customer_id,
+          investor_id,
           loan_principal_amount,
           interest_amount,
           total_amount,
@@ -90,7 +95,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const expectedAmount = Number(redemption.total_amount || contract?.total_amount || 0);
+    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    const baseAmount = Number(redemption.principal_amount || 0)
+      + Number(redemption.interest_amount || 0)
+      + Number(redemption.delivery_fee || 0);
+    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+    const expectedAmount = roundCurrency(baseAmount + penaltyAmount);
+
+    if (expectedAmount !== Number(redemption.total_amount || 0)) {
+      await supabase
+        .from('redemption_requests')
+        .update({
+          total_amount: expectedAmount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('redemption_id', redemptionId);
+    }
+
     const companyBank = await getCompanyBankAccount();
     const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
       receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
@@ -163,6 +184,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (penaltyRequirement.required) {
+      await markPenaltyPaymentVerified(supabase, contract, penaltyRequirement, {
+        slipUrl,
+        detectedAmount: verificationResult.detectedAmount,
+        verificationResult: verificationResult.result,
+        verificationDetails: verificationResult.rawResponse,
+        attemptCount: (previousAttempts || 0) + 1,
+      });
+    }
+
     // Update contract redemption status
     await supabase
       .from('contracts')
@@ -188,6 +219,18 @@ export async function POST(request: NextRequest) {
           console.error('Error fetching storage box for redemption card:', storageBoxError);
         }
 
+        const { data: bagAssignment, error: bagAssignmentError } = await supabase
+          .from('drop_point_bag_assignments')
+          .select('bag_number')
+          .eq('contract_id', redemption.contract_id)
+          .order('assigned_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (bagAssignmentError) {
+          console.error('Error fetching bag assignment for redemption card:', bagAssignmentError);
+        }
+
         const notificationCard = createDropPointRedemptionCard(redemption, getDropPointReturnUrl(redemptionId));
         if (storageBox?.box_code) {
           (notificationCard.contents as any).body.contents.splice(3, 0, {
@@ -198,6 +241,18 @@ export async function POST(request: NextRequest) {
             contents: [
               { type: 'text', text: 'กล่อง:', color: '#666666', size: 'sm', flex: 2 },
               { type: 'text', text: storageBox.box_code, color: '#365314', size: 'sm', flex: 5, weight: 'bold' }
+            ]
+          });
+        }
+        if (bagAssignment?.bag_number) {
+          (notificationCard.contents as any).body.contents.splice(2, 0, {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              { type: 'text', text: 'หมายเลขถุง:', color: '#666666', size: 'sm', flex: 2 },
+              { type: 'text', text: bagAssignment.bag_number, color: '#365314', size: 'sm', flex: 5, weight: 'bold' }
             ]
           });
         }
@@ -306,7 +361,7 @@ function createDropPointRedemptionCard(redemption: any, returnUrl: string): Flex
             layout: 'vertical',
             margin: 'lg',
             contents: [
-              { type: 'text', text: 'ข้อมูลผู้จำนำ:', color: '#666666', size: 'xs', margin: 'none' },
+              { type: 'text', text: 'ข้อมูลผู้ขอสินเชื่อ:', color: '#666666', size: 'xs', margin: 'none' },
               { type: 'text', text: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`, color: '#333333', size: 'sm', weight: 'bold', margin: 'sm' },
               { type: 'text', text: `โทร: ${pawner?.phone_number || '-'}`, color: '#666666', size: 'xs', margin: 'sm' }
             ]

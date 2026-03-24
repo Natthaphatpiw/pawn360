@@ -40,12 +40,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. ดึงข้อมูลรายการจำนำ
+    // 2. ดึงข้อมูลรายการขอสินเชื่อ
     const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
 
     if (!item) {
       return NextResponse.json(
-        { error: 'ไม่พบรายการจำนำ' },
+        { error: 'ไม่พบรายการขอสินเชื่อ' },
         { status: 404 }
       );
     }

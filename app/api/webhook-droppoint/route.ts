@@ -85,7 +85,7 @@ async function handleFollow(event: WebhookEvent & { type: 'follow' }) {
           size: 'sm'
         }, {
           type: 'text',
-          text: 'กรุณาลงทะเบียนเพื่อเริ่มรับสินค้าจำนำ',
+          text: 'กรุณาลงทะเบียนเพื่อเริ่มรับสินทรัพย์ที่ขอสินเชื่อ',
           wrap: true,
           color: '#666666',
           size: 'xs',
@@ -280,7 +280,7 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
 
     // Send message to investor about payment received
     if (investor?.line_id) {
-      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nอยู่ระหว่างส่งคืนสินค้าให้ผู้จำนำ`;
+      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nอยู่ระหว่างส่งคืนสินค้าให้ผู้ขอสินเชื่อ`;
 
       try {
         await investorLineClient.pushMessage(investor.line_id, {

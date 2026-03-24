@@ -201,7 +201,7 @@ function createPawnOfferCard(contract: any, loanRequest: any, investorRate: numb
   
   const card = {
     type: 'flex' as const,
-    altText: 'ข้อเสนอจำนำ',
+    altText: 'ข้อเสนอสินเชื่อ',
     contents: {
       type: 'bubble' as const,
       header: {
@@ -209,7 +209,7 @@ function createPawnOfferCard(contract: any, loanRequest: any, investorRate: numb
         layout: 'vertical',
         contents: [{
           type: 'text',
-          text: 'ข้อเสนอจำนำ',
+          text: 'ข้อเสนอสินเชื่อ',
           weight: 'bold',
           size: 'lg',
           color: '#ffffff',
@@ -237,7 +237,7 @@ function createPawnOfferCard(contract: any, loanRequest: any, investorRate: numb
               layout: 'baseline',
               spacing: 'sm',
               contents: [
-                { type: 'text', text: 'วงเงิน:', color: '#666666', size: 'sm', flex: 0 },
+                { type: 'text', text: 'วงเงินสินเชื่อ:', color: '#666666', size: 'sm', flex: 0 },
                 { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#1E3A8A', size: 'md', weight: 'bold', flex: 0, align: 'end' }
               ]
             },
@@ -289,15 +289,6 @@ function createPawnOfferCard(contract: any, loanRequest: any, investorRate: numb
           },
           style: 'primary',
           color: '#1E3A8A'
-        }, {
-          type: 'button',
-          action: {
-            type: 'postback',
-            label: 'ปฏิเสธ',
-            data: `action=decline_offer&contractId=${contract.contract_id}`
-          },
-          style: 'secondary',
-          color: '#E9EFF6'
         }]
       }
     }

@@ -235,9 +235,9 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
 
       {/* Privacy Notice */}
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-2">ข้อมูลผู้จำนำ</h2>
+        <h2 className="text-lg font-bold text-gray-800 mb-2">ข้อมูลผู้ขอสินเชื่อ</h2>
         <div className="bg-white rounded-xl border border-gray-200 p-4 text-sm text-gray-600">
-          ข้อมูลส่วนบุคคลของผู้จำนำถูกปกปิดตามนโยบายความเป็นส่วนตัว
+          ข้อมูลส่วนบุคคลของผู้ขอสินเชื่อถูกปกปิดตามนโยบายความเป็นส่วนตัว
         </div>
         <div className="h-px bg-gray-300 my-4 opacity-50"></div>
       </div>
