@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { buildItemNotesWithPasscode } from '@/lib/utils/item-private-notes';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       ai_confidence: itemData.aiConfidence || null,
       accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
       defects: itemData.defects || null,
-      notes: itemData.notes || null,
+      notes: buildItemNotesWithPasscode(itemData.notes, itemData.devicePasscode),
       image_urls: itemData.images,
       item_status: 'DRAFT',
       drop_point_id: branchId || null,

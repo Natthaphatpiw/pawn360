@@ -210,7 +210,7 @@ export default function PawnerContractList() {
       {/* Header */}
       <div className="mb-4 flex justify-between items-end">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 leading-tight">รายการสัญญาจำนำ</h1>
+          <h1 className="text-xl font-bold text-gray-800 leading-tight">รายการสัญญาสินเชื่อ</h1>
           <p className="text-gray-500 text-sm font-light mt-1">
             {userName || profile?.displayName || 'ผู้ใช้'}
           </p>
@@ -224,7 +224,7 @@ export default function PawnerContractList() {
       <div className="flex-1 overflow-y-auto space-y-3 pb-24 no-scrollbar">
         {contracts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">ไม่มีรายการสัญญาจำนำ</p>
+            <p className="text-gray-500">ไม่มีรายการสัญญาสินเชื่อ</p>
           </div>
         ) : (
           contracts.map((contract) => {
@@ -277,7 +277,7 @@ export default function PawnerContractList() {
           onClick={() => router.push('/estimate')}
           className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
         >
-          <span className="text-base font-bold">จำนำสินค้า</span>
+          <span className="text-base font-bold">ขอสินเชื่อ</span>
           <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
         </button>
       </div>

@@ -30,7 +30,7 @@ export function getS3Client(): S3Client {
 
 /**
  * อัปโหลด QR Code ไปยัง AWS S3
- * @param itemId - ID ของรายการจำนำ
+ * @param itemId - ID ของรายการขอสินเชื่อ
  * @param qrCodeBuffer - Buffer ของ QR Code (PNG)
  * @returns Presigned URL ของ QR Code ใน S3
  */
@@ -64,7 +64,7 @@ export async function uploadQRCodeToS3(
 
 /**
  * สร้าง Presigned URL สำหรับดาวน์โหลด QR Code (ใช้เมื่อ ACL ไม่เป็น public)
- * @param itemId - ID ของรายการจำนำ
+ * @param itemId - ID ของรายการขอสินเชื่อ
  * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
  * @returns Presigned URL
  */

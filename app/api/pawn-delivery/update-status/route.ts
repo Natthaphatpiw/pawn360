@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       }
       if (deliveryRequest.status !== 'ITEM_PICKED') {
         return NextResponse.json(
-          { error: 'ต้องรอให้ผู้จำนำยืนยันรับของก่อน' },
+          { error: 'ต้องรอให้ผู้ขอสินเชื่อยืนยันรับของก่อน' },
           { status: 400 }
         );
       }

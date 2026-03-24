@@ -134,7 +134,7 @@ export default function ManualEstimateClient() {
     const condition = Number(conditionScore);
 
     if (!Number.isFinite(price) || price <= 0) {
-      setError('กรุณาระบุราคาจำนำให้ถูกต้อง');
+      setError('กรุณาระบุวงเงินสินเชื่อให้ถูกต้อง');
       return;
     }
     if (!Number.isFinite(condition) || condition < 0 || condition > 100) {
@@ -254,7 +254,7 @@ export default function ManualEstimateClient() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-sm text-gray-600">
-              ราคาจำนำ (บาท)
+              วงเงินสินเชื่อ (บาท)
               <input
                 type="number"
                 value={estimatedPrice}

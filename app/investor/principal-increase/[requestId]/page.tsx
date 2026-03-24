@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ChevronLeft, TrendingUp, User, AlertTriangle, CheckCircle, X, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 export default function InvestorPrincipalIncreaseApprovalPage() {
   const router = useRouter();
@@ -18,6 +19,16 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+
+  const goToInvestment = () => {
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_INVESTMENT,
+        process.env.NEXT_PUBLIC_LIFF_ID_INVEST_DASHBOARD,
+      ],
+      fallbackPath: '/investment',
+    });
+  };
 
   useEffect(() => {
     if (requestId) {
@@ -60,7 +71,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
       });
 
       if (response.data.success) {
-        router.push('/investment');
+        goToInvestment();
       } else {
         throw new Error(response.data.error);
       }
@@ -91,7 +102,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
           <h1 className="text-xl font-bold text-gray-800 mb-2">เกิดข้อผิดพลาด</h1>
           <p className="text-gray-500 text-sm mb-6">{error}</p>
           <button
-            onClick={() => router.push('/investment')}
+            onClick={goToInvestment}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
             กลับหน้าการลงทุน
@@ -118,7 +129,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             คำขอเพิ่มเงินต้นนี้ได้รับการดำเนินการแล้ว
           </p>
           <button
-            onClick={() => router.push('/investment')}
+            onClick={goToInvestment}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
             กลับหน้าการลงทุน
@@ -140,7 +151,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             คุณได้ปฏิเสธคำขอเพิ่มเงินต้นนี้แล้ว
           </p>
           <button
-            onClick={() => router.push('/investment')}
+            onClick={goToInvestment}
             className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
           >
             กลับหน้าการลงทุน
@@ -245,10 +256,10 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
         <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
           <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
             <User className="w-5 h-5 text-[#1E3A8A]" />
-            ข้อมูลผู้จำนำ
+            ข้อมูลผู้ขอสินเชื่อ
           </h3>
           <div className="text-sm text-gray-600">
-            ข้อมูลส่วนบุคคลของผู้จำนำถูกปกปิดตามนโยบายความเป็นส่วนตัว
+            ข้อมูลส่วนบุคคลของผู้ขอสินเชื่อถูกปกปิดตามนโยบายความเป็นส่วนตัว
           </div>
         </div>
 
@@ -256,7 +267,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
         <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
           <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
             <Wallet className="w-5 h-5 text-[#1E3A8A]" />
-            บัญชีรับเงินของผู้จำนำ
+            บัญชีรับเงินของผู้ขอสินเชื่อ
           </h3>
 
           <div className="bg-[#EFF6FF] rounded-xl p-3 border border-[#BFDBFE]">
@@ -310,9 +321,9 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
             ข้อควรทราบ
           </h3>
           <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
-            <li>หากอนุมัติ คุณต้องโอนเงิน {requestDetails?.increase_amount?.toLocaleString()} บาท ไปยังบัญชีผู้จำนำ</li>
+            <li>หากอนุมัติ คุณต้องโอนเงิน {requestDetails?.increase_amount?.toLocaleString()} บาท ไปยังบัญชีผู้ขอสินเชื่อ</li>
             <li>หลังจากโอนเงิน กรุณาอัปโหลดสลิปเพื่อยืนยัน</li>
-            <li>เงินต้นจะเพิ่มขึ้นหลังจากผู้จำนำยืนยันรับเงินแล้ว</li>
+            <li>เงินต้นจะเพิ่มขึ้นหลังจากผู้ขอสินเชื่อยืนยันรับเงินแล้ว</li>
           </ul>
         </div>
       </div>

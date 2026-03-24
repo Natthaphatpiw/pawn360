@@ -24,10 +24,17 @@ interface Calculation {
   interestRemaining?: number;
   interestTotalIfPayLater?: number;
   totalToPay: number;
+  baseTotalToPay?: number;
   principalAfterReduction: number;
   newInterestForRemaining: number;
   interestSavings: number;
   description: string;
+  penaltyRequired?: boolean;
+  penaltyAmount?: number;
+  penalty?: {
+    daysOverdue: number;
+    penaltyAmount: number;
+  };
 }
 
 interface CompanyBank {
@@ -60,25 +67,6 @@ export default function PrincipalReductionPage() {
     }
   }, [contractId, reductionAmount]);
 
-  const redirectToPenalty = (payload?: any) => {
-    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
-      return false;
-    }
-
-    try {
-      const url = new URL(payload.penaltyLiffUrl);
-      if (!url.searchParams.get('contractId')) {
-        url.searchParams.set('contractId', contractId);
-      }
-      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
-      window.location.href = url.toString();
-      return true;
-    } catch (error) {
-      window.location.href = payload.penaltyLiffUrl;
-      return true;
-    }
-  };
-
   const fetchCalculation = async () => {
     try {
       const response = await axios.post('/api/contract-actions/calculate', {
@@ -92,9 +80,6 @@ export default function PrincipalReductionPage() {
         setContract(response.data.contract);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error fetching calculation:', error);
     } finally {
       setLoading(false);
@@ -142,9 +127,6 @@ export default function PrincipalReductionPage() {
         router.push(`/contracts/${contractId}/principal-reduction/upload?requestId=${nextRequestId}`);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error creating request:', error);
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
@@ -180,12 +162,13 @@ export default function PrincipalReductionPage() {
   const interestFirstPart = calculation.interestFirstPart ?? calculation.interestForPeriod ?? 0;
   const interestRemaining = calculation.interestRemaining ?? calculation.newInterestForRemaining ?? 0;
   const feeAmount = calculation.feeAmount ?? 0;
+  const interestAccruedOnly = Number(calculation.interestAccrued || Math.max(0, interestFirstPart - feeAmount));
   const round2 = (value: number) => Math.round(value * 100) / 100;
   const originalTotalInterest = round2(
     calculation.currentPrincipal * calculation.dailyInterestRate * calculation.daysInContract + feeAmount
   );
   const totalInterestAfterAction = round2(interestFirstPart + interestRemaining);
-  const totalToPayNow = calculation.reductionAmount + interestFirstPart;
+  const penaltyAmount = calculation.penaltyRequired ? Number(calculation.penaltyAmount || calculation.penalty?.penaltyAmount || 0) : 0;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -242,15 +225,23 @@ export default function PrincipalReductionPage() {
 
         {/* Calculation Details */}
         <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการลดเงินต้น</h2>
+          <h2 className="font-bold text-gray-800 text-sm mb-3">รายการที่ต้องชำระ</h2>
           <p className="text-xs text-gray-600 mb-3">
             การลดเงินต้นคือการชำระเงินต้นบางส่วน เพื่อให้ดอกเบี้ยที่เหลือลดลง
             โดยสัญญาใหม่จะเริ่มนับระยะเวลาใหม่ตามสัญญาเดิม
           </p>
           <div className="bg-[#FFF8F5] rounded-xl p-4 mb-3">
             <DetailRow label="จำนวนที่ต้องการลด" value={`${calculation.reductionAmount.toLocaleString()} บาท`} />
-            <DetailRow label="ดอกเบี้ยถึงวันนี้ (รวมค่าธรรมเนียม)" value={`${interestFirstPart.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ยถึงวันนี้" value={`${interestAccruedOnly.toLocaleString()} บาท`} />
             <DetailRow label="ค่าธรรมเนียมคงที่" value={`${feeAmount.toLocaleString()} บาท`} />
+            {penaltyAmount > 0 && (
+              <>
+                <DetailRow label="ค่าปรับเกินกำหนด" value={`${penaltyAmount.toLocaleString()} บาท`} highlight />
+                <p className="text-xs text-[#B85C38] mt-1">
+                  เกินกำหนดแล้ว {calculation.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                </p>
+              </>
+            )}
             <DetailRow label="ดอกเบี้ยในสัญญาใหม่" value={`${interestRemaining.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยตามสัญญาเดิม" value={`${originalTotalInterest.toLocaleString()} บาท`} />
             <DetailRow label="ดอกเบี้ยรวมหลังทำรายการ" value={`${totalInterestAfterAction.toLocaleString()} บาท`} />
@@ -268,7 +259,7 @@ export default function PrincipalReductionPage() {
           <div className="bg-[#B85C38] rounded-xl p-4 text-white">
             <div className="flex justify-between items-center">
               <span className="text-sm">ยอดที่ต้องชำระ</span>
-              <span className="text-2xl font-bold">{totalToPayNow.toLocaleString()} บาท</span>
+              <span className="text-2xl font-bold">{Number(calculation.totalToPay || 0).toLocaleString()} บาท</span>
             </div>
           </div>
         </div>

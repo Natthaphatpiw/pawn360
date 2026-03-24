@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, Home, Share2 } from 'lucide-react';
+import { Download, Home } from 'lucide-react';
 import axios from 'axios';
 import html2canvas from 'html2canvas';
 
@@ -29,7 +29,7 @@ export default function InvestorPawnTicketPage() {
       setTicketData(response.data.ticketData);
     } catch (error) {
       console.error('Error fetching ticket data:', error);
-      alert('ไม่สามารถโหลดข้อมูลตั๋วจำนำได้');
+      alert('ไม่สามารถโหลดข้อมูลสัญญาสินเชื่อได้');
     } finally {
       setLoading(false);
     }
@@ -105,37 +105,6 @@ export default function InvestorPawnTicketPage() {
     }
   };
 
-  const handleShare = async () => {
-    if (!ticketRef.current) return;
-
-    try {
-      const canvas = await html2canvas(ticketRef.current, {
-        background: '#F5F7FA',
-        logging: false,
-        useCORS: true
-      });
-
-      canvas.toBlob(async (blob) => {
-        if (blob && navigator.share) {
-          const file = new File([blob], `investment-contract-${ticketData.ticketNo}.png`, { type: 'image/png' });
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'สัญญาลงทุนอิเล็กทรอนิกส์',
-              text: `สัญญาลงทุนเลขที่ ${ticketData.ticketNo}`
-            });
-          } catch (err) {
-            console.error('Error sharing:', err);
-          }
-        } else {
-          alert('เบราว์เซอร์ของคุณไม่รองรับการแชร์');
-        }
-      }, 'image/png');
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
@@ -163,12 +132,6 @@ export default function InvestorPawnTicketPage() {
       {/* Header Actions */}
       <div className="w-full max-w-sm flex justify-between items-center mb-4 px-2">
         <h1 className="text-lg font-bold text-gray-800">สัญญาลงทุนอิเล็กทรอนิกส์</h1>
-        <button
-          onClick={handleShare}
-          className="p-2 bg-white rounded-full shadow-sm text-gray-600 hover:text-[#1E3A8A]"
-        >
-          <Share2 className="w-5 h-5" />
-        </button>
       </div>
 
       {/* Ticket Paper Card */}
@@ -259,9 +222,9 @@ export default function InvestorPawnTicketPage() {
 
           {/* Pawner Info (Redacted) */}
           <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้กู้ (ผู้จำนำ)</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้ขอสินเชื่อ</h3>
             <div className="text-sm text-gray-500">
-              ข้อมูลส่วนบุคคลของผู้จำนำถูกปกปิดตามนโยบายความเป็นส่วนตัว
+              ข้อมูลส่วนบุคคลของผู้ขอสินเชื่อถูกปกปิดตามนโยบายความเป็นส่วนตัว
             </div>
           </div>
 

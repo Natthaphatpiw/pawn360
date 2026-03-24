@@ -11,6 +11,7 @@ import PawnSummary from './pawn-summary';
 import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
@@ -284,6 +285,7 @@ interface FormData {
   model: string;
   capacity?: string;
   serialNo?: string;
+  devicePasscode?: string;
   color?: string;
   screenSize?: string;
   watchSize?: string;
@@ -352,6 +354,33 @@ interface Customer {
 
 type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'contract_agreement' | 'contract_success';
 
+const createInitialFormData = (): FormData => ({
+  itemType: '',
+  brand: '',
+  model: '',
+  capacity: '',
+  serialNo: '',
+  devicePasscode: '',
+  color: '',
+  screenSize: '',
+  watchSize: '',
+  watchConnectivity: '',
+  connectivity: '',
+  accessories: '',
+  condition: 50,
+  defects: '',
+  note: '',
+  lenses: ['', ''],
+  appleCategory: '',
+  appleSpecs: '',
+  appleAccessories: {
+    box: false,
+    adapter: false,
+    cable: false,
+    receipt: false,
+  },
+});
+
 function EstimatePageInner() {
   const { profile, isLoading, error: liffError } = useLiff();
   const router = useRouter();
@@ -367,31 +396,7 @@ function EstimatePageInner() {
   const [draftCount, setDraftCount] = useState<number>(0);
 
   // Form data
-  const [formData, setFormData] = useState<FormData>({
-    itemType: '',
-    brand: '',
-    model: '',
-    capacity: '',
-    serialNo: '',
-    color: '',
-    screenSize: '',
-    watchSize: '',
-    watchConnectivity: '',
-    connectivity: '',
-    accessories: '',
-    condition: 50,
-    defects: '',
-    note: '',
-    lenses: ['', ''],
-    appleCategory: '',
-    appleSpecs: '',
-    appleAccessories: {
-      box: false,
-      adapter: false,
-      cable: false,
-      receipt: false,
-    },
-  });
+  const [formData, setFormData] = useState<FormData>(createInitialFormData);
 
   // Images
   const [images, setImages] = useState<File[]>([]);
@@ -439,31 +444,7 @@ function EstimatePageInner() {
   const [contractId, setContractId] = useState<string>('');
 
   const resetEstimateForm = () => {
-    setFormData({
-      itemType: '',
-      brand: '',
-      model: '',
-      capacity: '',
-      serialNo: '',
-      color: '',
-      screenSize: '',
-      watchSize: '',
-      watchConnectivity: '',
-      connectivity: '',
-      accessories: '',
-      condition: 50,
-      defects: '',
-      note: '',
-      lenses: ['', ''],
-      appleCategory: '',
-      appleSpecs: '',
-      appleAccessories: {
-        box: false,
-        adapter: false,
-        cable: false,
-        receipt: false,
-      },
-    });
+    setFormData(createInitialFormData());
     setImages([]);
     setImageUrls([]);
     setUploadedImageUrls([]);
@@ -591,6 +572,7 @@ function EstimatePageInner() {
         if (!res.data?.success || !res.data?.item) return;
 
         const d = res.data.item;
+        const notesPayload = splitItemNotesAndPasscode(d.notes);
         const accessoriesTokens = (d.accessories || '')
           .split(',')
           .map((t: string) => t.trim())
@@ -603,6 +585,7 @@ function EstimatePageInner() {
           model: d.model || '',
           capacity: d.capacity || '',
           serialNo: d.serial_number || '',
+          devicePasscode: d.device_passcode || notesPayload.devicePasscode || '',
           color: d.color || '',
           screenSize: d.screen_size || '',
           watchSize: d.watch_size || '',
@@ -610,7 +593,7 @@ function EstimatePageInner() {
           accessories: d.accessories || '',
           condition: typeof d.item_condition === 'number' ? d.item_condition : prev.condition,
           defects: d.defects || '',
-          note: d.notes || '',
+          note: notesPayload.publicNotes,
           cpu: d.cpu || '',
           ram: d.ram || '',
           storage: d.storage || '',
@@ -804,6 +787,7 @@ function EstimatePageInner() {
         model: '',
         capacity: '',
         serialNo: '',
+        devicePasscode: '',
         color: '',
         screenSize: '',
         watchSize: '',
@@ -1969,6 +1953,7 @@ function EstimatePageInner() {
               watchSize: formData.watchSize,
               watchConnectivity: formData.watchConnectivity,
               serialNo: formData.serialNo,
+              devicePasscode: formData.devicePasscode,
               condition: formData.condition,
               aiConditionScore: conditionResult?.score,
               aiConditionReason: conditionResult?.reason,
@@ -2001,6 +1986,7 @@ function EstimatePageInner() {
               ].filter(Boolean).join('\n'),
             }}
             lineId={profile.userId}
+            draftItemId={draftId}
             onBack={() => {
               resetEstimateForm();
               setCurrentStep('form');
@@ -2042,27 +2028,7 @@ function EstimatePageInner() {
             contractId={contractId}
             onBackToHome={() => {
               setCurrentStep('form');
-              setFormData({
-                itemType: '',
-                brand: '',
-                model: '',
-                capacity: '',
-                serialNo: '',
-                accessories: '',
-                condition: 50,
-                defects: '',
-                note: '',
-                lenses: ['', ''],
-                appleCategory: '',
-                appleSpecs: '',
-                color: '',
-                appleAccessories: {
-                  box: false,
-                  adapter: false,
-                  cable: false,
-                  receipt: false,
-                },
-              });
+              setFormData(createInitialFormData());
               setImages([]);
               setImageUrls([]);
               setEstimateResult(null);
@@ -2130,33 +2096,13 @@ function EstimatePageInner() {
                 onClick={() => setCurrentStep('pawn_setup')}
                 className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-green-600 hover:bg-green-700 text-white"
               >
-                ดำเนินการจำนำต่อ
+                ดำเนินการขอสินเชื่อต่อ
               </button>
               <button
                 onClick={() => {
                   // Full reset for new estimation
                   setCurrentStep('form');
-                  setFormData({
-                    itemType: '',
-                    brand: '',
-                    model: '',
-                    capacity: '',
-                    serialNo: '',
-                    accessories: '',
-                    condition: 50,
-                    defects: '',
-                    note: '',
-                    lenses: ['', ''],
-                    appleCategory: '',
-                    appleSpecs: '',
-                    color: '',
-                    appleAccessories: {
-                      box: false,
-                      adapter: false,
-                      cable: false,
-                      receipt: false,
-                    },
-                  });
+                  setFormData(createInitialFormData());
                   setImages([]);
                   setImageUrls([]);
                   setUploadedImageUrls([]);
@@ -2176,7 +2122,7 @@ function EstimatePageInner() {
         {/* Pawn Setup Step */}
         {currentStep === 'pawn_setup' && estimateResult && (
           <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการจำนำ</h1>
+            <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการขอสินเชื่อ</h1>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <FormLabel
@@ -2194,14 +2140,14 @@ function EstimatePageInner() {
               />
               <p className="text-xs text-gray-500 mt-2">
                 {isSerialRequiredForType(formData.itemType)
-                  ? 'กรุณากรอกเลขเครื่อง/Serial ให้ครบถ้วนก่อนดำเนินการจำนำ'
+                  ? 'กรุณากรอกเลขเครื่อง/Serial ให้ครบถ้วนก่อนดำเนินการขอสินเชื่อ'
                   : 'ถ้ามีหมายเลขซีเรียล สามารถกรอกได้เพื่อความถูกต้องของสัญญา'}
               </p>
             </div>
 
             {/* Store Selection */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold mb-3">เลือกร้านจำนำ</h3>
+              <h3 className="font-semibold mb-3">เลือกจุดรับฝาก</h3>
               <select
                 value={selectedStore}
                 onChange={(e) => setSelectedStore(e.target.value)}
@@ -2222,7 +2168,7 @@ function EstimatePageInner() {
                 <h3 className="font-semibold mb-3">ระยะเวลาและดอกเบี้ย</h3>
 
                 <div className="mb-4">
-                  <label className="block text-sm font-medium mb-2">จำนวนวันที่ต้องการจำนำ</label>
+                  <label className="block text-sm font-medium mb-2">จำนวนวันที่ต้องการขอสินเชื่อ</label>
                   <select
                     value={pawnDuration}
                     onChange={(e) => setPawnDuration(e.target.value)}
@@ -2244,7 +2190,7 @@ function EstimatePageInner() {
                       <span className="font-semibold">{estimateResult.estimatedPrice.toLocaleString()} บาท</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span>ราคาที่ต้องการจำนำ:</span>
+                      <span>ราคาที่ต้องการขอสินเชื่อ:</span>
                       <div className="flex items-center gap-2">
                           <input
                           type="number"
@@ -2299,7 +2245,7 @@ function EstimatePageInner() {
                   disabled={isSubmitting}
                   className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold bg-green-600 hover:bg-green-700 text-white"
                 >
-                  {isSubmitting ? 'กำลังสร้าง QR Code...' : 'สร้าง QR Code สำหรับจำนำ'}
+                  {isSubmitting ? 'กำลังสร้าง QR Code...' : 'สร้าง QR Code สำหรับขอสินเชื่อ'}
                 </button>
               ) : (
                 <div className="w-full py-4 px-4 rounded-lg text-center text-base font-semibold bg-gray-300 text-gray-500">
@@ -2338,36 +2284,16 @@ function EstimatePageInner() {
               <h3 className="font-bold mb-2">ขั้นตอนต่อไป:</h3>
               <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
                 <li>เปิด LINE และตรวจสอบข้อความ QR Code</li>
-                <li>นำ QR Code ไปแสดงที่ร้านจำนำ</li>
+                <li>นำ QR Code ไปแสดงที่จุดรับฝาก</li>
                 <li>พนักงานจะสแกน QR Code และตรวจสอบสินค้า</li>
-                <li>รับเงินจำนำหลังจากพนักงานอนุมัติ</li>
+                <li>รับเงินสินเชื่อหลังจากพนักงานอนุมัติ</li>
               </ol>
             </div>
 
             <button
               onClick={() => {
                 setCurrentStep('form');
-                setFormData({
-                  itemType: '',
-                  brand: '',
-                  model: '',
-                  capacity: '',
-                  serialNo: '',
-                  accessories: '',
-                  condition: 50,
-                  defects: '',
-                note: '',
-                lenses: ['', ''],
-                appleCategory: '',
-                appleSpecs: '',
-                color: '',
-                appleAccessories: {
-                  box: false,
-                  adapter: false,
-                    cable: false,
-                    receipt: false,
-                  },
-                });
+                setFormData(createInitialFormData());
                 setImages([]);
                 setImageUrls([]);
                 setEstimateResult(null);

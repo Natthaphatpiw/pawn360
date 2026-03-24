@@ -42,6 +42,7 @@ export async function GET(
         verified_at,
         created_at,
         updated_at,
+        item_return_confirmed_at,
         contract:contract_id (
           contract_id,
           contract_number,
@@ -60,6 +61,7 @@ export async function GET(
       `)
       .eq('contract.drop_point_id', dropPoint.drop_point_id)
       .in('request_status', RETURN_PENDING_STATUSES)
+      .is('item_return_confirmed_at', null)
       .order('updated_at', { ascending: false });
 
     if (redemptionError) {

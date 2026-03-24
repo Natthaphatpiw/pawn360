@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { buildPenaltyLiffUrl, getPenaltyRequirement } from '@/lib/services/penalty';
+import { ensurePenaltyPaymentRecord, getPenaltyRequirement } from '@/lib/services/penalty';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,24 +51,9 @@ export async function POST(request: NextRequest) {
     }
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
     if (penaltyRequirement.required) {
-      return NextResponse.json(
-        {
-          error: 'มีค่าปรับค้างชำระ กรุณาชำระค่าปรับก่อนทำรายการ',
-          penaltyRequired: true,
-          penalty: {
-            contractId: contract.contract_id,
-            contractNumber: contract.contract_number,
-            contractStartDate: penaltyRequirement.contractStartDate.toISOString(),
-            contractEndDate: penaltyRequirement.contractEndDate.toISOString(),
-            today: penaltyRequirement.today.toISOString(),
-            daysOverdue: penaltyRequirement.daysOverdue,
-            penaltyAmount: penaltyRequirement.penaltyAmount,
-          },
-          penaltyLiffUrl: buildPenaltyLiffUrl(contract.contract_id),
-        },
-        { status: 409 }
-      );
+      await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
     }
 
     // Check if contract is in valid status for redemption
@@ -142,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     const basePrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
     const deliveryFeeAmount = deliveryFee || 0;
-    const totalAmount = basePrincipal + interestDue + deliveryFeeAmount;
+    const totalAmount = basePrincipal + interestDue + deliveryFeeAmount + penaltyAmount;
 
     // Create redemption request
     const { data: redemption, error: redemptionError } = await supabase
@@ -190,6 +175,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       redemptionId: redemption.redemption_id,
+      penaltyRequired: penaltyRequirement.required,
+      penaltyAmount,
       message: 'Redemption request created successfully',
     });
 

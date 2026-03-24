@@ -8,7 +8,7 @@ const sarabun = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: 'จำนำสินค้า',
+  title: 'ขอสินเชื่อ',
 };
 
 export default function EstimateLayout({

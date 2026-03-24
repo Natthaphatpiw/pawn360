@@ -809,7 +809,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                   <div className="space-y-4">
                     {/* Pawn Price */}
                     <div>
-                      <label className="block text-sm font-medium mb-1">ราคาจำนำ (บาท)</label>
+                      <label className="block text-sm font-medium mb-1">วงเงินสินเชื่อ (บาท)</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -852,7 +852,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
 
                     {/* Loan Days */}
                     <div>
-                      <label className="block text-sm font-medium mb-1">จำนวนวันจำนำ</label>
+                      <label className="block text-sm font-medium mb-1">จำนวนวันสัญญา</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -874,7 +874,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
-                          <span>ราคาจำนำ:</span>
+                          <span>วงเงินสินเชื่อ:</span>
                           <span className="font-semibold">{(parseFloat(contractDetails.pawnPrice) || 0).toLocaleString()} บาท</span>
                         </div>
                         <div className="flex justify-between">

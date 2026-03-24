@@ -1,19 +1,16 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Download, Home, Share2 } from 'lucide-react';
+import { Home } from 'lucide-react';
 import axios from 'axios';
-import html2canvas from 'html2canvas';
 
 export default function PawnTicketPage() {
   const router = useRouter();
   const params = useParams();
   const contractId = params.contractId as string;
-  const ticketRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [ticketData, setTicketData] = useState<any>(null);
 
   useEffect(() => {
@@ -29,111 +26,9 @@ export default function PawnTicketPage() {
       setTicketData(response.data.ticketData);
     } catch (error) {
       console.error('Error fetching ticket data:', error);
-      alert('ไม่สามารถโหลดข้อมูลตั๋วจำนำได้');
+      alert('ไม่สามารถโหลดข้อมูลสัญญาสินเชื่อได้');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDownloadImage = async () => {
-    if (!ticketRef.current) return;
-
-    try {
-      setSaving(true);
-
-      // Capture the ticket as canvas
-      const canvas = await html2canvas(ticketRef.current, {
-        background: '#F2F2F2',
-        logging: false,
-        useCORS: true
-      });
-
-      // Convert to base64 for upload and fallback download
-      const imageBase64 = canvas.toDataURL('image/png');
-
-      // Upload to S3
-      try {
-        const uploadResponse = await axios.post('/api/contracts/upload-pawn-ticket', {
-          contractId,
-          imageBase64
-        });
-
-        if (uploadResponse.data.success) {
-          console.log('Pawn ticket uploaded to S3:', uploadResponse.data.url);
-        }
-      } catch (uploadError) {
-        console.error('Error uploading to S3:', uploadError);
-        // Continue with download even if upload fails
-      }
-
-      const triggerDownload = (href: string) => {
-        const link = document.createElement('a');
-        link.href = href;
-        link.download = `pawn-ticket-${ticketData.ticketNo}.png`;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      };
-      const shouldOpenPreview = /iPad|iPhone|iPod/i.test(navigator.userAgent) || /Line/i.test(navigator.userAgent);
-
-      // Download locally with fallback for browsers that block blob downloads
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          triggerDownload(url);
-          if (shouldOpenPreview) {
-            window.open(imageBase64, '_blank', 'noopener,noreferrer');
-          }
-          URL.revokeObjectURL(url);
-          alert('บันทึกรูปภาพสำเร็จ');
-          return;
-        }
-
-        triggerDownload(imageBase64);
-        if (shouldOpenPreview) {
-          window.open(imageBase64, '_blank', 'noopener,noreferrer');
-        }
-        alert('บันทึกรูปภาพสำเร็จ');
-      }, 'image/png');
-
-    } catch (error) {
-      console.error('Error downloading image:', error);
-      alert('ไม่สามารถบันทึกรูปภาพได้');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleShare = async () => {
-    if (!ticketRef.current) return;
-
-    try {
-      const canvas = await html2canvas(ticketRef.current, {
-        background: '#F2F2F2',
-        logging: false,
-        useCORS: true
-      });
-
-      canvas.toBlob(async (blob) => {
-        if (blob && navigator.share) {
-          const file = new File([blob], `pawn-ticket-${ticketData.ticketNo}.png`, { type: 'image/png' });
-          try {
-            await navigator.share({
-              files: [file],
-              title: 'ตั๋วจำนำอิเล็กทรอนิกส์',
-              text: `ตั๋วจำนำเลขที่ ${ticketData.ticketNo}`
-            });
-          } catch (err) {
-            console.error('Error sharing:', err);
-          }
-        } else {
-          alert('เบราว์เซอร์ของคุณไม่รองรับการแชร์');
-        }
-      }, 'image/png');
-    } catch (error) {
-      console.error('Error sharing:', error);
     }
   };
 
@@ -152,7 +47,7 @@ export default function PawnTicketPage() {
     return (
       <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">ไม่พบข้อมูลตั๋วจำนำ</p>
+          <p className="text-gray-600">ไม่พบข้อมูลสัญญาสินเชื่อ</p>
         </div>
       </div>
     );
@@ -163,17 +58,11 @@ export default function PawnTicketPage() {
 
       {/* Header Actions */}
       <div className="w-full max-w-sm flex justify-between items-center mb-4 px-2">
-        <h1 className="text-lg font-bold text-gray-800">ตั๋วจำนำอิเล็กทรอนิกส์</h1>
-        <button
-          onClick={handleShare}
-          className="p-2 bg-white rounded-full shadow-sm text-gray-600 hover:text-[#B85C38]"
-        >
-          <Share2 className="w-5 h-5" />
-        </button>
+        <h1 className="text-lg font-bold text-gray-800">สัญญาสินเชื่ออิเล็กทรอนิกส์</h1>
       </div>
 
       {/* Ticket Paper Card */}
-      <div ref={ticketRef} className="w-full max-w-sm bg-white rounded-xl shadow-md overflow-hidden relative">
+      <div className="w-full max-w-sm bg-white rounded-xl shadow-md overflow-hidden relative">
         {/* Decorative Top Border */}
         <div className="h-2 bg-[#B85C38]"></div>
 
@@ -191,9 +80,9 @@ export default function PawnTicketPage() {
             </div>
             <div className="text-right">
               <div className="inline-block bg-[#B85C38] text-white text-xs font-bold px-3 py-1 rounded-full mb-1">
-                ตั๋วจำนำ
+                สัญญาสินเชื่อ
               </div>
-              <div className="text-[10px] text-gray-400">Pawn Ticket</div>
+              <div className="text-[10px] text-gray-400">Loan Contract</div>
             </div>
           </div>
 
@@ -227,7 +116,7 @@ export default function PawnTicketPage() {
 
           {/* Pawner Info */}
           <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้จำนำ</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้ขอสินเชื่อ</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">ชื่อ-นามสกุล</span>
@@ -256,7 +145,7 @@ export default function PawnTicketPage() {
 
           {/* Item Details */}
           <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ทรัพย์สินที่จำนำ</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ทรัพย์สินค้ำประกัน</h3>
             <div className="bg-[#F9FAFB] rounded-lg p-3 border border-gray-100">
               {ticketData.items.map((item: any, index: number) => (
                 <div key={index} className="mb-2 last:mb-0">
@@ -297,9 +186,9 @@ export default function PawnTicketPage() {
           {/* Terms & Conditions */}
           <div className="text-[10px] text-gray-400 text-justify leading-snug mb-8">
             <p>
-              * ผู้จำนำตกลงจำนำทรัพย์สินรายการข้างต้นไว้กับผู้รับจำนำเพื่อเป็นประกันการชำระหนี้
+              * ผู้ขอสินเชื่อตกลงใช้ทรัพย์สินรายการข้างต้นเป็นหลักประกันการชำระหนี้
               โดยยอมเสียดอกเบี้ยในอัตรา {ticketData.interestRate} หากไม่มาไถ่ถอนหรือส่งดอกเบี้ยภายในระยะเวลาที่กำหนด
-              ทรัพย์สินจะตกเป็นสิทธิ์ของผู้รับจำนำทันทีตามกฎหมาย
+              ทรัพย์สินจะตกเป็นสิทธิ์ของผู้ให้กู้ทันทีตามกฎหมาย
             </p>
           </div>
 
@@ -314,19 +203,19 @@ export default function PawnTicketPage() {
                     className="absolute bottom-2 max-h-12 max-w-full object-contain"
                   />
                 ) : (
-                  <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้จำนำ</span>
+                  <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้ขอสินเชื่อ</span>
                 )}
               </div>
-              <div className="text-[10px] text-gray-500">ลงชื่อ ผู้จำนำ</div>
+              <div className="text-[10px] text-gray-500">ลงชื่อ ผู้ขอสินเชื่อ</div>
             </div>
             <div className="text-center">
               <div className="h-16 border-b border-dashed border-gray-300 mb-2 relative flex items-end justify-center">
                 <div className="w-12 h-12 bg-[#B85C38]/10 rounded-full absolute top-1 right-2 border-2 border-[#B85C38]/30 flex items-center justify-center rotate-[-15deg]">
                   <span className="text-[8px] text-[#B85C38] font-bold uppercase">Pawnly</span>
                 </div>
-                <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้รับจำนำ</span>
+                <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้ให้กู้</span>
               </div>
-              <div className="text-[10px] text-gray-500">ลงชื่อ ผู้รับจำนำ</div>
+              <div className="text-[10px] text-gray-500">ลงชื่อ ผู้ให้กู้</div>
             </div>
           </div>
         </div>
@@ -342,15 +231,6 @@ export default function PawnTicketPage() {
 
       {/* Footer Action Buttons */}
       <div className="w-full max-w-sm mt-6 space-y-3">
-        <button
-          onClick={handleDownloadImage}
-          disabled={saving}
-          className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-3 flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-[0.98] disabled:opacity-50"
-        >
-          <Download className="w-5 h-5" />
-          <span className="text-base font-bold">{saving ? 'กำลังบันทึก...' : 'บันทึกรูปภาพ'}</span>
-        </button>
-
         <button
           onClick={() => router.push('/dashboard')}
           className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-2xl py-3 flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import Image from 'next/image';
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { Noto_Sans_Thai } from 'next/font/google';
 import { useRouter, useParams } from 'next/navigation';
@@ -156,11 +155,10 @@ export default function DraftDetailPage() {
             <div className="grid grid-cols-3 gap-2">
               {draft.image_urls.map((url, index) => (
                 <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                  <Image
+                  <img
                     src={url}
                     alt={`Image ${index + 1}`}
-                    fill
-                    className="object-cover"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               ))}
@@ -316,7 +314,7 @@ export default function DraftDetailPage() {
               <div className="text-sm">
                 <p className="font-semibold text-gray-800 mb-1">ต้องลงทะเบียนก่อน</p>
                 <p className="text-xs text-gray-600">
-                  คุณต้องลงทะเบียนก่อนจึงจะสามารถสร้างสัญญาจำนำได้
+                  คุณต้องลงทะเบียนก่อนจึงจะสามารถดำเนินการขอสินเชื่อต่อได้
                 </p>
               </div>
             </div>
@@ -340,7 +338,7 @@ export default function DraftDetailPage() {
             ) : (
               <>
                 <CheckCircle className="w-5 h-5" />
-                {isRegistered ? 'ดำเนินการต่อ' : 'ลงทะเบียนเพื่อจำนำ'}
+                {isRegistered ? 'ดำเนินการต่อ' : 'ลงทะเบียนเพื่อขอสินเชื่อ'}
               </>
             )}
           </button>

@@ -114,7 +114,7 @@ const PawnContractDetail = () => {
       <div className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10 sticky top-0">
         <ChevronLeft className="w-6 h-6 text-gray-800 cursor-pointer" onClick={() => router.back()} />
         <div className="text-center">
-          <h1 className="font-bold text-lg text-gray-800">รายการจำนำ</h1>
+          <h1 className="font-bold text-lg text-gray-800">รายการขอสินเชื่อ</h1>
           <p className="text-xs text-gray-400">www.pawnly.io</p>
         </div>
         <div className="flex items-center gap-3">

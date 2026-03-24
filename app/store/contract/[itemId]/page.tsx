@@ -121,7 +121,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
         setItem(response.data.item);
         setCustomer(response.data.customer);
       } else {
-        setError('ไม่พบข้อมูลรายการจำนำ');
+        setError('ไม่พบข้อมูลรายการขอสินเชื่อ');
       }
     } catch (err: any) {
       console.error('Error fetching item data:', err);
@@ -192,7 +192,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
       });
 
       if (response.data.success) {
-        setSuccess('สร้างสัญญาจำนำเรียบร้อยแล้ว');
+        setSuccess('สร้างสัญญาสินเชื่อเรียบร้อยแล้ว');
         setContractSteps({ contractSigned: true, photoTaken: true });
         setShowContractModal(false);
 
@@ -311,9 +311,9 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
               {/* Item Preview */}
               {item && customer && (
                 <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: '#F9F9F9', border: '1px solid #E0E0E0' }}>
-                  <h3 className="font-semibold mb-2" style={{ color: '#1E293B' }}>ข้อมูลรายการจำนำ</h3>
+                  <h3 className="font-semibold mb-2" style={{ color: '#1E293B' }}>ข้อมูลรายการขอสินเชื่อ</h3>
                   <p className="text-sm text-gray-600">สินค้า: {item.brand} {item.model}</p>
-                  <p className="text-sm text-gray-600">ผู้จำนำ: {customer.fullName}</p>
+                  <p className="text-sm text-gray-600">ผู้ขอสินเชื่อ: {customer.fullName}</p>
                   <p className="text-sm text-gray-600">เบอร์โทร: {customer.phone}</p>
                 </div>
               )}
@@ -324,7 +324,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
             <div className="space-y-6">
               {/* Header */}
               <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold mb-2" style={{ color: '#1E293B' }}>สร้างสัญญาจำนำ</h1>
+                <h1 className="text-2xl font-bold mb-2" style={{ color: '#1E293B' }}>สร้างสัญญาสินเชื่อ</h1>
                 <p className="text-sm" style={{ color: '#6B7280' }}>ตรวจสอบข้อมูลและสร้างสัญญา</p>
               </div>
 
@@ -353,7 +353,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
                 </div>
 
                 <div className="rounded-lg p-3" style={{ backgroundColor: '#EEECEB' }}>
-                  <h4 className="font-semibold mb-2" style={{ color: '#1E293B' }}>ข้อมูลผู้จำนำ</h4>
+                  <h4 className="font-semibold mb-2" style={{ color: '#1E293B' }}>ข้อมูลผู้ขอสินเชื่อ</h4>
                   <p className="text-sm text-gray-600">{customer.fullName}</p>
                   <p className="text-sm text-gray-600">เบอร์โทร: {customer.phone}</p>
                   <p className="text-sm text-gray-600">เลขบัตร: {customer.idNumber}</p>
@@ -397,7 +397,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
                     color: loading ? '#9CA3AF' : 'white'
                   }}
                 >
-                  {loading ? 'กำลังสร้างสัญญา...' : 'สร้างสัญญาจำนำ'}
+                  {loading ? 'กำลังสร้างสัญญา...' : 'สร้างสัญญาสินเชื่อ'}
                 </button>
               )}
 

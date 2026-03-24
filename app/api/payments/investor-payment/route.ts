@@ -71,6 +71,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const expectedAmount = Number(contract.loan_principal_amount || 0);
+    const submittedAmount = Number(amount || 0);
+
+    if (!Number.isFinite(submittedAmount) || submittedAmount <= 0) {
+      return NextResponse.json(
+        { error: 'ยอดเงินไม่ถูกต้อง' },
+        { status: 400 }
+      );
+    }
+
+    if (Math.round(submittedAmount * 100) !== Math.round(expectedAmount * 100)) {
+      return NextResponse.json(
+        {
+          error: `ยอดเงินต้องเท่ากับวงเงินสินเชื่อ ${expectedAmount.toLocaleString()} บาท`,
+          expectedAmount,
+        },
+        { status: 400 }
+      );
+    }
+
     const { data: existingPayments, error: existingPaymentsError } = await supabase
       .from('payments')
       .select('payment_id, payment_status')
@@ -94,7 +114,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const verificationResult = await verifyPaymentSlip(paymentSlipUrl, Number(amount), {
+    const verificationResult = await verifyPaymentSlip(paymentSlipUrl, expectedAmount, {
       receiverAccountNo: contract.pawners?.bank_account_no || null,
       receiverPromptpay: contract.pawners?.promptpay_number || null,
       receiverName: contract.pawners?.bank_account_name || `${contract.pawners?.firstname || ''} ${contract.pawners?.lastname || ''}`.trim() || null,
@@ -121,7 +141,7 @@ export async function POST(request: NextRequest) {
       .insert({
         contract_id: contractId,
         payment_type: 'PRINCIPAL',
-        amount: amount,
+        amount: expectedAmount,
         payment_method: 'BANK_TRANSFER',
         payment_status: 'PENDING',
         paid_by_investor_id: investor.investor_id,

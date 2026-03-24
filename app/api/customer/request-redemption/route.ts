@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     if (!item) {
       return NextResponse.json(
-        { error: 'ไม่พบรายการจำนำ' },
+        { error: 'ไม่พบรายการขอสินเชื่อ' },
         { status: 404 }
       );
     }

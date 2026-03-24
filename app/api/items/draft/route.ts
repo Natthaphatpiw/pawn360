@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshImageUrls } from '@/lib/aws/s3';
+import { buildItemNotesWithPasscode, splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -44,8 +45,11 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      const notesPayload = splitItemNotesAndPasscode(item?.notes);
       const refreshedItem = {
         ...item,
+        notes: notesPayload.publicNotes,
+        device_passcode: notesPayload.devicePasscode,
         image_urls: await refreshImageUrls(item?.image_urls),
       };
 
@@ -66,10 +70,15 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     const refreshedItems = await Promise.all(
-      (items || []).map(async (draft) => ({
-        ...draft,
-        image_urls: await refreshImageUrls(draft?.image_urls),
-      }))
+      (items || []).map(async (draft) => {
+        const notesPayload = splitItemNotesAndPasscode(draft?.notes);
+        return {
+          ...draft,
+          notes: notesPayload.publicNotes,
+          device_passcode: notesPayload.devicePasscode,
+          image_urls: await refreshImageUrls(draft?.image_urls),
+        };
+      })
     );
 
     return NextResponse.json(
@@ -107,6 +116,7 @@ export async function POST(request: NextRequest) {
       accessories,
       defects,
       notes,
+      devicePasscode,
       imageUrls,
       conditionResult,
       estimateResult,
@@ -183,7 +193,7 @@ export async function POST(request: NextRequest) {
         watch_connectivity: watchConnectivity || null,
         accessories: accessories || null,
         defects: defects || null,
-        notes: notes || null,
+        notes: buildItemNotesWithPasscode(notes, devicePasscode),
         image_urls: imageUrls || [],
         item_condition: totalScore,
         ai_condition_score: aiScore,

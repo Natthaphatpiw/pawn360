@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         let message = '';
 
         if (dbStatus === 'VERIFIED') {
-          message = `ยืนยันตัวตนสำเร็จ\n\nคุณ${pawner.firstname} ${pawner.lastname}\nสามารถเริ่มใช้งานระบบจำนำ P2P ได้แล้ว\n\nกดที่นี่เพื่อเริ่มจำนำสินค้า`;
+          message = `ยืนยันตัวตนสำเร็จ\n\nคุณ${pawner.firstname} ${pawner.lastname}\nสามารถเริ่มใช้งานระบบสินเชื่อ P2P ได้แล้ว\n\nกดที่นี่เพื่อเริ่มขอสินเชื่อ`;
         } else if (dbStatus === 'REJECTED') {
           message = `การยืนยันตัวตนไม่สำเร็จ\n\nเหตุผล: ${rejectionReason || 'ไม่สามารถยืนยันตัวตนได้'}\n\nกรุณาลองใหม่อีกครั้ง`;
         } else if (dbStatus === 'PENDING') {

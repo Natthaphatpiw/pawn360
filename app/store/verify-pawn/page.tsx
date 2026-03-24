@@ -61,7 +61,7 @@ function StoreVerifyPawnContent() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // ดึงข้อมูลรายการจำนำ
+  // ดึงข้อมูลรายการขอสินเชื่อ
   useEffect(() => {
     if (itemId) {
       fetchPawnRequest();
@@ -110,7 +110,7 @@ function StoreVerifyPawnContent() {
         setEditedInterestRate(item.negotiatedInterestRate || item.interestRate || 3);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'ไม่พบรายการจำนำ');
+      setError(err.response?.data?.error || 'ไม่พบรายการขอสินเชื่อ');
     } finally {
       setIsLoading(false);
     }
@@ -205,7 +205,7 @@ function StoreVerifyPawnContent() {
 
       // ส่งคำขอยืนยันให้ลูกค้าเสมอ
       if (!pawnRequest) {
-        setError('ไม่พบข้อมูลรายการจำนำ');
+        setError('ไม่พบข้อมูลรายการขอสินเชื่อ');
         return;
       }
 
@@ -280,7 +280,7 @@ function StoreVerifyPawnContent() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md">
           <h2 className="text-yellow-800 font-semibold text-lg mb-2">ไม่พบข้อมูล</h2>
-          <p className="text-yellow-600">ไม่พบรายการจำนำที่ต้องการ</p>
+          <p className="text-yellow-600">ไม่พบรายการขอสินเชื่อที่ต้องการ</p>
         </div>
       </div>
     );
@@ -301,7 +301,7 @@ function StoreVerifyPawnContent() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">ตรวจสอบรายการจำนำ</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">ตรวจสอบรายการขอสินเชื่อ</h1>
 
         {/* Customer Info */}
         <div className="mb-6 bg-blue-50 rounded-lg p-4">
@@ -381,10 +381,10 @@ function StoreVerifyPawnContent() {
           )}
         </div>
 
-        {/* ข้อมูลการจำนำ */}
+        {/* ข้อมูลการขอสินเชื่อ */}
         <div className="mb-6 border-t pt-4">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold text-gray-700">ข้อมูลการจำนำ</h2>
+            <h2 className="text-lg font-semibold text-gray-700">ข้อมูลการขอสินเชื่อ</h2>
             {!isEditingTerms && (
               <button
                 type="button"
@@ -406,7 +406,7 @@ function StoreVerifyPawnContent() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">ราคาที่ลูกค้าต้องการจำนำ</p>
+                  <p className="text-sm text-gray-600">ราคาที่ลูกค้าต้องการขอสินเชื่อ</p>
                   <p className="font-medium text-green-600">
                     {(pawnRequest.negotiatedAmount || pawnRequest.desiredAmount)?.toLocaleString() || '-'} บาท
                   </p>
@@ -457,7 +457,7 @@ function StoreVerifyPawnContent() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  ราคาที่จำนำ (บาท) *
+                  วงเงินสินเชื่อ (บาท) *
                 </label>
                 <input
                   type="text"

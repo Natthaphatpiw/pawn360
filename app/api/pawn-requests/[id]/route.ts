@@ -21,7 +21,7 @@ export async function GET(
 
     if (!item) {
       return NextResponse.json(
-        { error: 'ไม่พบรายการจำนำ' },
+        { error: 'ไม่พบรายการขอสินเชื่อ' },
         { status: 404 }
       );
     }
@@ -70,7 +70,7 @@ export async function PUT(
 
     if (!pawnedPrice || typeof pawnedPrice !== 'number') {
       return NextResponse.json(
-        { error: 'กรุณาระบุราคาจำนำที่ถูกต้อง' },
+        { error: 'กรุณาระบุวงเงินสินเชื่อที่ถูกต้อง' },
         { status: 400 }
       );
     }
@@ -91,7 +91,7 @@ export async function PUT(
 
     if (result.matchedCount === 0) {
       return NextResponse.json(
-        { error: 'ไม่พบรายการจำนำ' },
+        { error: 'ไม่พบรายการขอสินเชื่อ' },
         { status: 404 }
       );
     }

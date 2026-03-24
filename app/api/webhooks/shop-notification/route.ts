@@ -181,7 +181,7 @@ async function handleActionResponse(
       // เพิ่มเงินต้น - แจ้งให้มารับเงิน (ไม่มี QR code)
       // ดึงชื่อร้านจาก storeId
       const storesCollection = notificationsCollection.s.db.collection('stores');
-      let storeName = 'ร้านจำนำ'; // Default fallback
+      let storeName = 'จุดรับฝาก'; // Default fallback
 
       if (item.storeId) {
         const store = await storesCollection.findOne({ _id: new ObjectId(item.storeId) });

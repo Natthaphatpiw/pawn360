@@ -117,7 +117,7 @@ function DropPointHistoryContent() {
               <div>
                 <div className="text-base font-bold text-gray-800">{entry.title || '-'}</div>
                 <div className="text-xs text-gray-500">
-                  {entry.type === 'PAWN' ? 'จำนำ' : 'ส่งคืน'} • {formatDate(entry.date)}
+                  {entry.type === 'PAWN' ? 'รับเข้า' : 'ส่งคืน'} • {formatDate(entry.date)}
                 </div>
               </div>
               <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">

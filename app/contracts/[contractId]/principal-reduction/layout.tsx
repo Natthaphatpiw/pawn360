@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'ลดเงินต้น',
-  description: 'ดำเนินการลดเงินต้นสัญญาจำนำ',
+  description: 'ดำเนินการลดเงินต้นสัญญาสินเชื่อ',
 };
 
 export default function PrincipalReductionLayout({

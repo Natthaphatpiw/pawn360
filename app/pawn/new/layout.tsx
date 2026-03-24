@@ -2,7 +2,7 @@ import { LiffProvider } from '@/lib/liff/liff-provider';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'จำนำสินค้า',
+  title: 'ขอสินเชื่อ',
 };
 
 export default function PawnNewLayout({

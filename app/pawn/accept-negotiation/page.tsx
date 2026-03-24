@@ -70,7 +70,7 @@ function AcceptNegotiationContent() {
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">ยืนยันเงื่อนไขใหม่</h1>
             <p className="text-gray-600 text-sm">
-              ร้านค้าได้แก้ไขเงื่อนไขการจำนำ กดยืนยันเพื่อตกลง
+              ร้านค้าได้แก้ไขเงื่อนไขการขอสินเชื่อ กดยืนยันเพื่อตกลง
             </p>
           </div>
 

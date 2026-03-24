@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense, useRef } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { ChevronLeft, CheckCircle, Camera, RefreshCw } from 'lucide-react';
+import { ChevronLeft, CheckCircle, Camera, QrCode, RefreshCw } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
@@ -35,6 +35,7 @@ type RedemptionDetail = {
   redemption_id: string;
   request_status: string;
   drop_point_return_photos?: string[] | null;
+  item_return_confirmed_at?: string | null;
   delivery_method?: string;
   delivery_address_full?: string;
   delivery_contact_phone?: string;
@@ -295,6 +296,8 @@ function DropPointReturnsContent() {
       }
     ];
 
+    const isReturnCompleted = detail.request_status === 'COMPLETED' || Boolean(detail.item_return_confirmed_at);
+
     return (
       <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 pb-24">
         <button
@@ -338,15 +341,26 @@ function DropPointReturnsContent() {
 
         <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm">
           <h2 className="text-sm font-bold text-gray-800 mb-3">หมายเลขถุง / สแกน QR code</h2>
-          <input
-            type="text"
-            placeholder="กรอกหมายเลขถุงก่อนส่งคืน"
-            value={returnBagNumber}
-            inputMode="text"
-            autoCapitalize="characters"
-            onChange={(e) => setReturnBagNumber(e.target.value.toUpperCase())}
-            className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#365314]"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="กรอกหมายเลขถุงก่อนส่งคืน"
+              value={returnBagNumber}
+              inputMode="text"
+              autoCapitalize="characters"
+              onChange={(e) => setReturnBagNumber(e.target.value.toUpperCase())}
+              readOnly={isReturnCompleted}
+              className="flex-1 rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#365314] disabled:bg-gray-50"
+            />
+            <button
+              type="button"
+              onClick={() => alert('ฟีเจอร์สแกน QR ผ่านกล้องกำลังเตรียมเปิดใช้งาน กรุณาพิมพ์รหัสหรือใช้เครื่องสแกนภายนอกก่อน')}
+              className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-3 py-2 text-xs font-semibold text-[#365314] bg-white"
+            >
+              <QrCode className="w-4 h-4" />
+              สแกน
+            </button>
+          </div>
           <p className="text-[10px] text-gray-400 mt-2">พิมพ์รหัสถุง หรือสแกน QR code แล้วให้รหัสมาอยู่ในช่องนี้ก่อนกดยืนยัน</p>
         </div>
 
@@ -402,13 +416,19 @@ function DropPointReturnsContent() {
           </div>
         </div>
 
-        <button
-          onClick={handleConfirmReturn}
-          disabled={confirming || uploadingIndex !== null || !returnBagNumber.trim() || !returnPhotos[0] || !returnPhotos[1]}
-          className="w-full bg-[#0F6C2F] text-white rounded-2xl py-4 font-bold shadow-sm hover:bg-[#0B5A27] transition-colors disabled:opacity-60"
-        >
-          {confirming ? 'กำลังยืนยัน...' : 'ยืนยันการส่งคืน'}
-        </button>
+        {!isReturnCompleted ? (
+          <button
+            onClick={handleConfirmReturn}
+            disabled={confirming || uploadingIndex !== null || !returnBagNumber.trim() || !returnPhotos[0] || !returnPhotos[1]}
+            className="w-full bg-[#0F6C2F] text-white rounded-2xl py-4 font-bold shadow-sm hover:bg-[#0B5A27] transition-colors disabled:opacity-60"
+          >
+            {confirming ? 'กำลังยืนยัน...' : 'ยืนยันการส่งคืน'}
+          </button>
+        ) : (
+          <div className="w-full rounded-2xl border border-gray-200 bg-white py-4 text-center text-sm font-medium text-gray-500">
+            รายการนี้ยืนยันการส่งคืนเรียบร้อยแล้ว
+          </div>
+        )}
 
         <PinModal
           open={pinModalOpen}

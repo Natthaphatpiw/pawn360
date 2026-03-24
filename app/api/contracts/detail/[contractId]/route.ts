@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 export async function GET(
   request: NextRequest,
@@ -157,11 +158,16 @@ export async function GET(
     const remainingPrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
     const remainingInterest = Math.max(0, interestDue);
     const remainingAmount = Math.max(0, remainingPrincipal + remainingInterest);
+    const itemNotes = splitItemNotesAndPasscode(contract.item?.notes);
 
     return NextResponse.json({
       success: true,
       contract: {
         ...contract,
+        item: contract.item ? {
+          ...contract.item,
+          notes: itemNotes.publicNotes,
+        } : contract.item,
         remainingDays,
         displayStatus,
         remainingAmount,

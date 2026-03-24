@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       try {
         await investorLineClient.pushMessage(investor.line_id, {
           type: 'text',
-          text: `ผู้จำนำยืนยันรับเงินแล้ว\n\nสัญญาเดิม: ${contract?.contract_number}\nสัญญาใหม่: ${newContract.contract_number}\nเงินต้นใหม่: ${principalAmount?.toLocaleString()} บาท\nเพิ่มขึ้น: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`
+          text: `ผู้ขอสินเชื่อยืนยันรับเงินแล้ว\n\nสัญญาเดิม: ${contract?.contract_number}\nสัญญาใหม่: ${newContract.contract_number}\nเงินต้นใหม่: ${principalAmount?.toLocaleString()} บาท\nเพิ่มขึ้น: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`
         });
       } catch (err) {
         console.error('Error sending message to investor:', err);

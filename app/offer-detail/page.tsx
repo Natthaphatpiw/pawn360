@@ -190,7 +190,13 @@ function OfferDetailContent() {
               if (typeof window !== 'undefined' && (window as any).liff?.closeWindow) {
                 (window as any).liff.closeWindow();
               } else {
-                router.push('/investment');
+                openLiffEntry({
+                  liffIdCandidates: [
+                    process.env.NEXT_PUBLIC_LIFF_ID_INVESTMENT,
+                    process.env.NEXT_PUBLIC_LIFF_ID_INVEST_DASHBOARD,
+                  ],
+                  fallbackPath: '/investment',
+                });
               }
             }}
             className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-2xl py-4 font-bold transition-colors"
@@ -306,7 +312,7 @@ function OfferDetailContent() {
 
         {/* Details List */}
         <div className="space-y-1 mb-4">
-          <InfoRow label="ผู้จำนำ" value="ไม่เปิดเผย" valueColor="text-gray-500" />
+          <InfoRow label="ผู้ขอสินเชื่อ" value="ไม่เปิดเผย" valueColor="text-gray-500" />
           <InfoRow label="สินค้า" value={`${contract.items?.brand} ${contract.items?.model}`} />
           <InfoRow label="ความจุ" value={contract.items?.capacity || 'ไม่ระบุ'} />
           <InfoRow label="สภาพ" value={`${contract.items?.item_condition}%`} />

@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (!item) {
       console.error('Item not found for id:', itemId);
       return NextResponse.json(
-        { error: 'ไม่พบรายการจำนำ' },
+        { error: 'ไม่พบรายการขอสินเชื่อ' },
         { status: 404 }
       );
     }

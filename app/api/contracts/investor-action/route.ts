@@ -239,7 +239,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
           align: 'center'
         }, {
           type: 'text',
-          text: 'สินค้าของคุณมีผู้สนใจปล่อยเงินจำนำ',
+          text: 'มีผู้สนใจปล่อยสินเชื่อให้กับสินค้าของคุณ',
           size: 'sm',
           color: '#ffffff',
           align: 'center',
@@ -309,7 +309,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
               spacing: 'sm',
               margin: 'lg',
               contents: [
-                { type: 'text', text: 'วงเงินจำนำ:', color: '#666666', size: 'sm', flex: 2 },
+                { type: 'text', text: 'วงเงินสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
                 { type: 'text', text: `${contract.loan_principal_amount.toLocaleString()} บาท`, color: '#C0562F', size: 'lg', flex: 5, weight: 'bold' }
               ]
             },
@@ -320,6 +320,15 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
               contents: [
                 { type: 'text', text: 'ดอกเบี้ย:', color: '#666666', size: 'sm', flex: 2 },
                 { type: 'text', text: `${contract.interest_amount.toLocaleString()} บาท`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'baseline',
+              spacing: 'sm',
+              contents: [
+                { type: 'text', text: 'ค่าธรรมเนียม:', color: '#666666', size: 'sm', flex: 2 },
+                { type: 'text', text: `${Number(contract.platform_fee_amount || 0).toLocaleString()} บาท`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
               ]
             },
             {
@@ -343,7 +352,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
               margin: 'md'
             }, {
               type: 'text',
-              text: 'กรุณากรอกที่อยู่รับสินค้าและชำระค่าจัดส่งผ่านปุ่มด้านล่าง',
+              text: 'กรุณากรอกที่อยู่รับสินค้าผ่านปุ่มด้านล่าง',
               size: 'xs',
               color: '#666666',
               wrap: true
@@ -384,7 +393,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
           type: 'button',
           action: {
             type: 'postback',
-            label: 'ยืนยันการจำนำ',
+            label: 'ยืนยันคำขอสินเชื่อ',
             data: `action=confirm_pawn&contractId=${contract.contract_id}`
           },
           style: 'primary',

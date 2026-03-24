@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshImageUrls } from '@/lib/aws/s3';
+import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 export async function GET(
   request: NextRequest,
@@ -90,14 +91,20 @@ export async function GET(
     let items = contract.items as any;
     if (Array.isArray(items)) {
       items = await Promise.all(
-        items.map(async (item) => ({
-          ...item,
-          image_urls: await refreshImageUrls(item?.image_urls),
-        }))
+        items.map(async (item) => {
+          const notesPayload = splitItemNotesAndPasscode(item?.notes);
+          return {
+            ...item,
+            notes: notesPayload.publicNotes,
+            image_urls: await refreshImageUrls(item?.image_urls),
+          };
+        })
       );
     } else if (items) {
+      const notesPayload = splitItemNotesAndPasscode(items?.notes);
       items = {
         ...items,
+        notes: notesPayload.publicNotes,
         image_urls: await refreshImageUrls(items?.image_urls),
       };
     }

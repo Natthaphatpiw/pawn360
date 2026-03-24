@@ -8,6 +8,7 @@ import { useLiff } from '@/lib/liff/liff-provider';
 
 interface Calculation {
   interestToPay: number;
+  baseTotalToPay?: number;
   totalToPay: number;
   newEndDate: string;
   extensionDays: number;
@@ -19,6 +20,12 @@ interface Calculation {
   feeAmount?: number;
   interestAccrued?: number;
   interestAccruedWithFee?: number;
+  penaltyRequired?: boolean;
+  penaltyAmount?: number;
+  penalty?: {
+    daysOverdue: number;
+    penaltyAmount: number;
+  };
 }
 
 interface CompanyBank {
@@ -50,25 +57,6 @@ export default function InterestPaymentPage() {
     }
   }, [contractId]);
 
-  const redirectToPenalty = (payload?: any) => {
-    if (!payload?.penaltyRequired || !payload?.penaltyLiffUrl) {
-      return false;
-    }
-
-    try {
-      const url = new URL(payload.penaltyLiffUrl);
-      if (!url.searchParams.get('contractId')) {
-        url.searchParams.set('contractId', contractId);
-      }
-      url.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`);
-      window.location.href = url.toString();
-      return true;
-    } catch (error) {
-      window.location.href = payload.penaltyLiffUrl;
-      return true;
-    }
-  };
-
   const fetchCalculation = async () => {
     try {
       const response = await axios.post('/api/contract-actions/calculate', {
@@ -81,9 +69,6 @@ export default function InterestPaymentPage() {
         setContract(response.data.contract);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error fetching calculation:', error);
     } finally {
       setLoading(false);
@@ -130,9 +115,6 @@ export default function InterestPaymentPage() {
         router.push(`/contracts/${contractId}/interest-payment/upload?requestId=${nextRequestId}`);
       }
     } catch (error: any) {
-      if (redirectToPenalty(error?.response?.data)) {
-        return;
-      }
       console.error('Error creating request:', error);
       alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
@@ -164,6 +146,8 @@ export default function InterestPaymentPage() {
       </div>
     );
   }
+
+  const penaltyAmount = calculation.penaltyRequired ? Number(calculation.penaltyAmount || calculation.penalty?.penaltyAmount || 0) : 0;
 
   return (
     <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
@@ -221,14 +205,19 @@ export default function InterestPaymentPage() {
 
         {/* Calculation Details */}
         <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการต่อดอกเบี้ย</h2>
+          <h2 className="font-bold text-gray-800 text-sm mb-3">รายการที่ต้องชำระ</h2>
           <div className="bg-[#FFF8F5] rounded-xl p-4 mb-3">
-            <DetailRow
-              label="ดอกเบี้ยสะสม (รวมค่าธรรมเนียม)"
-              value={`${calculation.interestToPay.toLocaleString()} บาท`}
-            />
+            <DetailRow label="ดอกเบี้ยถึงวันนี้" value={`${Number(calculation.interestAccrued || 0).toLocaleString()} บาท`} />
             {typeof calculation.feeAmount === 'number' && (
               <DetailRow label="ค่าธรรมเนียม" value={`${calculation.feeAmount.toLocaleString()} บาท`} />
+            )}
+            {penaltyAmount > 0 && (
+              <>
+                <DetailRow label="ค่าปรับเกินกำหนด" value={`${penaltyAmount.toLocaleString()} บาท`} highlight />
+                <p className="text-xs text-[#B85C38] mt-1">
+                  เกินกำหนดแล้ว {calculation.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                </p>
+              </>
             )}
             <DetailRow label="ขยายสัญญาเพิ่ม" value={`${calculation.extensionDays} วัน`} />
             <div className="border-t border-[#F0D4C8] my-2"></div>

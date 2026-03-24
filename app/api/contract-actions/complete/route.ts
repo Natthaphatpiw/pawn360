@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { requirePinToken } from '@/lib/security/pin';
 
 // LINE clients
 const pawnerLineClient = new Client({
@@ -27,6 +28,22 @@ const addUtcDays = (value: Date, days: number) => {
   const result = new Date(value);
   result.setUTCDate(result.getUTCDate() + days);
   return result;
+};
+
+const getRenewedContractWindow = (durationDays: number) => {
+  const normalizedDuration = Math.max(1, durationDays);
+  const now = new Date();
+  const contractStartDate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+  ));
+  const contractEndDate = addUtcDays(contractStartDate, normalizedDuration - 1);
+
+  return {
+    contractStartDate,
+    contractEndDate,
+  };
 };
 
 const formatThaiDate = (value: Date) => (
@@ -98,13 +115,25 @@ const buildRenewedContractRecord = (params: {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { requestId, signatureUrl, pawnerLineId } = body;
+    const { requestId, signatureUrl, pawnerLineId, pinToken } = body;
 
     if (!requestId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    if (!pawnerLineId) {
+      return NextResponse.json(
+        { error: 'Pawner LINE ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const pinCheck = await requirePinToken('PAWNER', pawnerLineId, pinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
     }
 
     const supabase = supabaseAdmin();
@@ -206,35 +235,33 @@ export async function POST(request: NextRequest) {
       case 'INTEREST_PAYMENT': {
         const principalAmount = Number(contract.current_principal_amount || contract.loan_principal_amount || 0);
         const durationDays = durationDaysDefault;
-        const contractStartDate = new Date(contractEndDate);
-        const contractEndDateNew = addUtcDays(contractStartDate, durationDays);
+        const renewedWindow = getRenewedContractWindow(durationDays);
         const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
 
         newContractPayload = {
           principalAmount,
           interestAmount,
-          contractStartDate,
-          contractEndDate: contractEndDateNew,
+          contractStartDate: renewedWindow.contractStartDate,
+          contractEndDate: renewedWindow.contractEndDate,
           durationDays,
           signedContractUrl: signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
         };
 
-        notificationMessage = `ต่อดอกเบี้ยเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nดอกเบี้ยที่ชำระ: ${Number(actionRequest.interest_to_pay || 0).toLocaleString()} บาท\nเริ่มสัญญาใหม่: ${formatThaiDate(contractStartDate)}\nครบกำหนดใหม่: ${formatThaiDate(contractEndDateNew)}`;
+        notificationMessage = `ต่อดอกเบี้ยเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nดอกเบี้ยที่ชำระ: ${Number(actionRequest.interest_to_pay || 0).toLocaleString()} บาท\nเริ่มสัญญาใหม่: ${formatThaiDate(renewedWindow.contractStartDate)}\nครบกำหนดใหม่: ${formatThaiDate(renewedWindow.contractEndDate)}`;
         break;
       }
 
       case 'PRINCIPAL_REDUCTION': {
         const principalAmount = Number(actionRequest.principal_after_reduction || contract.current_principal_amount || contract.loan_principal_amount || 0);
         const durationDays = durationDaysDefault;
-        const contractStartDate = new Date(contractEndDate);
-        const contractEndDateNew = addUtcDays(contractStartDate, durationDays);
+        const renewedWindow = getRenewedContractWindow(durationDays);
         const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
 
         newContractPayload = {
           principalAmount,
           interestAmount,
-          contractStartDate,
-          contractEndDate: contractEndDateNew,
+          contractStartDate: renewedWindow.contractStartDate,
+          contractEndDate: renewedWindow.contractEndDate,
           durationDays,
           signedContractUrl: signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
         };
@@ -246,15 +273,14 @@ export async function POST(request: NextRequest) {
       case 'PRINCIPAL_INCREASE': {
         const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
         const durationDays = durationDaysDefault;
-        const contractStartDate = new Date(contractEndDate);
-        const contractEndDateNew = addUtcDays(contractStartDate, durationDays);
+        const renewedWindow = getRenewedContractWindow(durationDays);
         const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
 
         newContractPayload = {
           principalAmount,
           interestAmount,
-          contractStartDate,
-          contractEndDate: contractEndDateNew,
+          contractStartDate: renewedWindow.contractStartDate,
+          contractEndDate: renewedWindow.contractEndDate,
           durationDays,
           signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || contract.signed_contract_url,
         };

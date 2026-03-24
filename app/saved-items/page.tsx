@@ -62,7 +62,7 @@ export default function SavedItemsPage() {
       case 'pending':
         return 'รอดำเนินการ';
       case 'active':
-        return 'จำนำอยู่';
+        return 'อยู่ระหว่างสัญญา';
       case 'redeemed':
         return 'ไถ่ถอนแล้ว';
       case 'lost':

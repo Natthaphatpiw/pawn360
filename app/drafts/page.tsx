@@ -152,7 +152,7 @@ export default function DraftsPage() {
             <div className="text-sm text-gray-700">
               <p className="font-semibold mb-1">บันทึกชั่วคราว</p>
               <p className="text-xs text-gray-600">
-                สินค้าที่คุณบันทึกไว้จะถูกเก็บไว้ 7 วัน คุณสามารถกลับมาสร้างสัญญาจำนำได้ภายหลัง
+                สินค้าที่คุณบันทึกไว้จะถูกเก็บไว้ 7 วัน คุณสามารถกลับมาดำเนินการขอสินเชื่อได้ภายหลัง
               </p>
             </div>
           </div>

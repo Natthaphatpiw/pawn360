@@ -96,7 +96,7 @@ export default function NewPawnPage() {
         }, 2000);
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างรายการจำนำ');
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างคำขอสินเชื่อ');
     } finally {
       setIsSubmitting(false);
     }
@@ -140,7 +140,7 @@ export default function NewPawnPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">สร้างรายการจำนำใหม่</h1>
+        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">สร้างคำขอสินเชื่อใหม่</h1>
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -270,13 +270,13 @@ export default function NewPawnPage() {
                 />
               </div>
 
-              {/* ข้อมูลการจำนำ */}
+              {/* ข้อมูลการขอสินเชื่อ */}
               <div className="border-t pt-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">ข้อมูลการจำนำ</h3>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">ข้อมูลการขอสินเชื่อ</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">ราคาที่ต้องการจำนำ (บาท) *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">ราคาที่ต้องการขอสินเชื่อ (บาท) *</label>
                     <input
                       type="number"
                       name="desiredAmount"
@@ -307,7 +307,7 @@ export default function NewPawnPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">จำนวนวันที่ต้องการจำนำ *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">จำนวนวันที่ต้องการขอสินเชื่อ *</label>
                     <input
                       type="number"
                       name="loanDays"
@@ -377,7 +377,7 @@ export default function NewPawnPage() {
             disabled={isSubmitting}
             className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
-            {isSubmitting ? 'กำลังสร้างรายการ...' : 'สร้างรายการจำนำ'}
+            {isSubmitting ? 'กำลังสร้างรายการ...' : 'สร้างคำขอสินเชื่อ'}
           </button>
         </form>
       </div>

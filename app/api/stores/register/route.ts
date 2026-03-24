@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
         { days: 30, rate: 10.0 },
       ],
       contractTemplate: {
-        header: 'สัญญาจำนำทองคำ',
+        header: 'สัญญาสินเชื่อทองคำ',
         footer: 'ขอบคุณที่ใช้บริการ',
-        terms: 'เงื่อนไขการจำนำมาตรฐาน',
+        terms: 'เงื่อนไขการขอสินเชื่อมาตรฐาน',
       },
       lineIds: [lineId], // เพิ่ม lineIds เป็น array
       passwordHash, // Keep for backward compatibility
