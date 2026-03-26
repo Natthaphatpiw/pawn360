@@ -968,9 +968,10 @@ async function handlePostbackEvent(event: WebhookEvent) {
         const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
         if (channelAccessToken) {
           const client = new Client({ channelAccessToken });
+          const itemName = [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'สินค้า';
           await client.pushMessage(userId, {
             type: 'text',
-            text: `ยืนยันรับสินค้าเรียบร้อยแล้ว\n\n${item?.brand} ${item?.model}\n\nขอบคุณที่ใช้บริการ Pawnly`
+            text: `ยืนยันรับสินค้าเรียบร้อยแล้ว\n\n${itemName}\n\nขอบคุณที่ใช้บริการ Pawnly`
           });
         }
 
@@ -1247,6 +1248,8 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
 
 // Helper function to create drop point notification card
 function createDropPointNotificationCard(contract: any): FlexMessage {
+  const itemName = [contract.items?.brand, contract.items?.model].filter(Boolean).join(' ').trim() || '-';
+  const pawnerName = [contract.pawners?.firstname, contract.pawners?.lastname].filter(Boolean).join(' ').trim() || '-';
   const formatShortDate = (value?: string) => {
     if (!value) return '-';
     const date = new Date(value);
@@ -1302,7 +1305,7 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
             spacing: 'sm',
             contents: [
               { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${contract.items?.brand} ${contract.items?.model}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: itemName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
           {
@@ -1346,7 +1349,7 @@ function createDropPointNotificationCard(contract: any): FlexMessage {
             margin: 'lg',
             contents: [
               { type: 'text', text: 'ผู้ขอสินเชื่อ:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: `${contract.pawners?.firstname} ${contract.pawners?.lastname}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: pawnerName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
           {

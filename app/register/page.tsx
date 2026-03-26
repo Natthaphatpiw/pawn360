@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 interface PawnerData {
   customer_id: string;
@@ -114,6 +116,21 @@ export default function PawnerRegister() {
 
     checkUser();
   }, [liffLoading, liffError, profile?.userId]);
+
+  useEffect(() => {
+    if (!profile?.userId || pawnerData?.kyc_status !== 'VERIFIED') return;
+    const resume = getPawnerEstimateResume(profile.userId);
+    if (!resume?.returnAfterVerify || !resume.draftId) return;
+
+    clearPawnerEstimateResume(profile.userId);
+    openLiffEntry({
+      liffIdCandidates: [
+        process.env.NEXT_PUBLIC_LIFF_ID_PAWN,
+      ],
+      fallbackPath: `/estimate?draftId=${resume.draftId}`,
+      statePath: `/estimate?draftId=${resume.draftId}`,
+    });
+  }, [profile?.userId, pawnerData?.kyc_status]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;

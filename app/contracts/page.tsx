@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import { openLiffEntry } from '@/lib/liff/navigation';
 
 interface ContractItem {
   item_id: string;
@@ -283,7 +284,12 @@ export default function PawnerContractList() {
         </button>
         {/* Pawn Entry Button */}
         <button
-          onClick={() => router.push('/estimate')}
+          onClick={() => openLiffEntry({
+            liffIdCandidates: [
+              process.env.NEXT_PUBLIC_LIFF_ID_PAWN,
+            ],
+            fallbackPath: '/estimate',
+          })}
           className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
         >
           <span className="text-base font-bold">ขอสินเชื่อ</span>

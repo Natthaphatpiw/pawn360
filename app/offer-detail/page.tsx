@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense, type ReactNode, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import ImageCarousel from '@/components/ImageCarousel';
@@ -26,9 +26,8 @@ const resolveInvestorTier = (total: number) => {
 };
 
 function OfferDetailContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const redirectToInvestorVerification = () => {
     openLiffEntry({
@@ -60,24 +59,34 @@ function OfferDetailContent() {
       // liff.state format: /offer-detail?contractId=xxx
       const match = liffState.match(/contractId=([^&]+)/);
       if (match) {
-        contractId = match[1];
+        contractId = decodeURIComponent(match[1]);
       }
     }
   }
 
-  console.log('Extracted contractId:', contractId);
-
   useEffect(() => {
-    if (!contractId || !profile?.userId) return;
+    if (liffLoading) return;
+
+    if (!contractId) {
+      setError('ไม่พบรายละเอียดข้อเสนอ');
+      setLoading(false);
+      return;
+    }
+
+    if (!profile?.userId) {
+      setError('ไม่พบ LINE profile กรุณาเปิดลิงก์ผ่าน LINE');
+      setLoading(false);
+      return;
+    }
+
     ensureInvestorKyc();
-  }, [contractId, profile?.userId]);
+  }, [contractId, profile?.userId, liffLoading]);
 
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
       console.log('Fetching contract details for:', contractId);
       const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&lineId=${profile?.userId}`);
-      console.log('Contract data received:', response.data);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);
@@ -196,6 +205,7 @@ function OfferDetailContent() {
                     process.env.NEXT_PUBLIC_LIFF_ID_INVEST_DASHBOARD,
                   ],
                   fallbackPath: '/investment',
+                  statePath: '/investment',
                 });
               }
             }}
@@ -221,7 +231,13 @@ function OfferDetailContent() {
             })}
           </div>
           <button
-            onClick={() => router.back()}
+            onClick={() => openLiffEntry({
+              liffIdCandidates: [
+                process.env.NEXT_PUBLIC_LIFF_ID_INVESTOR_OFFERS,
+              ],
+              fallbackPath: '/investor-offers',
+              statePath: '/investor-offers',
+            })}
             className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
           >
             กลับ
@@ -238,7 +254,13 @@ function OfferDetailContent() {
           <div className="text-red-600 mb-4">{error || 'ไม่พบข้อมูลข้อเสนอ'}</div>
           <div className="text-sm text-gray-500 mb-4">Contract ID: {contractId}</div>
           <button
-            onClick={() => router.back()}
+            onClick={() => openLiffEntry({
+              liffIdCandidates: [
+                process.env.NEXT_PUBLIC_LIFF_ID_INVESTOR_OFFERS,
+              ],
+              fallbackPath: '/investor-offers',
+              statePath: '/investor-offers',
+            })}
             className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
           >
             กลับ

@@ -6,6 +6,7 @@ import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { haversineDistanceMeters } from '@/lib/services/geo';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import { savePawnerEstimateResume } from '@/lib/pawner-estimate-resume';
 
 const SERIAL_OPTIONAL_TYPES = new Set([
   'อุปกรณ์เสริมโทรศัพท์',
@@ -433,7 +434,61 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
     }
   };
 
-  const handleRegister = () => {
+  const buildDraftPayload = () => ({
+    lineId,
+    itemType: itemData.itemType,
+    brand: itemData.brand,
+    model: itemData.model,
+    capacity: itemData.capacity,
+    color: itemData.color,
+    serialNo: serialNo.trim() || undefined,
+    screenSize: itemData.screenSize,
+    watchSize: itemData.watchSize,
+    watchConnectivity: itemData.watchConnectivity,
+    accessories: itemData.appleAccessories?.join(', ') || null,
+    defects: itemData.defects,
+    notes: itemData.notes,
+    devicePasscode: devicePasscode.trim() || undefined,
+    imageUrls: itemData.images,
+    conditionResult: {
+      score: itemData.aiConditionScore,
+      reason: itemData.aiConditionReason,
+    },
+    estimateResult: {
+      estimatedPrice: itemData.estimatedPrice,
+      confidence: itemData.aiConfidence,
+    },
+    cpu: itemData.processor,
+    ram: itemData.ram,
+    storage: itemData.storage,
+    gpu: itemData.gpu,
+    lenses: itemData.lenses?.map(lens => lens.model),
+  });
+
+  const handleRegister = async () => {
+    try {
+      setIsSubmitting(true);
+
+      let resumeDraftId = draftItemId || null;
+      if (!resumeDraftId) {
+        const draftResponse = await axios.post('/api/items/draft', buildDraftPayload());
+        resumeDraftId = draftResponse.data?.item?.item_id || null;
+      }
+
+      if (resumeDraftId) {
+        savePawnerEstimateResume({
+          lineId,
+          draftId: resumeDraftId,
+          createdAt: new Date().toISOString(),
+          returnAfterVerify: true,
+        });
+      }
+    } catch (saveResumeError) {
+      console.error('Error preparing estimate resume:', saveResumeError);
+    } finally {
+      setIsSubmitting(false);
+    }
+
     openLiffEntry({
       liffIdCandidates: [
         process.env.NEXT_PUBLIC_LIFF_ID_REGISTER,

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense, useRef } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { ChevronLeft, CheckCircle, Camera, QrCode, RefreshCw } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
@@ -75,11 +75,11 @@ const openReturnList = () => {
       process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN,
     ],
     fallbackPath: '/drop-point-returns',
+    statePath: '/drop-point-returns',
   });
 };
 
 function DropPointReturnsContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
 
@@ -470,7 +470,13 @@ function DropPointReturnsContent() {
         redemptions.map((item) => (
           <button
             key={item.redemption_id}
-            onClick={() => router.push(`/drop-point-returns?redemptionId=${item.redemption_id}`)}
+            onClick={() => openLiffEntry({
+              liffIdCandidates: [
+                process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN,
+              ],
+              fallbackPath: `/drop-point-returns?redemptionId=${item.redemption_id}`,
+              statePath: `/drop-point-returns?redemptionId=${item.redemption_id}`,
+            })}
             className="w-full bg-white rounded-2xl p-4 mb-3 text-left shadow-sm"
           >
             <div className="flex justify-between items-start">

@@ -148,7 +148,7 @@ export async function GET(
         drop_point_return_photos: refreshedReturnPhotos,
         storage_box_code: storageBox?.box_code || null,
         storage_box_assigned_at: storageBox?.occupied_at || storageBox?.last_updated_at || null,
-        bag_number: bag?.bag_number || null,
+        bag_number: bag?.bag_number || storageBox?.box_code || null,
         bag_assigned_at: bag?.assigned_at || null
       }
     });

@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { openLiffEntry } from '@/lib/liff/navigation';
 
 const INVESTOR_TIER_THRESHOLDS = {
@@ -25,7 +24,6 @@ const resolveInvestorTier = (total: number) => {
 };
 
 function InvestorOffersContent() {
-  const router = useRouter();
   const { profile, isLoading: liffLoading } = useLiff();
 
   const redirectToInvestorVerification = () => {
@@ -94,13 +92,7 @@ function InvestorOffersContent() {
 
       {/* Header */}
       <div className="mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => router.push('/investor-dashboard')}
-            className="p-2 -ml-2 text-[#1E3A8A] hover:bg-[#E9EFF6] rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+        <div className="flex justify-end mb-4">
           <div className="text-gray-400 text-xs font-light">
             {visibleOffers.length} ข้อเสนอ
           </div>
@@ -143,6 +135,7 @@ function InvestorOffersContent() {
                   process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL,
                 ],
                 fallbackPath: `/offer-detail?contractId=${offer.contract_id}`,
+                statePath: `/offer-detail?contractId=${offer.contract_id}`,
               });
             };
 

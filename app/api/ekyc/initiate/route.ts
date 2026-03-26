@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { hasKycSubmissionCompleted, isKycNeedReview } from '@/lib/kyc/review';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +31,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Check if user already has an eKYC URL (reuse existing URL)
-    if (pawner.ekyc_url && pawner.kyc_status === 'PENDING') {
+    const shouldReusePendingUrl = pawner.ekyc_url
+      && pawner.kyc_status === 'PENDING'
+      && !hasKycSubmissionCompleted(pawner)
+      && !isKycNeedReview(pawner);
+
+    if (shouldReusePendingUrl) {
       console.log('Reusing existing eKYC URL for customer:', customerId);
       return NextResponse.json({
         success: true,

@@ -203,6 +203,9 @@ export async function POST(request: NextRequest) {
 }
 
 function createPaymentConfirmationCard(contract: any, payment: any, investor: any, slipUrl: string): FlexMessage {
+  const itemName = [contract.items?.brand, contract.items?.model].filter(Boolean).join(' ').trim() || '-';
+  const investorName = [investor.firstname, investor.lastname].filter(Boolean).join(' ').trim() || '-';
+
   return {
     type: 'flex',
     altText: 'ยืนยันการรับเงินจากนักลงทุน',
@@ -250,7 +253,7 @@ function createPaymentConfirmationCard(contract: any, payment: any, investor: an
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: `${contract.items?.brand} ${contract.items?.model}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                { type: 'text', text: itemName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
               ]
             },
             {
@@ -278,7 +281,7 @@ function createPaymentConfirmationCard(contract: any, payment: any, investor: an
             },
             {
               type: 'text',
-              text: `โอนโดย: ${investor.firstname} ${investor.lastname}`,
+              text: `โอนโดย: ${investorName}`,
               size: 'xs',
               color: '#888888',
               margin: 'md'

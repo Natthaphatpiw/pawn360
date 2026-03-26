@@ -522,7 +522,7 @@ export async function GET(
       idCard: '-',
       address: '-',
       phone: '',
-      signatureUrl: null
+      signatureUrl: contract.signed_contract_url || contract.pawner?.signature_url || null
     };
 
     const redactedInvestor = {

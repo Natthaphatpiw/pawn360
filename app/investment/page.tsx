@@ -30,7 +30,7 @@ type Contract = {
 
 const CATEGORY_CONFIG = [
   { key: 'mobile', label: 'Mobile', color: '#3B82F6' },
-  { key: 'apple', label: 'Apple', color: '#6366F1' },
+  { key: 'tablet', label: 'Tablet', color: '#6366F1' },
   { key: 'laptop', label: 'Laptop', color: '#EF4444' },
   { key: 'camera', label: 'Camera', color: '#F59E0B' },
   { key: 'accessory', label: 'Mobile Acc.', color: '#22C55E' },
@@ -40,20 +40,28 @@ const CATEGORY_CONFIG = [
 
 const ENDED_STATUSES = ['COMPLETED', 'TERMINATED'];
 
-const mapCategory = (itemType?: string) => {
-  const normalized = String(itemType || '').trim().toLowerCase();
+const mapCategory = (item?: ContractItem) => {
+  const normalized = [
+    item?.item_type,
+    item?.brand,
+    item?.model,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+    .toLowerCase();
 
   if (!normalized) {
     return 'other';
   }
 
-  if (normalized === 'apple' || normalized.includes('iphone') || normalized.includes('ipad') || normalized.includes('macbook')) {
-    return 'apple';
+  if (normalized.includes('ipad') || normalized.includes('tablet') || normalized.includes('แท็บเล็ต')) {
+    return 'tablet';
   }
-  if (normalized.includes('โทรศัพท์มือถือ') || normalized.includes('mobile') || normalized.includes('phone')) {
+  if (normalized.includes('iphone') || normalized.includes('โทรศัพท์มือถือ') || normalized.includes('mobile') || normalized.includes('phone') || normalized.includes('smartphone')) {
     return 'mobile';
   }
-  if (normalized.includes('โน้ตบุค') || normalized.includes('laptop') || normalized.includes('notebook')) {
+  if (normalized.includes('macbook') || normalized.includes('โน้ตบุค') || normalized.includes('laptop') || normalized.includes('notebook')) {
     return 'laptop';
   }
   if (normalized.includes('กล้อง') || normalized.includes('camera')) {
@@ -128,7 +136,7 @@ export default function InvestmentDashboard() {
   const analytics = useMemo(() => {
     const allCounts: Record<string, number> = {
       mobile: 0,
-      apple: 0,
+      tablet: 0,
       laptop: 0,
       camera: 0,
       accessory: 0,
@@ -137,7 +145,7 @@ export default function InvestmentDashboard() {
     };
     const currentCounts: Record<string, number> = {
       mobile: 0,
-      apple: 0,
+      tablet: 0,
       laptop: 0,
       camera: 0,
       accessory: 0,
@@ -214,7 +222,7 @@ export default function InvestmentDashboard() {
     });
 
     contracts.forEach((contract) => {
-      const category = mapCategory(contract.items?.item_type);
+      const category = mapCategory(contract.items);
       allCounts[category] += 1;
 
       const isEnded = ENDED_STATUSES.includes(contract.contract_status || '');

@@ -16,6 +16,8 @@ const mapRedemptionStatus = (status: string) => {
   return 'ไม่ทราบสถานะ';
 };
 
+const VISIBLE_HISTORY_STATUSES = new Set(['ถึงแล้ว', 'คืนแล้ว', 'ยกเลิก']);
+
 const getItemTitle = (
   items?: { brand?: string | null; model?: string | null }
     | Array<{ brand?: string | null; model?: string | null }>
@@ -143,7 +145,7 @@ export async function GET(
     });
 
     const entries = [...contractEntries, ...redemptionEntries]
-      .filter((entry) => entry.date && entry.status !== 'กำลังมา')
+      .filter((entry) => entry.date && VISIBLE_HISTORY_STATUSES.has(entry.status))
       .sort((a, b) => new Date(b.date as string).getTime() - new Date(a.date as string).getTime());
 
     return NextResponse.json({

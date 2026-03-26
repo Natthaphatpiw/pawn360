@@ -292,10 +292,15 @@ export default function InvestorPawnTicketPage() {
             </div>
             <div className="text-center">
               <div className="h-16 border-b border-dashed border-gray-300 mb-2 relative flex items-end justify-center">
-                <div className="w-12 h-12 bg-[#1E3A8A]/10 rounded-full absolute top-1 right-2 border-2 border-[#1E3A8A]/30 flex items-center justify-center rotate-[-15deg]">
-                  <span className="text-[8px] text-[#1E3A8A] font-bold uppercase">Pawnly</span>
-                </div>
-                <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้กู้</span>
+                {ticketData.pawner.signatureUrl ? (
+                  <img
+                    src={ticketData.pawner.signatureUrl}
+                    alt="Pawner Signature"
+                    className="absolute bottom-2 max-h-12 max-w-full object-contain"
+                  />
+                ) : (
+                  <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้กู้</span>
+                )}
               </div>
               <div className="text-[10px] text-gray-500">ลงชื่อ ผู้กู้</div>
             </div>

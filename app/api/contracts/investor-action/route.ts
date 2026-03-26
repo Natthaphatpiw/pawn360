@@ -221,6 +221,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
   const isDelivery = deliveryMethod === 'DELIVERY';
   const deliveryLiffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
   const deliveryUrl = `https://liff.line.me/${deliveryLiffId}?contractId=${contract.contract_id}`;
+  const itemName = [contract.items?.brand, contract.items?.model].filter(Boolean).join(' ').trim() || '-';
 
   const card = {
     type: 'flex',
@@ -269,7 +270,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: contract.items.brand + ' ' + contract.items.model, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                { type: 'text', text: itemName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
               ]
             },
             {
