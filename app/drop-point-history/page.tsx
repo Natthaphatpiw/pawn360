@@ -16,7 +16,6 @@ type HistoryEntry = {
 const FILTERS = [
   { key: 'ALL', label: 'ทั้งหมด' },
   { key: 'ARRIVED', label: 'ถึงแล้ว' },
-  { key: 'RETURN_PENDING', label: 'รอคืนของ' },
   { key: 'RETURNED', label: 'คืนแล้ว' },
   { key: 'CANCELLED', label: 'ยกเลิก' },
 ];
@@ -54,7 +53,6 @@ function DropPointHistoryContent() {
   const filteredEntries = useMemo(() => {
     if (filter === 'ALL') return entries;
     if (filter === 'ARRIVED') return entries.filter((entry) => entry.status === 'ถึงแล้ว');
-    if (filter === 'RETURN_PENDING') return entries.filter((entry) => entry.status === 'รอคืนของ');
     if (filter === 'RETURNED') return entries.filter((entry) => entry.status === 'คืนแล้ว');
     if (filter === 'CANCELLED') return entries.filter((entry) => entry.status === 'ยกเลิก');
     return entries;

@@ -153,12 +153,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const { data: storageBoxAssignment, error: storageBoxAssignmentError } = await supabase
+      .from('drop_point_storage_boxes')
+      .select('box_code')
+      .eq('contract_id', redemption.contract?.contract_id)
+      .order('last_updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (storageBoxAssignmentError && storageBoxAssignmentError.code !== 'PGRST205') {
+      console.error('Error checking storage box assignment:', storageBoxAssignmentError);
+      return NextResponse.json(
+        { error: 'Failed to verify storage box assignment' },
+        { status: 500 }
+      );
+    }
+
+    const expectedBagNumber = existingBagAssignment?.bag_number || storageBoxAssignment?.box_code || null;
+
     if (
-      existingBagAssignment?.bag_number &&
-      existingBagAssignment.bag_number !== resolvedBagNumber
+      expectedBagNumber &&
+      expectedBagNumber !== resolvedBagNumber
     ) {
       return NextResponse.json(
-        { error: `หมายเลขถุงไม่ตรงกับข้อมูลเดิม (${existingBagAssignment.bag_number})` },
+        { error: `หมายเลขถุงไม่ตรงกับข้อมูลเดิม (${expectedBagNumber})` },
         { status: 400 }
       );
     }

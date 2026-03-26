@@ -12,6 +12,7 @@ import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
 
 const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
@@ -386,6 +387,8 @@ function EstimatePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('draftId');
+  const [resumedDraftId, setResumedDraftId] = useState<string | null>(null);
+  const effectiveDraftId = draftId || resumedDraftId;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -539,6 +542,14 @@ function EstimatePageInner() {
   }, [profile?.userId]);
 
   useEffect(() => {
+    if (!profile?.userId || draftId) return;
+    const resume = getPawnerEstimateResume(profile.userId);
+    if (resume?.draftId) {
+      setResumedDraftId(resume.draftId);
+    }
+  }, [profile?.userId, draftId]);
+
+  useEffect(() => {
     let mounted = true;
     const fetchManualConfig = async () => {
       try {
@@ -564,11 +575,11 @@ function EstimatePageInner() {
 
   // Load draft into estimate flow (continue from /drafts/[itemId])
   useEffect(() => {
-    if (!profile?.userId || !draftId) return;
+    if (!profile?.userId || !effectiveDraftId) return;
 
     const loadDraft = async () => {
       try {
-        const res = await axios.get(`/api/items/draft?lineId=${profile.userId}&itemId=${draftId}`);
+        const res = await axios.get(`/api/items/draft?lineId=${profile.userId}&itemId=${effectiveDraftId}`);
         if (!res.data?.success || !res.data?.item) return;
 
         const d = res.data.item;
@@ -619,13 +630,14 @@ function EstimatePageInner() {
 
         // Continue to pawn summary right away (user can proceed to contract)
         setCurrentStep('pawn_summary');
+        clearPawnerEstimateResume(profile.userId);
       } catch (e) {
         console.error('Error loading draft:', e);
       }
     };
 
     loadDraft();
-  }, [profile?.userId, draftId]);
+  }, [profile?.userId, effectiveDraftId]);
 
   // Fetch draft count
   const fetchDraftCount = async () => {
@@ -1986,7 +1998,7 @@ function EstimatePageInner() {
               ].filter(Boolean).join('\n'),
             }}
             lineId={profile.userId}
-            draftItemId={draftId}
+            draftItemId={effectiveDraftId}
             onBack={() => {
               resetEstimateForm();
               setCurrentStep('form');
@@ -2001,6 +2013,7 @@ function EstimatePageInner() {
               }
 
               console.log('📊 Setting state - loanRequestId:', reqId, 'itemId:', itmId);
+              clearPawnerEstimateResume(profile.userId);
               setLoanRequestId(reqId);
               setItemId(itmId);
               setCurrentStep('contract_agreement');

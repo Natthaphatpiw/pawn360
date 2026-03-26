@@ -17,16 +17,21 @@ export const resolveLiffId = (...candidates: Array<string | undefined | null>): 
 export const openLiffEntry = (options: {
   liffIdCandidates: Array<string | undefined | null>;
   fallbackPath: string;
+  statePath?: string;
 }) => {
   if (typeof window === 'undefined') {
     return;
   }
 
   const liffId = resolveLiffId(...options.liffIdCandidates);
+  const normalizedStatePath = normalizeCandidate(options.statePath);
   if (liffId) {
-    window.location.assign(`https://liff.line.me/${liffId}`);
+    const stateQuery = normalizedStatePath
+      ? `?liff.state=${encodeURIComponent(normalizedStatePath)}`
+      : '';
+    window.location.assign(`https://liff.line.me/${liffId}${stateQuery}`);
     return;
   }
 
-  window.location.assign(options.fallbackPath);
+  window.location.assign(normalizedStatePath || options.fallbackPath);
 };

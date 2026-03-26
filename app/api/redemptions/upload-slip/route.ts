@@ -232,7 +232,8 @@ export async function POST(request: NextRequest) {
         }
 
         const notificationCard = createDropPointRedemptionCard(redemption, getDropPointReturnUrl(redemptionId));
-        if (storageBox?.box_code) {
+        const bagOrBoxCode = bagAssignment?.bag_number || storageBox?.box_code || null;
+        if (storageBox?.box_code && bagAssignment?.bag_number && bagAssignment.bag_number !== storageBox.box_code) {
           (notificationCard.contents as any).body.contents.splice(3, 0, {
             type: 'box',
             layout: 'baseline',
@@ -244,7 +245,7 @@ export async function POST(request: NextRequest) {
             ]
           });
         }
-        if (bagAssignment?.bag_number) {
+        if (bagOrBoxCode) {
           (notificationCard.contents as any).body.contents.splice(2, 0, {
             type: 'box',
             layout: 'baseline',
@@ -252,7 +253,7 @@ export async function POST(request: NextRequest) {
             margin: 'md',
             contents: [
               { type: 'text', text: 'หมายเลขถุง:', color: '#666666', size: 'sm', flex: 2 },
-              { type: 'text', text: bagAssignment.bag_number, color: '#365314', size: 'sm', flex: 5, weight: 'bold' }
+              { type: 'text', text: bagOrBoxCode, color: '#365314', size: 'sm', flex: 5, weight: 'bold' }
             ]
           });
         }

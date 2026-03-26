@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { Client } from '@line/bot-sdk';
 import crypto from 'crypto';
-
-const lineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
+import { pushLineTextMessage } from '@/lib/line/push-text';
 
 // Verify webhook signature (if UpPass provides signature header)
 function verifyWebhookSignature(payload: string, signature: string | null): boolean {
@@ -77,6 +72,9 @@ export async function POST(request: NextRequest) {
       } else if (kycStatus === 'complete' && ekycStatus === 'fail') {
         dbStatus = 'REJECTED';
         rejectionReason = 'eKYC verification failed';
+      } else if (kycStatus === 'complete' && ekycStatus === 'need_review') {
+        dbStatus = 'PENDING';
+        rejectionReason = 'Manual review required';
       } else if (kycStatus === 'accepted') {
         dbStatus = 'VERIFIED'; // Legacy support
       } else if (kycStatus === 'rejected') {
@@ -132,15 +130,17 @@ export async function POST(request: NextRequest) {
         } else if (dbStatus === 'REJECTED') {
           message = `การยืนยันตัวตนไม่สำเร็จ\n\nเหตุผล: ${rejectionReason || 'ไม่สามารถยืนยันตัวตนได้'}\n\nกรุณาลองใหม่อีกครั้ง`;
         } else if (dbStatus === 'PENDING') {
-          message = `รอการตรวจสอบ\n\nข้อมูลการยืนยันตัวตนของคุณอยู่ระหว่างการตรวจสอบ\nเราจะแจ้งให้ทราบเมื่อเสร็จสิ้น`;
+          message = ekycStatus === 'need_review'
+            ? 'รอการตรวจสอบเพิ่มเติม\n\nระบบได้รับข้อมูลยืนยันตัวตนแล้ว แต่ต้องมีเจ้าหน้าที่ตรวจสอบเพิ่มเติม\nเราจะแจ้งผลให้ทราบเมื่อเสร็จสิ้น'
+            : `รอการตรวจสอบ\n\nข้อมูลการยืนยันตัวตนของคุณอยู่ระหว่างการตรวจสอบ\nเราจะแจ้งให้ทราบเมื่อเสร็จสิ้น`;
         }
 
         if (message) {
           try {
-            // Send LINE message directly using LINE Bot SDK
-            await lineClient.pushMessage(pawner.line_id, {
-              type: 'text',
-              text: message
+            await pushLineTextMessage({
+              channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+              to: pawner.line_id,
+              text: message,
             });
             console.log(`📱 LINE notification sent to ${pawner.line_id}`);
           } catch (notifyError) {
@@ -184,9 +184,10 @@ export async function POST(request: NextRequest) {
         // Notify user
         if (pawner?.line_id) {
           try {
-            await lineClient.pushMessage(pawner.line_id, {
-              type: 'text',
-              text: `การยืนยันตัวตนไม่สำเร็จ\n\nครบจำนวนครั้งที่พยายามแล้ว\nกรุณาติดต่อฝ่ายสนับสนุน`
+            await pushLineTextMessage({
+              channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+              to: pawner.line_id,
+              text: 'การยืนยันตัวตนไม่สำเร็จ\n\nครบจำนวนครั้งที่พยายามแล้ว\nกรุณาติดต่อฝ่ายสนับสนุน',
             });
           } catch (error) {
             console.error('Failed to send notification:', error);

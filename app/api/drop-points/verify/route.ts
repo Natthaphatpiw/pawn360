@@ -319,6 +319,11 @@ export async function POST(request: NextRequest) {
 }
 
 function createPaymentInstructionCard(contract: any): FlexMessage {
+  const itemName = [contract.items?.brand, contract.items?.model].filter(Boolean).join(' ').trim() || '-';
+  const accountName = contract.pawners?.bank_account_name
+    || [contract.pawners?.firstname, contract.pawners?.lastname].filter(Boolean).join(' ').trim()
+    || 'ไม่ระบุ';
+
   return {
     type: 'flex',
     altText: 'สินค้าผ่านการตรวจสอบแล้ว - กรุณาโอนเงิน',
@@ -366,7 +371,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'สินค้า:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: `${contract.items?.brand} ${contract.items?.model}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                { type: 'text', text: itemName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
               ]
             },
             {
@@ -396,7 +401,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
               spacing: 'sm',
               contents: [
                 { type: 'text', text: 'ชื่อบัญชี:', color: '#666666', size: 'sm', flex: 2 },
-                { type: 'text', text: contract.pawners?.bank_account_name || `${contract.pawners?.firstname} ${contract.pawners?.lastname}`, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
+                { type: 'text', text: accountName, color: '#333333', size: 'sm', flex: 5, weight: 'bold' }
               ]
             },
             {
