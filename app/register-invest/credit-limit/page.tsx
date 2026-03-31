@@ -23,7 +23,7 @@ interface InvestorData {
   addr_postcode?: string | null;
 }
 
-type PreferenceState = Record<string, { enabled: boolean; sub: string[] }>;
+type PreferenceState = Record<string, { enabled: boolean; sub: string[]; limitAmount: string }>;
 
 type PreferenceCategory = {
   key: string;
@@ -36,12 +36,20 @@ type PreferenceCategory = {
 
 const CATEGORY_OPTIONS: PreferenceCategory[] = [
   {
+    key: 'Apple',
+    labelTh: 'สินค้า Apple',
+    labelEn: 'Apple products',
+    subLabelTh: 'ประเภท',
+    subLabelEn: 'Category',
+    options: ['iPhone', 'iPad', 'MacBook', 'Apple Watch', 'AirPods', 'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro'],
+  },
+  {
     key: 'โทรศัพท์มือถือ',
     labelTh: 'โทรศัพท์มือถือ',
     labelEn: 'Mobile',
     subLabelTh: 'ยี่ห้อ',
     subLabelEn: 'Brand',
-    options: ['Apple', 'Samsung', 'Huawei', 'Xiaomi', 'OPPO', 'Vivo', 'Realme', 'OnePlus', 'Google', 'Sony', 'Nokia', 'ASUS', 'อื่นๆ'],
+    options: ['Samsung', 'Huawei', 'Xiaomi', 'OPPO', 'Vivo', 'Realme', 'OnePlus', 'Google', 'Sony', 'Nokia', 'ASUS', 'อื่นๆ'],
   },
   {
     key: 'โน้ตบุค',
@@ -49,7 +57,7 @@ const CATEGORY_OPTIONS: PreferenceCategory[] = [
     labelEn: 'Computer laptop',
     subLabelTh: 'ยี่ห้อ',
     subLabelEn: 'Brand',
-    options: ['Apple', 'Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
+    options: ['Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
   },
   {
     key: 'กล้อง',
@@ -58,14 +66,6 @@ const CATEGORY_OPTIONS: PreferenceCategory[] = [
     subLabelTh: 'ยี่ห้อ',
     subLabelEn: 'Brand',
     options: ['Canon', 'Nikon', 'Sony', 'Fujifilm', 'Panasonic', 'GoPro', 'DJI', 'อื่นๆ'],
-  },
-  {
-    key: 'Apple',
-    labelTh: 'สินค้า Apple',
-    labelEn: 'Apple products',
-    subLabelTh: 'ประเภท',
-    subLabelEn: 'Category',
-    options: ['iPhone', 'iPad', 'MacBook', 'Apple Watch', 'AirPods', 'iMac', 'Mac mini', 'Mac Studio', 'Mac Pro'],
   },
   {
     key: 'อุปกรณ์เสริมโทรศัพท์',
@@ -91,9 +91,14 @@ const TIER_LABELS: Record<string, string> = {
 const buildDefaultPreferences = () => {
   const base: PreferenceState = {};
   CATEGORY_OPTIONS.forEach((category) => {
-    base[category.key] = { enabled: false, sub: [] };
+    base[category.key] = { enabled: false, sub: [], limitAmount: '' };
   });
   return base;
+};
+
+const formatAmount = (value: string | number) => {
+  const digits = String(value).replace(/[^0-9]/g, '');
+  return digits.length ? Number(digits).toLocaleString('en-US') : '';
 };
 
 const normalizePreferences = (raw: any): PreferenceState => {
@@ -108,7 +113,13 @@ const normalizePreferences = (raw: any): PreferenceState => {
       ? entry.sub.filter((value: unknown): value is string => typeof value === 'string')
       : [];
     const enabled = typeof entry.enabled === 'boolean' ? entry.enabled : sub.length > 0;
-    base[key] = { enabled, sub };
+    const rawAmount = entry.limitAmount ?? entry.amount ?? entry.limit_amount;
+    const limitAmount = typeof rawAmount === 'number'
+      ? formatAmount(rawAmount)
+      : typeof rawAmount === 'string'
+      ? formatAmount(rawAmount)
+      : '';
+    base[key] = { enabled, sub, limitAmount };
   });
 
   return base;
@@ -155,6 +166,33 @@ export default function CreditLimitPage() {
     }
 
     const fetchInvestor = async () => {
+
+      // ── Mock data for UI preview ──
+      // ----------------------------------------------------
+      if (process.env.NEXT_PUBLIC_LIFF_MOCK === 'true') {
+        const mockData = {
+          investor_id: 'mock-001',
+          investor_tier: 'GOLD',
+          total_active_principal: 250000,
+          max_investment_amount: 200000,
+          auto_invest_enabled: false,
+          auto_liquidation_enabled: false,
+          phone_number: '0812345678',
+          addr_house_no: '123',
+          addr_street: 'สุขุมวิท',
+          addr_sub_district: 'คลองเตย',
+          addr_district: 'คลองเตย',
+          addr_province: 'กรุงเทพมหานคร',
+          addr_postcode: '10110',
+          investment_preferences: null,
+        };
+        setInvestor(mockData);
+        setLimitInput(formatAmount(mockData.max_investment_amount || 0));
+        setLoading(false);
+        return;
+      }
+      // ----------------------------------------------------
+
       try {
         setLoading(true);
         const response = await axios.get(`/api/investors/check?lineId=${profile.userId}`);
@@ -162,8 +200,9 @@ export default function CreditLimitPage() {
           const data = response.data.investor;
           setInvestor(data);
           const currentLimit = data?.max_investment_amount || 0;
-          setLimitInput(currentLimit.toString());
-          setPreferences(normalizePreferences(data?.investment_preferences));
+          const normalized = normalizePreferences(data?.investment_preferences);
+          setPreferences(normalized);
+          setLimitInput(formatAmount(currentLimit));
           setAutoMatchEnabled(!!data?.auto_invest_enabled);
           setAutoLiquidationEnabled(!!data?.auto_liquidation_enabled);
           const returnDelivery = data?.investment_preferences?.return_delivery;
@@ -218,14 +257,31 @@ export default function CreditLimitPage() {
     return parts.length > 0 ? parts.join(' ') : '-';
   }, [investor]);
 
+  const parseAmount = (value: string) => {
+    const digits = value.replace(/[^0-9]/g, '');
+    return digits.length ? Number(digits) : 0;
+  };
+
+  const getTotalCategoryLimit = (prefs: PreferenceState) => {
+    return Object.values(prefs).reduce((sum, entry) => {
+      const isEnabled = entry.enabled || entry.sub.length > 0;
+      if (!isEnabled) return sum;
+      return sum + parseAmount(entry.limitAmount);
+    }, 0);
+  };
+
+  const totalLimit = parseAmount(limitInput);
+  const totalCategorySum = getTotalCategoryLimit(preferences);
+
   const toggleCategory = (key: string) => {
     setPreferences((prev) => {
       const next = { ...prev };
-      const current = next[key] || { enabled: false, sub: [] };
+      const current = next[key] || { enabled: false, sub: [], limitAmount: '' };
       const enabled = !current.enabled;
       next[key] = {
         enabled,
         sub: enabled ? current.sub : [],
+        limitAmount: current.limitAmount || '',
       };
       return next;
     });
@@ -234,7 +290,7 @@ export default function CreditLimitPage() {
   const toggleSubOption = (key: string, option: string) => {
     setPreferences((prev) => {
       const next = { ...prev };
-      const current = next[key] || { enabled: false, sub: [] };
+      const current = next[key] || { enabled: false, sub: [], limitAmount: '' };
       const exists = current.sub.includes(option);
       const sub = exists
         ? current.sub.filter((value) => value !== option)
@@ -242,6 +298,22 @@ export default function CreditLimitPage() {
       next[key] = {
         enabled: true,
         sub,
+        limitAmount: current.limitAmount || '',
+      };
+      return next;
+    });
+  };
+
+  const setCategoryLimitAmount = (key: string, value: string) => {
+    setPreferences((prev) => {
+      const next = { ...prev };
+      const current = next[key] || { enabled: false, sub: [], limitAmount: '' };
+      const otherTotal = getTotalCategoryLimit(prev) - parseAmount(current.limitAmount);
+      const parsed = parseAmount(value);
+      const maxAllowed = totalLimit > 0 ? Math.max(totalLimit - otherTotal, 0) : parsed;
+      next[key] = {
+        ...current,
+        limitAmount: formatAmount(parsed > maxAllowed ? maxAllowed : value),
       };
       return next;
     });
@@ -249,9 +321,14 @@ export default function CreditLimitPage() {
 
   const handleSave = async () => {
     if (!profile?.userId) return;
-    const parsed = Number(limitInput.replace(/,/g, ''));
-    if (Number.isNaN(parsed) || parsed < 0) {
+    const categoryTotal = getTotalCategoryLimit(preferences);
+    const parsed = parseAmount(limitInput);
+    if (Number.isNaN(parsed) || parsed <= 0) {
       setError('กรุณากรอกวงเงินให้ถูกต้อง');
+      return;
+    }
+    if (categoryTotal > 0 && categoryTotal > parsed) {
+      setError('ยอดรวมวงเงินหมวดหมู่ต้องไม่เกินวงเงินรวม');
       return;
     }
     if (!autoLiquidationEnabled) {
@@ -294,7 +371,10 @@ export default function CreditLimitPage() {
         autoLiquidationEnabled,
       });
       if (response.data.success) {
-        setInvestor(response.data.investor);
+        const updatedInvestor = response.data.investor || (investor ? { ...investor, max_investment_amount: parsed } : null);
+        if (updatedInvestor) {
+          setInvestor(updatedInvestor);
+        }
         alert('บันทึกสำเร็จ');
         router.push('/register-invest');
       }
@@ -345,10 +425,10 @@ export default function CreditLimitPage() {
           <div className="text-3xl font-bold text-[#1E3A8A]">{currentLimit.toLocaleString()}</div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-4 border border-gray-100">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-gray-800 font-bold text-lg">วงเงินใหม่</span>
+              <span className="text-gray-800 font-semibold text-base">วงเงินใหม่</span>
               <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
                 New credit limit
               </span>
@@ -359,13 +439,29 @@ export default function CreditLimitPage() {
           <input
             type="text"
             value={limitInput}
-            onChange={(e) => setLimitInput(e.target.value)}
+            onChange={(e) => setLimitInput(formatAmount(e.target.value))}
             placeholder="100,000"
-            className="w-full p-4 bg-white border border-gray-300 rounded-xl text-2xl text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#1E3A8A]"
+            className="w-full p-4 bg-white border border-gray-300 rounded-xl text-xl text-gray-800 text-center focus:outline-none focus:ring-1 focus:ring-[#1E3A8A]"
           />
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-4 border border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-base text-gray-800 font-semibold">ยอดรวมวงเงินจากหมวดหมู่</div>
+            <span className="text-sm text-gray-500">บาท</span>
+          </div>
+          <input
+            type="text"
+            value={totalCategorySum.toLocaleString()}
+            readOnly
+            className="w-full p-4 bg-gray-100 rounded-xl text-xl text-gray-600 text-center focus:outline-none focus:ring-0 focus:border-transparent"
+          />
+          {totalLimit > 0 && totalCategorySum > totalLimit && (
+            <p className="mt-2 text-xs text-red-600">ยอดรวมหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</p>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 border border-gray-100">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-gray-800 font-bold text-lg">สินค้าที่ต้องการ</span>
             <span className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">Item preferences</span>
@@ -373,7 +469,7 @@ export default function CreditLimitPage() {
 
           <div className="space-y-3">
             {CATEGORY_OPTIONS.map((category) => {
-              const entry = preferences[category.key] || { enabled: false, sub: [] };
+              const entry = preferences[category.key] || { enabled: false, sub: [], limitAmount: '' };
               const isEnabled = entry.enabled || entry.sub.length > 0;
               return (
                 <div
@@ -417,13 +513,34 @@ export default function CreditLimitPage() {
                       );
                     })}
                   </div>
+
+                  {isEnabled && (
+                    <div className="mt-4">
+                      <label className="text-sm font-medium text-gray-700">วงเงินสำหรับหมวดนี้</label>
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9,]*"
+                          value={entry.limitAmount}
+                          onChange={(e) => setCategoryLimitAmount(category.key, e.target.value)}
+                          placeholder="0"
+                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#1E3A8A] bg-white"
+                        />
+                        <span className="text-sm text-gray-500">บาท</span>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">
+                        {totalLimit > 0 ? `เหลืออีก ${Math.max(0, totalLimit - (totalCategorySum - parseAmount(entry.limitAmount))).toLocaleString()} บาท สำหรับหมวดนี้` : 'กรุณากรอกวงเงินรวมก่อนเพื่อดูยอดที่เหลือ'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-4">
           <div
             className={`rounded-2xl border px-4 py-3 cursor-pointer ${autoMatchAllowed ? 'border-[#DCE4F0] bg-[#F3F6FB]' : 'border-[#FAD7D7] bg-[#FEF2F2]'}`}
             onClick={() => setAutoMatchInfoOpen((prev) => !prev)}
@@ -495,7 +612,7 @@ export default function CreditLimitPage() {
         </div>
 
         {!autoLiquidationEnabled && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-4">
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-4">
             <div>
               <div className="font-semibold text-gray-800">ที่อยู่สำหรับส่งคืนสินค้า</div>
               <div className="text-xs text-gray-500">ใช้เมื่อปิดการขายทอดตลาดโดย Pawnly</div>
@@ -540,21 +657,21 @@ export default function CreditLimitPage() {
                   placeholder="บ้านเลขที่ *"
                   value={returnAddress.houseNo}
                   onChange={(e) => setReturnAddress((prev) => ({ ...prev, houseNo: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                 />
                 <input
                   type="text"
                   placeholder="หมู่บ้าน/คอนโด"
                   value={returnAddress.village}
                   onChange={(e) => setReturnAddress((prev) => ({ ...prev, village: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                 />
                 <input
                   type="text"
                   placeholder="ถนน/ซอย"
                   value={returnAddress.street}
                   onChange={(e) => setReturnAddress((prev) => ({ ...prev, street: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -562,14 +679,14 @@ export default function CreditLimitPage() {
                     placeholder="ตำบล/แขวง *"
                     value={returnAddress.subDistrict}
                     onChange={(e) => setReturnAddress((prev) => ({ ...prev, subDistrict: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                   />
                   <input
                     type="text"
                     placeholder="อำเภอ/เขต *"
                     value={returnAddress.district}
                     onChange={(e) => setReturnAddress((prev) => ({ ...prev, district: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -578,14 +695,17 @@ export default function CreditLimitPage() {
                     placeholder="จังหวัด *"
                     value={returnAddress.province}
                     onChange={(e) => setReturnAddress((prev) => ({ ...prev, province: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                   />
                   <input
                     type="text"
-                    placeholder="รหัสไปรษณีย์"
+                    placeholder="รหัสไปรษณีย์ *"
                     value={returnAddress.postcode}
-                    onChange={(e) => setReturnAddress((prev) => ({ ...prev, postcode: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                    onChange={(e) => setReturnAddress((prev) => ({ ...prev, postcode: e.target.value.replace(/[^0-9]/g, '').slice(0, 5) }))}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={5}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400"
                   />
                 </div>
               </div>
@@ -593,10 +713,13 @@ export default function CreditLimitPage() {
 
             <input
               type="tel"
-              placeholder="เบอร์ติดต่อสำหรับการจัดส่ง"
+              placeholder="0812345678"
               value={returnContactPhone}
-              onChange={(e) => setReturnContactPhone(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
+              onChange={(e) => setReturnContactPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+              inputMode="tel"
+              pattern="[0-9]*"
+              maxLength={10}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400"
             />
           </div>
         )}
@@ -610,7 +733,7 @@ export default function CreditLimitPage() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="w-full bg-[#0B3B82] hover:bg-[#08306A] text-white rounded-2xl py-4 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98] disabled:opacity-50"
+          className="w-full bg-[#0B3B82] hover:bg-[#08306A] text-white rounded-2xl py-4 flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50"
         >
           <span className="text-base font-bold">{saving ? 'กำลังบันทึก...' : 'บันทึก'}</span>
           <span className="text-[10px] opacity-80 font-light">Save</span>
