@@ -363,13 +363,24 @@ export default function InvestorRegister() {
   if (investorData) {
     if (!pinVerified) {
       return (
-        <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6">
-          <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
-            <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูข้อมูลสมาชิก</h2>
-            <p className="text-sm text-gray-500 mt-2">เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูข้อมูลบัญชีผู้ลงทุน</p>
-            <button type="button" onClick={() => setPinModalOpen(true)} className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white">
-              ยืนยัน PIN
-            </button>
+        <div className="min-h-screen bg-white flex items-center justify-center p-6">
+          <div className="w-full max-w-md rounded-[30px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_22px_60px_rgba(11,59,130,0.14)]">
+            <div className="rounded-[24px] border border-white/90 bg-white/80 px-4 py-5 text-center shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
+              <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+                Secure Access
+              </div>
+              <h2 className="mt-3 text-xl font-semibold text-[#243B62]">ยืนยัน PIN ก่อนเข้าดูข้อมูลสมาชิก</h2>
+              <p className="mt-2 text-sm text-[#6F7E97]">
+                เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูข้อมูลบัญชีผู้ลงทุน
+              </p>
+              <button
+                type="button"
+                onClick={() => setPinModalOpen(true)}
+                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#6D8FC8] via-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition-transform active:scale-[0.98]"
+              >
+                ยืนยัน PIN
+              </button>
+            </div>
           </div>
           {profile?.userId && (
             <PinModal
@@ -472,7 +483,7 @@ export default function InvestorRegister() {
               <Image src={tierImage} alt={`${TIER_LABELS[investorTier]} tier`} fill className="object-cover" priority />
             </div>
           </button>
-          <div className="bg-white rounded-2xl mx-4 p-4 text-center mb-4">
+          <div className="bg-white/80 border border-white/90 rounded-2xl mx-4 p-4 text-center mb-4 shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
               <p className="text-xl font-medium text-gray-800 mb-2">{investorData.firstname} {investorData.lastname}</p>
               <p className="text-[#393939] text-sm font-light">Member ID: {investorData.investor_id.slice(0, 8)}</p>
             </div>
@@ -610,7 +621,7 @@ export default function InvestorRegister() {
                   </span>
                 </div>
                 {!autoMatchAllowed && remainingToNext > 0 && (
-                  <div className="text-[10px] text-gray-400">ปล่อยสัญญาเพิ่มอีก {remainingToNext.toLocaleString()} บาท เพื่อปลดล็อก</div>
+                  <div className="text-[10px] text-gray-400 text-right">ปล่อยสัญญาเพิ่มอีก {remainingToNext.toLocaleString()} บาท เพื่อปลดล็อก</div>
                 )}
                 <div className="flex items-center justify-between">
                   <span>Liquidated by Pawnly</span>
