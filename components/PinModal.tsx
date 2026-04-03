@@ -277,7 +277,7 @@ export default function PinModal({
             <button
               onClick={handleVerify}
               disabled={loading || !!lockedUntil}
-              className="w-full rounded-2xl bg-gradient-to-r from-[var(--pin-primary)] to-[#6D8FC8] py-3 text-sm font-bold text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition hover:brightness-95 disabled:opacity-60"
+              className="w-full rounded-2xl bg-gradient-to-r from-[#6D8FC8] via-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition hover:brightness-95 disabled:opacity-60"
             >
               {loading ? 'กำลังยืนยัน...' : 'ยืนยัน PIN'}
             </button>
@@ -287,7 +287,7 @@ export default function PinModal({
             <button
               onClick={handleSetup}
               disabled={loading || !!lockedUntil}
-              className="w-full rounded-2xl bg-gradient-to-r from-[var(--pin-primary)] to-[#6D8FC8] py-3 text-sm font-bold text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition hover:brightness-95 disabled:opacity-60"
+              className="w-full rounded-2xl bg-gradient-to-r from-[#6D8FC8] via-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition hover:brightness-95 disabled:opacity-60"
             >
               {loading ? 'กำลังตั้งค่า...' : 'ตั้งค่า PIN'}
             </button>
@@ -297,7 +297,7 @@ export default function PinModal({
             <button
               onClick={handleReset}
               disabled={loading || !!lockedUntil}
-              className="w-full rounded-2xl bg-gradient-to-r from-[var(--pin-primary)] to-[#6D8FC8] py-3 text-sm font-bold text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition hover:brightness-95 disabled:opacity-60"
+              className="w-full rounded-2xl bg-gradient-to-r from-[#6D8FC8] via-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition hover:brightness-95 disabled:opacity-60"
             >
               {loading ? 'กำลังรีเซ็ต...' : 'รีเซ็ต PIN'}
             </button>
@@ -307,7 +307,7 @@ export default function PinModal({
             <button
               type="button"
               onClick={() => setMode('reset')}
-              className="w-full rounded-2xl border border-[#D9E3F2] bg-white/80 py-3 text-xs font-semibold text-[#5C76A6]"
+              className="w-full rounded-2xl border border-[#D9E3F2] bg-white/80 py-3 text-sm font-medium text-[#5C76A6]"
             >
               ลืม PIN
             </button>
@@ -317,7 +317,7 @@ export default function PinModal({
             <button
               type="button"
               onClick={() => setMode('verify')}
-              className="w-full rounded-2xl border border-[#D9E3F2] bg-white/80 py-3 text-xs font-semibold text-[#5C76A6]"
+              className="w-full rounded-2xl border border-[#D9E3F2] bg-white/80 py-3 text-sm font-medium text-[#5C76A6]"
             >
               กลับไปยืนยัน PIN
             </button>
@@ -326,7 +326,7 @@ export default function PinModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-2xl border border-[#D9E3F2] bg-white/80 py-3 text-xs font-semibold text-[#6F7E97]"
+            className="w-full rounded-2xl border border-[#D9E3F2] bg-white/80 py-3 text-sm font-medium text-[#6F7E97]"
           >
             ยกเลิก
           </button>
