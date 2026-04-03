@@ -173,3 +173,43 @@ summary::-webkit-details-marker {
     animation: none;
   }
 }
+/* ─── Dot Bricks Base ─────────────────────────────────────────────────────── */
+
+.dot-bricks {
+  position: relative;
+  top: 8px;
+  left: -9999px;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: var(--dot-color, #06367B);
+  color: var(--dot-color, #06367B);
+  box-shadow:
+    9991px -16px 0 0 var(--dot-color, #06367B),
+    9991px 0 0 0 var(--dot-color, #06367B),
+    10007px 0 0 0 var(--dot-color, #06367B);
+  animation: dot-bricks 2s infinite ease;
+}
+
+@keyframes dot-bricks {
+  0%      { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
+  8.333%  { box-shadow: 10007px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
+  16.667% { box-shadow: 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
+  25%     { box-shadow: 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B); }
+  33.333% { box-shadow: 10007px 0 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B); }
+  41.667% { box-shadow: 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B); }
+  50%     { box-shadow: 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B); }
+  58.333% { box-shadow: 9991px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B); }
+  66.666% { box-shadow: 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B); }
+  75%     { box-shadow: 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B); }
+  83.333% { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B); }
+  91.667% { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B); }
+  100%    { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
+}
+
+/* ─── สีต่างกันแต่ละหน้า ──────────────────────────────────────────────────── */
+
+.page-investor  { --dot-color: #06367B; }  /* Deep Blue   */
+.page-pawner    { --dot-color: #C55125; }  /* Orange      */
+.page-droppoint    { --dot-color: #0E5D1E; }  /* Forest Green */
+.page-neutral { --dot-color: #686360; }  /* Warm Grey   */

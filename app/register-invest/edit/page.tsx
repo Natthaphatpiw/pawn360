@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronLeft } from 'lucide-react';
 
 interface InvestorData {
   investor_id: string;
@@ -51,6 +51,24 @@ interface FormData {
     accountName: string;
   };
 }
+
+const BANK_OPTIONS = [
+  'พร้อมเพย์',
+  'กสิกรไทย',
+  'ไทยพาณิชย์',
+  'กรุงเทพ',
+  'กรุงไทย',
+  'ธนชาต',
+  'กรุงศรีอยุธยา',
+  'ทหารไทยธนชาต',
+];
+
+const ACCOUNT_TYPE_OPTIONS = [
+  'บัญชีออมทรัพย์',
+  'บัญชีเงินฝากประจำ',
+  'บัญชีกระแสรายวัน',
+  'บัญชีเงินตราต่างประเทศ',
+];
 
 export default function InvestorEditProfile() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
@@ -199,42 +217,38 @@ export default function InvestorEditProfile() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]"></div>
+      <div className="min-h-screen bg-white flex items-center justify-center page-investor">
+        <div className="dot-bricks"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans">
-      {/* Header */}
-      <div className="bg-white sticky top-0 z-10 shadow-sm">
-        <div className="px-4 py-4 flex items-center">
-          <button
-            onClick={() => router.back()}
-            className="mr-3 text-[#1E3A8A] hover:bg-[#EEF2F8] p-2 rounded-full transition-colors"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <div>
-            <h1 className="text-lg font-bold text-gray-800">แก้ไขข้อมูล</h1>
-            <p className="text-xs text-gray-500">Edit profile</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 py-6 flex justify-center">
-        <div className="w-full max-w-md pb-20">
-
-          {/* Success Message */}
+    <div className="min-h-screen bg-white font-sans">
+      <div className="px-4 pt-6 flex justify-center">
+        <div className="w-full max-w-md pb-10">
           {success && (
-            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
               บันทึกข้อมูลเรียบร้อยแล้ว กำลังกลับไปหน้าโปรไฟล์...
             </div>
           )}
 
-          {/* Personal Info Group */}
-          <div className="space-y-1">
+          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+            <div className="mb-5 rounded-[24px] border border-white/80 bg-white/70 px-4 py-4">
+              <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+                Investor Profile
+              </div>
+              <div className="mt-3 bg-gradient-to-r from-[#0B3B82] via-[#1E4FA3] to-[#6D8FC8] bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+                แก้ไขข้อมูล
+              </div>
+              <p className="mt-1 text-xs text-[#6F7E97]">อัปเดตข้อมูลส่วนตัวและบัญชีธนาคารให้เป็นปัจจุบัน</p>
+            </div>
+
+            <div className="mb-2">
+              <h2 className="text-lg font-bold text-[#243B62]">Personal Information</h2>
+              <p className="text-xs text-[#6F7E97]">ข้อมูลส่วนตัว</p>
+            </div>
+            <div className="space-y-1">
             <EditField
               labelEn="First name"
               labelTh="ชื่อจริง"
@@ -286,17 +300,14 @@ export default function InvestorEditProfile() {
               color="blue"
             />
           </div>
-
-          <div className="h-px bg-gray-300 my-6"></div>
-
-          {/* Address Header */}
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-800">Address</h2>
-            <p className="text-gray-500 text-xs">ที่อยู่</p>
           </div>
-
-          {/* Address Fields Group */}
-          <div className="space-y-1">
+          
+          <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-[#243B62]">Address</h2>
+              <p className="text-xs text-[#6F7E97]">ที่อยู่</p>
+            </div>
+            <div className="space-y-1">
             <EditField
               labelEn="Address (เลขที่)"
               labelTh=""
@@ -370,40 +381,23 @@ export default function InvestorEditProfile() {
               color="blue"
             />
           </div>
-
-          <div className="h-px bg-gray-300 my-6"></div>
-
-          {/* Bank Account Header */}
-          <div className="mb-4">
-            <h2 className="text-lg font-bold text-gray-800">Bank Account</h2>
-            <p className="text-gray-500 text-xs">ข้อมูลบัญชีธนาคาร</p>
           </div>
-
-          {/* Bank Account Fields Group */}
-          <div className="space-y-1">
-            {/* Bank Name Dropdown */}
+          
+          <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
             <div className="mb-4">
-              <div className="mb-1">
-                <div className="text-gray-800 font-bold text-sm md:text-base">Bank Name</div>
-                <div className="text-gray-500 text-xs font-light">ชื่อธนาคาร</div>
-              </div>
-              <select
-                name="bank_bankName"
-                value={formData.bankInfo.bankName}
-                onChange={handleInputChange}
-                className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1E3A8A] text-gray-800"
-              >
-                <option value="">เลือกธนาคาร</option>
-                <option value="พร้อมเพย์">พร้อมเพย์</option>
-                <option value="กสิกรไทย">กสิกรไทย</option>
-                <option value="ไทยพาณิชย์">ไทยพาณิชย์</option>
-                <option value="กรุงเทพ">กรุงเทพ</option>
-                <option value="กรุงไทย">กรุงไทย</option>
-                <option value="ธนชาต">ธนชาต</option>
-                <option value="กรุงศรีอยุธยา">กรุงศรีอยุธยา</option>
-                <option value="ทหารไทยธนชาต">ทหารไทยธนชาต</option>
-              </select>
+              <h2 className="text-lg font-bold text-[#243B62]">Bank Account</h2>
+              <p className="text-xs text-[#6F7E97]">ข้อมูลบัญชีธนาคาร</p>
             </div>
+            <div className="space-y-1">
+            <DropdownField
+              labelEn="Bank Name"
+              labelTh="ชื่อธนาคาร"
+              name="bank_bankName"
+              value={formData.bankInfo.bankName}
+              placeholder="เลือกธนาคาร"
+              options={BANK_OPTIONS}
+              onChange={handleInputChange}
+            />
 
             <EditField
               labelEn="Account No."
@@ -415,26 +409,15 @@ export default function InvestorEditProfile() {
               onChange={handleInputChange}
               color="blue"
             />
-
-            {/* Account Type Dropdown */}
-            <div className="mb-4">
-              <div className="mb-1">
-                <div className="text-gray-800 font-bold text-sm md:text-base">Account Type</div>
-                <div className="text-gray-500 text-xs font-light">ประเภทบัญชี</div>
-              </div>
-              <select
-                name="bank_accountType"
-                value={formData.bankInfo.accountType}
-                onChange={handleInputChange}
-                className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1E3A8A] text-gray-800"
-              >
-                <option value="">เลือกประเภทบัญชี</option>
-                <option value="บัญชีออมทรัพย์">บัญชีออมทรัพย์</option>
-                <option value="บัญชีเงินฝากประจำ">บัญชีเงินฝากประจำ</option>
-                <option value="บัญชีกระแสรายวัน">บัญชีกระแสรายวัน</option>
-                <option value="บัญชีเงินตราต่างประเทศ">บัญชีเงินตราต่างประเทศ</option>
-              </select>
-            </div>
+            <DropdownField
+              labelEn="Account Type"
+              labelTh="ประเภทบัญชี"
+              name="bank_accountType"
+              value={formData.bankInfo.accountType}
+              placeholder="เลือกประเภทบัญชี"
+              options={ACCOUNT_TYPE_OPTIONS}
+              onChange={handleInputChange}
+            />
 
             <EditField
               labelEn="Account Name"
@@ -446,40 +429,115 @@ export default function InvestorEditProfile() {
               color="blue"
             />
           </div>
-
-          {/* Error Message */}
+          </div>
+          
           {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div className="my-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {error}
             </div>
           )}
 
-          {/* Submit Button */}
-          <div className="mt-8 mb-4 space-y-3">
+          <div className="mt-4 space-y-2">
             <button
               onClick={handleSubmit}
               disabled={submitting || success}
-              className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex w-full flex-col items-center justify-center rounded-full bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-2 text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 hover:from-[#18448F] hover:to-[#08306A]"
             >
-              <span className="text-base font-bold">
-                {submitting ? 'กำลังบันทึก...' : success ? 'บันทึกเรียบร้อย' : 'บันทึกข้อมูล'}
+              <span className="text-base font-medium">
+                {submitting ? 'กำลังบันทึก...' : success ? 'บันทึกเรียบร้อย' : 'บันทึก'}
               </span>
               {!submitting && !success && (
-                <span className="text-[10px] font-light opacity-90">Save changes</span>
+                <span className="text-xs font-light opacity-90">Save</span>
               )}
             </button>
 
             <button
               onClick={() => router.back()}
               disabled={submitting}
-              className="w-full bg-white border border-[#1E3A8A] hover:bg-gray-50 text-[#1E3A8A] rounded-2xl py-4 flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="w-full rounded-full bg-[#E6EBF2] py-2 text-[#06367B] flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50 hover:bg-[#B2C1D6]"
             >
-              <span className="text-base font-bold">ยกเลิก</span>
-              <span className="text-[10px] font-light opacity-80">Cancel</span>
+              <span className="text-base font-medium">ยกเลิก</span>
+              <span className="text-xs font-light opacity-80">Cancel</span>
             </button>
           </div>
-
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DropdownField({
+  labelEn,
+  labelTh,
+  name,
+  value,
+  placeholder,
+  options,
+  onChange,
+}: {
+  labelEn: string;
+  labelTh: string;
+  name: string;
+  value: string;
+  placeholder: string;
+  options: string[];
+  onChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleSelect = (nextValue: string) => {
+    const syntheticEvent = {
+      target: { name, value: nextValue },
+    } as React.ChangeEvent<HTMLSelectElement>;
+    onChange(syntheticEvent);
+    setOpen(false);
+  };
+
+  return (
+    <div className="mb-4" ref={containerRef}>
+      <div className="mb-1">
+        <div className="text-sm font-medium text-gray-800 md:text-base">{labelEn}</div>
+        <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-left text-base text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
+          aria-expanded={open}
+        >
+          <span className={value ? 'text-gray-800' : 'text-gray-400'}>{value || placeholder}</span>
+          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+
+        {open && (
+          <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+            <div className="max-h-60 overflow-y-auto py-1">
+              {options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleSelect(option)}
+                  className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option ? 'bg-[#E8F0FF] text-[#1E3A8A]' : 'text-gray-700 hover:bg-gray-50'}`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -507,15 +565,15 @@ const EditField = ({
   required?: boolean;
   color?: "orange" | "blue";
 }) => {
-  const ringColor = color === "blue" ? "focus:ring-[#1E3A8A]" : "focus:ring-[#C0562F]";
+  const ringColor = color === "blue" ? "focus:ring-[#06367B]" : "focus:ring-[#06367B]";
   
   return (
     <div className="mb-4">
       <div className="mb-1">
-        <div className="text-gray-800 font-bold text-sm md:text-base">
+        <div className="text-sm font-medium text-gray-800 md:text-base">
           {labelEn} {required && <span className="text-red-500">*</span>}
         </div>
-        {labelTh && <div className="text-gray-500 text-xs font-light">{labelTh}</div>}
+        {labelTh && <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>}
       </div>
       <input
         type={type}
@@ -523,7 +581,7 @@ const EditField = ({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className={`w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 ${ringColor} text-gray-800`}
+        className={`w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 ${ringColor}`}
       />
     </div>
   );
