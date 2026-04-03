@@ -64,7 +64,7 @@ interface RegisterFormData {
 type RegistrationPreferenceState = Record<string, { enabled: boolean; limitAmount: string }>;
 
 const TIER_IMAGES: Record<string, string> = {
-  SILVER: '/tier-image/PawnlyTier-Silver.png',
+  SILVER: '/tier-image/silver-pawnlytier.png',
   GOLD: '/tier-image/gold-pawnlytier.png',
   PLATINUM: '/tier-image/plattinam-pawnlytier.png',
 };
@@ -463,7 +463,7 @@ export default function InvestorRegister() {
 
     return (
       <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center pb-8">
-        <div className="w-full max-w-sm my-2 rounded-[28px] bg-gradient-to-br from-white via-[#E6EBF2] to-[#E4ECF8] shadow-[0_10px_30px_rgba(30,58,138,0.08)] border border-[#E4ECF8]">
+        <div className="w-full max-w-sm my-3 rounded-[28px] bg-gradient-to-br from-white via-[#E6EBF2] to-[#E4ECF8] shadow-[0_10px_30px_rgba(30,58,138,0.08)] border border-[#E4ECF8]">
           <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white/90 mt-4 ml-4 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
             Investor Profile
           </div>
@@ -477,7 +477,7 @@ export default function InvestorRegister() {
               <p className="text-[#393939] text-sm font-light">Member ID: {investorData.investor_id.slice(0, 8)}</p>
             </div>
         </div>
-        <div className="w-full max-w-sm space-y-2">
+        <div className="w-full max-w-sm space-y-3">
           {/* Current Limit */}
           <div className="w-full bg-[#E6EBF2] rounded-3xl p-4 text-center">
             <h2 className="text-gray-600 text-lg font-medium">วงเงินปัจจุบัน</h2>
