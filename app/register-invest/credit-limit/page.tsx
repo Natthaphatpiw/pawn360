@@ -512,10 +512,20 @@ export default function CreditLimitPage() {
             {CATEGORY_OPTIONS.map((category) => {
               const entry = preferences[category.key] || { enabled: false, sub: [], limitAmount: '' };
               const isEnabled = entry.enabled || entry.sub.length > 0;
+              const remainingForCategory = totalLimit > 0
+                ? Math.max(0, totalLimit - (totalCategorySum - parseAmount(entry.limitAmount)))
+                : 0;
+              const noCreditLeft = isEnabled && totalLimit > 0 && remainingForCategory <= 0;
               return (
                 <div
                   key={category.key}
-                  className={`rounded-2xl border p-4 transition-colors ${isEnabled ? 'border-[#1E3A8A]/50 bg-[#E6EBF2]' : 'border-gray-200 bg-white'}`}
+                  className={`rounded-2xl border p-4 transition-colors ${
+                    noCreditLeft
+                      ? 'border-[#FD5661] bg-[#FEEDEE]'
+                      : isEnabled
+                      ? 'border-[#1E3A8A]/50 bg-[#E6EBF2]'
+                      : 'border-gray-200 bg-white'
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -570,8 +580,8 @@ export default function CreditLimitPage() {
                         />
                         <span className="text-sm text-gray-500">บาท</span>
                       </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        {totalLimit > 0 ? `เหลืออีก ${Math.max(0, totalLimit - (totalCategorySum - parseAmount(entry.limitAmount))).toLocaleString()} บาท สำหรับหมวดนี้` : 'กรุณากรอกวงเงินรวมก่อนเพื่อดูยอดที่เหลือ'}
+                      <div className={`mt-2 text-xs ${noCreditLeft ? 'text-[#D13F49]' : 'text-gray-500'}`}>
+                        {totalLimit > 0 ? `เหลืออีก ${remainingForCategory.toLocaleString()} บาท สำหรับหมวดนี้` : 'กรุณากรอกวงเงินรวมก่อนเพื่อดูยอดที่เหลือ'}
                       </div>
                     </div>
                   )}
