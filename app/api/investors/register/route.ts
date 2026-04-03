@@ -10,6 +10,9 @@ export async function POST(request: NextRequest) {
       lastname,
       phoneNumber,
       nationalId,
+      referralCode,
+      maxInvestmentAmount,
+      preferences,
       address,
       bankInfo
     } = body;
@@ -75,6 +78,9 @@ export async function POST(request: NextRequest) {
         bank_account_no: bankInfo?.accountNo?.trim() || null,
         bank_account_type: bankAccountType,
         bank_account_name: bankInfo?.accountName?.trim() || null,
+        referral_code: referralCode?.trim() || null,
+        max_investment_amount: typeof maxInvestmentAmount === 'number' && maxInvestmentAmount > 0 ? maxInvestmentAmount : null,
+        investment_preferences: preferences || null,
         kyc_status: 'NOT_VERIFIED',
         is_active: true,
         is_blocked: false,
