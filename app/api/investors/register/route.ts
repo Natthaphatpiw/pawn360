@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
       bankInfo
     } = body;
 
+    const normalizedReferralCode = referralCode?.trim()?.toUpperCase() || null;
+
     // Validation
     if (!lineId || !firstname || !lastname || !phoneNumber || !nationalId) {
       return NextResponse.json(
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
         bank_account_no: bankInfo?.accountNo?.trim() || null,
         bank_account_type: bankAccountType,
         bank_account_name: bankInfo?.accountName?.trim() || null,
-        referral_code: referralCode?.trim() || null,
+        referral_code: normalizedReferralCode,
         max_investment_amount: typeof maxInvestmentAmount === 'number' && maxInvestmentAmount > 0 ? maxInvestmentAmount : null,
         investment_preferences: preferences || null,
         kyc_status: 'NOT_VERIFIED',
