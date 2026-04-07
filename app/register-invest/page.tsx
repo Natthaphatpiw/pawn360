@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import type { StaticImageData } from 'next/image';
 import { ChevronDown, X } from 'lucide-react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
@@ -9,6 +10,10 @@ import axios from 'axios';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 import { loadMockInvestor } from '@/lib/mock-investor';
+import pawnlyWelcomeLogo from '@/app/Image-logos/Pawnly logo - No BG,Full - Off-White.png';
+import investorTierSilver from '@/Assets/image-tiers/investortiersilver.png';
+import investorTierGold from '@/Assets/image-tiers/investortiergold.png';
+import investorTierPlatinum from '@/Assets/image-tiers/investortierplatinum.png';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // เปิดใช้ด้วย NEXT_PUBLIC_LIFF_MOCK=true ใน .env.local
@@ -63,10 +68,10 @@ interface RegisterFormData {
 
 type RegistrationPreferenceState = Record<string, { enabled: boolean; limitAmount: string }>;
 
-const TIER_IMAGES: Record<string, string> = {
-  SILVER: '/tier-image/silver-pawnlytier.png',
-  GOLD: '/tier-image/gold-pawnlytier.png',
-  PLATINUM: '/tier-image/plattinam-pawnlytier.png',
+const TIER_IMAGES: Record<string, StaticImageData> = {
+  SILVER: investorTierSilver,
+  GOLD: investorTierGold,
+  PLATINUM: investorTierPlatinum,
 };
 
 const TIER_LABELS: Record<string, string> = {
@@ -215,6 +220,18 @@ type ReferralClassification = {
   isValid: boolean;
 };
 
+type RegistrationSetupPayload = {
+  maxInvestmentAmount: number;
+  preferences: Record<string, { enabled: boolean; sub: string[]; limitAmount: number }>;
+};
+
+type RegistrationSubmission = {
+  formData: RegisterFormData;
+  registrationSetup?: RegistrationSetupPayload;
+};
+
+const INVESTOR_REGISTRATION_EKYC_STORAGE_KEY = 'pawn360_investor_registration_ekyc_active';
+
 function classifyReferralCode(value: string | null | undefined): ReferralClassification {
   const code = String(value || '').trim().toUpperCase();
   const match = code.match(/^([A-Z]{2})(\d{2})([A-Z0-9]{4})$/);
@@ -234,11 +251,69 @@ function classifyReferralCode(value: string | null | undefined): ReferralClassif
   };
 }
 
+function normalizeRegisteredInvestor(raw: any, overrides?: Partial<InvestorData>): InvestorData {
+  return {
+    investor_id: raw?.investor_id || 'temp-investor',
+    line_id: raw?.line_id || '',
+    firstname: raw?.firstname || '',
+    lastname: raw?.lastname || '',
+    kyc_status: raw?.kyc_status || 'NOT_VERIFIED',
+    referral_code: raw?.referral_code ?? null,
+    max_investment_amount: raw?.max_investment_amount ?? null,
+    investor_tier: raw?.investor_tier || 'SILVER',
+    total_active_principal: Number(raw?.total_active_principal || 0),
+    auto_invest_enabled: !!raw?.auto_invest_enabled,
+    auto_liquidation_enabled: !!raw?.auto_liquidation_enabled,
+    investment_preferences: raw?.investment_preferences || null,
+    stats: {
+      totalContracts: Number(raw?.stats?.totalContracts || 0),
+      activeContracts: Number(raw?.stats?.activeContracts || 0),
+      endedContracts: Number(raw?.stats?.endedContracts || 0),
+      totalInvestedAmount: Number(raw?.stats?.totalInvestedAmount || 0),
+      currentInvestedAmount: Number(raw?.stats?.currentInvestedAmount || 0),
+    },
+    ...overrides,
+  };
+}
+
+function buildJuzmatchAutoFilledFormData(displayName: string | null | undefined, referralCode: string): RegisterFormData {
+  const cleanedName = String(displayName || '').trim();
+  const nameParts = cleanedName ? cleanedName.split(/\s+/) : [];
+  const firstname = nameParts[0] || 'ลูกค้า';
+  const lastname = nameParts.slice(1).join(' ') || 'JUZMATCH';
+
+  return {
+    firstname,
+    lastname,
+    phoneNumber: '0812345678',
+    nationalId: '0000000000000',
+    referralCode,
+    address: {
+      houseNo: 'ข้อมูลจาก JUZMATCH',
+      village: '-',
+      street: '-',
+      subDistrict: 'ดึงจาก JUZMATCH console',
+      district: 'ดึงจาก JUZMATCH console',
+      province: 'ดึงจาก JUZMATCH console',
+      country: 'Thailand',
+      postcode: '10110',
+    },
+    bankInfo: {
+      bankName: 'ธนาคารกสิกรไทย (KBANK)',
+      accountNo: '0000000000',
+      accountType: 'บัญชีออมทรัพย์',
+      accountName: `${firstname} ${lastname}`.trim(),
+    },
+  };
+}
+
 export default function InvestorRegister() {
-  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError, liffObject } = useLiff();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [investorData, setInvestorData] = useState<InvestorData | null>(null);
+  const [registeredEkycInvestor, setRegisteredEkycInvestor] = useState<InvestorData | null>(null);
+  const [postRegistrationView, setPostRegistrationView] = useState<'verified' | 'pending' | null>(null);
   const [pinVerified, setPinVerified] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [tierModalOpen, setTierModalOpen] = useState(false);
@@ -272,13 +347,13 @@ export default function InvestorRegister() {
 
     const checkUser = async () => {
       // ── Mock mode ────────────────────────────────────────────────────────────
-      if (process.env.NEXT_PUBLIC_LIFF_MOCK === 'true') {
-        console.info('[Mock] Using mock investor data for UI preview');
-        setInvestorData(loadMockInvestor());
-        setPinVerified(true); // ข้าม PIN modal ไปเลยตอน mock
-        setLoading(false);
-        return;
-      }
+      // if (process.env.NEXT_PUBLIC_LIFF_MOCK === 'true') {
+      //   console.info('[Mock] Using mock investor data for UI preview');
+      //   setInvestorData(loadMockInvestor());
+      //   setPinVerified(true); // ข้าม PIN modal ไปเลยตอน mock
+      //   setLoading(false);
+      //   return;
+      // }
 
       // ── Real API ─────────────────────────────────────────────────────────────
       try {
@@ -286,12 +361,24 @@ export default function InvestorRegister() {
         if (response.data.exists) {
           const investor = response.data.investor;
           setInvestorData(investor);
-          const session = getPinSession('INVESTOR', profile.userId);
-          if (session?.token) {
+          const hasPostRegistrationEkycFlow = typeof window !== 'undefined'
+            && window.localStorage.getItem(INVESTOR_REGISTRATION_EKYC_STORAGE_KEY) === 'active';
+
+          if (hasPostRegistrationEkycFlow) {
             setPinVerified(true);
+            if (investor.kyc_status === 'VERIFIED') {
+              setPostRegistrationView('verified');
+            } else {
+              setPostRegistrationView('pending');
+            }
           } else {
-            setPinVerified(false);
-            setPinModalOpen(true);
+            const session = getPinSession('INVESTOR', profile.userId);
+            if (session?.token) {
+              setPinVerified(true);
+            } else {
+              setPinVerified(false);
+              setPinModalOpen(true);
+            }
           }
         }
       } catch (error: any) {
@@ -320,35 +407,72 @@ export default function InvestorRegister() {
     }
   };
 
-  const handleSubmit = async (registrationSetup?: {
-    maxInvestmentAmount: number;
-    preferences: Record<string, { enabled: boolean; sub: string[]; limitAmount: number }>;
-  }) => {
-    if (!profile?.userId) { setError('กรุณาเข้าสู่ระบบ LINE'); return; }
-    if (!formData.firstname || !formData.lastname || !formData.phoneNumber || !formData.nationalId) {
-      setError('กรุณากรอกข้อมูลให้ครบถ้วน'); return;
+  const handleSubmit = async ({ formData: submittedFormData, registrationSetup }: RegistrationSubmission) => {
+    if (!profile?.userId) { setError('กรุณาเข้าสู่ระบบ LINE'); return null; }
+    if (!submittedFormData.firstname || !submittedFormData.lastname || !submittedFormData.phoneNumber || !submittedFormData.nationalId) {
+      setError('กรุณากรอกข้อมูลให้ครบถ้วน'); return null;
     }
     setSubmitting(true);
     setError(null);
     try {
       const response = await axios.post('/api/investors/register', {
         lineId: profile.userId,
-        ...formData,
-        referralCode: formData.referralCode || null,
+        ...submittedFormData,
+        referralCode: submittedFormData.referralCode || null,
         maxInvestmentAmount: registrationSetup?.maxInvestmentAmount || null,
         preferences: registrationSetup ? {
           categories: registrationSetup.preferences,
-          referral: classifyReferralCode(formData.referralCode),
-        } : formData.referralCode ? {
-          referral: classifyReferralCode(formData.referralCode),
+          referral: classifyReferralCode(submittedFormData.referralCode),
+        } : submittedFormData.referralCode ? {
+          referral: classifyReferralCode(submittedFormData.referralCode),
         } : null,
       });
-      if (response.data.success) router.push('/ekyc-invest');
+      if (response.data.success) {
+        return normalizeRegisteredInvestor(response.data.investor, {
+          kyc_status: response.data.investor?.kyc_status || 'NOT_VERIFIED',
+        });
+      }
+      return null;
     } catch (error: any) {
       console.error('Registration error:', error);
       setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการลงทะเบียน');
+      return null;
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const clearPostRegistrationEkycFlow = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(INVESTOR_REGISTRATION_EKYC_STORAGE_KEY);
+    }
+    setPostRegistrationView(null);
+  };
+
+  const handleStartRegistrationEkyc = async (submission: RegistrationSubmission) => {
+    const investor = registeredEkycInvestor || await handleSubmit(submission);
+    if (!investor?.investor_id) return;
+
+    setRegisteredEkycInvestor(investor);
+    setError(null);
+
+    try {
+      const response = await axios.post('/api/ekyc/initiate-invest', {
+        investorId: investor.investor_id,
+      });
+
+      if (response.data.success && response.data.url) {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(INVESTOR_REGISTRATION_EKYC_STORAGE_KEY, 'active');
+          window.location.href = response.data.url;
+        }
+        return;
+      }
+
+      setError('ไม่สามารถเริ่มต้นการยืนยันตัวตนได้');
+    } catch (ekycError: any) {
+      console.error('eKYC start error:', ekycError);
+      setError(ekycError.response?.data?.error || 'ไม่สามารถเริ่มต้นการยืนยันตัวตนได้');
     }
   };
 
@@ -361,6 +485,61 @@ export default function InvestorRegister() {
   }
 
   if (investorData) {
+    if (postRegistrationView === 'verified') {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center p-6">
+          <div className="w-full max-w-md rounded-[30px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_22px_60px_rgba(11,59,130,0.14)]">
+            <div className="rounded-[24px] border border-white/90 bg-white/80 px-4 py-6 text-center shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3B82] text-3xl text-white">✓</div>
+              <h2 className="mt-4 text-2xl font-semibold text-[#243B62]">ยืนยันตัวตนสำเร็จ</h2>
+              <p className="mt-2 text-sm text-[#6F7E97]">
+                บัญชีนักลงทุนของคุณพร้อมใช้งานแล้ว สามารถกลับสู่หน้าหลักเพื่อดูข้อมูลสมาชิกได้ทันที
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  clearPostRegistrationEkycFlow();
+                  setPinVerified(true);
+                }}
+                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition-transform active:scale-[0.98]"
+              >
+                กลับสู่หน้าหลัก
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (postRegistrationView === 'pending') {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center p-6">
+          <div className="w-full max-w-md rounded-[30px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_22px_60px_rgba(11,59,130,0.14)]">
+            <div className="rounded-[24px] border border-white/90 bg-white/80 px-4 py-6 text-center shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#E6EBF2] text-3xl text-[#0B3B82]">…</div>
+              <h2 className="mt-4 text-2xl font-semibold text-[#243B62]">Please wait for eKYC approving</h2>
+              <p className="mt-2 text-sm text-[#6F7E97]">
+                ระบบกำลังตรวจสอบผลการยืนยันตัวตนของคุณ กรุณารอผลอนุมัติภายใน 24 ชั่วโมง
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (liffObject?.closeWindow) {
+                    liffObject.closeWindow();
+                  } else if (typeof window !== 'undefined' && (window as any).liff?.closeWindow) {
+                    (window as any).liff.closeWindow();
+                  }
+                }}
+                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition-transform active:scale-[0.98]"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (!pinVerified) {
       return (
         <div className="min-h-screen bg-white flex items-center justify-center p-6">
@@ -478,10 +657,13 @@ export default function InvestorRegister() {
           <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white/90 mt-4 ml-4 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
             Investor Profile
           </div>
-          <button onClick={() => setTierModalOpen(true)} className="mt-2 w-full rounded-3xl overflow-hidden active:scale-[0.98] transition-transform">
-            <div className="relative h-24 w-full">
-              <Image src={tierImage} alt={`${TIER_LABELS[investorTier]} tier`} fill className="object-cover" priority />
-            </div>
+          <button onClick={() => setTierModalOpen(true)} className="m-4 block overflow-hidden rounded-3xl active:scale-[0.98] transition-transform shadow-[0_10px_30px_rgba(30,58,138,0.15)]">
+            <Image
+              src={tierImage}
+              alt={`${TIER_LABELS[investorTier]} tier`}
+              priority
+              className="block h-auto w-full"
+            />
           </button>
           <div className="bg-white/80 border border-white/90 rounded-2xl mx-4 p-4 text-center mb-4 shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
               <p className="text-xl font-medium text-gray-800 mb-2">{investorData.firstname} {investorData.lastname}</p>
@@ -726,9 +908,15 @@ export default function InvestorRegister() {
 
   return (
     <RegisterForm
+      profileName={profile?.displayName || ''}
       formData={formData}
       handleInputChange={handleInputChange}
       handleSubmit={handleSubmit}
+      handleStartEkyc={handleStartRegistrationEkyc}
+      onRegistered={(registeredInvestor) => {
+        setInvestorData(registeredInvestor);
+        setPinVerified(true);
+      }}
       submitting={submitting}
       error={error}
     />
@@ -748,6 +936,18 @@ const RegisterField = ({ labelEn, labelTh, placeholder, value, onChange, name, t
     </div>
     <input type={type} name={name} placeholder={placeholder} value={value} onChange={onChange}
       className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]" />
+  </div>
+);
+
+const StaticInfoField = ({ labelEn, labelTh, value }: { labelEn: string; labelTh: string; value: string }) => (
+  <div className="mb-4">
+    <div className="mb-1">
+      <div className="text-sm font-medium text-gray-800 md:text-base">{labelEn}</div>
+      <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>
+    </div>
+    <div className="w-full rounded-xl border border-[#D9E3F2] bg-[#F3F6FB] px-3 py-3 text-gray-700">
+      {value || '-'}
+    </div>
   </div>
 );
 
@@ -828,30 +1028,42 @@ function DropdownField({
   );
 }
 
-function StepBar({ currentStep }: { currentStep: number }) {
-  const steps = [
-    { id: 1, label: 'ข้อมูล' },
-    { id: 2, label: 'สินค้า' },
-    { id: 3, label: 'วงเงิน' },
-  ];
-
+function StepBar({ currentStep, steps }: { currentStep: number; steps: Array<{ id: number; label: string }> }) {
   return (
-    <div className="mb-4 rounded-[22px] border border-[#D9E3F2] bg-white/90 px-4 py-3 shadow-[0_8px_18px_rgba(11,59,130,0.06)]">
-      <div className="flex items-start gap-2">
-        {steps.map((step, index) => {
-          const active = currentStep >= step.id;
-          return (
-            <React.Fragment key={step.id}>
-              <div className="flex min-w-[56px] flex-col items-center text-center">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${active ? 'bg-[#0B3B82] text-white' : 'bg-[#E6EBF2] text-[#6F7E97]'}`}>
-                  {step.id}
+    <div className="mb-4 rounded-[24px] border border-[#D9E3F2] bg-white/90 p-2 shadow-[0_8px_18px_rgba(11,59,130,0.06)]">
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
+      >
+          {steps.map((step) => {
+            const completed = currentStep > step.id;
+            const current = currentStep === step.id;
+            return (
+                <div
+                  key={step.id}
+                  className={`flex min-h-[66px] flex-col items-center justify-center rounded-[18px] border px-2 py-3 text-center ${
+                    completed
+                      ? 'border-[#1E4FA3] bg-[#1E4FA3]'
+                      : current
+                      ? 'border-[#1E4FA3] bg-[rgba(30,79,163,0.5)]'
+                      : 'border-[#D9E3F2] bg-white'
+                  }`}
+                >
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
+                    completed || current
+                      ? 'bg-white text-[#0B3B82]'
+                      : 'bg-[#E6EBF2] text-[#6F7E97]'
+                  }`}>
+                    {step.id}
+                  </div>
+                  <span className={`mt-1 text-[11px] font-medium ${
+                    completed || current
+                      ? 'text-white'
+                      : 'text-[#8A98B2]'
+                  }`}>{step.label}</span>
                 </div>
-                <span className={`mt-1 text-[11px] font-medium ${active ? 'text-[#0B3B82]' : 'text-[#8A98B2]'}`}>{step.label}</span>
-              </div>
-              {index < steps.length - 1 && <div className={`mt-4 h-[2px] flex-1 rounded-full ${currentStep > step.id ? 'bg-[#0B3B82]' : 'bg-[#D9E3F2]'}`} />}
-            </React.Fragment>
-          );
-        })}
+            );
+          })}
       </div>
     </div>
   );
@@ -970,28 +1182,83 @@ const ACCOUNT_TYPE_OPTIONS = [
 
 const MAX_CREDIT_LIMIT = 1_000_000;
 
-function RegisterForm({ formData, handleInputChange, handleSubmit, submitting, error }: {
+function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, handleStartEkyc, onRegistered, submitting, error }: {
+  profileName: string;
   formData: RegisterFormData;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => void;
-  handleSubmit: (registrationSetup?: {
-    maxInvestmentAmount: number;
-    preferences: Record<string, { enabled: boolean; sub: string[]; limitAmount: number }>;
-  }) => void;
+  handleSubmit: (submission: RegistrationSubmission) => Promise<InvestorData | null>;
+  handleStartEkyc: (submission: RegistrationSubmission) => Promise<void>;
+  onRegistered: (investor: InvestorData) => void;
   submitting: boolean;
   error: string | null;
 }) {
-  const [step, setStep] = useState(1);
+  const [stepKey, setStepKey] = useState<'welcome' | 'referral' | 'details' | 'preferences' | 'limits' | 'ekyc' | 'success'>('welcome');
   const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward');
   const [poppingBubbleKey, setPoppingBubbleKey] = useState<string | null>(null);
   const [totalLimitInput, setTotalLimitInput] = useState('');
   const [divideEqually, setDivideEqually] = useState(true);
   const [preferenceState, setPreferenceState] = useState<RegistrationPreferenceState>(() => buildRegistrationPreferenceState());
+  const [hasReferralCode, setHasReferralCode] = useState<boolean | null>(null);
+  const [completedInvestor, setCompletedInvestor] = useState<InvestorData | null>(null);
+  const [addPersonalBankAccount, setAddPersonalBankAccount] = useState(false);
+
+  const referralPreview = classifyReferralCode(formData.referralCode);
+  const isJuzmatchReferral = hasReferralCode === true && referralPreview.source === 'JUZMATCH' && referralPreview.isValid;
   const selectedPreferenceKeys = Object.keys(preferenceState).filter((key) => preferenceState[key]?.enabled);
+  const juzmatchAutoFilledForm = buildJuzmatchAutoFilledFormData(profileName, formData.referralCode);
+  const hasPersonalBankInfo = Boolean(
+    formData.bankInfo.bankName &&
+    formData.bankInfo.accountNo &&
+    formData.bankInfo.accountType &&
+    formData.bankInfo.accountName
+  );
+  const activeFormData = isJuzmatchReferral
+    ? {
+        ...juzmatchAutoFilledForm,
+        bankInfo: addPersonalBankAccount && hasPersonalBankInfo
+          ? formData.bankInfo
+          : juzmatchAutoFilledForm.bankInfo,
+      }
+    : formData;
+
+  useEffect(() => {
+    if (isJuzmatchReferral && !totalLimitInput) {
+      setTotalLimitInput('500,000');
+    }
+  }, [isJuzmatchReferral, totalLimitInput]);
+
   const computedPayload = buildCategoryLimitPayload(preferenceState, totalLimitInput, divideEqually);
   const equalPreviewAmount = selectedPreferenceKeys.length > 0 ? Math.floor(parseAmountInput(totalLimitInput) / selectedPreferenceKeys.length) : 0;
-  const referralPreview = classifyReferralCode(formData.referralCode);
-  const isJuzmatchReferral = referralPreview.source === 'JUZMATCH';
   const manualCategoryTotal = selectedPreferenceKeys.reduce((sum, key) => sum + parseAmountInput(preferenceState[key]?.limitAmount || ''), 0);
+
+  const stepOrder = [
+    { id: 1, key: 'welcome', label: 'เริ่มต้น' },
+    { id: 2, key: 'referral', label: 'Referral' },
+    { id: 3, key: 'details', label: 'ข้อมูล' },
+    { id: 4, key: 'preferences', label: 'สินค้า' },
+    { id: 5, key: 'limits', label: 'วงเงิน' },
+    { id: 6, key: 'ekyc', label: 'eKYC' },
+    { id: 7, key: 'success', label: 'สำเร็จ' },
+  ];
+  const currentStepIndex = stepOrder.findIndex((step) => step.key === stepKey);
+  const visibleStepOrder = stepOrder.filter((step) => step.key !== 'welcome' && step.key !== 'success');
+  const visibleStepIndex = visibleStepOrder.findIndex((step) => step.key === stepKey);
+  const currentVisibleStep = visibleStepIndex >= 0 ? visibleStepIndex + 1 : visibleStepOrder.length;
+
+  const goToStep = (nextStep: typeof stepKey, direction: 'forward' | 'backward') => {
+    setStepDirection(direction);
+    setStepKey(nextStep);
+  };
+
+  const goNext = () => {
+    const next = stepOrder[currentStepIndex + 1];
+    if (next) goToStep(next.key as typeof stepKey, 'forward');
+  };
+
+  const goBack = () => {
+    const previous = stepOrder[currentStepIndex - 1];
+    if (previous) goToStep(previous.key as typeof stepKey, 'backward');
+  };
 
   const handleCategoryLimitChange = (key: string, value: string) => {
     setPreferenceState((prev) => {
@@ -1012,275 +1279,543 @@ function RegisterForm({ formData, handleInputChange, handleSubmit, submitting, e
     });
   };
 
-  const handleNextFromDetails = () => {
-    if (!formData.firstname || !formData.lastname || !formData.phoneNumber || !formData.nationalId) return;
-    setStepDirection('forward');
-    setStep(2);
+  const isReferralStepValid = hasReferralCode === false || (hasReferralCode === true && referralPreview.isValid);
+  const isDetailsStepValid = isJuzmatchReferral
+    ? !addPersonalBankAccount || hasPersonalBankInfo
+    : (
+      !!formData.firstname &&
+      !!formData.lastname &&
+      !!formData.phoneNumber &&
+      !!formData.nationalId &&
+      !!formData.bankInfo.bankName &&
+      !!formData.bankInfo.accountNo &&
+      !!formData.bankInfo.accountType &&
+      !!formData.bankInfo.accountName
+    );
+  const isLimitsStepValid = computedPayload.totalLimit > 0 && computedPayload.categories !== null;
+
+  const completeRegistration = async () => {
+    if (!computedPayload.categories || computedPayload.totalLimit <= 0) return;
+    const investor = await handleSubmit({
+      formData: activeFormData,
+      registrationSetup: {
+        maxInvestmentAmount: computedPayload.totalLimit,
+        preferences: computedPayload.categories,
+      },
+    });
+    if (investor) {
+      setCompletedInvestor(investor);
+      goToStep('success', 'forward');
+    }
   };
 
-  const handleFinalSubmit = () => {
-    if (computedPayload.totalLimit <= 0 || computedPayload.categories === null) return;
-    handleSubmit({
-      maxInvestmentAmount: computedPayload.totalLimit,
-      preferences: computedPayload.categories,
-    });
+  const buildRegistrationSubmission = (): RegistrationSubmission | null => {
+    if (!computedPayload.categories || computedPayload.totalLimit <= 0) return null;
+    return {
+      formData: activeFormData,
+      registrationSetup: {
+        maxInvestmentAmount: computedPayload.totalLimit,
+        preferences: computedPayload.categories,
+      },
+    };
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className={`min-h-screen font-sans ${stepKey === 'welcome' ? 'bg-gradient-to-br from-[#0F4FAE] via-[#2D69C7] to-[#8BB8F2]' : 'bg-white'}`}>
       <style jsx>{`
         @keyframes step-enter-up {
-          from {
-            opacity: 0;
-            transform: translateY(28px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(28px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
         @keyframes bubble-pop-in {
-          from {
-            opacity: 0;
-            transform: scale(0.82) translateY(18px);
-          }
-          72% {
-            opacity: 1;
-            transform: scale(1.04) translateY(-2px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
+          from { opacity: 0; transform: scale(0.82) translateY(18px); }
+          72% { opacity: 1; transform: scale(1.04) translateY(-2px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
         }
-
         @keyframes bubble-select-pop {
-          0% {
-            transform: scale(1);
-          }
-          22% {
-            transform: scale(0.94);
-          }
-          58% {
-            transform: scale(1.05);
-          }
-          82% {
-            transform: scale(0.985);
-          }
-          100% {
-            transform: scale(1);
-          }
+          0% { transform: scale(1); }
+          22% { transform: scale(0.94); }
+          58% { transform: scale(1.05); }
+          82% { transform: scale(0.985); }
+          100% { transform: scale(1); }
+        }
+        @keyframes float-blob {
+          0% { transform: translateY(0) translateX(0) scale(1); }
+          50% { transform: translateY(-12px) translateX(8px) scale(1.05); }
+          100% { transform: translateY(0) translateX(0) scale(1); }
+        }
+        @keyframes pulse-star {
+          0%, 100% { opacity: 0.45; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.14); }
+        }
+        @keyframes referral-reveal {
+          from { opacity: 0; transform: scale(0.84) translateY(12px); }
+          72% { opacity: 1; transform: scale(1.04) translateY(-2px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes bank-fields-pop {
+          from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+          70% { opacity: 1; transform: translateY(1px) scale(1.01); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
-      <div className="px-4 pt-6 flex justify-center">
-        <div className="w-full max-w-md pb-10">
-          <StepBar currentStep={step} />
-          <div
-            key={step}
-            style={{
-              animation: 'step-enter-up 250ms ease',
-            }}
-          >
-            {step === 1 && (
-              <>
-              <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-                <div className="mb-5 rounded-[24px] border border-white/80 bg-white/70 px-4 py-4">
-                  <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
-                    Investor Register
-                  </div>
-                  <div className="mt-3 bg-gradient-to-r from-[#0B3B82] via-[#1E4FA3] to-[#6D8FC8] bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
-                    สมัครสมาชิก
-                  </div>
-                  <p className="mt-1 text-xs text-[#6F7E97]">กรอกข้อมูลส่วนตัวและบัญชีธนาคารก่อนตั้งค่าการลงทุน</p>
+      <div className={`flex justify-center ${stepKey === 'welcome' ? 'min-h-screen px-0 pt-0' : 'px-4 pt-6'}`}>
+        <div className={`w-full ${stepKey === 'welcome' ? '' : 'max-w-md pb-10'}`}>
+          {stepKey !== 'welcome' && stepKey !== 'success' && (
+            <StepBar currentStep={currentVisibleStep} steps={visibleStepOrder.map((step, index) => ({ id: index + 1, label: step.label }))} />
+          )}
+          <div key={stepKey} style={{ animation: 'step-enter-up 250ms ease' }}>
+            {stepKey === 'welcome' && (
+              <div className="relative min-h-screen overflow-hidden px-6 py-10 text-white">
+                <div className="pointer-events-none absolute inset-0">
+                  <div className="absolute left-[-18px] top-8 h-28 w-28 rounded-full bg-white/14" style={{ animation: 'float-blob 6.2s ease-in-out infinite' }} />
+                  <div className="absolute right-[-12px] top-16 h-24 w-24 rounded-full bg-[#DCEAFE]/18" style={{ animation: 'float-blob 7.1s ease-in-out infinite' }} />
+                  <div className="absolute bottom-[-18px] left-16 h-32 w-32 rounded-full bg-white/10" style={{ animation: 'float-blob 8s ease-in-out infinite' }} />
+                  <div className="absolute right-10 top-8 h-2.5 w-2.5 rounded-full bg-white/70" style={{ animation: 'pulse-star 3.1s ease-in-out infinite' }} />
+                  <div className="absolute left-24 top-24 h-2 w-2 rounded-full bg-white/60" style={{ animation: 'pulse-star 2.7s ease-in-out infinite' }} />
+                  <div className="absolute bottom-20 right-20 h-3 w-3 rounded-full bg-[#EAF4FF]/80" style={{ animation: 'pulse-star 3.4s ease-in-out infinite' }} />
                 </div>
-
-                <div className="mb-2">
-                  <h2 className="text-lg font-bold text-[#243B62]">Personal Information</h2>
-                  <p className="text-xs text-[#6F7E97]">ข้อมูลส่วนตัว</p>
-                </div>
-                <div className="space-y-1">
-                  <RegisterField labelEn="First name" labelTh="ชื่อจริง" placeholder="ชื่อจริง" name="firstname" value={formData.firstname} onChange={handleInputChange} />
-                  <RegisterField labelEn="Last name" labelTh="นามสกุล" placeholder="นามสกุล" name="lastname" value={formData.lastname} onChange={handleInputChange} />
-                  <RegisterField labelEn="Phone number" labelTh="เบอร์โทรศัพท์" placeholder="000-000-0000" name="phoneNumber" type="tel" value={formData.phoneNumber} onChange={handleInputChange} />
-                  <RegisterField labelEn="ID" labelTh="เลขบัตรประชาชน 13 หลัก" placeholder="X-XXXX-XXXXX-XX-X" name="nationalId" value={formData.nationalId} onChange={handleInputChange} />
+                <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-md flex-col justify-center">
+                  <div className="mb-8 flex justify-center">
+                    <Image
+                      src={pawnlyWelcomeLogo}
+                      alt="Pawnly"
+                      priority
+                      className="h-auto w-[180px]"
+                    />
+                  </div>
+                  <div className="inline-flex w-fit rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/90">
+                    Welcome To Pawnly
+                  </div>
+                  <h1 className="mt-4 text-3xl font-semibold leading-tight">เริ่มต้นเป็นสมาชิกนักลงทุนกับ Pawnly</h1>
+                  <p className="mt-3 max-w-sm text-sm text-white/90">
+                    เลือกเส้นทางที่เหมาะกับคุณก่อนเริ่มสมัครสมาชิก ระบบจะพาคุณไปทีละขั้นจนพร้อมเข้าสู่หน้าสมาชิก
+                  </p>
+                  <div className="mt-8 rounded-[26px] border border-white/20 bg-white/14 p-4 backdrop-blur-[1px]">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 text-2xl">✦</div>
+                      <div>
+                        <div className="text-base font-medium">เส้นทางสมัครสมาชิกใหม่</div>
+                        <div className="text-xs text-white/80">รองรับทั้งนักลงทุนทั่วไปและลูกค้า JUZMATCH</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-                <div className="mb-4">
-                  <h2 className="text-lg font-bold text-[#243B62]">Address</h2>
-                  <p className="text-xs text-[#6F7E97]">ที่อยู่</p>
+            {stepKey === 'referral' && (
+              <div className="rounded-[32px] border border-[#D9E3F2] bg-gradient-to-br from-[#0F4FAE] via-[#2D69C7] to-[#8BB8F2] p-5 text-white shadow-[0_18px_45px_rgba(11,59,130,0.22)]">
+                <div className="inline-flex rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/90">
+                  Referral Entry
                 </div>
-                <div className="space-y-1">
+                <h2 className="mt-4 text-2xl font-semibold">คุณมี Referral code หรือไม่</h2>
+                <p className="mt-2 text-sm text-white/85">หากมีรหัสจาก JUZMATCH หรือเพื่อน สามารถกรอกเพื่อกำหนดสิทธิ์และเส้นทางสมัครได้ทันที</p>
+                <div className="mt-6 space-y-3">
                   {[
-                    { labelEn: 'Address (เลขที่)', placeholder: 'บ้านเลขที่', name: 'addr_houseNo', value: formData.address.houseNo },
-                    { labelEn: 'Village/Building (หมู่บ้าน/อาคาร)', placeholder: 'ชื่อหมู่บ้าน/อาคาร', name: 'addr_village', value: formData.address.village },
-                    { labelEn: 'Street (ตรอก/ซอย/ถนน)', placeholder: 'ถนน/ตรอก/ซอย', name: 'addr_street', value: formData.address.street },
-                    { labelEn: 'Sub-district (แขวง/ตำบล)', placeholder: 'แขวง/ตำบล', name: 'addr_subDistrict', value: formData.address.subDistrict },
-                    { labelEn: 'District (เขต/อำเภอ)', placeholder: 'เขต/อำเภอ', name: 'addr_district', value: formData.address.district },
-                    { labelEn: 'Province (จังหวัด)', placeholder: 'จังหวัด', name: 'addr_province', value: formData.address.province },
-                    { labelEn: 'Country (ประเทศ)', placeholder: 'ประเทศ', name: 'addr_country', value: formData.address.country },
-                    { labelEn: 'Postcode (รหัสไปรษณีย์)', placeholder: 'XXXXX', name: 'addr_postcode', value: formData.address.postcode },
-                  ].map((f) => (
-                    <RegisterField key={f.name} labelEn={f.labelEn} labelTh="" placeholder={f.placeholder} name={f.name} value={f.value} onChange={handleInputChange} />
+                    { value: true, title: 'มี Referral code', desc: 'ใช้สำหรับลูกค้า JUZMATCH หรือรหัสแนะนำจากเพื่อน' },
+                    { value: false, title: 'ไม่มี Referral code', desc: 'สมัครเป็นนักลงทุนทั่วไปและดำเนินขั้นตอนมาตรฐาน' },
+                  ].map((option) => (
+                    <button
+                      key={String(option.value)}
+                      type="button"
+                      onClick={() => setHasReferralCode(option.value)}
+                      className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
+                        hasReferralCode === option.value
+                          ? 'border-white bg-white text-[#0B3B82] shadow-[0_10px_24px_rgba(11,59,130,0.18)]'
+                          : 'border-white/25 bg-white/12 text-white'
+                      }`}
+                    >
+                      <div className="text-base font-medium">{option.title}</div>
+                      <div className={`mt-1 text-xs ${hasReferralCode === option.value ? 'text-[#5C76A6]' : 'text-white/78'}`}>{option.desc}</div>
+                    </button>
                   ))}
                 </div>
+                {hasReferralCode && (
+                  <div
+                    className="mt-5 rounded-[24px] bg-white p-4 text-[#243B62] shadow-[0_10px_24px_rgba(11,59,130,0.18)]"
+                    style={{ animation: 'referral-reveal 220ms ease' }}
+                  >
+                    <div className="text-sm font-medium">Referral code</div>
+                    {/* <div className="mt-1 text-xs text-[#6F7E97]">ตัวอย่าง JUZMATCH: `JM260001` หรือรหัสเพื่อน: `FR260001`</div> */}
+                    <input
+                      type="text"
+                      name="referralCode"
+                      placeholder="AA260001"
+                      value={formData.referralCode}
+                      onChange={handleInputChange}
+                      className="mt-3 w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-base text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
+                    />
+                    <div className={`mt-2 text-xs ${referralPreview.isValid ? 'text-[#1E4FA3]' : 'text-[#B42318]'}`}>
+                      {referralPreview.isValid
+                        ? referralPreview.source === 'JUZMATCH'
+                          ? 'ตรวจพบรหัส JUZMATCH ระบบจะดึงข้อมูลที่ JUZMATCH บันทึกไว้มาแสดงแบบอัตโนมัติ'
+                          : 'ตรวจพบรหัสแนะนำจากเพื่อน ระบบจะมอบสิทธิ์พิเศษที่คุณและเพื่อนจะได้รับเมื่อสมัครเสร็จ'
+                        : ''}
+                    </div>
+                    {referralPreview.source === 'JUZMATCH' && referralPreview.isValid && (
+                      <div className="mt-3 rounded-2xl border border-[#D9E3F2] bg-[#F4F8FD] px-3 py-3 text-xs text-[#5C76A6]">
+                        รหัสนี้จะใช้ค้นหาข้อมูลนักลงทุนจาก JUZMATCH console ซึ่งทีมงาน JUZMATCH บันทึกไว้ล่วงหน้า แล้วนำมา Autofill ในขั้นตอนถัดไป
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+            )}
 
-              <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-                <div className="mb-4">
-                  <h2 className="text-lg font-bold text-[#243B62]">Bank Account</h2>
-                  <p className="text-xs text-[#6F7E97]">ข้อมูลบัญชีธนาคาร</p>
-                </div>
-                <DropdownField labelEn="Bank name" labelTh="ชื่อธนาคาร" name="bank_bankName" value={formData.bankInfo.bankName} placeholder="เลือกธนาคาร" options={BANKS} onChange={handleInputChange} />
-                <RegisterField labelEn="Account no." labelTh="หมายเลขบัญชี" placeholder="0000000000" name="bank_accountNo" type="tel" value={formData.bankInfo.accountNo} onChange={handleInputChange} />
-                <DropdownField labelEn="Account type" labelTh="ประเภทบัญชี" name="bank_accountType" value={formData.bankInfo.accountType} placeholder="เลือกประเภทบัญชี" options={ACCOUNT_TYPE_OPTIONS} onChange={handleInputChange} />
-                <RegisterField labelEn="Account name" labelTh="ชื่อบัญชี" placeholder="ชื่อ-นามสกุลเจ้าของบัญชี" name="bank_accountName" value={formData.bankInfo.accountName} onChange={handleInputChange} />
-              </div>
+            {stepKey === 'details' && (
+              <>
+                <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+                  <div className="mb-5 rounded-[24px] border border-white/80 bg-white/70 px-4 py-4">
+                    <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+                      {isJuzmatchReferral ? 'JUZMATCH Investor' : 'Investor Register'}
+                    </div>
+                    <div className="mt-3 bg-gradient-to-r from-[#0B3B82] via-[#1E4FA3] to-[#6D8FC8] bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+                      {isJuzmatchReferral ? 'สมาชิกจาก JUZMATCH' : 'สมัครสมาชิก'}
+                    </div>
+                    <p className="mt-1 text-xs text-[#6F7E97]">
+                      {isJuzmatchReferral ? 'ข้อมูลชุดนี้มาจาก JUZMATCH ด้วย referral code ที่คุณกรอกไว้ และไม่สามารถแก้ไขในหน้านี้ได้' : 'กรอกข้อมูลส่วนตัว ที่อยู่ และบัญชีธนาคารก่อนตั้งค่าการลงทุน'}
+                    </p>
+                    {/* {isJuzmatchReferral && (
+                      <div className="mt-4 rounded-2xl border border-[#D9E3F2] bg-[#F4F8FD] px-4 py-3 text-xs text-[#5C76A6]">
+                        ข้อมูลส่วนตัว ที่อยู่ บัญชีธนาคาร และวงเงินรวมในเส้นทางนี้ เป็นข้อมูลที่ JUZMATCH admin กรอกไว้ในระบบก่อนส่งรหัส `JMYYXXXX` ให้คุณ
+                      </div>
+                    )} */}
+                  </div>
 
-              <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-                <div className="mb-2">
-                  <h2 className="text-lg font-bold text-[#243B62]">Referral Code</h2>
-                  <p className="text-xs text-[#6F7E97]">โค้ดสำหรับกำหนดสิทธิ์การเข้าถึงฟังก์ชัน</p>
+                  <div className="mb-2">
+                    <h2 className="text-lg font-bold text-[#243B62]">Personal Information</h2>
+                    <p className="text-xs text-[#6F7E97]">ข้อมูลส่วนตัว</p>
+                  </div>
+                  <div className="space-y-1">
+                    {isJuzmatchReferral ? (
+                      <>
+                        <StaticInfoField labelEn="First name" labelTh="ชื่อจริง" value={activeFormData.firstname} />
+                        <StaticInfoField labelEn="Last name" labelTh="นามสกุล" value={activeFormData.lastname} />
+                        <StaticInfoField labelEn="Phone number" labelTh="เบอร์โทรศัพท์" value={activeFormData.phoneNumber} />
+                        <StaticInfoField labelEn="ID" labelTh="เลขบัตรประชาชน 13 หลัก" value={activeFormData.nationalId} />
+                      </>
+                    ) : (
+                      <>
+                        <RegisterField labelEn="First name" labelTh="ชื่อจริง" placeholder="ชื่อจริง" name="firstname" value={formData.firstname} onChange={handleInputChange} />
+                        <RegisterField labelEn="Last name" labelTh="นามสกุล" placeholder="นามสกุล" name="lastname" value={formData.lastname} onChange={handleInputChange} />
+                        <RegisterField labelEn="Phone number" labelTh="เบอร์โทรศัพท์" placeholder="000-000-0000" name="phoneNumber" type="tel" value={formData.phoneNumber} onChange={handleInputChange} />
+                        <RegisterField labelEn="ID" labelTh="เลขบัตรประชาชน 13 หลัก" placeholder="X-XXXX-XXXXX-XX-X" name="nationalId" value={formData.nationalId} onChange={handleInputChange} />
+                      </>
+                    )}
+                  </div>
                 </div>
-                <RegisterField labelEn=" " labelTh=" " placeholder="AA260001" name="referralCode" value={formData.referralCode} onChange={handleInputChange}/>
-              </div>
+
+                <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+                  <div className="mb-4">
+                    <h2 className="text-lg font-bold text-[#243B62]">Address</h2>
+                    <p className="text-xs text-[#6F7E97]">ที่อยู่</p>
+                  </div>
+                  <div className="space-y-1">
+                    {isJuzmatchReferral ? (
+                      <>
+                        <StaticInfoField labelEn="Address (เลขที่)" labelTh="" value={activeFormData.address.houseNo} />
+                        <StaticInfoField labelEn="Village/Building (หมู่บ้าน/อาคาร)" labelTh="" value={activeFormData.address.village} />
+                        <StaticInfoField labelEn="Street (ตรอก/ซอย/ถนน)" labelTh="" value={activeFormData.address.street} />
+                        <StaticInfoField labelEn="Sub-district (แขวง/ตำบล)" labelTh="" value={activeFormData.address.subDistrict} />
+                        <StaticInfoField labelEn="District (เขต/อำเภอ)" labelTh="" value={activeFormData.address.district} />
+                        <StaticInfoField labelEn="Province (จังหวัด)" labelTh="" value={activeFormData.address.province} />
+                        <StaticInfoField labelEn="Country (ประเทศ)" labelTh="" value={activeFormData.address.country} />
+                        <StaticInfoField labelEn="Postcode (รหัสไปรษณีย์)" labelTh="" value={activeFormData.address.postcode} />
+                      </>
+                    ) : (
+                      [
+                        { labelEn: 'Address (เลขที่)', placeholder: 'บ้านเลขที่', name: 'addr_houseNo', value: formData.address.houseNo },
+                        { labelEn: 'Village/Building (หมู่บ้าน/อาคาร)', placeholder: 'ชื่อหมู่บ้าน/อาคาร', name: 'addr_village', value: formData.address.village },
+                        { labelEn: 'Street (ตรอก/ซอย/ถนน)', placeholder: 'ถนน/ตรอก/ซอย', name: 'addr_street', value: formData.address.street },
+                        { labelEn: 'Sub-district (แขวง/ตำบล)', placeholder: 'แขวง/ตำบล', name: 'addr_subDistrict', value: formData.address.subDistrict },
+                        { labelEn: 'District (เขต/อำเภอ)', placeholder: 'เขต/อำเภอ', name: 'addr_district', value: formData.address.district },
+                        { labelEn: 'Province (จังหวัด)', placeholder: 'จังหวัด', name: 'addr_province', value: formData.address.province },
+                        { labelEn: 'Country (ประเทศ)', placeholder: 'ประเทศ', name: 'addr_country', value: formData.address.country },
+                        { labelEn: 'Postcode (รหัสไปรษณีย์)', placeholder: 'XXXXX', name: 'addr_postcode', value: formData.address.postcode },
+                      ].map((f) => (
+                        <RegisterField key={f.name} labelEn={f.labelEn} labelTh="" placeholder={f.placeholder} name={f.name} value={f.value} onChange={handleInputChange} />
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+                  <div className="mb-4">
+                    <h2 className="text-lg font-bold text-[#243B62]">Bank Account</h2>
+                    <p className="text-xs text-[#6F7E97]">ข้อมูลบัญชีธนาคาร</p>
+                  </div>
+                  {isJuzmatchReferral ? (
+                    <>
+                      <div className="rounded-[24px] border border-[#D9E3F2] bg-white/80 px-4 py-4 shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+                        <div className="inline-flex rounded-full border border-[#CFE0F5] bg-[#F4F8FD] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#5C76A6]">
+                          JUZMATCH Pool
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-[#42597D]">
+                          บัญชีลงทุนหลักของคุณมีเงิน Escrow หรือวงเงินที่ถืออยู่ใน JUZMATCH Pool อยู่แล้ว หากต้องการเพิ่มวงเงินลงทุนให้มากกว่ายอดใน Pool คุณสามารถเพิ่มบัญชีส่วนตัวไว้ล่วงหน้าได้
+                        </p>
+                        {/* <p className="mt-2 text-xs leading-5 text-[#6F7E97]">
+                          บัญชีนี้เป็นตัวเลือกเพิ่มเติม ระบบจะใช้ JUZMATCH Pool ก่อน และเมื่อ Pool ไม่พอ ระบบจะสลับไปใช้บัญชีส่วนตัวพร้อมแจ้งให้คุณโอนเงินเข้าดีลนั้นด้วยตนเอง หากยังไม่ต้องการเพิ่มตอนนี้ คุณสามารถกลับมาเพิ่มภายหลังได้ในหน้าแก้ไขข้อมูลสมาชิก
+                        </p> */}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setAddPersonalBankAccount((prev) => !prev)}
+                        className={`mt-4 flex w-full items-center justify-between rounded-[22px] border px-4 py-4 text-left transition-all ${
+                          addPersonalBankAccount
+                            ? 'border-[#1E4FA3] bg-white shadow-[0_10px_22px_rgba(11,59,130,0.08)]'
+                            : 'border-[#D9E3F2] bg-white/70'
+                        }`}
+                        aria-pressed={addPersonalBankAccount}
+                      >
+                        <div>
+                          <div className="text-sm font-semibold text-[#243B62]">เพิ่มบัญชีส่วนตัว</div>
+                          <div className="mt-1 text-xs text-[#6F7E97]">
+                            ตัวเลือกเสริมสำหรับนักลงทุนที่ต้องการใช้วงเงินเกินจาก JUZMATCH Pool
+                          </div>
+                        </div>
+                        <div className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors ${addPersonalBankAccount ? 'justify-end bg-[#1E4FA3]' : 'justify-start bg-[#D5DDE9]'}`}>
+                          <span className="h-5 w-5 rounded-full bg-white transition-transform" />
+                        </div>
+                      </button>
+
+                      <div className={`grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-250 ease-in-out ${addPersonalBankAccount ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                        <div className="min-h-0">
+                          <div className="space-y-1" style={addPersonalBankAccount ? { animation: 'bank-fields-pop 250ms ease' } : undefined}>
+                            <DropdownField labelEn="Bank name" labelTh="ชื่อธนาคาร" name="bank_bankName" value={formData.bankInfo.bankName} placeholder="เลือกธนาคาร" options={BANKS} onChange={handleInputChange} />
+                            <RegisterField labelEn="Account no." labelTh="หมายเลขบัญชี" placeholder="0000000000" name="bank_accountNo" type="tel" value={formData.bankInfo.accountNo} onChange={handleInputChange} />
+                            <DropdownField labelEn="Account type" labelTh="ประเภทบัญชี" name="bank_accountType" value={formData.bankInfo.accountType} placeholder="เลือกประเภทบัญชี" options={ACCOUNT_TYPE_OPTIONS} onChange={handleInputChange} />
+                            <RegisterField labelEn="Account name" labelTh="ชื่อบัญชี" placeholder="ชื่อ-นามสกุลเจ้าของบัญชี" name="bank_accountName" value={formData.bankInfo.accountName} onChange={handleInputChange} />
+                            <div className="pb-4 text-xs text-[#6F7E97]">
+                              ไม่บังคับเพิ่มบัญชีส่วนตัว แต่หากเปิดใช้งาน กรุณากรอกข้อมูลให้ครบถ้วน หรือจะข้ามไปก่อนแล้วค่อยมาเพิ่มภายหลังที่หน้าแก้ไขข้อมูลสมาชิกก็ได้
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {!addPersonalBankAccount && (
+                        <div className="my-4 rounded-[22px] border border-dashed border-[#C8D6EC] bg-white/75 px-4 py-4 text-sm text-[#5C76A6]">
+                          ระบบจะใช้เงินใน JUZMATCH Pool ของคุณเป็นแหล่งวงเงินหลักก่อน โดยยังไม่จำเป็นต้องเพิ่มบัญชีส่วนตัวในขั้นตอนนี้ และคุณสามารถเพิ่มภายหลังได้ที่หน้าแก้ไขข้อมูลสมาชิก
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <DropdownField labelEn="Bank name" labelTh="ชื่อธนาคาร" name="bank_bankName" value={formData.bankInfo.bankName} placeholder="เลือกธนาคาร" options={BANKS} onChange={handleInputChange} />
+                      <RegisterField labelEn="Account no." labelTh="หมายเลขบัญชี" placeholder="0000000000" name="bank_accountNo" type="tel" value={formData.bankInfo.accountNo} onChange={handleInputChange} />
+                      <DropdownField labelEn="Account type" labelTh="ประเภทบัญชี" name="bank_accountType" value={formData.bankInfo.accountType} placeholder="เลือกประเภทบัญชี" options={ACCOUNT_TYPE_OPTIONS} onChange={handleInputChange} />
+                      <RegisterField labelEn="Account name" labelTh="ชื่อบัญชี" placeholder="ชื่อ-นามสกุลเจ้าของบัญชี" name="bank_accountName" value={formData.bankInfo.accountName} onChange={handleInputChange} />
+                    </>
+                  )}
+                </div>
               </>
             )}
 
-            {step === 2 && (
+            {stepKey === 'preferences' && (
               <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-6 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-              <div className="text-center">
-                <h2 className="mt-0 text-2xl font-semibold text-[#243B62]">เลือกสินค้าที่ต้องการลงทุน</h2>
-                <p className="mt-1 text-sm text-[#6F7E97]">แตะเลือกเป็นฟองรายการที่สนใจได้หลายหมวดหมู่</p>
-              </div>
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                {REGISTER_CATEGORY_OPTIONS.map((category, index) => {
-                  const selected = preferenceState[category.key]?.enabled;
-                  return (
-                    <button
-                      key={category.key}
-                      type="button"
-                      onClick={() => {
-                        setPoppingBubbleKey(category.key);
-                        setPreferenceState((prev) => ({ ...prev, [category.key]: { ...prev[category.key], enabled: !prev[category.key].enabled } }));
-                        window.setTimeout(() => {
-                          setPoppingBubbleKey((current) => (current === category.key ? null : current));
-                        }, 320);
-                      }}
-                      style={{
-                        animation: [
-                          `bubble-pop-in 340ms cubic-bezier(0.22, 1, 0.36, 1) ${index * 60}ms both`,
-                          poppingBubbleKey === category.key ? 'bubble-select-pop 320ms cubic-bezier(0.2, 0.9, 0.25, 1)' : '',
-                        ].filter(Boolean).join(', '),
-                      }}
-                      className={`min-w-[132px] rounded-full px-5 py-3 text-center will-change-transform transition-[transform,colors,box-shadow,background-image] duration-300 ease-out focus:outline-none focus:ring-0 active:scale-[0.97] ${selected ? 'border border-[#0B3B82] bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] text-white shadow-[0_10px_24px_rgba(11,59,130,0.18)]' : 'border border-[#CCD6E6] bg-white text-[#35507A]'}`}
-                    >
-                      <div className="text-sm font-medium">{category.labelTh}</div>
-                      <div className={`text-[11px] ${selected ? 'text-white/80' : 'text-[#6F7E97]'}`}>{category.labelEn}</div>
-                    </button>
-                  );
-                })}
-              </div>
+                <div className="text-center">
+                  <h2 className="mt-0 text-2xl font-semibold text-[#243B62]">เลือกสินค้าที่ต้องการลงทุน</h2>
+                  <p className="mt-1 text-sm text-[#6F7E97]">แตะเลือกเป็นฟองรายการที่สนใจได้หลายหมวดหมู่</p>
+                </div>
+                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                  {REGISTER_CATEGORY_OPTIONS.map((category, index) => {
+                    const selected = preferenceState[category.key]?.enabled;
+                    return (
+                      <button
+                        key={category.key}
+                        type="button"
+                        onClick={() => {
+                          setPoppingBubbleKey(category.key);
+                          setPreferenceState((prev) => ({ ...prev, [category.key]: { ...prev[category.key], enabled: !prev[category.key].enabled } }));
+                          window.setTimeout(() => {
+                            setPoppingBubbleKey((current) => (current === category.key ? null : current));
+                          }, 320);
+                        }}
+                        style={{
+                          animation: [
+                            `bubble-pop-in 340ms cubic-bezier(0.22, 1, 0.36, 1) ${index * 60}ms both`,
+                            poppingBubbleKey === category.key ? 'bubble-select-pop 320ms cubic-bezier(0.2, 0.9, 0.25, 1)' : '',
+                          ].filter(Boolean).join(', '),
+                        }}
+                        className={`min-w-[132px] rounded-full px-5 py-3 text-center will-change-transform transition-[transform,colors,box-shadow,background-image] duration-300 ease-out focus:outline-none focus:ring-0 active:scale-[0.97] ${selected ? 'border border-[#0B3B82] bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] text-white shadow-[0_10px_24px_rgba(11,59,130,0.18)]' : 'border border-[#CCD6E6] bg-white text-[#35507A]'}`}
+                      >
+                        <div className="text-sm font-medium">{category.labelTh}</div>
+                        <div className={`text-[11px] ${selected ? 'text-white/80' : 'text-[#6F7E97]'}`}>{category.labelEn}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            {step === 3 && (
+            {stepKey === 'limits' && (
               <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-              <div className="mb-4">
-                <h2 className="text-2xl font-semibold text-[#243B62]">กำหนดวงเงินลงทุน</h2>
-                <p className="mt-1 text-sm text-[#6F7E97]">ระบุวงเงินรวมและวงเงินรายหมวดหมู่สำหรับรายการที่เลือกไว้</p>
-              </div>
-              <div className="rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-base font-semibold text-gray-800">
-                    วงเงินรวม <span className="text-[#D92D20]">*</span>
-                  </div>
-                  <span className="text-sm text-gray-500">บาท</span>
+                <div className="mb-4">
+                  <h2 className="text-2xl font-semibold text-[#243B62]">กำหนดวงเงินลงทุน</h2>
+                  <p className="mt-1 text-sm text-[#6F7E97]">
+                    {isJuzmatchReferral ? 'วงเงินรวมจะถูกดึงจากข้อมูล JUZMATCH และคุณสามารถกำหนดวงเงินรายหมวดหมู่ได้' : 'ระบุวงเงินรวมและวงเงินรายหมวดหมู่สำหรับรายการที่เลือกไว้'}
+                  </p>
                 </div>
-                <input
-                  type="text"
-                  value={totalLimitInput}
-                  onChange={(e) => setTotalLimitInput(formatAmount(Math.min(parseAmountInput(e.target.value), MAX_CREDIT_LIMIT)))}
-                  placeholder="100,000"
-                  className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-xl text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
-                />
-                <div className="mt-2 text-xs text-[#6F7E97]">สูงสุดไม่เกิน 1,000,000 บาท</div>
-                {isJuzmatchReferral && (
-                  <div className="mt-2 text-xs text-[#6F7E97]">
-                    หากคุณเป็นลูกค้า JUZMATCH กรุณาใส่วงเงินตามยอด Pool ที่เห็นในเอกสารสัญญากระดาษจริง
+                <div className="rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-base font-semibold text-gray-800">วงเงินรวม <span className="text-[#D92D20]">*</span></div>
+                    <span className="text-sm text-gray-500">บาท</span>
                   </div>
-                )}
-              </div>
-              <div className="mt-4 rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-base font-semibold text-gray-800">แบ่งเท่ากันอัตโนมัติ</div>
-                    <div className="text-xs text-[#6F7E97]">กระจายวงเงินรวมให้หมวดที่เลือกอย่างเท่า ๆ กัน</div>
-                  </div>
-                  <button type="button" onClick={() => setDivideEqually((prev) => !prev)} className={`h-7 w-12 rounded-full p-1 transition-colors ${divideEqually ? 'bg-[#0B3B82]' : 'bg-gray-200'}`} aria-pressed={divideEqually}>
-                    <span className={`block h-5 w-5 rounded-full bg-white transition-transform ${divideEqually ? 'translate-x-5' : ''}`} />
-                  </button>
+                  <input
+                    type="text"
+                    value={totalLimitInput}
+                    onChange={(e) => setTotalLimitInput(formatAmount(Math.min(parseAmountInput(e.target.value), MAX_CREDIT_LIMIT)))}
+                    disabled={isJuzmatchReferral}
+                    placeholder="100,000"
+                    className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-xl text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B] disabled:bg-[#F3F6FB] disabled:text-[#6F7E97]"
+                  />
+                  <div className="mt-2 text-xs text-[#6F7E97]">สูงสุดไม่เกิน 1,000,000 บาท</div>
+                  {isJuzmatchReferral && (
+                    <div className="mt-2 text-xs text-[#6F7E97]">สำหรับลูกค้า JUZMATCH ระบบล็อกวงเงินรวมตามยอดในสัญญากระดาษจริงไว้แล้ว</div>
+                  )}
                 </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {selectedPreferenceKeys.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#CCD6E6] bg-white/70 px-4 py-8 text-center text-sm text-[#6F7E97]">ยังไม่ได้เลือกหมวดหมู่ในขั้นตอนก่อนหน้า</div>
-                ) : (
-                  selectedPreferenceKeys.map((key) => (
-                    <div key={key} className="rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-gray-800">{REGISTER_CATEGORY_OPTIONS.find((item) => item.key === key)?.labelTh || key}</div>
-                          <div className="text-xs text-[#6F7E97]">{ITEM_TYPE_LABELS[key] || key}</div>
-                        </div>
-                        <div className="w-[150px]">
-                          <input
-                            type="text"
-                            value={divideEqually && parseAmountInput(totalLimitInput) > 0 ? formatAmount(equalPreviewAmount) : preferenceState[key]?.limitAmount || ''}
-                            onChange={(e) => handleCategoryLimitChange(key, e.target.value)}
-                            disabled={divideEqually}
-                            placeholder="0"
-                            className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-sm text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B] disabled:bg-[#F3F6FB] disabled:text-[#6F7E97]"
-                          />
+                <div className="mt-4 rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-base font-semibold text-gray-800">แบ่งเท่ากันอัตโนมัติ</div>
+                      <div className="text-xs text-[#6F7E97]">กระจายวงเงินรวมให้หมวดที่เลือกอย่างเท่า ๆ กัน</div>
+                    </div>
+                    <button type="button" onClick={() => setDivideEqually((prev) => !prev)} className={`h-7 w-12 rounded-full p-1 transition-colors ${divideEqually ? 'bg-[#0B3B82]' : 'bg-gray-200'}`} aria-pressed={divideEqually}>
+                      <span className={`block h-5 w-5 rounded-full bg-white transition-transform ${divideEqually ? 'translate-x-5' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {selectedPreferenceKeys.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-[#CCD6E6] bg-white/70 px-4 py-8 text-center text-sm text-[#6F7E97]">ยังไม่ได้เลือกหมวดหมู่ในขั้นตอนก่อนหน้า</div>
+                  ) : (
+                    selectedPreferenceKeys.map((key) => (
+                      <div key={key} className="rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="font-semibold text-gray-800">{REGISTER_CATEGORY_OPTIONS.find((item) => item.key === key)?.labelTh || key}</div>
+                            <div className="text-xs text-[#6F7E97]">{ITEM_TYPE_LABELS[key] || key}</div>
+                          </div>
+                          <div className="w-[150px]">
+                            <input
+                              type="text"
+                              value={divideEqually && parseAmountInput(totalLimitInput) > 0 ? formatAmount(equalPreviewAmount) : preferenceState[key]?.limitAmount || ''}
+                              onChange={(e) => handleCategoryLimitChange(key, e.target.value)}
+                              disabled={divideEqually}
+                              placeholder="0"
+                              className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-sm text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B] disabled:bg-[#F3F6FB] disabled:text-[#6F7E97]"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    ))
+                  )}
+                </div>
+                {computedPayload.categories === null && (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">ยอดรวมวงเงินรายหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</div>
+                )}
+                {!divideEqually && manualCategoryTotal > parseAmountInput(totalLimitInput) && parseAmountInput(totalLimitInput) > 0 && (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">ยอดรวมวงเงินแต่ละหมวดหมู่ต้องไม่เกินวงเงินรวม</div>
                 )}
               </div>
-              {computedPayload.categories === null && (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">ยอดรวมวงเงินรายหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</div>
-              )}
-              {!divideEqually && manualCategoryTotal > parseAmountInput(totalLimitInput) && parseAmountInput(totalLimitInput) > 0 && (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">ยอดรวมวงเงินแต่ละหมวดหมู่ต้องไม่เกินวงเงินรวม</div>
-              )}
+            )}
+
+            {stepKey === 'ekyc' && (
+              <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-5 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+                <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+                  eKYC Preparation
+                </div>
+                <h2 className="mt-4 text-2xl font-semibold text-[#243B62]">เตรียมตัวก่อนยืนยันตัวตน</h2>
+                <p className="mt-2 text-sm text-[#6F7E97]">ก่อนเข้าใช้งานเต็มรูปแบบ กรุณาเตรียมเอกสารและอุปกรณ์ให้พร้อมสำหรับ eKYC</p>
+                <div className="mt-6 space-y-3">
+                  {[
+                    'บัตรประชาชนตัวจริงที่ยังไม่หมดอายุ',
+                    'มือถือที่มีกล้องพร้อมถ่ายภาพใบหน้าและเอกสาร',
+                    'แสงสว่างเพียงพอ และเครือข่ายอินเทอร์เน็ตที่เสถียร',
+                    'เวลาทำรายการประมาณ 3-5 นาที',
+                  ].map((item) => (
+                    <div key={item} className="rounded-2xl border border-white/90 bg-white/80 px-4 py-3 text-sm text-[#35507A] shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {stepKey === 'success' && (
+              <div className="rounded-[32px] border border-[#D9E3F2] bg-gradient-to-br from-[#0F4FAE] via-[#2D69C7] to-[#8BB8F2] p-6 text-white shadow-[0_18px_45px_rgba(11,59,130,0.22)]">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/15 text-4xl">
+                  ✓
+                </div>
+                <h2 className="mt-5 text-center text-2xl font-semibold">
+                  สมัครสมาชิกสำเร็จ
+                </h2>
+                <p className="mt-2 text-center text-sm text-white/85">
+                  {isJuzmatchReferral
+                    ? 'เราได้รับข้อมูลของคุณแล้ว กรุณารอการตรวจสอบ eKYC โดยปกติใช้เวลาประมาณ 1-3 วันทำการ หลังผ่านการยืนยันแล้ว JUZMATCH Pool จะแสดงในหน้าสมาชิก'
+                    : 'เราได้รับข้อมูลของคุณแล้ว กรุณารอการตรวจสอบ eKYC โดยปกติใช้เวลาประมาณ 1-3 วันทำการ'}
+                </p>
+                <div className="mt-6 rounded-[24px] border border-white/20 bg-white/12 p-4">
+                  <div className="text-sm font-medium">สถานะล่าสุด</div>
+                  <div className="mt-2 text-xs text-white/80">
+                    {isJuzmatchReferral
+                      ? `รหัส ${formData.referralCode} ถูกผูกกับบัญชีแล้ว • สถานะยืนยันตัวตน: ${completedInvestor?.kyc_status || 'NOT_VERIFIED'}`
+                      : `สถานะยืนยันตัวตน: ${completedInvestor?.kyc_status || 'NOT_VERIFIED'}`}
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {error && (
-            <div className="my-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>
-          )}
+          {error && <div className="my-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
 
-          <div className="my-4">
-            <button
-              onClick={step === 1 ? handleNextFromDetails : step === 2 ? () => {
-                setStepDirection('forward');
-                setStep(3);
-              } : handleFinalSubmit}
-              disabled={submitting || (step === 1 && (!formData.firstname || !formData.lastname || !formData.phoneNumber || !formData.nationalId)) || (step === 2 && selectedPreferenceKeys.length === 0) || (step === 3 && (computedPayload.totalLimit <= 0 || computedPayload.categories === null))}
-              className="flex w-full flex-col items-center justify-center rounded-full bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-2 text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 hover:from-[#18448F] hover:to-[#08306A]"
-            >
-              <span className="text-base font-medium">{submitting ? 'กำลังบันทึก...' : step < 3 ? 'ถัดไป' : 'ดำเนินการต่อ'}</span>
-              {!submitting && <span className="text-xs font-light opacity-90">Continue</span>}
-            </button>
-            {step > 1 && (
-              <button type="button" onClick={() => {
-                setStepDirection('backward');
-                setStep((prev) => Math.max(1, prev - 1));
-              }} className="mt-2 flex w-full flex-col items-center justify-center rounded-full bg-[#E6EBF2] py-2 text-[#06367B] transition-colors active:scale-[0.98]">
+          <div className={`${stepKey === 'welcome' ? 'mx-auto mt-[-96px] w-full max-w-md px-6 pb-10' : 'my-4'}`}>
+            {stepKey !== 'success' && (
+              <button
+                onClick={() => {
+                  if (stepKey === 'welcome') goNext();
+                  else if (stepKey === 'referral') goNext();
+                  else if (stepKey === 'details') goNext();
+                  else if (stepKey === 'preferences') goNext();
+                  else if (stepKey === 'limits') goNext();
+                  else if (stepKey === 'ekyc') {
+                    const submission = buildRegistrationSubmission();
+                    if (submission) handleStartEkyc(submission);
+                  }
+                }}
+                disabled={
+                  submitting ||
+                  (stepKey === 'referral' && !isReferralStepValid) ||
+                  (stepKey === 'details' && !isDetailsStepValid) ||
+                  (stepKey === 'preferences' && selectedPreferenceKeys.length === 0) ||
+                  (stepKey === 'limits' && !isLimitsStepValid)
+                }
+                className={`flex w-full flex-col items-center justify-center rounded-full py-2 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  stepKey === 'welcome'
+                    ? 'bg-white text-[#0B3B82]'
+                    : 'bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] text-white'
+                }`}
+              >
+                <span className="text-base font-medium">
+                  {submitting ? 'กำลังบันทึก...' : stepKey === 'ekyc' ? 'เริ่มดำเนินการยืนยันตัวตน' : 'ถัดไป'}
+                </span>
+                {!submitting && <span className="text-xs font-light opacity-80">Next</span>}
+              </button>
+            )}
+
+            {stepKey === 'success' && completedInvestor && (
+              <button
+                type="button"
+                onClick={() => onRegistered(completedInvestor)}
+                className="flex w-full flex-col items-center justify-center rounded-full bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-2 text-white transition-all active:scale-[0.98]"
+              >
+                <span className="text-base font-medium">เข้าสู่หน้าสมาชิก</span>
+                <span className="text-xs font-light opacity-90">Go to Member Page</span>
+              </button>
+            )}
+
+            {currentStepIndex > 0 && stepKey !== 'success' && stepKey !== 'referral' && (
+              <button type="button" onClick={goBack} className="mt-2 flex w-full flex-col items-center justify-center rounded-full bg-[#E6EBF2] py-2 text-[#06367B] transition-colors active:scale-[0.98]">
                 <span className="text-base font-medium">ย้อนกลับ</span>
                 <span className="text-xs font-light opacity-80">Back</span>
               </button>
