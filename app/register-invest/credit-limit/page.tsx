@@ -12,6 +12,7 @@ interface InvestorData {
   investor_tier?: string | null;
   total_active_principal?: number | null;
   max_investment_amount?: number | null;
+  referral_code?: string | null;
   auto_invest_enabled?: boolean | null;
   auto_liquidation_enabled?: boolean | null;
   investment_preferences?: any;
@@ -23,6 +24,10 @@ interface InvestorData {
   addr_district?: string | null;
   addr_province?: string | null;
   addr_postcode?: string | null;
+  bank_name?: string | null;
+  bank_account_no?: string | null;
+  bank_account_type?: string | null;
+  bank_account_name?: string | null;
 }
 
 type PreferenceState = Record<string, { enabled: boolean; sub: string[]; limitAmount: string }>;
@@ -91,6 +96,14 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const MAX_CREDIT_LIMIT = 1_000_000;
+
+const classifyReferralCode = (value: string | null | undefined) => {
+  const code = String(value || '').trim().toUpperCase();
+  const match = code.match(/^([A-Z]{2})(\d{2})([A-Z0-9]{4})$/);
+  if (!match) return { code, source: 'UNKNOWN' as const, isValid: false };
+  const source = match[1] === 'JM' ? 'JUZMATCH' : match[1] === 'FR' ? 'FRIEND' : 'UNKNOWN';
+  return { code, source, isValid: source !== 'UNKNOWN' };
+};
 
 const buildDefaultPreferences = () => {
   const base: PreferenceState = {};
@@ -438,6 +451,28 @@ export default function CreditLimitPage() {
   }
 
   const currentLimit = investor?.max_investment_amount || 0;
+  const referral = classifyReferralCode(
+    investor?.referral_code
+      ?? investor?.investment_preferences?.referral?.code
+      ?? investor?.investment_preferences?.referral_code
+  );
+  const isJuzmatchInvestor = referral.source === 'JUZMATCH' && referral.isValid;
+  const storedPoolAmount = Number(
+    investor?.investment_preferences?.juzmatch_pool_amount
+    ?? investor?.investment_preferences?.juzmatchPoolAmount
+    ?? investor?.investment_preferences?.pool_amount
+    ?? 0
+  );
+  const juzmatchPoolAmount = isJuzmatchInvestor
+    ? Math.min(MAX_CREDIT_LIMIT, storedPoolAmount > 0 ? storedPoolAmount : currentLimit)
+    : 0;
+  const topUpAmount = isJuzmatchInvestor ? Math.max(0, totalLimit - juzmatchPoolAmount) : 0;
+  const poolFirstCoverage = isJuzmatchInvestor ? Math.min(totalLimit, juzmatchPoolAmount) : 0;
+  const hasPersonalBankAccount = Boolean(
+    investor?.bank_name ||
+    investor?.bank_account_no ||
+    investor?.bank_account_name
+  );
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -479,6 +514,29 @@ export default function CreditLimitPage() {
             className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-xl text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
           />
           <div className="mt-2 text-xs text-[#6F7E97]">สูงสุดไม่เกิน 1,000,000 บาท</div>
+          {isJuzmatchInvestor && (
+            <div className="mt-3 rounded-[20px] border border-[#D9E3F2] bg-white/80 px-4 py-4 text-sm text-[#42597D] shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+              <div className="font-semibold text-[#243B62]">การใช้วงเงินสำหรับลูกค้า JUZMATCH</div>
+              <p className="mt-2 leading-6">
+                คุณสามารถตั้งวงเงินรวมมากกว่ายอดใน JUZMATCH Pool ได้ ระบบจะใช้วงเงินจาก Pool ก่อนเสมอ และหากวงเงินรวมสูงกว่า Pool ระบบจะสลับไปใช้บัญชีส่วนตัวของคุณโดยอัตโนมัติ
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-2xl border border-[#D9E3F2] bg-[#F8FBFF] px-3 py-3">
+                  <div className="text-[#6F7E97]">ยอดใน JUZMATCH Pool</div>
+                  <div className="mt-1 text-base font-semibold text-[#0B3B82]">{juzmatchPoolAmount.toLocaleString()} บาท</div>
+                </div>
+                <div className="rounded-2xl border border-[#D9E3F2] bg-[#F8FBFF] px-3 py-3">
+                  <div className="text-[#6F7E97]">วงเงินจากบัญชีส่วนตัว</div>
+                  <div className="mt-1 text-base font-semibold text-[#0B3B82]">{topUpAmount.toLocaleString()} บาท</div>
+                </div>
+              </div>
+              {topUpAmount > 0 && (
+                <div className="mt-3 rounded-2xl border border-[#CFE0F5] bg-[#F4F8FD] px-3 py-3 text-xs leading-5 text-[#5C76A6]">
+                  ระบบจะหักจาก JUZMATCH Pool ก่อนจำนวน {poolFirstCoverage.toLocaleString()} บาท และเมื่อ Pool ใช้ครบแล้ว จะสลับไปยังบัญชีส่วนตัว{hasPersonalBankAccount ? 'ที่บันทึกไว้' : ''}อีก {topUpAmount.toLocaleString()} บาท พร้อมแจ้งให้คุณโอนเงินเข้าหาผู้จำนำในดีลนั้นด้วยตนเอง
+                </div>
+              )}
+            </div>
+          )}
           </div>
 
           <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
