@@ -3,6 +3,8 @@
 :root {
   /* ─── Background ─── */
   --background: #F9F9F9; /* Off-white ตาม Design System ใหม่ */
+  --background-dark: #3B3B3B;
+  --background-darker: #1B1B1B;
   --background-white: #FFFFFF;
   --background-subtle: #EBEBEB;
 
@@ -79,7 +81,7 @@
   --white: #FFFFFF;
 
   /* ─── Border / Line ─── */
-  --line:        #D5D5D5;
+  --line:        #575757;
   --line-soft:   #EBEBEB;
   --line-strong: #757575;
 
@@ -90,13 +92,22 @@
 
 @theme inline {
   /* ─── Fonts ─── */
-  --font-sans: var(--font-noto-sans-thai), "Google Sans Flex", sans-serif;
-  --font-mono: var(--font-noto-sans-thai);
+  --font-sans: 'Noto Sans Thai', sans-serif;
+  --font-mono: 'Noto Sans Thai', monospace;
 
-  /* ─── Background ─── */
+  /* ─── Font Variables ─── */
+  --font-bellota-text: 'Bellota Text';
+  --font-noto-sans-thai: 'Noto Sans Thai';
+
+  /* ─── English Font Override ─── */
+  --font-english: var(--font-bellota-text), var(--font-noto-sans-thai), sans-serif;
+
   --color-background:        var(--background);
   --color-background-white:  var(--background-white);
   --color-background-subtle: var(--background-subtle);
+  --color-background-dark:   var(--background-dark);
+  --color-background-darker: var(--background-darker);
+
 
   /* ─── Foreground ─── */
   --color-foreground:        var(--foreground);
@@ -151,6 +162,10 @@
   /* ─── Elevation ─── */
   --shadow-soft: 0 12px 30px rgba(59, 59, 59, 0.06);
   --shadow-strong: 0 18px 40px rgba(59, 59, 59, 0.12);
+}
+
+.font-english {
+  font-family: 'Bellota Text', 'Noto Sans Thai', sans-serif;
 }
 
 body {
@@ -229,34 +244,34 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 5px;
-  background-color: var(--dot-color, #06367B);
-  color: var(--dot-color, #06367B);
+  background-color: var(--primary);
+  color: var(--primary);
   box-shadow:
-    9991px -16px 0 0 var(--dot-color, #06367B),
-    9991px 0 0 0 var(--dot-color, #06367B),
-    10007px 0 0 0 var(--dot-color, #06367B);
+    9991px -16px 0 0 var(--s2),
+    9991px 0 0 0 var(--primary),
+    10007px 0 0 0 var(--s3);
   animation: dot-bricks 2s infinite ease;
 }
 
 @keyframes dot-bricks {
-  0%      { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
-  8.333%  { box-shadow: 10007px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
-  16.667% { box-shadow: 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
-  25%     { box-shadow: 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B); }
-  33.333% { box-shadow: 10007px 0 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B); }
-  41.667% { box-shadow: 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B); }
-  50%     { box-shadow: 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B); }
-  58.333% { box-shadow: 9991px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B); }
-  66.666% { box-shadow: 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B), 9991px -16px 0 0 var(--dot-color, #06367B); }
-  75%     { box-shadow: 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B); }
-  83.333% { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B); }
+  0%      { box-shadow: 9991px -16px 0 0 var(--s2), 9991px 0 0 0 var(--primary), 10007px 0 0 0 var(--s3); }
+  8.333%  { box-shadow: 10007px -16px 0 0 var(--s2), 9991px 0 0 0 var(--primary), 10007px 0 0 0 var(--s3); }
+  16.667% { box-shadow: 10007px -16px 0 0 var(--s2), 9991px -16px 0 0 var(--primary), 10007px 0 0 0 var(--s3); }
+  25%     { box-shadow: 10007px -16px 0 0 var(--s2), 9991px -16px 0 0 var(--primary), 9991px 0 0 0 var(--s3); }
+  33.333% { box-shadow: 10007px 0 0 0 var(--s2), 9991px -16px 0 0 var(--primary), 9991px 0 0 0 var(--s3); }
+  41.667% { box-shadow: 10007px 0 0 0 var(--s2), 10007px -16px 0 0 var(--primary), 9991px 0 0 0 var(--s3); }
+  50%     { box-shadow: 10007px 0 0 0 var(--s2), 10007px -16px 0 0 var(--primary), 9991px -16px 0 0 var(--s3); }
+  58.333% { box-shadow: 9991px 0 0 0 var(--s2), 10007px -16px 0 0 var(--primary), 9991px -16px 0 0 var(--s3); }
+  66.666% { box-shadow: 9991px 0 0 0 var(--s2), 10007px 0 0 0 var(--primary), 9991px -16px 0 0 var(--s3); }
+  75%     { box-shadow: 9991px 0 0 0 var(--s2), 10007px 0 0 0 var(--primary), 10007px -16px 0 0 var(--s3); }
+  83.333% { box-shadow: 9991px -16px 0 0 var(--s2), 10007px 0 0 0 var(--primary), 10007px -16px 0 0 var(--s3); }
   91.667% { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px -16px 0 0 var(--dot-color, #06367B); }
   100%    { box-shadow: 9991px -16px 0 0 var(--dot-color, #06367B), 9991px 0 0 0 var(--dot-color, #06367B), 10007px 0 0 0 var(--dot-color, #06367B); }
 }
 
 /* ─── สีต่างกันแต่ละหน้า ──────────────────────────────────────────────────── */
 
-.page-investor  { --dot-color: #06367B; }  /* Deep Blue   */
-.page-pawner    { --dot-color: #C55125; }  /* Orange      */
-.page-droppoint    { --dot-color: #0E5D1E; }  /* Forest Green */
-.page-neutral { --dot-color: #686360; }  /* Warm Grey   */
+.page-investor  { --dot-color: var(--s2); }  /* Deep Blue   */
+.page-pawner    { --dot-color: var(--primary); }  /* Orange      */
+.page-droppoint    { --dot-color: var(--s3); }  /* Forest Green */
+.page-neutral { --dot-color: var(--s1); }  /* Warm Grey   */
