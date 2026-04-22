@@ -195,7 +195,7 @@ export default function Home() {
             </div>
             <div className="fade-up relative z-0 mx-auto -mt-10 w-full max-w-[1216px] rounded-[40px] border border-primary-border bg-primary-soft px-4 pb-10 pt-12 text-center text-s1 sm:-mt-16 sm:px-12 sm:pt-16 lg:-mt-20">
               <h2 className="text-2xl font-base sm:text-3xl lg:text-[40px] font-english">
-                What is <span className="text-primary font-semibold font-english">Pawnly</span>?
+                What is <span className="text-primary font-bold font-english">Pawnly</span>?
               </h2>
               <p className="mt-1 text-xl text-foreground-subtle font-light">พอว์นลี่คืออะไร</p>
               <p className="mt-4 leading-6 xs:text-sm font-english text-foreground font-light">
@@ -225,8 +225,8 @@ export default function Home() {
         {/* ── Three Pillars ── */}
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-24 text-center sm:px-6 sm:pb-28 lg:px-14">
           <div className="fade-up">
-            <h3 className="text-xl font-medium text-s1 sm:text-[36px] font-english">Our Three Pillars</h3>
-            <p className="mt-1 text-lg text-foreground-subtle font-english">Our services/Solutions</p>
+            <h3 className="text-xl font-medium text-s1 font-english">Our Three Pillars</h3>
+            <p className="mt-1 text-lg text-foreground-subtle font-english">Services/Solutions</p>
           </div>
           <div className="fade-up mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 sm:justify-items-center" style={{ transitionDelay: '0.2s' }}>
             {[
@@ -249,7 +249,7 @@ export default function Home() {
         <section className="py-16 sm:py-20">
           <div className="mx-auto w-full bg-background-dark px-4 py-15 text-center text-s1 sm:px-6 lg:px-14">
             <h3 className="text-xl font-medium text-white sm:text-[36px] leading-[1] font-english">Why Pawnly?</h3>
-            <div className="mx-auto flex w-full items-center mt-4 grid gap-6 sm:mt-6 sm:grid-cols-2 lg:mt-8 lg:grid-cols-3 max-w-[1216px]">
+            <div className="mx-auto flex flex-wrap gap-6 justify-center mt-4 sm:mt-6 lg:mt-8 max-w-[1216px]">
               {[
                 {
                   title: 'Safety First',
@@ -291,10 +291,8 @@ export default function Home() {
               ].map((item, index) => (
                 <div
                   key={item.title}
-                  className={`font-english fade-up rounded-[28px] bg-background-darker px-4 py-6 transition-all duration-200 hover:scale-[1.0] ${
-                    index === 2 ? 'sm:col-span-2 lg:col-span-1' : ''
-                  }`}
-                  style={{ transitionDelay: '0.2s' }}
+                  className="font-english fade-up rounded-[28px] bg-background-darker px-4 py-6 transition-all duration-200 hover:scale-[1.0] min-w-[240px] flex-1"
+                  style={{ transitionDelay: `${index * 0.1}s` }}
                 >
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary-soft text-primary">
                     {item.icon}
@@ -317,7 +315,7 @@ export default function Home() {
                 alt="Contact Pawnly"
                 width={1200}
                 height={936}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-fill mx-auto h-auto w-full max-w-[420px] object-cover lg:max-w-none"
               />
             </div>
             <div className="fade-up rounded-[24px] bg-background-white px-8 py-10 text-s1 sm:px-14 sm:py-14">
@@ -373,10 +371,10 @@ export default function Home() {
                 <div className="w-full">
                   <h5 className="text-sm font-semibold text-primary font-english">Approaches</h5>
                   <ul className="mt-3 space-y-2">
-                    <li><Link href="/home" className="text-foreground-subtle transition-colors hover:text-primary">หน้าหลัก</Link></li>
-                    <li><Link href="/borrowers" className="text-foreground-subtle transition-colors hover:text-primary">ผู้ขอสินเชื่อ</Link></li>
-                    <li><Link href="/investors" className="text-foreground-subtle transition-colors hover:text-primary">นักลงทุน</Link></li>
-                    <li><Link href="/branches" className="text-foreground-subtle transition-colors hover:text-primary">จุดรับฝาก</Link></li>
+                    <li><Link href="/" className="text-foreground-subtle transition-colors hover:text-primary">หน้าหลัก</Link></li>
+                    <li><Link href="/pawner" className="text-foreground-subtle transition-colors hover:text-primary">ผู้ขอสินเชื่อ</Link></li>
+                    <li><Link href="/investor" className="text-foreground-subtle transition-colors hover:text-primary">นักลงทุน</Link></li>
+                    <li><Link href="/drop-point-page" className="text-foreground-subtle transition-colors hover:text-primary">จุดรับฝาก</Link></li>
                   </ul>
                 </div>
 
@@ -394,10 +392,27 @@ export default function Home() {
                   <h5 className="text-sm font-semibold text-primary font-english">Follow us</h5>
                   <div className="mt-3 flex flex-wrap gap-2 justify-center lg:justify-start">
                     {[
-                      { name: 'Facebook', href: '...', icon: <svg>...</svg> },
-                      { name: 'YouTube', href: '...', icon: <svg>...</svg> },
-                      { name: 'X', href: '...', icon: <svg>...</svg> },
-                      { name: 'Mail', href: '...', icon: <svg>...</svg> },
+                      { name: 'Facebook', href: 'https://www.facebook.com', icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                      )},
+                      { name: 'YouTube', href: 'https://www.youtube.com', icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                      )},
+                      { name: 'X', href: 'https://x.com', icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                      )},
+                      { name: 'Mail', href: 'https://mail.google.com', icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                          <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                      )},
                     ].map((social) => (
                       <a
                         key={social.name}
