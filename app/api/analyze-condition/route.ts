@@ -26,7 +26,7 @@ const openaiClients = OPENAI_KEYS.map((apiKey) => new OpenAI({ apiKey }));
 const geminiClients = GEMINI_KEYS.map((apiKey) => new GoogleGenerativeAI(apiKey));
 
 const PRECHECK_MODEL = 'gpt-4.1-mini';
-const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL = 'gemini-3-flash-preview';
 const MAX_IMAGE_COUNT = 6;
 const MAX_TOTAL_IMAGE_MB = 10;
 const MIN_AI_CONDITION_SCORE = 0.3;
