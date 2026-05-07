@@ -14,5 +14,9 @@ export default function RegisterInvestLayout({
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_INVEST_REGISTER
     || process.env.NEXT_PUBLIC_LIFF_ID_INVEST
     || '2008641671-O4zZnvW9';
-  return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
+  return (
+    <LiffProvider liffId={liffId}>
+      <div className="theme-liff min-h-screen">{children}</div>
+    </LiffProvider>
+  );
 }

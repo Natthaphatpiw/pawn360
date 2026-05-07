@@ -104,9 +104,9 @@ export default function NewPawnPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">กำลังโหลด...</p>
         </div>
       </div>
@@ -115,8 +115,8 @@ export default function NewPawnPage() {
 
   if (liffError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-error-soft border border-error-border rounded-2xl p-6 max-w-md">
           <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
           <p className="text-red-600">{liffError}</p>
         </div>
@@ -126,8 +126,8 @@ export default function NewPawnPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 max-w-md text-center">
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="bg-success-soft border border-success-border rounded-2xl p-6 max-w-md text-center">
           <div className="text-green-600 text-5xl mb-4">✓</div>
           <h2 className="text-green-800 font-semibold text-lg mb-2">สร้างรายการสำเร็จ!</h2>
           <p className="text-green-600">QR Code ถูกส่งไปที่แชทของคุณแล้ว</p>
@@ -138,12 +138,12 @@ export default function NewPawnPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+    <div className="theme-liff min-h-screen bg-background py-6 px-4">
+      <div className="max-w-2xl mx-auto bg-surface rounded-2xl shadow-soft p-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">สร้างคำขอสินเชื่อใหม่</h1>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="bg-error-soft border border-error-border rounded-2xl p-4 mb-6">
             <p className="text-red-600">{error}</p>
           </div>
         )}
@@ -162,7 +162,7 @@ export default function NewPawnPage() {
                     value={formData.brand}
                     onChange={handleChange}
                     placeholder="Apple, Samsung, ฯลฯ"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
                 </div>
@@ -174,7 +174,7 @@ export default function NewPawnPage() {
                     value={formData.model}
                     onChange={handleChange}
                     placeholder="iPhone 15, Galaxy S24, ฯลฯ"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   />
                 </div>
@@ -187,7 +187,7 @@ export default function NewPawnPage() {
                     name="type"
                     value={formData.type}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                     required
                   >
                     <option value="Electronics">อิเล็กทรอนิกส์</option>
@@ -207,7 +207,7 @@ export default function NewPawnPage() {
                     name="serialNo"
                     value={formData.serialNo}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -242,7 +242,7 @@ export default function NewPawnPage() {
                   onChange={handleChange}
                   rows={3}
                   placeholder="รอยขีดข่วน, หน้าจอแตก, ฯลฯ"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-24 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -254,7 +254,7 @@ export default function NewPawnPage() {
                   value={formData.accessories}
                   onChange={handleChange}
                   placeholder="กล่อง, สายชาร์จ, หูฟัง, ฯลฯ"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -266,12 +266,12 @@ export default function NewPawnPage() {
                   onChange={handleChange}
                   rows={3}
                   placeholder="ข้อมูลเพิ่มเติมที่ต้องการแจ้ง"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-24 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               {/* ข้อมูลการขอสินเชื่อ */}
-              <div className="border-t pt-4">
+                <div className="border-t border-line-soft pt-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">ข้อมูลการขอสินเชื่อ</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -283,7 +283,7 @@ export default function NewPawnPage() {
                       value={formData.desiredAmount}
                       onChange={handleChange}
                       placeholder="เช่น 10000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                       min="0"
                       step="100"
@@ -297,7 +297,7 @@ export default function NewPawnPage() {
                       value={formData.estimatedValue}
                       onChange={handleChange}
                       placeholder="เช่น 15000"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                       min="0"
                       step="100"
@@ -314,7 +314,7 @@ export default function NewPawnPage() {
                       value={formData.loanDays}
                       onChange={handleChange}
                       placeholder="เช่น 30"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                       min="1"
                       step="1"
@@ -328,7 +328,7 @@ export default function NewPawnPage() {
                       value={formData.interestRate}
                       onChange={handleChange}
                       placeholder="เช่น 3"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                       required
                       min="0"
                       step="0.1"
@@ -345,7 +345,7 @@ export default function NewPawnPage() {
                   accept="image/*"
                   multiple
                   onChange={handleImageUpload}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-12 px-4 py-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 {images.length > 0 && (
                   <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -354,7 +354,7 @@ export default function NewPawnPage() {
                         <img
                           src={img}
                           alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-md"
+                          className="w-full h-32 object-cover rounded-2xl"
                         />
                         <button
                           type="button"
@@ -375,7 +375,7 @@ export default function NewPawnPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="w-full min-h-12 bg-primary text-primary-fg py-3 rounded-2xl font-semibold hover:bg-primary-hover disabled:bg-grey-4 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'กำลังสร้างรายการ...' : 'สร้างคำขอสินเชื่อ'}
           </button>
