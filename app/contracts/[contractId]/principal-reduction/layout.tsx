@@ -9,7 +9,7 @@ export default function PrincipalReductionLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[#F2F2F2]">
+    <div className="min-h-screen bg-background-white">
       {children}
     </div>
   );

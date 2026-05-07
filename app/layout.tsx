@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${notoSansThai.variable} ${notoSansThai.className} antialiased`}
+        className={`${notoSansThai.variable} ${notoSansThai.className} theme-web antialiased`}
       >
         {children}
         <ScrollReveal />

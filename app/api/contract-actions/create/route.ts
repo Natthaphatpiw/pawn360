@@ -200,6 +200,13 @@ export async function POST(request: NextRequest) {
 
     switch (actionType) {
       case 'INTEREST_PAYMENT': {
+        if (!pawnerSignatureUrl) {
+          return NextResponse.json(
+            { error: 'กรุณาเซ็นลายเซ็นเพื่อยืนยันคำขอ' },
+            { status: 400 }
+          );
+        }
+
         const interestToPay = interestAccruedWithFee;
         const renewedWindow = getRenewedContractWindow(daysInContract);
 
@@ -208,6 +215,7 @@ export async function POST(request: NextRequest) {
           interest_to_pay: interestToPay,
           total_amount: round2(interestToPay + penaltyAmount),
           new_end_date: renewedWindow.contractEndDate.toISOString().split('T')[0],
+          pawner_signature_url: pawnerSignatureUrl,
         };
         break;
       }
@@ -218,6 +226,13 @@ export async function POST(request: NextRequest) {
         if (reductionAmt <= 0 || reductionAmt > currentPrincipal) {
           return NextResponse.json(
             { error: 'จำนวนเงินที่ต้องการลดไม่ถูกต้อง' },
+            { status: 400 }
+          );
+        }
+
+        if (!pawnerSignatureUrl) {
+          return NextResponse.json(
+            { error: 'กรุณาเซ็นลายเซ็นเพื่อยืนยันคำขอ' },
             { status: 400 }
           );
         }
@@ -235,6 +250,7 @@ export async function POST(request: NextRequest) {
           total_amount: round2(totalToPay + penaltyAmount),
           principal_after_reduction: principalAfterReduction,
           new_interest_for_remaining: newInterestForRemaining,
+          pawner_signature_url: pawnerSignatureUrl,
         };
         break;
       }

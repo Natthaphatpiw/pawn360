@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
           contractStartDate: renewedWindow.contractStartDate,
           contractEndDate: renewedWindow.contractEndDate,
           durationDays,
-          signedContractUrl: signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
+          signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
         };
 
         notificationMessage = `ต่อดอกเบี้ยเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nดอกเบี้ยที่ชำระ: ${Number(actionRequest.interest_to_pay || 0).toLocaleString()} บาท\nเริ่มสัญญาใหม่: ${formatThaiDate(renewedWindow.contractStartDate)}\nครบกำหนดใหม่: ${formatThaiDate(renewedWindow.contractEndDate)}`;
@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
           contractStartDate: renewedWindow.contractStartDate,
           contractEndDate: renewedWindow.contractEndDate,
           durationDays,
-          signedContractUrl: signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
+          signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
         };
 
         notificationMessage = `ลดเงินต้นเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nเงินต้นใหม่: ${principalAmount.toLocaleString()} บาท\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`;

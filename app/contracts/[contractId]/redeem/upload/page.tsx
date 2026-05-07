@@ -2,9 +2,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Upload, X } from 'lucide-react';
+import { CheckCircle, Upload, X } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
+import TransactionHeader from '../../_components/TransactionHeader';
+import { getMockRedemption, isPreviewMode, withPreview } from '../../_lib/preview';
 
 export default function RedemptionUploadPage() {
   const router = useRouter();
@@ -12,6 +14,7 @@ export default function RedemptionUploadPage() {
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const redemptionId = searchParams.get('redemptionId');
+  const previewMode = isPreviewMode(searchParams);
 
   const { profile } = useLiff();
 
@@ -32,10 +35,12 @@ export default function RedemptionUploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (redemptionId) {
+    if (previewMode) {
+      setRedemptionDetails(getMockRedemption(redemptionId || `preview-redeem-${contractId}`, contractId));
+    } else if (redemptionId) {
       fetchRedemptionDetails();
     }
-  }, [redemptionId]);
+  }, [redemptionId, previewMode, contractId]);
 
   const fetchRedemptionDetails = async () => {
     try {
@@ -77,6 +82,15 @@ export default function RedemptionUploadPage() {
       return;
     }
 
+    if (previewMode) {
+      setUploading(true);
+      setTimeout(() => {
+        setShowSuccess(true);
+        setUploading(false);
+      }, 400);
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -113,18 +127,22 @@ export default function RedemptionUploadPage() {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#E8F5E9] text-3xl text-[#2E7D32]">
-            ✓
+      <div className="min-h-screen bg-background-white font-sans flex items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-xl bg-background-white p-8 text-center">
+          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ส่งหลักฐานการชำระเงินแล้ว</h1>
-          <p className="text-sm text-gray-500 mb-6">ระบบบันทึกคำขอไถ่ถอนเรียบร้อยแล้ว กรุณารอจุดรับฝากดำเนินการส่งคืนสินค้า</p>
+          <h1 className="text-xl font-bold text-foreground mb-2">ส่งหลักฐานการชำระเงินแล้ว</h1>
+          <p className="text-sm text-foreground-subtle mb-6">ระบบบันทึกคำขอไถ่ถอนเรียบร้อยแล้ว กรุณารอจุดรับฝากดำเนินการส่งคืนสินค้า</p>
           <button
-            onClick={() => router.replace('/contracts')}
-            className="w-full rounded-2xl bg-[#B85C38] py-4 font-bold text-white"
+            onClick={() => (
+              previewMode
+                ? router.replace(withPreview(`/contracts/${contractId}/redeem/receipt`, 'redemptionId', redemptionId || `preview-redeem-${contractId}`))
+                : router.replace('/contracts')
+            )}
+            className="w-full rounded-full bg-primary py-4 font-medium text-white"
           >
-            กลับไปหน้าสัญญา
+            {previewMode ? 'ดูขั้นตอนถัดไป' : 'กลับไปหน้าสัญญา'}
           </button>
         </div>
       </div>
@@ -132,58 +150,48 @@ export default function RedemptionUploadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
+    <div className="min-h-screen bg-background-white font-sans flex flex-col">
 
       {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="flex-1 text-center">
-          <h1 className="font-bold text-lg text-gray-800">ส่งหลักฐานการชำระเงิน</h1>
-          <p className="text-xs text-gray-400">Upload payment slip</p>
-        </div>
-        <div className="w-6"></div>
-      </div>
+      <TransactionHeader title="ส่งหลักฐานการชำระเงิน" subtitle="Upload Payment Slip" />
 
-      <div className="flex-1 flex flex-col items-center p-6">
+      <div className="flex-1 flex flex-col items-center p-4 pb-20">
 
         {/* Payment Summary */}
         {redemptionDetails && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-6 shadow-sm">
+          <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600 text-sm">ยอดหลักของรายการ:</span>
-              <span className="font-medium text-gray-800">
+              <span className="text-foreground-subtle text-sm">ยอดหลักของรายการ:</span>
+              <span className="font-medium text-foreground">
                 {baseAmount.toLocaleString()} บาท
               </span>
             </div>
             {penaltyAmount > 0 && (
               <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600 text-sm">ค่าปรับเกินกำหนด:</span>
-                <span className="font-medium text-[#B85C38]">
+                <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
+                <span className="font-medium text-primary">
                   {penaltyAmount.toLocaleString()} บาท
                 </span>
               </div>
             )}
             <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600 text-sm">ยอดชำระ:</span>
-              <span className="font-bold text-[#B85C38] text-lg">
+              <span className="text-foreground-subtle text-sm">ยอดชำระ:</span>
+              <span className="font-bold text-primary text-lg">
                 {redemptionDetails.total_amount?.toLocaleString()} บาท
               </span>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-foreground-subtle">
               {redemptionDetails.contract?.items?.brand} {redemptionDetails.contract?.items?.model}
             </p>
           </div>
         )}
 
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-6 shadow-sm">
-          <div className="text-sm font-bold text-gray-800 mb-2">ข้อมูลบัญชีรับเงิน</div>
-          <div className="text-xs text-gray-600 space-y-1">
-            <p>ธนาคาร: <span className="font-semibold text-gray-800">{companyBank.bank_name}</span></p>
-            <p>เลขบัญชี/พร้อมเพย์: <span className="font-semibold text-[#B85C38]">{companyBank.promptpay_number || companyBank.bank_account_no}</span></p>
-            <p>ชื่อบัญชี: <span className="font-semibold text-gray-800">{companyBank.bank_account_name}</span></p>
+        <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
+          <div className="text-sm font-bold text-foreground mb-2">ข้อมูลบัญชีรับเงิน</div>
+          <div className="text-sm text-foreground-subtle space-y-1">
+            <p>ธนาคาร: <span className="font-semibold text-foreground">{companyBank.bank_name}</span></p>
+            <p>เลขบัญชี/พร้อมเพย์: <span className="font-semibold text-primary">{companyBank.promptpay_number || companyBank.bank_account_no}</span></p>
+            <p>ชื่อบัญชี: <span className="font-semibold text-foreground">{companyBank.bank_account_name}</span></p>
           </div>
         </div>
 
@@ -199,8 +207,8 @@ export default function RedemptionUploadPage() {
 
           <div
             onClick={() => !slipImage && fileInputRef.current?.click()}
-            className={`bg-white rounded-3xl p-4 h-72 mb-6 shadow-sm flex flex-col items-center justify-center border-2 border-dashed transition-all cursor-pointer ${
-              slipImage ? 'border-[#B85C38]' : 'border-gray-300 hover:border-[#B85C38]'
+            className={`bg-background rounded-xl h-72 mb-4 flex flex-col items-center justify-center border-2 border-dashed transition-all cursor-pointer ${
+              slipImage ? 'border-primary' : 'border-primary-border hover:border-primary'
             }`}
           >
             {slipImage ? (
@@ -208,25 +216,16 @@ export default function RedemptionUploadPage() {
                 <img
                   src={slipImage}
                   alt="Slip Preview"
-                  className="w-full h-full object-contain rounded-2xl"
+                  className="w-full h-full object-contain rounded-lg overflow-hidden"
                 />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveImage();
-                  }}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
               </div>
             ) : (
               <div className="flex flex-col items-center">
-                <div className="w-16 h-16 mb-4 text-gray-400">
+                <div className="w-16 h-16 mb-4 text-foreground-subtle">
                   <Upload className="w-full h-full" />
                 </div>
-                <span className="text-gray-600 font-medium">แตะเพื่ออัปโหลดสลิป</span>
-                <span className="text-xs text-gray-400 mt-1">Tap to upload slip</span>
+                <span className="text-foreground-subtle font-medium">แตะเพื่ออัปโหลดสลิป</span>
+                <span className="text-xs text-foreground-subtle mt-1">Tap to upload slip</span>
               </div>
             )}
           </div>
@@ -235,17 +234,17 @@ export default function RedemptionUploadPage() {
           {slipImage && (
             <button
               onClick={handleRemoveImage}
-              className="w-full bg-[#F2E8E3] border border-[#B85C38] hover:bg-[#EBDDD5] text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center mb-8 transition-colors active:scale-[0.98]"
+              className="w-full bg-background-white border border-primary text-primary rounded-full py-2 flex flex-col items-center justify-center mb-4 transition-colors"
             >
-              <span className="text-base font-bold">ลบ</span>
-              <span className="text-[10px] font-light opacity-80">Remove</span>
+              <span className="text-base font-medium">ลบ</span>
+              <span className="text-xs font-light opacity-80">Remove</span>
             </button>
           )}
 
           {/* Instructions */}
-          <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6">
-            <h3 className="font-bold text-gray-800 text-sm mb-2">คำแนะนำ:</h3>
-            <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+          <div className="bg-primary-soft rounded-xl p-4 mb-4 border border-primary-border">
+            <h3 className="font-bold text-foreground text-sm mb-2">คำแนะนำ:</h3>
+            <ul className="text-xs text-foreground space-y-1 list-disc list-inside">
               <li>ถ่ายภาพสลิปให้ชัดเจน เห็นยอดเงินและวันที่</li>
               <li>ตรวจสอบยอดเงินให้ตรงกับที่ระบุ</li>
               <li>หากยอดไม่ตรง การไถ่ถอนจะถูกระงับ</li>
@@ -257,22 +256,22 @@ export default function RedemptionUploadPage() {
       </div>
 
       {/* Fixed Bottom Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F2F2]">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background-white/10 backdrop-blur-md border-t border-background-white/50">
         <div className="max-w-sm mx-auto">
           <button
             onClick={handleSubmit}
             disabled={!slipImage || uploading}
-            className={`w-full py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] ${
+            className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               slipImage && !uploading
-                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-primary hover:bg-primary/80 text-white'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
             {uploading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span className="text-md font-medium">กำลังส่ง...</span>
             ) : (
               <>
-                <span className="text-lg font-bold">ส่ง</span>
+                <span className="text-md font-medium">ส่ง</span>
                 <span className="text-xs font-light opacity-80">Submit</span>
               </>
             )}

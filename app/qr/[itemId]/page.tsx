@@ -14,9 +14,9 @@ export default function QRCodePage({ params }: { params: Promise<{ itemId: strin
   }, [itemId]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="theme-liff min-h-screen flex items-center justify-center bg-background">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
         <p className="mt-4 text-gray-600">กำลังเปิดแอปพลิเคชันร้านค้า...</p>
       </div>
     </div>

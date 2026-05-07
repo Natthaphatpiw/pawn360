@@ -2,14 +2,70 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Home } from 'lucide-react';
+import { Home, SearchX } from 'lucide-react';
 import axios from 'axios';
-import { openLiffEntry } from '@/lib/liff/navigation';
+import { getMockContractDetail, getMockContractsEnabled } from '@/lib/mock-contracts';
+
+const formatThaiDate = (dateString?: string) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear() + 543;
+  return `${day}/${month}/${year}`;
+};
+
+const buildMockPawnTicketData = (contract: any) => {
+  const principal = Number(contract.loan_principal_amount || 0);
+  const interestAmount = Number(contract.interest_amount || 0);
+  const totalAmount = Number(contract.total_amount || principal + interestAmount);
+  const itemName = contract.item
+    ? [contract.item.brand, contract.item.model, contract.item.capacity].filter(Boolean).join(' ')
+    : 'รายการทรัพย์สิน';
+
+  return {
+    shopName: 'Pawnly',
+    branch: contract.drop_point?.drop_point_name || 'สำนักงานใหญ่',
+    ticketNo: contract.contract_number || contract.contract_id.substring(0, 6).toUpperCase(),
+    bookNo: contract.contract_id.substring(0, 2).toUpperCase(),
+    date: formatThaiDate(contract.contract_start_date),
+    dueDate: formatThaiDate(contract.contract_end_date),
+    pawner: {
+      name: `${contract.customer?.firstname || ''} ${contract.customer?.lastname || ''}`.trim(),
+      idCard: contract.customer?.national_id || '-',
+      address: [
+        contract.drop_point?.addr_house_no,
+        contract.drop_point?.addr_street,
+        contract.drop_point?.addr_sub_district,
+        contract.drop_point?.addr_district,
+        contract.drop_point?.addr_province,
+        contract.drop_point?.addr_postcode,
+      ].filter(Boolean).join(' ') || '-',
+      signatureUrl: null,
+    },
+    items: contract.item ? [
+      {
+        seq: 1,
+        description: itemName,
+        serial: contract.item.serial_number ? `S/N: ${contract.item.serial_number}` : '',
+      },
+    ] : [],
+    amount: principal.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
+    interestAmountInterest: interestAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
+    interestAmountFee: '0.00',
+    interestAmount: interestAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
+    totalAmount: totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }),
+    amountText: `${totalAmount.toLocaleString('th-TH')} บาท`,
+    interestRate: `${((contract.interest_rate || 0) * 100).toFixed(2)}% ต่อเดือน`,
+    contractDuration: contract.contract_duration_days || 0,
+  };
+};
 
 export default function PawnTicketPage() {
   const router = useRouter();
   const params = useParams();
   const contractId = params.contractId as string;
+  const mockMode = getMockContractsEnabled();
 
   const [loading, setLoading] = useState(true);
   const [ticketData, setTicketData] = useState<any>(null);
@@ -18,238 +74,247 @@ export default function PawnTicketPage() {
     if (contractId) {
       fetchTicketData();
     }
-  }, [contractId]);
+  }, [contractId, mockMode]);
 
   const fetchTicketData = async () => {
     try {
       setLoading(true);
+      if (mockMode) {
+        const contract = await getMockContractDetail(contractId);
+        setTicketData(contract ? buildMockPawnTicketData(contract) : null);
+        return;
+      }
+
       const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}?viewer=pawner`);
       setTicketData(response.data.ticketData);
     } catch (error) {
       console.error('Error fetching ticket data:', error);
-      alert('ไม่สามารถโหลดข้อมูลสัญญาสินเชื่อได้');
+      setTicketData(null);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoHome = () => {
-    openLiffEntry({
-      liffIdCandidates: [
-        process.env.NEXT_PUBLIC_LIFF_ID_REGISTER,
-      ],
-      fallbackPath: '/register',
-    });
+    router.push('/contracts');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (!ticketData) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">ไม่พบข้อมูลสัญญาสินเชื่อ</p>
+      <div className="theme-liff min-h-screen bg-background px-4 py-6">
+        <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+          <div className="w-full max-w-sm rounded-xl border border-primary-border bg-primary-soft px-6 py-8 text-center shadow-soft">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-error-border bg-error-soft text-error">
+              <SearchX className="h-8 w-8" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground">ไม่พบข้อมูลสัญญาสินเชื่อ</h2>
+            <p className="mt-2 text-sm leading-relaxed text-foreground-subtle">
+              กรุณาตรวจสอบรหัสสัญญาอีกครั้ง หรือกลับไปยังหน้ารายการสัญญา
+            </p>
+            <button
+              type="button"
+              onClick={handleGoHome}
+              className="btn-transition mt-6 inline-flex min-h-12 items-center justify-center rounded-full border border-primary bg-primary-soft px-5 py-3 text-sm font-medium text-primary"
+            >
+              กลับหน้าหลัก
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center p-4 pb-20">
+    <div className="theme-liff min-h-screen bg-background px-4 py-6 pb-20">
+      <div className="mx-auto flex w-full max-w-sm flex-col items-center">
 
-      {/* Header Actions */}
-      <div className="w-full max-w-sm flex justify-between items-center mb-4 px-2">
-        <h1 className="text-lg font-bold text-gray-800">สัญญาสินเชื่ออิเล็กทรอนิกส์</h1>
-      </div>
+        {/* Pawn Ticket Header */}
+        <div className="mb-5 rounded-xl border border-primary-border bg-primary-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+              Pawn Ticket
+            </div>
+            <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-primary">
+              สัญญาสินเชื่ออิเล็กทรอนิกส์
+            </div>
+            <p className="mt-2 text-xs text-foreground-subtle">แสดงรายละเอียดสัญญา ทรัพย์สินค้ำประกัน และยอดเงินตามข้อมูลในระบบ</p>
+          </div>
+        </div>
 
-      {/* Ticket Paper Card */}
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-md overflow-hidden relative">
-        {/* Decorative Top Border */}
-        <div className="h-2 bg-[#B85C38]"></div>
+        <div className="relative w-full overflow-hidden rounded-lg bg-background-white shadow-strong">
+          <div className="h-2 bg-primary"></div>
 
-        <div className="p-6">
-          {/* Shop Header */}
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-[#F2E8E3] rounded-lg flex items-center justify-center text-[#B85C38] font-bold text-xl border border-[#B85C38]/20">
-                P
+          <div className="p-6">
+            <div className="mb-6 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary-border/30 bg-primary-soft text-xl font-bold text-primary">
+                  P
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-foreground">{ticketData.shopName}</div>
+                  <div className="text-xs text-foreground-subtle">{ticketData.branch}</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="mb-1 inline-block rounded-full bg-primary px-3 py-1 text-xs font-bold text-primary-fg">
+                  สัญญาสินเชื่อ
+                </div>
+                <div className="text-xs text-foreground-subtle">Loan Contract</div>
+              </div>
+            </div>
+
+            <div className="mb-4 flex justify-between rounded-md border border-primary bg-primary-soft p-3">
+              <div>
+                <div className="text-xs text-foreground-subtle">เล่มที่ (Book No.)</div>
+                <div className="font-bold text-foreground-muted">{ticketData.bookNo}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-foreground-subtle">เลขที่ (No.)</div>
+                <div className="font-bold text-primary">{ticketData.ticketNo}</div>
+              </div>
+            </div>
+
+            <div className="mb-6 grid grid-cols-2 gap-4">
+              <div>
+                <div className="mb-1 text-xs text-foreground-subtle">วันที่ทำรายการ</div>
+                <div className="border-b border-line-soft pb-1 text-sm font-medium text-foreground">
+                  {ticketData.date}
+                </div>
               </div>
               <div>
-                <div className="font-bold text-gray-800 text-lg">{ticketData.shopName}</div>
-                <div className="text-xs text-gray-500">{ticketData.branch}</div>
+                <div className="mb-1 text-xs text-foreground-subtle">วันครบกำหนดไถ่ถอน</div>
+                <div className="border-b border-line-soft pb-1 text-sm font-medium text-foreground">
+                  {ticketData.dueDate}
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="inline-block bg-[#B85C38] text-white text-xs font-bold px-3 py-1 rounded-full mb-1">
-                สัญญาสินเชื่อ
-              </div>
-              <div className="text-[10px] text-gray-400">Loan Contract</div>
-            </div>
-          </div>
 
-          {/* Ticket Numbers */}
-          <div className="flex justify-between mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-            <div>
-              <div className="text-[10px] text-gray-500">เล่มที่ (Book No.)</div>
-              <div className="font-bold text-gray-700">{ticketData.bookNo}</div>
+            <div className="mb-6">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wider text-foreground">ข้อมูลผู้ขอสินเชื่อ</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-foreground-subtle">ชื่อ-นามสกุล</span>
+                  <span className="text-right font-medium text-foreground">{ticketData.pawner.name}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-foreground-subtle">เลขบัตรประชาชน</span>
+                  <span className="text-right font-medium text-foreground">{ticketData.pawner.idCard}</span>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <span className="whitespace-nowrap text-foreground-subtle">ที่อยู่</span>
+                  <span className="max-w-[60%] text-right text-xs font-medium leading-relaxed text-foreground">
+                    {ticketData.pawner.address}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-[10px] text-gray-500">เลขที่ (No.)</div>
-              <div className="font-bold text-[#B85C38]">{ticketData.ticketNo}</div>
-            </div>
-          </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <div className="text-[10px] text-gray-500 mb-1">วันที่ทำรายการ</div>
-              <div className="text-sm font-medium text-gray-800 border-b border-gray-200 pb-1">
-                {ticketData.date}
+            <div className="mb-6">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wider text-foreground">ข้อมูลผู้ให้เงินกู้</h3>
+              <div className="text-sm text-foreground-subtle">
+                ข้อมูลส่วนบุคคลของผู้ให้เงินกู้ถูกปกปิดตามนโยบายความเป็นส่วนตัว
               </div>
             </div>
-            <div>
-              <div className="text-[10px] text-gray-500 mb-1">วันครบกำหนดไถ่ถอน</div>
-              <div className="text-sm font-medium text-gray-800 border-b border-gray-200 pb-1">
-                {ticketData.dueDate}
-              </div>
-            </div>
-          </div>
 
-          {/* Pawner Info */}
-          <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้ขอสินเชื่อ</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">ชื่อ-นามสกุล</span>
-                <span className="font-medium text-gray-800 text-right">{ticketData.pawner.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">เลขบัตรประชาชน</span>
-                <span className="font-medium text-gray-800 text-right">{ticketData.pawner.idCard}</span>
-              </div>
-              <div className="flex justify-between items-start">
-                <span className="text-gray-500 whitespace-nowrap">ที่อยู่</span>
-                <span className="font-medium text-gray-800 text-right text-xs leading-relaxed max-w-[60%]">
-                  {ticketData.pawner.address}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Investor Info (Redacted) */}
-          <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ข้อมูลผู้ให้เงินกู้</h3>
-            <div className="text-sm text-gray-500">
-              ข้อมูลส่วนบุคคลของผู้ให้เงินกู้ถูกปกปิดตามนโยบายความเป็นส่วนตัว
-            </div>
-          </div>
-
-          {/* Item Details */}
-          <div className="mb-6">
-            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">ทรัพย์สินค้ำประกัน</h3>
-            <div className="bg-[#F9FAFB] rounded-lg p-3 border border-gray-100">
-              {ticketData.items.map((item: any, index: number) => (
-                <div key={index} className="mb-2 last:mb-0">
-                  <div className="text-sm font-bold text-gray-800 mb-1">{item.seq}. รายการทรัพย์สิน</div>
-                  <div className="text-xs text-gray-600 leading-relaxed pl-4 border-l-2 border-[#B85C38]">
-                    {item.description}
-                    {item.serial && (
-                      <div className="text-[10px] text-gray-400 mt-1">{item.serial}</div>
-                    )}
+            <div className="mb-6">
+              <h3 className="mb-2 text-sm font-bold uppercase tracking-wider text-foreground">ทรัพย์สินค้ำประกัน</h3>
+              <div className="rounded-md border border-primary bg-primary-soft p-3">
+                {ticketData.items.map((item: any, index: number) => (
+                  <div key={index} className="mb-2 last:mb-0">
+                    <div className="mb-1 text-sm font-bold text-foreground">{item.seq}. รายการทรัพย์สิน</div>
+                    <div className="border-l-2 border-primary pl-4 text-xs leading-relaxed text-foreground-muted">
+                      {item.description}
+                      {item.serial && (
+                        <div className="mt-1 text-[10px] text-foreground-subtle">{item.serial}</div>
+                      )}
+                    </div>
                   </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-6 rounded-lg border border-primary-border/30 bg-primary-soft p-4">
+              <div className="mb-3 grid grid-cols-2 gap-4">
+                <div className="text-center">
+                  <div className="mb-1 text-xs text-foreground-subtle">เงินต้น</div>
+                  <div className="text-xl font-bold text-primary">{ticketData.amount}</div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Amount Section */}
-          <div className="mb-6 bg-[#F2E8E3] rounded-xl p-4 border border-[#B85C38]/20">
-            <div className="grid grid-cols-2 gap-4 mb-3">
-              <div className="text-center">
-                <div className="text-xs text-gray-600 mb-1">เงินต้น</div>
-                <div className="text-xl font-bold text-[#B85C38]">{ticketData.amount}</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xs text-gray-600 mb-1">ดอกเบี้ย</div>
-                <div className="text-xl font-bold text-[#B85C38]">{ticketData.interestAmountInterest || ticketData.interestAmount}</div>
-                {ticketData.interestAmountFee && (
-                  <div className="text-[10px] text-gray-500">ค่าธรรมเนียม {ticketData.interestAmountFee}</div>
-                )}
-              </div>
-            </div>
-            <div className="text-center pt-3 border-t border-[#B85C38]/20">
-              <div className="text-xs text-gray-600 mb-1">รวมยอดชำระคืน</div>
-              <div className="text-2xl font-bold text-[#B85C38]">{ticketData.totalAmount}</div>
-              <div className="text-sm font-medium text-gray-700 mt-1">{ticketData.amountText}</div>
-            </div>
-          </div>
-
-          {/* Terms & Conditions */}
-          <div className="text-[10px] text-gray-400 text-justify leading-snug mb-8">
-            <p>
-              * ผู้ขอสินเชื่อตกลงใช้ทรัพย์สินรายการข้างต้นเป็นหลักประกันการชำระหนี้
-              โดยยอมเสียดอกเบี้ยในอัตรา {ticketData.interestRate} หากไม่มาไถ่ถอนหรือส่งดอกเบี้ยภายในระยะเวลาที่กำหนด
-              ทรัพย์สินจะตกเป็นสิทธิ์ของผู้ให้กู้ทันทีตามกฎหมาย
-            </p>
-          </div>
-
-          {/* Signatures */}
-          <div className="grid grid-cols-2 gap-8 mt-4">
-            <div className="text-center">
-              <div className="h-16 border-b border-dashed border-gray-300 mb-2 relative flex items-end justify-center">
-                {ticketData.pawner.signatureUrl ? (
-                  <img
-                    src={ticketData.pawner.signatureUrl}
-                    alt="Pawner Signature"
-                    className="absolute bottom-2 max-h-12 max-w-full object-contain"
-                  />
-                ) : (
-                  <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้ขอสินเชื่อ</span>
-                )}
-              </div>
-              <div className="text-[10px] text-gray-500">ลงชื่อ ผู้ขอสินเชื่อ</div>
-            </div>
-            <div className="text-center">
-              <div className="h-16 border-b border-dashed border-gray-300 mb-2 relative flex items-end justify-center">
-                <div className="w-12 h-12 bg-[#B85C38]/10 rounded-full absolute top-1 right-2 border-2 border-[#B85C38]/30 flex items-center justify-center rotate-[-15deg]">
-                  <span className="text-[8px] text-[#B85C38] font-bold uppercase">Pawnly</span>
+                <div className="text-center">
+                  <div className="mb-1 text-xs text-foreground-subtle">ดอกเบี้ย</div>
+                  <div className="text-xl font-bold text-primary">{ticketData.interestAmountInterest || ticketData.interestAmount}</div>
+                  {ticketData.interestAmountFee && (
+                    <div className="text-[10px] text-foreground-subtle">ค่าธรรมเนียม {ticketData.interestAmountFee}</div>
+                  )}
                 </div>
-                <span className="text-gray-300 text-xs italic opacity-50 absolute bottom-2">ลายเซ็นผู้ให้กู้</span>
               </div>
-              <div className="text-[10px] text-gray-500">ลงชื่อ ผู้ให้กู้</div>
+              <div className="border-t border-primary-border/30 pt-3 text-center">
+                <div className="mb-1 text-xs text-foreground-subtle">รวมยอดชำระคืน</div>
+                <div className="text-2xl font-bold text-primary">{ticketData.totalAmount}</div>
+                <div className="mt-1 text-sm font-medium text-foreground-muted">{ticketData.amountText}</div>
+              </div>
             </div>
+
+            <div className="mb-8 text-[10px] leading-snug text-foreground-subtle text-justify">
+              <p>
+                * ผู้ขอสินเชื่อตกลงใช้ทรัพย์สินรายการข้างต้นเป็นหลักประกันการชำระหนี้
+                โดยยอมเสียดอกเบี้ยในอัตรา {ticketData.interestRate} หากไม่มาไถ่ถอนหรือส่งดอกเบี้ยภายในระยะเวลาที่กำหนด
+                ทรัพย์สินจะตกเป็นสิทธิ์ของผู้ให้กู้ทันทีตามกฎหมาย
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-8">
+              <div className="text-center">
+                <div className="relative mb-2 flex h-16 items-end justify-center border-b border-dashed border-line-soft">
+                  {ticketData.pawner.signatureUrl ? (
+                    <img
+                      src={ticketData.pawner.signatureUrl}
+                      alt="Pawner Signature"
+                      className="absolute bottom-2 max-h-12 max-w-full object-contain"
+                    />
+                  ) : (
+                    <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ขอสินเชื่อ</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-foreground-subtle">ลงชื่อ ผู้ขอสินเชื่อ</div>
+              </div>
+              <div className="text-center">
+                <div className="relative mb-2 flex h-16 items-end justify-center border-b border-dashed border-line-soft">
+                  <div className="absolute right-2 top-1 flex h-12 w-12 rotate-[-15deg] items-center justify-center rounded-full border-2 border-primary/30 bg-primary/10">
+                    <span className="text-[8px] font-bold uppercase text-primary">Pawnly</span>
+                  </div>
+                  <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ให้กู้</span>
+                </div>
+                <div className="text-[10px] text-foreground-subtle">ลงชื่อ ผู้ให้กู้</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-1 bg-background-subtle"></div>
+          <div className="flex">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div key={i} className="mx-[1px] -mt-1 h-2 flex-1 rounded-full bg-background-white shadow-sm"></div>
+            ))}
           </div>
         </div>
 
-        {/* Decorative Bottom */}
-        <div className="h-1 bg-gray-100"></div>
-        <div className="flex">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <div key={i} className="flex-1 h-2 bg-white rounded-full mx-[1px] -mt-1 shadow-sm"></div>
-          ))}
+        <div className="mt-6 w-full max-w-sm space-y-3">
+          <button
+            onClick={handleGoHome}
+            className="btn-transition flex w-full min-h-12 items-center justify-center gap-2 rounded-full border border-primary bg-background px-4 py-3 text-primary"
+          >
+            <Home className="h-5 w-5" />
+            <span className="text-base font-medium">กลับหน้าหลัก</span>
+          </button>
         </div>
       </div>
-
-      {/* Footer Action Buttons */}
-      <div className="w-full max-w-sm mt-6 space-y-3">
-        <button
-          onClick={handleGoHome}
-          className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-600 rounded-2xl py-3 flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-base font-bold">กลับหน้าหลัก</span>
-        </button>
-      </div>
-
     </div>
   );
 }
