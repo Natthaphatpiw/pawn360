@@ -388,7 +388,7 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
       const canvas = await html2canvas(contractElement, {
         useCORS: true,
         allowTaint: true,
-        backgroundColor: '#ffffff'
+        background: '#ffffff'
       });
       console.log('html2canvas completed, canvas size:', canvas.width, 'x', canvas.height);
 
