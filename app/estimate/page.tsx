@@ -4,8 +4,7 @@ import { Suspense, useState, useRef, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
-import { Camera, ChevronUp, ChevronDown, Check, FileText } from 'lucide-react';
-import { Noto_Sans_Thai } from 'next/font/google';
+import { Camera, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import PawnSummary from './pawn-summary';
 import ContractAgreementStep from './contract-agreement-step';
@@ -13,18 +12,24 @@ import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
-
-const sarabun = Noto_Sans_Thai({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-});
+import VolumeSlider from '@/components/VolumeSlider';
+import {
+  buildMockEstimate,
+  createMockPawnRequest,
+  getMockCustomer,
+  getMockDraftCount,
+  getMockImageUrls,
+  getMockStores,
+  isMockPawnerMode,
+  waitMock,
+} from '@/lib/mock-pawner';
 
 // Item types configuration
 const ITEM_TYPES = [
+  { id: 'apple', label: 'สินค้าของ Apple', value: 'Apple' },
   { id: 'mobile', label: 'โทรศัพท์มือถือ(Mobile)', value: 'โทรศัพท์มือถือ' },
   { id: 'mobile-accessory', label: 'อุปกรณ์เสริมโทรศัพท์มือถือ(Mobile accessory)', value: 'อุปกรณ์เสริมโทรศัพท์' },
   { id: 'camera', label: 'กล้องถ่ายรูป(Camera)', value: 'กล้อง' },
-  { id: 'apple', label: 'สินค้าของ Apple', value: 'Apple' },
   { id: 'laptop', label: 'คอมพิวเตอร์แล็ปท็อป(Computer laptop)', value: 'โน้ตบุค' },
   { id: 'computer-hardware', label: 'อุปกรณ์คอมพิวเตอร์(Computer hardware)', value: 'อุปกรณ์คอมพิวเตอร์' },
 ];
@@ -269,14 +274,107 @@ const APPLE_MODELS_BY_CATEGORY: Record<string, string[]> = {
 // Helper component for form labels
 const FormLabel = ({ thai, eng, required = false }: { thai: string; eng?: string; required?: boolean }) => (
   <div className="flex items-center gap-2 mb-2">
-    <span className="font-bold text-gray-800 text-sm md:text-base">
-      {thai} {required && <span className="text-red-500">*</span>}
+    <span className="font-medium text-foreground-muted text-sm md:text-base">
+      {thai} {required && <span className="text-error">*</span>}
     </span>
     {eng && (
-      <span className="bg-gray-200 text-gray-500 text-xs px-2 py-0.5 rounded-md font-normal">
+      <span className="bg-background-white/80 text-foreground-subtle text-xs px-2 py-0.5 rounded-md font-normal">
         {eng}
       </span>
     )}
+  </div>
+);
+
+function DropdownField({
+  value,
+  placeholder,
+  options,
+  onChange,
+  disabled = false,
+  className = '',
+  menuClassName = '',
+}: {
+  value: string;
+  placeholder: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (nextValue: string) => void;
+  disabled?: boolean;
+  className?: string;
+  menuClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleSelect = (nextValue: string) => {
+    onChange(nextValue);
+    setOpen(false);
+  };
+
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        disabled={disabled}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between rounded-xl border border-primary-border bg-background-white px-3 py-3 text-left text-sm font-base text-foreground-muted transition focus:outline-none focus:ring-1 focus:ring-primary-active disabled:cursor-not-allowed disabled:bg-background-subtle disabled:text-foreground-subtle ${className}`}
+      >
+        <span className={selectedOption ? 'text-foreground-muted' : 'font-normal text-foreground-subtle'}>
+          {selectedOption?.label || placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-foreground-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && !disabled && (
+        <div className={`dropdown-slide-down absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-lg border border-primary-border bg-background-white shadow-[0_10px_24px_rgba(11,59,130,0.08)] ${menuClassName}`}>
+          <div className="max-h-60 overflow-y-auto py-1">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option.value ? 'bg-primary-soft text-primary' : 'text-foreground-muted hover:bg-background-subtle'}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const EstimateSection = ({
+  title,
+  subtitle,
+  children,
+  className = '',
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <div className={`rounded-xl border border-primary-border bg-primary-soft/50 p-4 ${className}`}>
+    <div className="mb-4">
+      <h2 className="text-lg font-bold text-primary font-english">{title}</h2>
+      {subtitle ? <p className="text-xs text-foreground-subtle">{subtitle}</p> : null}
+    </div>
+    {children}
   </div>
 );
 
@@ -383,6 +481,7 @@ const createInitialFormData = (): FormData => ({
 });
 
 function EstimatePageInner() {
+  const mockMode = isMockPawnerMode();
   const { profile, isLoading, error: liffError } = useLiff();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -421,7 +520,7 @@ function EstimatePageInner() {
   const [customer, setCustomer] = useState<Customer | null>(null);
 
   // UI state
-  const [isConditionExpanded, setIsConditionExpanded] = useState(true);
+  const [isConditionExpanded, setIsConditionExpanded] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -493,6 +592,17 @@ function EstimatePageInner() {
       title: 'กำลังยกเลิกการประเมิน',
       detail: 'กำลังหยุดการประมวลผล',
     }));
+
+    if (mockMode) {
+      await waitMock(150);
+      setIsAnalyzing(false);
+      setIsEstimating(false);
+      setProcessingStatus(null);
+      setIsCanceling(false);
+      setError('ยกเลิก mock preview แล้ว');
+      return;
+    }
+
     abortControllerRef.current?.abort();
 
     if (manualRequestId) {
@@ -520,6 +630,13 @@ function EstimatePageInner() {
   // Check customer exists
   const checkCustomerExists = async () => {
     if (!profile?.userId) return;
+    if (mockMode) {
+      setCustomer({
+        ...getMockCustomer(),
+        lineId: profile.userId,
+      });
+      return;
+    }
     try {
       const response = await axios.get(`/api/users/check?lineId=${profile.userId}`);
       if (response.data.exists) {
@@ -552,6 +669,13 @@ function EstimatePageInner() {
   useEffect(() => {
     let mounted = true;
     const fetchManualConfig = async () => {
+      if (mockMode) {
+        if (mounted) {
+          setManualEstimateEnabled(false);
+          setManualConfigLoaded(true);
+        }
+        return;
+      }
       try {
         const response = await axios.get('/api/manual-estimate/config');
         if (mounted) {
@@ -642,6 +766,10 @@ function EstimatePageInner() {
   // Fetch draft count
   const fetchDraftCount = async () => {
     if (!profile?.userId) return;
+    if (mockMode) {
+      setDraftCount(getMockDraftCount());
+      return;
+    }
     try {
       const response = await axios.get(`/api/items/draft?lineId=${profile.userId}`);
       if (response.data.success) {
@@ -654,6 +782,10 @@ function EstimatePageInner() {
 
   // Fetch stores
   const fetchStores = async () => {
+    if (mockMode) {
+      setStores(getMockStores());
+      return;
+    }
     try {
       const response = await axios.get('/api/stores');
       if (response.data.success) {
@@ -910,7 +1042,7 @@ function EstimatePageInner() {
 
   // Validation
   const validateForm = (): string | null => {
-    if (images.length === 0) {
+    if (!mockMode && images.length === 0) {
       return 'กรุณาอัพโหลดรูปภาพอย่างน้อย 1 รูป';
     }
 
@@ -1027,6 +1159,54 @@ function EstimatePageInner() {
 
     if (!profile?.userId) {
       setError('กรุณาเข้าสู่ระบบ LINE ก่อน');
+      return;
+    }
+
+    if (mockMode) {
+      setIsAnalyzing(true);
+      setIsEstimating(true);
+      setError(null);
+      setIsCanceling(false);
+
+      try {
+        updateProcessingStatus(12, 'เตรียมข้อมูลตัวอย่าง', 'กำลังจัดเตรียม mock data สำหรับ preview');
+        await waitMock(300);
+        updateProcessingStatus(42, 'วิเคราะห์สภาพสินค้า', 'กำลังจำลองการวิเคราะห์สภาพจากข้อมูลที่กรอก');
+        await waitMock(450);
+
+        const mockImages = imageUrls.length > 0 ? imageUrls : getMockImageUrls(formData.itemType, formData.model);
+        const { estimateResult: mockEstimateResult, conditionResult: mockConditionResult } = buildMockEstimate({
+          itemType: formData.itemType,
+          brand: formData.brand,
+          model: formData.model,
+          condition: formData.condition,
+          appleCategory: formData.appleCategory,
+        });
+
+        setUploadedImageUrls(mockImages);
+        setConditionResult(mockConditionResult);
+        updateProcessingStatus(78, 'คำนวณราคาประเมิน', 'กำลังสร้างผลลัพธ์ตัวอย่างสำหรับ frontend preview');
+        await waitMock(450);
+
+        setEstimateResult(mockEstimateResult);
+        setDesiredPrice(mockEstimateResult.estimatedPrice.toString());
+        setFormData((prev) => ({
+          ...prev,
+          condition: Math.round(mockConditionResult.score * 100),
+        }));
+
+        updateProcessingStatus(100, 'พร้อมแสดงผล', 'กำลังเปิดหน้า Pawn Summary');
+        await waitMock(250);
+        setCurrentStep('pawn_summary');
+      } catch (mockError) {
+        console.error('Error during mock estimate flow:', mockError);
+        setError('เกิดข้อผิดพลาดในการสร้าง mock preview');
+      } finally {
+        setIsAnalyzing(false);
+        setIsEstimating(false);
+        setProcessingStatus(null);
+        setIsCanceling(false);
+      }
       return;
     }
 
@@ -1275,6 +1455,14 @@ function EstimatePageInner() {
     setError(null);
 
     try {
+      if (mockMode) {
+        await waitMock(500);
+        const mockRequest = createMockPawnRequest();
+        setLoanRequestId(mockRequest.requestId);
+        setCurrentStep('qr_display');
+        return;
+      }
+
       const pawnRequestData = {
         lineId: profile?.userId,
         brand: formData.brand,
@@ -1319,50 +1507,49 @@ function EstimatePageInner() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="min-h-screen bg-white flex items-center justify-center page-investor">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (liffError) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">เกิดข้อผิดพลาด: {liffError}</p>
+      <div className="theme-liff min-h-screen flex items-center justify-center bg-background-white p-6">
+        <div className="w-full max-w-md rounded-[30px] border border-primary-border/60 bg-gradient-to-br from-background-white via-primary-soft/35 to-primary-border/30 p-4 shadow-[0_22px_60px_rgba(219,71,16,0.14)]">
+          <div className="rounded-[24px] border border-background-white/90 bg-background-white/90 px-4 py-6 text-center shadow-[0_10px_24px_rgba(219,71,16,0.06)]">
+          <p className="text-error">เกิดข้อผิดพลาด: {liffError}</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen bg-gray-50 flex justify-center py-4 px-2 md:px-0 ${sarabun.className}`}>
-      <div className="w-full max-w-md bg-white rounded-lg shadow-sm p-4 md:p-6 pb-20">
+    <div className="theme-liff page-pawner min-h-screen bg-background-white flex justify-center py-4 px-2 font-sans md:px-0">
+      <div className="w-full max-w-md px-1 pb-20 pt-2 md:px-0">
         {isProcessing && processingStatus && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/40" />
-            <div className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <div className="absolute inset-0 bg-foreground/40" />
+            <div className="relative w-full max-w-sm rounded-2xl border border-primary-border/40 bg-background-white p-5 shadow-[var(--shadow-strong)]">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full border-4 border-orange-200 border-t-orange-500 animate-spin" />
+                <div className="h-10 w-10 rounded-full border-4 border-primary-border border-t-primary animate-spin" />
                 <div>
-                  <p className="text-xs text-gray-500">กำลังดำเนินการ</p>
-                  <p className="text-base font-semibold text-gray-800">{processingStatus.title}</p>
+                  <p className="text-xs text-foreground-subtle">กำลังดำเนินการ</p>
+                  <p className="text-base font-semibold text-foreground-muted">{processingStatus.title}</p>
                 </div>
               </div>
 
-              <p className="mt-3 text-sm text-gray-600">{processingStatus.detail}</p>
+              <p className="mt-3 text-sm text-foreground-subtle">{processingStatus.detail}</p>
 
               <div className="mt-4">
-                <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center justify-between text-xs text-foreground-subtle">
                   <span>ความคืบหน้า</span>
                   <span>{processingStatus.percent}%</span>
                 </div>
-                <div className="mt-2 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-background-subtle">
                   <div
-                    className="h-full bg-orange-500 transition-all duration-500"
+                    className="h-full bg-primary transition-all duration-500"
                     style={{ width: `${processingStatus.percent}%` }}
                   />
                 </div>
@@ -1371,7 +1558,7 @@ function EstimatePageInner() {
               <button
                 onClick={handleCancelProcessing}
                 disabled={isCanceling}
-                className="mt-5 w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-5 w-full min-h-12 rounded-full border border-s1 bg-background-white px-4 py-2 text-sm font-medium text-s1 hover:bg-background-subtle disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isCanceling ? 'กำลังยกเลิก...' : 'ยกเลิกการประเมิน'}
               </button>
@@ -1383,24 +1570,34 @@ function EstimatePageInner() {
         {currentStep === 'form' && (
           <>
             {/* Header */}
-            <div className="mb-6">
-              <div>
-                <h1 className="text-xl font-bold text-gray-800">ประเมินราคาสินค้า</h1>
-                <p className="text-xs text-gray-500">AI Price Estimation</p>
+            <div className="mb-4 rounded-xl border border-primary-border bg-primary-soft/50 p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+              <div className="rounded-[var(--radius-lg)] border border-background-white/80 bg-background-white/90 px-4 py-4">
+                <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+                  AI Price Estimation
+                </div>
+                <div className="mt-3 text-primary bg-clip-text text-3xl font-semibold tracking-[0.08em]">
+                  ประเมินราคา
+                </div>
+                <p className="mt-1 text-xs text-foreground-subtle">
+                  กรอกรายละเอียดสินค้า อัปโหลดรูปภาพ และตั้งค่าขอสินเชื่อในสไตล์เดียวกับหน้าสมัครสมาชิก
+                </p>
               </div>
             </div>
 
             {/* Image Upload Section */}
-            <div className="mb-6">
+            <EstimateSection title="Item Images" subtitle="รูปสินค้า" className="mb-4">
               <div className="flex justify-between items-end mb-2">
                 <FormLabel thai="รูปสินค้า" eng="Item images" required />
-                <span className="text-gray-400 text-xs">{images.length}/6</span>
+                <span className="text-foreground-subtle text-xs">{images.length}/6</span>
               </div>
 
               {images.length === 0 ? (
-                <div className="border-2 border-dashed border-gray-200 rounded-xl bg-white h-32 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setShowTutorial(true)}>
-                  <Camera className="w-8 h-8 text-gray-400 mb-1" />
-                  <span className="text-gray-600 text-sm font-medium">เพิ่มรูปถ่าย</span>
+                <div className="border-2 border-dashed border-primary-border rounded-[var(--radius-lg)] bg-background-white/90 text-primary-border h-32 flex flex-col items-center justify-center cursor-pointer hover:bg-background-subtle transition-colors shadow-[0_8px_18px_rgba(11,59,130,0.05)]" onClick={() => setShowTutorial(true)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" className="bi bi-camera-fill" viewBox="0 0 16 16">
+                    <path d="M10.5 8.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/>
+                    <path d="M2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4zm.5 2a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m9 2.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0"/>
+                  </svg>
+                  <span className="mt-2 text-foreground-subtle text-sm font-medium">เพิ่มรูปถ่าย</span>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
@@ -1411,11 +1608,11 @@ function EstimatePageInner() {
                         alt={`สินค้า ${index + 1}`}
                         width={100}
                         height={100}
-                        className="w-full h-24 object-cover rounded-lg"
+                        className="w-full h-24 object-cover rounded-2xl"
                       />
                       <button
                         onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                        className="absolute -top-2 -right-2 bg-error text-error-fg rounded-full w-6 h-6 flex items-center justify-center text-xs"
                       >
                         ×
                       </button>
@@ -1424,7 +1621,7 @@ function EstimatePageInner() {
                   {images.length < 6 && (
                     <button
                       onClick={() => setShowTutorial(true)}
-                      className="border-2 border-dashed border-gray-300 rounded-lg h-24 flex items-center justify-center text-gray-400"
+                      className="border-2 border-dashed border-primary-border rounded-[var(--radius-lg)] h-24 flex items-center justify-center bg-background-white/75 text-foreground-subtle"
                     >
                       +
                     </button>
@@ -1432,7 +1629,7 @@ function EstimatePageInner() {
                 </div>
               )}
 
-              <div className="mt-2 text-xs text-gray-400 space-y-1">
+              <div className="mt-3 text-xs text-foreground-subtle space-y-1">
                 {formData.itemType === 'อุปกรณ์เสริมโทรศัพท์' ? (
                   <>
                     <p>*อย่างน้อย 2 รูป</p>
@@ -1455,143 +1652,131 @@ function EstimatePageInner() {
                   </>
                 )}
               </div>
-            </div>
+            </EstimateSection>
 
-            {/* Item Type Selection */}
-            <div className="mb-4">
-              <FormLabel thai="ประเภทสินค้า" eng="Item type" required />
-              <div className="relative">
-                <select
-                  name="itemType"
-                  value={formData.itemType}
-                  onChange={handleInputChange}
-                  className="w-full p-3 pr-10 bg-white border border-gray-200 rounded-lg text-gray-800 appearance-none focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm md:text-base"
-                >
-                  <option value="">เลือกประเภทสินค้า</option>
-                  {ITEM_TYPES.map(type => (
-                    <option key={type.id} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
+            <EstimateSection title="Item Details" subtitle="รายละเอียดสินค้า" className="mb-4">
+              <div className="mb-4">
+                <FormLabel thai="ประเภทสินค้า" eng="Item type" required />
+                <div className="relative">
+                  <DropdownField
+                    value={formData.itemType}
+                    placeholder="เลือกประเภทสินค้า"
+                    options={ITEM_TYPES.map((type) => ({ value: type.value, label: type.label }))}
+                    onChange={(nextValue) => {
+                      handleInputChange({
+                        target: { name: 'itemType', value: nextValue },
+                      } as React.ChangeEvent<HTMLSelectElement>);
+                    }}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Conditional Fields Based on Item Type */}
-            {formData.itemType && (
-              <>
-                <div className="h-px bg-gray-200 my-6"></div>
+              {/* Conditional Fields Based on Item Type */}
+              {formData.itemType && (
+                <>
+                  <div className="h-px bg-primary my-6"></div>
 
-                {/* Apple Product Selection */}
-                {formData.itemType === 'Apple' && (
-                  <div className="mb-6 space-y-4">
-                    <div>
-                      <FormLabel thai="ประเภทสินค้า Apple" eng="Apple category" required />
-                      <div className="relative">
-                        <select
-                          name="appleCategory"
-                          value={formData.appleCategory}
-                          onChange={handleAppleCategoryChange}
-                          className="w-full p-3 pr-10 bg-white border border-gray-200 rounded-lg text-gray-800 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 text-sm md:text-base"
-                        >
-                          <option value="">เลือกประเภทสินค้า</option>
-                          {APPLE_CATEGORIES.map(category => (
-                            <option key={category.value} value={category.value}>
-                              {category.label}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
+                  {/* Apple Product Selection */}
+                  {formData.itemType === 'Apple' && (
+                    <div className="mb-6 space-y-4">
+                      <div>
+                        <FormLabel thai="ประเภทสินค้า Apple" eng="Apple category" required />
+                        <div className="relative">
+                          <DropdownField
+                            value={formData.appleCategory || ''}
+                            placeholder="เลือกประเภทสินค้า"
+                            options={APPLE_CATEGORIES.map((category) => ({ value: category.value, label: category.label }))}
+                            onChange={(nextValue) => {
+                              handleAppleCategoryChange({
+                                target: { value: nextValue },
+                              } as React.ChangeEvent<HTMLSelectElement>);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <FormLabel thai="รุ่นสินค้า Apple" eng="Apple model" required />
+                        <div className="relative">
+                          <DropdownField
+                            value={formData.model}
+                            placeholder={formData.appleCategory ? 'เลือกรุ่นสินค้า' : 'กรุณาเลือกประเภทสินค้าก่อน'}
+                            options={appleModels.map((model) => ({ value: model, label: model }))}
+                            onChange={(nextValue) => {
+                              handleAppleModelChange({
+                                target: { value: nextValue },
+                              } as React.ChangeEvent<HTMLSelectElement>);
+                            }}
+                            disabled={!formData.appleCategory}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <FormLabel thai="ความจุ" eng="Capacity" required />
+                        <input
+                          type="text"
+                          name="capacity"
+                          value={formData.capacity}
+                          onChange={handleInputChange}
+                          placeholder="เช่น 128GB, 256GB, 1TB"
+                          list="apple-capacity-options"
+                          className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
+                        />
+                        <datalist id="apple-capacity-options">
+                          <option value="32GB" />
+                          <option value="64GB" />
+                          <option value="128GB" />
+                          <option value="256GB" />
+                          <option value="512GB" />
+                          <option value="1TB" />
+                          <option value="2TB" />
+                          <option value="4TB" />
+                          <option value="8TB" />
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <FormLabel thai="สเปคเพิ่มเติม" eng="Additional specs" />
+                        <input
+                          type="text"
+                          name="appleSpecs"
+                          value={formData.appleSpecs}
+                          onChange={handleInputChange}
+                          placeholder="เช่น ชิป M2, Cellular, GPS + Cellular"
+                          className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
+                        />
+                      </div>
+
+                      <div>
+                        <FormLabel thai="สี" eng="Color" required />
+                        <input
+                          type="text"
+                          name="color"
+                          value={formData.color}
+                          onChange={handleInputChange}
+                          placeholder="เช่น Black, Silver, Starlight..."
+                          className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
+                        />
                       </div>
                     </div>
-
-                    <div>
-                      <FormLabel thai="รุ่นสินค้า Apple" eng="Apple model" required />
-                      <div className="relative">
-                        <select
-                          name="model"
-                          value={formData.model}
-                          onChange={handleAppleModelChange}
-                          disabled={!formData.appleCategory}
-                          className="w-full p-3 pr-10 bg-white border border-gray-200 rounded-lg text-gray-800 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 text-sm md:text-base disabled:bg-gray-100 disabled:text-gray-400"
-                        >
-                          <option value="">
-                            {formData.appleCategory ? 'เลือกรุ่นสินค้า' : 'กรุณาเลือกประเภทสินค้าก่อน'}
-                          </option>
-                          {appleModels.map(model => (
-                            <option key={model} value={model}>{model}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <FormLabel thai="ความจุ" eng="Capacity" required />
-                      <input
-                        type="text"
-                        name="capacity"
-                        value={formData.capacity}
-                        onChange={handleInputChange}
-                        placeholder="เช่น 128GB, 256GB, 1TB"
-                        list="apple-capacity-options"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
-                      />
-                      <datalist id="apple-capacity-options">
-                        <option value="32GB" />
-                        <option value="64GB" />
-                        <option value="128GB" />
-                        <option value="256GB" />
-                        <option value="512GB" />
-                        <option value="1TB" />
-                        <option value="2TB" />
-                        <option value="4TB" />
-                        <option value="8TB" />
-                      </datalist>
-                    </div>
-
-                    <div>
-                      <FormLabel thai="สเปคเพิ่มเติม" eng="Additional specs" />
-                      <input
-                        type="text"
-                        name="appleSpecs"
-                        value={formData.appleSpecs}
-                        onChange={handleInputChange}
-                        placeholder="เช่น ชิป M2, Cellular, GPS + Cellular"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
-                      />
-                    </div>
-
-                    <div>
-                      <FormLabel thai="สี" eng="Color" required />
-                      <input
-                        type="text"
-                        name="color"
-                        value={formData.color}
-                        onChange={handleInputChange}
-                        placeholder="เช่น Black, Silver, Starlight..."
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base"
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Regular Brand Selection (Not Apple) */}
                 {formData.itemType !== 'Apple' && (
                   <div className="mb-4">
                     <FormLabel thai="ยี่ห้อ" eng="Brand" required />
                     <div className="relative">
-                      <select
-                        name="brand"
+                      <DropdownField
                         value={formData.brand}
-                        onChange={handleInputChange}
-                        className="w-full p-3 pr-10 bg-white border border-gray-200 rounded-lg text-gray-400 appearance-none focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 text-sm md:text-base"
-                      >
-                        <option value="">ยี่ห้อ</option>
-                        {BRANDS_BY_TYPE[formData.itemType]?.map(brand => (
-                          <option key={brand} value={brand}>{brand}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
+                        placeholder="ยี่ห้อ"
+                        options={(BRANDS_BY_TYPE[formData.itemType] || []).map((brand) => ({ value: brand, label: brand }))}
+                        onChange={(nextValue) => {
+                          handleInputChange({
+                            target: { name: 'brand', value: nextValue },
+                          } as React.ChangeEvent<HTMLSelectElement>);
+                        }}
+                      />
                     </div>
                   </div>
                 )}
@@ -1606,7 +1791,7 @@ function EstimatePageInner() {
                       value={formData.model}
                       onChange={handleInputChange}
                       placeholder="รุ่น"
-                      className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                      className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                     />
                   </div>
                 )}
@@ -1614,7 +1799,7 @@ function EstimatePageInner() {
                 {/* Mobile Specific Fields */}
                 {formData.itemType === 'โทรศัพท์มือถือ' && (
                   <>
-                    <div className="h-px bg-gray-200 my-6"></div>
+                    <div className="h-px bg-line-soft my-6"></div>
                     <div className="mb-4">
                       <FormLabel thai="ความจุ" eng="Capacity" required />
                       <input
@@ -1623,7 +1808,7 @@ function EstimatePageInner() {
                         value={formData.capacity}
                         onChange={handleInputChange}
                         placeholder="ความจุเครื่อง"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                        className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                       />
                     </div>
                   </>
@@ -1631,10 +1816,10 @@ function EstimatePageInner() {
 
                 {/* Camera Specific - Lens Model */}
                 {formData.itemType === 'กล้อง' && (
-                  <div className="mb-4 bg-gray-50/50 p-2 -mx-2 rounded-lg">
+                  <div className="mb-4 bg-background-subtle/60 p-2 -mx-2 rounded-2xl">
                     <div className="flex justify-between items-end mb-2 px-1">
                       <FormLabel thai="รุ่นเลนส์" eng="Lens model" />
-                      <span className="text-gray-400 text-xs">{formData.lenses?.length || 0}/5</span>
+                      <span className="text-foreground-subtle text-xs">{formData.lenses?.length || 0}/5</span>
                     </div>
 
                     <div className="space-y-3">
@@ -1645,7 +1830,7 @@ function EstimatePageInner() {
                           value={lens}
                           onChange={(e) => updateLens(index, e.target.value)}
                           placeholder="รุ่นเลนส์"
-                          className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                          className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                         />
                       ))}
 
@@ -1653,7 +1838,7 @@ function EstimatePageInner() {
                         <button
                           type="button"
                           onClick={addLens}
-                          className="w-full py-2.5 border border-orange-300 text-orange-600 rounded-lg font-medium hover:bg-orange-50 transition-colors flex items-center justify-center gap-1 text-sm md:text-base"
+                        className="w-full min-h-12 py-2.5 border border-primary-border text-primary rounded-2xl font-medium hover:bg-primary-soft transition-colors flex items-center justify-center gap-1 text-sm md:text-base"
                         >
                           <span className="font-bold">เพิ่ม</span>
                           <span className="text-xs font-normal">add</span>
@@ -1666,7 +1851,7 @@ function EstimatePageInner() {
                 {/* Laptop Specific Fields */}
                 {formData.itemType === 'โน้ตบุค' && (
                   <>
-                    <div className="h-px bg-gray-200 my-6"></div>
+                    <div className="h-px bg-line-soft my-6"></div>
                     <div className="mb-4">
                       <FormLabel thai="ซีพียู" eng="CPU" required />
                       <input
@@ -1675,7 +1860,7 @@ function EstimatePageInner() {
                         value={formData.cpu}
                         onChange={handleInputChange}
                         placeholder="CPU"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                        className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                       />
                     </div>
                     <div className="mb-4">
@@ -1686,7 +1871,7 @@ function EstimatePageInner() {
                         value={formData.ram}
                         onChange={handleInputChange}
                         placeholder="RAM"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                        className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                       />
                     </div>
                     <div className="mb-4">
@@ -1697,7 +1882,7 @@ function EstimatePageInner() {
                         value={formData.gpu}
                         onChange={handleInputChange}
                         placeholder="GPU"
-                        className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                        className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                       />
                     </div>
                   </>
@@ -1717,7 +1902,7 @@ function EstimatePageInner() {
                       value={formData.accessories}
                       onChange={handleInputChange}
                       placeholder="อุปกรณ์เสริม"
-                      className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                      className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                     />
                   </div>
                 )}
@@ -1726,38 +1911,66 @@ function EstimatePageInner() {
                 {formData.itemType === 'Apple' && (
                   <div className="mb-8">
                     <FormLabel thai="อุปกรณ์ที่มีให้" eng="Included Items" />
-                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-                      <label className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <label
+                        className={`flex items-center justify-center rounded-full border px-4 py-2 text-center transition-colors ${
+                          formData.appleAccessories?.box
+                            ? 'border-primary bg-primary text-primary-fg'
+                            : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+                        } cursor-pointer`}
+                      >
                         <input
                           type="checkbox"
-                          className="accent-black"
+                          className="sr-only"
                           checked={formData.appleAccessories?.box || false}
                           onChange={() => handleAppleAccessoryChange('box')}
-                        /> กล่อง (Box)
+                        />
+                        กล่อง (Box)
                       </label>
-                      <label className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <label
+                        className={`flex items-center justify-center rounded-full border px-4 py-2 text-center transition-colors ${
+                          formData.appleAccessories?.adapter
+                            ? 'border-primary bg-primary text-primary-fg'
+                            : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+                        } cursor-pointer`}
+                      >
                         <input
                           type="checkbox"
-                          className="accent-black"
+                          className="sr-only"
                           checked={formData.appleAccessories?.adapter || false}
                           onChange={() => handleAppleAccessoryChange('adapter')}
-                        /> หัวชาร์จ (Adapter)
+                        />
+                        หัวชาร์จ (Adapter)
                       </label>
-                      <label className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <label
+                        className={`flex items-center justify-center rounded-full border px-4 py-2 text-center transition-colors ${
+                          formData.appleAccessories?.cable
+                            ? 'border-primary bg-primary text-primary-fg'
+                            : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+                        } cursor-pointer`}
+                      >
                         <input
                           type="checkbox"
-                          className="accent-black"
+                          className="sr-only"
                           checked={formData.appleAccessories?.cable || false}
                           onChange={() => handleAppleAccessoryChange('cable')}
-                        /> สายชาร์จ (Cable)
+                        />
+                        สายชาร์จ (Cable)
                       </label>
-                      <label className="flex items-center gap-2 p-2 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <label
+                        className={`flex items-center justify-center rounded-full border px-4 py-2 text-center transition-colors ${
+                          formData.appleAccessories?.receipt
+                            ? 'border-primary bg-primary text-primary-fg'
+                            : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+                        } cursor-pointer`}
+                      >
                         <input
                           type="checkbox"
-                          className="accent-black"
+                          className="sr-only"
                           checked={formData.appleAccessories?.receipt || false}
                           onChange={() => handleAppleAccessoryChange('receipt')}
-                        /> ใบเสร็จ (Receipt)
+                        />
+                        ใบเสร็จ (Receipt)
                       </label>
                     </div>
                   </div>
@@ -1767,35 +1980,20 @@ function EstimatePageInner() {
                 <div className="mb-4 mt-6">
                   <div className="flex justify-between items-center mb-4">
                     <FormLabel thai="สภาพ" eng="Condition" required />
-                    <span className="text-gray-500 font-medium">{formData.condition}%</span>
+                    <span className="text-primary font-bold">{formData.condition}%</span>
                   </div>
 
-                  <div className="px-2 mb-2 relative">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
+                  <div className="mb-2 rounded-lg border border-primary/15 bg-background-white px-5 py-3">
+                    <VolumeSlider
+                      min={0}
+                      max={100}
+                      step={1}
                       value={formData.condition}
-                      onChange={(e) => setFormData(prev => ({ ...prev, condition: parseInt(e.target.value) }))}
-                      className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, ${formData.itemType === 'Apple' ? '#000000' : '#c2410c'} 0%, ${formData.itemType === 'Apple' ? '#000000' : '#c2410c'} ${formData.condition}%, #e5e7eb ${formData.condition}%, #e5e7eb 100%)`
-                      }}
+                      ariaLabel="Condition"
+                      onChange={(condition) => setFormData(prev => ({ ...prev, condition }))}
                     />
-                    <style jsx>{`
-                      input[type=range]::-webkit-slider-thumb {
-                        -webkit-appearance: none;
-                        height: 24px;
-                        width: 24px;
-                        border-radius: 50%;
-                        background: #ffffff;
-                        border: 1px solid #e5e7eb;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        margin-top: -10px;
-                      }
-                    `}</style>
 
-                    <div className="flex justify-between text-xs text-gray-500 mt-2 font-medium">
+                    <div className="mt-3 flex justify-between text-xs font-semibold text-foreground-subtle">
                       <span>0%</span>
                       <span>100%</span>
                     </div>
@@ -1803,69 +2001,75 @@ function EstimatePageInner() {
                 </div>
 
                 {/* Condition Instructions Box */}
-                <div className="bg-gray-100 rounded-xl px-4 py-3 mb-6 border border-gray-200">
+                <div className="bg-background-white rounded-lg px-4 py-3 mb-6 border border-primary-border">
                   <div
                     className="flex justify-between items-center cursor-pointer"
                     onClick={() => setIsConditionExpanded(!isConditionExpanded)}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-800 text-sm md:text-base">
+                      <span className="font-medium text-foreground text-sm md:text-base">
                         {formData.itemType === 'Apple' ? 'วิธีประเมินสภาพ' : 'วิธีดูสภาพ'}
                       </span>
-                      <span className="bg-gray-300 text-gray-600 text-xs px-2 py-0.5 rounded-md">
+                      <span className="bg-background-subtle text-foreground-subtle text-xs px-2 py-0.5 rounded-md">
                         {formData.itemType === 'Apple' ? 'Guide' : 'Instructions'}
                       </span>
                     </div>
-                    {isConditionExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+                    {isConditionExpanded ? <ChevronUp className="w-5 h-5 text-foreground-subtle" /> : <ChevronDown className="w-5 h-5 text-foreground-subtle" />}
                   </div>
 
-                  {isConditionExpanded && (
-                    <div className="mt-3 space-y-3 text-sm text-gray-600 border-t border-gray-200 pt-3">
+                  <div
+                    className={`overflow-hidden text-sm text-foreground-muted transition-[max-height,opacity,transform] duration-300 ease-out ${
+                      isConditionExpanded
+                        ? 'mt-3 max-h-[500px] translate-y-0 border-t border-primary-border pt-3 opacity-100'
+                        : 'max-h-0 -translate-y-2 opacity-0 pointer-events-none'
+                    }`}
+                  >
+                    <div className="space-y-3">
                       {formData.itemType === 'Apple' ? (
                         <>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-gray-700">95 - 100%</span>
+                            <span className="font-bold min-w-[80px] text-foreground-muted">95 - 100%</span>
                             <span>Perfect: ไม่มีรอย เครื่องสวยกริ๊บ แบตเตอรี่สุขภาพดี</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-gray-700">80 - 94%</span>
+                            <span className="font-bold min-w-[80px] text-foreground-muted">80 - 94%</span>
                             <span>Good: มีรอยขนแมวเล็กน้อยตามขอบ ไม่กระทบหน้าจอ</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-gray-700">60 - 79%</span>
+                            <span className="font-bold min-w-[80px] text-foreground-muted">60 - 79%</span>
                             <span>Fair: มีรอยชัดเจน รอยบุบ หรือหน้าจอลอก แต่ใช้งานปกติ</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-gray-700">ต่ำกว่า 60%</span>
+                            <span className="font-bold min-w-[80px] text-foreground-muted">ต่ำกว่า 60%</span>
                             <span>Poor: จอแตก เปิดไม่ติด หรือมีฟังก์ชันเสียหาย (เช่น FaceID เสีย)</span>
                           </div>
                         </>
                       ) : (
                         <>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-gray-700">90 - 100%</span>
+                            <span className="font-bold min-w-[70px] text-foreground-muted">90 - 100%</span>
                             <span>เหมือนใหม่ ไม่มีรอยขีดข่วนหรือตำหนิใดๆ ใช้งานได้ 100%</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-gray-700">70 - 89%</span>
+                            <span className="font-bold min-w-[70px] text-foreground-muted">70 - 89%</span>
                             <span>ใช้งานได้ หน้าจอไม่มีรอยตำหนิลึก อาจมีรอยขนแมวตามขอบหรือด้านหลังเล็กน้อย</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-gray-700">50 - 69%</span>
-                            <span>ใช้งานได้ <span className="font-bold text-black">แต่</span> หน้าจอมีรอยขีดข่วนชัดเจน ตัวเครื่องมีรอยบุบ/ถลอกจากการใช้งาน</span>
+                            <span className="font-bold min-w-[70px] text-foreground-muted">50 - 69%</span>
+                            <span>ใช้งานได้ <span className="font-bold text-foreground">แต่</span> หน้าจอมีรอยขีดข่วนชัดเจน ตัวเครื่องมีรอยบุบ/ถลอกจากการใช้งาน</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-gray-700">25 - 49%</span>
+                            <span className="font-bold min-w-[70px] text-foreground-muted">25 - 49%</span>
                             <span>ใช้งานได้แต่มีตำหนิใหญ่ หน้าจอมีรอยร้าว หรือตัวเครื่องมีรอยบุบอย่างเห็นได้ชัด</span>
                           </div>
                           <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-gray-700">0 - 24%</span>
+                            <span className="font-bold min-w-[70px] text-foreground-muted">0 - 24%</span>
                             <span>ใช้งานไม่ได้ เครื่องเปิดไม่ติด, หน้าจอแตก, ปุ่มหลักเสีย, หรือมีความเสียหายจากน้ำ</span>
                           </div>
                         </>
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
 
                 {/* Defects */}
@@ -1878,7 +2082,7 @@ function EstimatePageInner() {
                       onChange={handleInputChange}
                       rows={3}
                       placeholder="เช่น จอมี Dead Pixel 1 จุด, สายชาร์จเหลือง, ไม่มีกล่อง..."
-                      className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 placeholder-gray-300 text-sm md:text-base resize-none"
+                      className="w-full min-h-12 rounded-2xl border border-primary-border bg-background-white p-3 text-sm md:text-sm text-foreground-muted focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle"
                     />
                   ) : (
                     <input
@@ -1887,7 +2091,7 @@ function EstimatePageInner() {
                       value={formData.defects}
                       onChange={handleInputChange}
                       placeholder="ตำหนิ"
-                      className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                      className="w-full min-h-12 rounded-full border border-primary-border bg-background-white p-3 text-sm md:text-sm text-foreground-muted focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle"
                     />
                   )}
                 </div>
@@ -1901,15 +2105,16 @@ function EstimatePageInner() {
                     value={formData.note}
                     onChange={handleInputChange}
                     placeholder="หมายเหตุ"
-                    className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400 placeholder-gray-300 text-sm md:text-base"
+                    className="w-full min-h-12 rounded-full border border-primary-border bg-background-white p-3 text-sm md:text-sm text-foreground-muted focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle"
                   />
                 </div>
-              </>
-            )}
+                </>
+              )}
+            </EstimateSection>
 
             {/* Error Message */}
             {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-600">
+              <div className="mb-4 rounded-lg border border-error/20 bg-error-soft p-3 text-error">
                 {error}
               </div>
             )}
@@ -1919,10 +2124,10 @@ function EstimatePageInner() {
               <button
                 onClick={handleAnalyzeAndEstimate}
                 disabled={isProcessing}
-                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full min-h-12 rounded-full px-4 py-3 text-base font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
-                  backgroundColor: isProcessing ? '#9ca3af' : '#c2410c',
-                  color: 'white'
+                  backgroundColor: isProcessing ? 'var(--background-subtle)' : 'var(--primary)',
+                  color: 'var(--primary-fg)',
                 }}
               >
                 {isProcessing ? 'กำลังประมวลผล...' : 'ประเมินราคาด้วย AI'}
@@ -1930,12 +2135,11 @@ function EstimatePageInner() {
 
               <button
                 onClick={() => router.push('/drafts')}
-                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center justify-center gap-2"
+                className="relative flex w-full min-h-12 items-center justify-center rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft"
               >
-                <FileText className="w-5 h-5" />
-                ดูบันทึกชั่วคราว
+                <span className="text-center">ดูบันทึกชั่วคราว</span>
                 {draftCount > 0 && (
-                  <span className="bg-orange-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  <span className="absolute right-4 flex h-6 w-6 items-center justify-center rounded-full bg-error text-[10px] font-bold text-error-fg">
                     {draftCount}
                   </span>
                 )}
@@ -2057,57 +2261,68 @@ function EstimatePageInner() {
         {/* Estimate Result Step */}
         {currentStep === 'estimate_result' && estimateResult && conditionResult && (
           <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-center text-gray-800 mb-6">ผลการประเมินราคา</h1>
-
-            {/* Estimated Price Card */}
-            <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200">
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-2">ราคาประเมิน</p>
-                <p className="text-4xl font-bold text-orange-700">{estimateResult.estimatedPrice.toLocaleString()} ฿</p>
-                <p className="text-xs text-gray-500 mt-2">Confidence: {Math.round(estimateResult.confidence * 100)}%</p>
+            <div className="rounded-[28px] border border-primary-border bg-gradient-to-br from-background-white via-primary-soft/35 to-primary-border/30 p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+              <div className="rounded-[24px] border border-background-white/80 bg-background-white/70 px-4 py-4 text-center">
+                <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-foreground-subtle">
+                  Estimate Result
+                </div>
+                <div className="mt-3 bg-gradient-to-r from-primary via-s2 to-s2-active bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+                  ผลการประเมินราคา
+                </div>
+                <p className="mt-1 text-xs text-foreground-subtle">
+                  ตรวจสอบราคาประเมิน สภาพสินค้า และรายละเอียดก่อนดำเนินการต่อ
+                </p>
               </div>
             </div>
 
-            {/* Condition Result Card */}
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-              <h3 className="font-bold text-gray-800 mb-3">สภาพสินค้า (วิเคราะห์โดย AI)</h3>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">คะแนนสภาพ:</span>
-                <span className="text-lg font-bold text-gray-800">{Math.round(conditionResult.score * 100)}%</span>
+            <EstimateSection title="Estimated Price" subtitle="ราคาประเมิน">
+              <div className="rounded-[24px] border border-primary-border bg-background-white/80 p-6 text-center shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+                <p className="mb-2 text-sm text-foreground-subtle">ราคาประเมิน</p>
+                <p className="text-4xl font-bold text-primary">{estimateResult.estimatedPrice.toLocaleString()} ฿</p>
+                <p className="mt-2 text-xs text-foreground-subtle">Confidence: {Math.round(estimateResult.confidence * 100)}%</p>
               </div>
-              <div className="w-full rounded-full h-3 mb-3 bg-gray-200">
-                <div
-                  className="h-3 rounded-full bg-green-600"
-                  style={{ width: `${conditionResult.score * 100}%` }}
-                ></div>
-              </div>
-              <p className="text-sm text-gray-600">{conditionResult.reason}</p>
-            </div>
+            </EstimateSection>
 
-            {/* Item Details Card */}
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-              <h3 className="font-bold text-gray-800 mb-3">รายละเอียดสินค้า</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">ประเภท:</span>
-                  <span className="font-medium">{formData.itemType}</span>
+            <EstimateSection title="Condition Analysis" subtitle="สภาพสินค้า (วิเคราะห์โดย AI)">
+              <div className="rounded-[24px] border border-primary-border bg-background-white/80 p-4 shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-foreground-subtle">คะแนนสภาพ:</span>
+                  <span className="text-lg font-bold text-foreground-muted">{Math.round(conditionResult.score * 100)}%</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">ยี่ห้อ:</span>
-                  <span className="font-medium">{formData.brand}</span>
+                <div className="w-full rounded-full h-3 mb-3 bg-background-subtle">
+                  <div
+                    className="h-3 rounded-full bg-success"
+                    style={{ width: `${conditionResult.score * 100}%` }}
+                  ></div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">รุ่น:</span>
-                  <span className="font-medium">{formData.model}</span>
+                <p className="text-sm text-foreground-muted">{conditionResult.reason}</p>
+              </div>
+            </EstimateSection>
+
+            <EstimateSection title="Item Details" subtitle="รายละเอียดสินค้า">
+              <div className="rounded-[24px] border border-primary-border bg-background-white/80 p-4 shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-foreground-subtle">ประเภท:</span>
+                    <span className="font-medium text-foreground-muted">{formData.itemType}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-subtle">ยี่ห้อ:</span>
+                    <span className="font-medium text-foreground-muted">{formData.brand}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-subtle">รุ่น:</span>
+                    <span className="font-medium text-foreground-muted">{formData.model}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </EstimateSection>
 
             {/* Action Buttons */}
             <div className="space-y-3">
               <button
                 onClick={() => setCurrentStep('pawn_setup')}
-                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-green-600 hover:bg-green-700 text-white"
+                className="w-full rounded-full bg-success px-4 py-3 text-base font-medium text-success-fg transition-colors hover:bg-success-hover"
               >
                 ดำเนินการขอสินเชื่อต่อ
               </button>
@@ -2124,7 +2339,7 @@ function EstimatePageInner() {
                   setSelectedStore('');
                   setError(null);
                 }}
-                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-gray-200 hover:bg-gray-300 text-gray-700"
+                className="w-full rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft"
               >
                 ประเมินสินค้าอื่น
               </button>
@@ -2135,9 +2350,21 @@ function EstimatePageInner() {
         {/* Pawn Setup Step */}
         {currentStep === 'pawn_setup' && estimateResult && (
           <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-center mb-6">ตั้งค่าการขอสินเชื่อ</h1>
+            <div className="rounded-[28px] border border-primary-border bg-gradient-to-br from-background-white via-primary-soft/35 to-primary-border/30 p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+              <div className="rounded-[24px] border border-background-white/80 bg-background-white/70 px-4 py-4 text-center">
+                <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-foreground-subtle">
+                  Pawn Setup
+                </div>
+                <div className="mt-3 bg-gradient-to-r from-primary via-s2 to-s2-active bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+                  ตั้งค่าการขอสินเชื่อ
+                </div>
+                <p className="mt-1 text-xs text-foreground-subtle">
+                  เลือกสาขา ระยะเวลา และตรวจสอบยอดรวมก่อนสร้าง QR Code
+                </p>
+              </div>
+            </div>
 
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <EstimateSection title="Serial Number" subtitle="หมายเลขซีเรียล">
               <FormLabel
                 thai={formData.itemType === 'Apple' ? 'Serial Number / IMEI' : 'หมายเลขซีเรียล'}
                 eng="Serial no."
@@ -2149,54 +2376,39 @@ function EstimatePageInner() {
                 value={formData.serialNo}
                 onChange={handleInputChange}
                 placeholder={formData.itemType === 'Apple' ? 'ระบุหมายเลขเครื่อง' : 'ระบุหมายเลขซีเรียล'}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full min-h-12 rounded-2xl border border-line-soft bg-background-white p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="mt-2 text-xs text-foreground-subtle">
                 {isSerialRequiredForType(formData.itemType)
                   ? 'กรุณากรอกเลขเครื่อง/Serial ให้ครบถ้วนก่อนดำเนินการขอสินเชื่อ'
                   : 'ถ้ามีหมายเลขซีเรียล สามารถกรอกได้เพื่อความถูกต้องของสัญญา'}
               </p>
-            </div>
+            </EstimateSection>
 
-            {/* Store Selection */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h3 className="font-semibold mb-3">เลือกจุดรับฝาก</h3>
-              <select
+            <EstimateSection title="Drop Point" subtitle="เลือกจุดรับฝาก">
+              <DropdownField
                 value={selectedStore}
-                onChange={(e) => setSelectedStore(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">กรุณาเลือกร้าน</option>
-                {stores.map((store) => (
-                  <option key={store._id} value={store._id}>
-                    {store.storeName}
-                  </option>
-                ))}
-              </select>
-            </div>
+                placeholder="กรุณาเลือกร้าน"
+                options={stores.map((store) => ({ value: store._id, label: store.storeName }))}
+                onChange={setSelectedStore}
+              />
+            </EstimateSection>
 
             {/* Duration and Interest */}
             {selectedStore && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold mb-3">ระยะเวลาและดอกเบี้ย</h3>
-
+              <EstimateSection title="Loan Terms" subtitle="ระยะเวลาและดอกเบี้ย">
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-2">จำนวนวันที่ต้องการขอสินเชื่อ</label>
-                  <select
+                  <DropdownField
                     value={pawnDuration}
-                    onChange={(e) => setPawnDuration(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="7">7 วัน</option>
-                    <option value="14">14 วัน</option>
-                    <option value="30">30 วัน</option>
-                    <option value="60">60 วัน</option>
-                    <option value="90">90 วัน</option>
-                  </select>
+                    placeholder="เลือกจำนวนวัน"
+                    options={['7', '14', '30', '60', '90'].map((day) => ({ value: day, label: `${day} วัน` }))}
+                    onChange={setPawnDuration}
+                  />
                 </div>
 
                 {/* Interest Calculation Display */}
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="rounded-xl border border-primary-border bg-background-white/80 p-4 shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>ราคาประเมิน:</span>
@@ -2210,7 +2422,7 @@ function EstimatePageInner() {
                           value={desiredPrice}
                           onChange={(e) => setDesiredPrice(e.target.value)}
                           placeholder={estimateResult.estimatedPrice.toString()}
-                          className="w-24 p-1 border border-gray-300 rounded text-right text-sm placeholder:text-gray-300"
+                          className="w-24 rounded border border-line-soft p-1 text-right text-sm placeholder:text-foreground-subtle"
                           min="1"
                           max={estimateResult.estimatedPrice}
                         />
@@ -2223,29 +2435,28 @@ function EstimatePageInner() {
                     </div>
                     <div className="flex justify-between">
                       <span>ดอกเบี้ย:</span>
-                      <span className="font-semibold text-red-600">{interestAmount.toLocaleString()} บาท</span>
+                      <span className="font-semibold text-error">{interestAmount.toLocaleString()} บาท</span>
                     </div>
                     <div className="border-t pt-2 flex justify-between font-semibold">
                       <span>รวมทั้งสิ้น:</span>
-                      <span className="text-green-600">{totalAmount.toLocaleString()} บาท</span>
+                      <span className="text-success">{totalAmount.toLocaleString()} บาท</span>
                     </div>
                   </div>
                 </div>
-              </div>
+              </EstimateSection>
             )}
 
             {/* Customer Info */}
             {customer && (
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h3 className="font-semibold mb-2">ข้อมูลลูกค้า</h3>
-                <p className="text-sm text-gray-600">{customer.fullName}</p>
-                <p className="text-sm text-gray-600">{customer.phone}</p>
-              </div>
+              <EstimateSection title="Customer Info" subtitle="ข้อมูลลูกค้า">
+                <p className="text-sm text-foreground-subtle">{customer.fullName}</p>
+                <p className="text-sm text-foreground-subtle">{customer.phone}</p>
+              </EstimateSection>
             )}
 
             {/* Error Message */}
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600">
+              <div className="rounded-lg border border-error/20 bg-error-soft p-3 text-error">
                 {error}
               </div>
             )}
@@ -2256,25 +2467,25 @@ function EstimatePageInner() {
                 <button
                   onClick={handleCreatePawnRequest}
                   disabled={isSubmitting}
-                  className="w-full py-4 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold bg-green-600 hover:bg-green-700 text-white"
+                  className="w-full rounded-full bg-success px-4 py-4 text-base font-semibold text-success-fg transition-colors hover:bg-success-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting ? 'กำลังสร้าง QR Code...' : 'สร้าง QR Code สำหรับขอสินเชื่อ'}
                 </button>
               ) : (
-                <div className="w-full py-4 px-4 rounded-lg text-center text-base font-semibold bg-gray-300 text-gray-500">
+                <div className="w-full rounded-full bg-background-subtle px-4 py-4 text-center text-base font-semibold text-foreground-subtle">
                   เลือกร้านเพื่อสร้าง QR Code
                 </div>
               )}
 
               <button
                 onClick={() => setCurrentStep('estimate_result')}
-                className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-gray-200 hover:bg-gray-300 text-gray-700"
+                className="w-full rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft"
               >
                 ย้อนกลับ
               </button>
             </div>
 
-            <p className="text-xs text-center text-gray-600">
+            <p className="text-xs text-center text-foreground-subtle">
               QR Code จะถูกส่งไปยัง LINE ของคุณ และคุณสามารถนำไปให้ร้านไหนก็ได้
             </p>
           </div>
@@ -2283,19 +2494,28 @@ function EstimatePageInner() {
         {/* QR Display Step */}
         {currentStep === 'qr_display' && (
           <div className="text-center space-y-6">
-            <h1 className="text-2xl font-bold text-gray-800">สร้าง QR Code สำเร็จ!</h1>
+            <div className="rounded-[28px] border border-primary-border bg-gradient-to-br from-background-white via-primary-soft/35 to-primary-border/30 p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+              <div className="rounded-[24px] border border-background-white/80 bg-background-white/70 px-4 py-4">
+                <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-foreground-subtle">
+                  QR Ready
+                </div>
+                <div className="mt-3 bg-gradient-to-r from-primary via-s2 to-s2-active bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+                  สร้าง QR Code สำเร็จ!
+                </div>
+              </div>
+            </div>
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-              <div className="text-green-700">
+            <div className="rounded-[24px] border border-success/20 bg-success-soft p-6">
+              <div className="text-success">
                 <Check className="w-16 h-16 mx-auto mb-4" />
                 <p className="font-medium">QR Code ถูกส่งไปยัง LINE ของคุณแล้ว</p>
                 <p className="text-sm mt-2">กรุณาตรวจสอบข้อความใน LINE</p>
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 text-left">
+            <div className="rounded-[28px] border border-primary-border bg-gradient-to-br from-background-white via-primary-soft/35 to-primary-border/30 p-4 text-left shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
               <h3 className="font-bold mb-2">ขั้นตอนต่อไป:</h3>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
+              <ol className="list-decimal list-inside space-y-1 text-sm text-foreground-muted">
                 <li>เปิด LINE และตรวจสอบข้อความ QR Code</li>
                 <li>นำ QR Code ไปแสดงที่จุดรับฝาก</li>
                 <li>พนักงานจะสแกน QR Code และตรวจสอบสินค้า</li>
@@ -2313,7 +2533,7 @@ function EstimatePageInner() {
                 setConditionResult(null);
                 setSelectedStore('');
               }}
-              className="w-full py-3 px-4 rounded-lg transition-colors font-medium text-base bg-gray-200 hover:bg-gray-300 text-gray-700"
+              className="w-full rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft"
             >
               ประเมินสินค้าอื่น
             </button>
@@ -2322,11 +2542,17 @@ function EstimatePageInner() {
 
         {/* Tutorial Modal */}
         {showTutorial && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-              <div className="bg-gray-100 rounded-xl p-4 max-w-sm w-full">
-                <h3 className="text-lg font-semibold mb-4 text-gray-800">คำแนะนำในการถ่ายรูป</h3>
-                <div className="text-sm text-gray-700 space-y-2">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
+            onClick={() => setShowTutorial(false)}
+          >
+            <div
+              className="modal-pop-in w-full max-w-sm rounded-[var(--radius-xl)] bg-background-white p-4 shadow-[var(--shadow-strong)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="rounded-lg bg-background-subtle p-4">
+                <h3 className="mb-4 text-lg font-semibold text-foreground-muted">คำแนะนำในการถ่ายรูป</h3>
+                <div className="space-y-2 text-sm text-foreground-muted">
                   <p>• ถ่าย 4 ด้าน (หน้า หลัง ซ้าย ขวา)</p>
                   <p>• ถ่ายในที่ที่มีแสงสว่างเพียงพอ</p>
                   <p>• ไม่ถ่ายติดแสงสะท้อน</p>
@@ -2334,23 +2560,23 @@ function EstimatePageInner() {
                   <p>• วางสินค้าเดี่ยวๆ พยายามไม่ให้มีวัตถุอื่นอยู่ในเฟรม</p>
                 </div>
               </div>
-              <div className="flex space-x-3 mt-4">
+              <div className="mt-4 flex gap-3">
                 <button
                   onClick={openCamera}
-                  className="flex-1 bg-orange-700 text-white py-2 px-4 rounded-lg hover:bg-orange-800"
+                  className="flex-1 min-h-12 rounded-full bg-primary px-4 py-2 text-primary-fg hover:bg-primary-hover"
                 >
                   ถ่ายรูป
                 </button>
                 <button
                   onClick={openFilePicker}
-                  className="flex-1 bg-orange-50 text-orange-700 py-2 px-4 rounded-lg hover:bg-orange-100"
+                  className="flex-1 min-h-12 rounded-full bg-primary-soft px-4 py-2 text-primary hover:bg-primary-border"
                 >
                   อัปโหลดรูปภาพ
                 </button>
               </div>
               <button
                 onClick={() => setShowTutorial(false)}
-                className="w-full mt-3 bg-gray-100 text-gray-800 py-2 px-4 rounded-lg"
+                className="mt-3 w-full rounded-full bg-background-subtle px-4 py-2 text-foreground-muted transition-colors hover:bg-line-soft"
               >
                 ยกเลิก
               </button>
@@ -2384,10 +2610,10 @@ export default function EstimatePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="theme-liff min-h-screen flex items-center justify-center bg-background-white">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">กำลังโหลด...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-foreground-subtle">กำลังโหลด...</p>
           </div>
         </div>
       }

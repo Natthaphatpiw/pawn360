@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Clock, CheckCircle, X, AlertTriangle } from 'lucide-react';
+import { Clock, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
+import TransactionHeader from '../../_components/TransactionHeader';
+import { getMockPrincipalIncreaseRequest, isPreviewMode, withPreview } from '../../_lib/preview';
 
 export default function PrincipalIncreaseWaitingPage() {
   const router = useRouter();
@@ -11,25 +13,57 @@ export default function PrincipalIncreaseWaitingPage() {
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const requestId = searchParams.get('requestId');
+  const selectedStatus = searchParams.get('status');
+  const previewMode = isPreviewMode(searchParams);
 
   const [loading, setLoading] = useState(true);
   const [requestDetails, setRequestDetails] = useState<any>(null);
   const [status, setStatus] = useState<string>('PENDING_INVESTOR_APPROVAL');
 
+  const allowedPreviewStatuses = new Set([
+    'PENDING_INVESTOR_APPROVAL',
+    'AWAITING_INVESTOR_APPROVAL',
+    'INVESTOR_APPROVED',
+    'AWAITING_INVESTOR_PAYMENT',
+    'INVESTOR_SLIP_UPLOADED',
+    'INVESTOR_SLIP_VERIFIED',
+    'INVESTOR_TRANSFERRED',
+    'AWAITING_PAWNER_CONFIRM',
+    'AWAITING_PAYMENT',
+    'SLIP_REJECTED',
+    'INVESTOR_REJECTED',
+    'COMPLETED',
+  ]);
+
   useEffect(() => {
+    if (previewMode) {
+      const mockRequest = getMockPrincipalIncreaseRequest(requestId || `preview-increase-${contractId}`, contractId);
+      const resolvedStatus = selectedStatus && allowedPreviewStatuses.has(selectedStatus)
+        ? selectedStatus
+        : 'PENDING_INVESTOR_APPROVAL';
+      setRequestDetails({
+        ...mockRequest,
+        request_status: resolvedStatus,
+      });
+      setStatus(resolvedStatus);
+      setLoading(false);
+      return;
+    }
+
     if (requestId) {
       fetchRequestDetails();
       // Poll for status updates every 10 seconds
       const interval = setInterval(fetchRequestDetails, 10000);
       return () => clearInterval(interval);
     }
-  }, [requestId]);
+  }, [requestId, previewMode, contractId, selectedStatus]);
 
   useEffect(() => {
     if ((status === 'AWAITING_PAYMENT' || status === 'SLIP_REJECTED') && requestId) {
-      router.replace(`/contracts/${contractId}/principal-increase/upload?requestId=${requestId}`);
+      const nextPath = `/contracts/${contractId}/principal-increase/upload`;
+      router.replace(previewMode ? withPreview(nextPath, 'requestId', requestId) : `${nextPath}?requestId=${requestId}`);
     }
-  }, [status, requestId, contractId, router]);
+  }, [status, requestId, contractId, router, previewMode]);
 
   const fetchRequestDetails = async () => {
     try {
@@ -50,6 +84,11 @@ export default function PrincipalIncreaseWaitingPage() {
   };
 
   const handleConfirmReceived = async () => {
+    if (previewMode) {
+      setStatus('COMPLETED');
+      return;
+    }
+
     try {
       const response = await axios.post('/api/contract-actions/confirm-received', {
         requestId,
@@ -65,8 +104,8 @@ export default function PrincipalIncreaseWaitingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
+      <div className="min-h-screen bg-background-white font-sans flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
@@ -77,19 +116,46 @@ export default function PrincipalIncreaseWaitingPage() {
   // Show different states based on status
   if (status === 'INVESTOR_REJECTED') {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-10 h-10 text-red-500" />
+      <div className="min-h-screen bg-background-white font-sans flex flex-col">
+        
+        {/* Header */}
+        <TransactionHeader title="การอนุมัติ" subtitle="Approval" />
+
+        <div className="bg-background rounded-xl p-4 text-center w-full max-w-sm mx-auto mt-2">
+          <div className="w-32 h-32 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="w-24 h-24 text-red-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">คำขอถูกปฏิเสธ</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">คำขอถูกปฏิเสธ</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             นักลงทุนได้ปฏิเสธคำขอเพิ่มเงินต้นของคุณ
           </p>
 
+          {requestDetails && (
+            <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-foreground-subtle">รายการ:</span>
+                  <span className="font-bold">{item?.brand} {item?.model}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground-subtle">จำนวนที่ขอเพิ่ม:</span>
+                  <span className="font-bold text-primary">
+                    {requestDetails.increase_amount?.toLocaleString()} บาท
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground-subtle">สถานะ:</span>
+                  <span className="font-bold text-red-600">
+                    คำขอถูกปฏิเสธ
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {requestDetails?.rejection_reason && (
-            <div className="bg-red-50 rounded-2xl p-4 mb-6 text-left">
+            <div className="bg-red-50 rounded-xl p-4 mb-6 text-left">
               <p className="text-sm text-red-700">
                 <span className="font-bold">เหตุผล:</span> {requestDetails.rejection_reason}
               </p>
@@ -98,7 +164,7 @@ export default function PrincipalIncreaseWaitingPage() {
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full bg-primary text-primary-fg rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>
@@ -109,32 +175,32 @@ export default function PrincipalIncreaseWaitingPage() {
 
   if (status === 'COMPLETED') {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+      <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-4">
+        <div className="bg-background-white rounded-xl p-4 text-center max-w-sm w-full">
+          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">เพิ่มเงินต้นสำเร็จ</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">เพิ่มเงินต้นสำเร็จ</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             เงินต้นของสัญญาได้รับการเพิ่มเรียบร้อยแล้ว
           </p>
 
           {contract && (
-            <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6 text-left">
+            <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">เลขที่สัญญา:</span>
+                  <span className="text-foreground-subtle">เลขที่สัญญา:</span>
                   <span className="font-bold">{contract.contract_number}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">เงินต้นใหม่:</span>
-                  <span className="font-bold text-[#B85C38]">
+                  <span className="text-foreground-subtle">เงินต้นใหม่:</span>
+                  <span className="font-bold text-primary">
                     {(requestDetails.principal_after_increase || requestDetails.new_principal_amount)?.toLocaleString()} บาท
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">เพิ่มขึ้น:</span>
+                  <span className="text-foreground-subtle">เพิ่มขึ้น:</span>
                   <span className="font-bold text-green-600">
                     + {requestDetails.increase_amount?.toLocaleString()} บาท
                   </span>
@@ -145,7 +211,7 @@ export default function PrincipalIncreaseWaitingPage() {
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full bg-primary text-primary-fg rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>
@@ -156,34 +222,38 @@ export default function PrincipalIncreaseWaitingPage() {
 
   if (status === 'INVESTOR_TRANSFERRED') {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+      <div className="min-h-screen bg-background-white font-sans flex flex-col">
+        
+        {/* Header */}
+        <TransactionHeader title="การอนุมัติ" subtitle="Approval" />
+
+        <div className="bg-background rounded-xl p-4 text-center w-full max-w-sm mx-auto mt-2">
+          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">นักลงทุนโอนเงินแล้ว</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">นักลงทุนโอนเงินแล้ว</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             กรุณาตรวจสอบบัญชีของคุณและยืนยันการได้รับเงิน
           </p>
 
           {requestDetails && (
-            <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6 text-left">
+            <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">จำนวนเงิน:</span>
-                  <span className="font-bold text-[#B85C38]">
+                  <span className="text-foreground-subtle">จำนวนเงิน:</span>
+                  <span className="font-bold text-primary">
                     {requestDetails.increase_amount?.toLocaleString()} บาท
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">โอนเข้าบัญชี:</span>
+                  <span className="text-foreground-subtle">โอนเข้าบัญชี:</span>
                   <span className="font-bold">
                     {requestDetails.pawner_bank_name || requestDetails.contract?.pawners?.bank_name || ''}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">เลขบัญชี:</span>
+                  <span className="text-foreground-subtle">เลขบัญชี:</span>
                   <span className="font-bold">
                     {requestDetails.pawner_bank_account_no || requestDetails.contract?.pawners?.bank_account_no || ''}
                   </span>
@@ -192,16 +262,22 @@ export default function PrincipalIncreaseWaitingPage() {
             </div>
           )}
 
+          <div className="bg-amber-50 rounded-lg p-3 mb-6 border border-amber-200 text-left">
+            <p className="text-xs text-amber-700">
+              หมายเหตุ: หากผู้ขอสินเชื่อไม่ยืนยันภายใน 24 ชั่วโมง ระบบจะถือว่าได้รับเงินแล้ว
+            </p>
+          </div>
+
           <button
             onClick={handleConfirmReceived}
-            className="w-full bg-green-500 hover:bg-green-600 text-white rounded-2xl py-4 font-bold transition-colors mb-3"
+            className="w-full bg-green-500 hover:bg-green-600 text-white rounded-full py-4 font-medium transition-colors mb-3"
           >
             ยืนยันได้รับเงินแล้ว
           </button>
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl py-3 font-medium transition-colors"
+            className="w-full bg-primary hover:bg-primary/80 text-primary-fg rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>
@@ -212,27 +288,30 @@ export default function PrincipalIncreaseWaitingPage() {
 
   if (status === 'AWAITING_PAYMENT' || status === 'SLIP_REJECTED') {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-10 h-10 text-amber-500" />
+      <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-top p-4">
+        <div className="bg-background rounded-xl p-4 text-center max-w-sm w-full">
+          <div className="w-32 h-32 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-24 h-24 text-amber-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">รออัปโหลดสลิปดอกเบี้ย</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">รออัปโหลดสลิปดอกเบี้ย</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             กรุณาอัปโหลดสลิปการชำระดอกเบี้ยเพื่อให้ระบบส่งคำขอไปยังนักลงทุน
           </p>
 
           <button
-            onClick={() => router.push(`/contracts/${contractId}/principal-increase/upload?requestId=${requestId}`)}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors mb-3"
+            onClick={() => {
+              const nextPath = `/contracts/${contractId}/principal-increase/upload`;
+              router.push(previewMode ? withPreview(nextPath, 'requestId', requestId || `preview-increase-${contractId}`) : `${nextPath}?requestId=${requestId}`);
+            }}
+            className="w-full bg-primary hover:bg-primary/80 text-white rounded-full py-4 font-bold transition-colors mb-3"
           >
             อัปโหลดสลิป
           </button>
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl py-3 font-medium transition-colors"
+            className="w-full bg-primary hover:bg-primary/80 text-primary-fg rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>
@@ -243,47 +322,37 @@ export default function PrincipalIncreaseWaitingPage() {
 
   // Default: Waiting for investor approval
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
+    <div className="min-h-screen bg-background-white font-sans flex flex-col">
       {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="flex-1 text-center">
-          <h1 className="font-bold text-lg text-gray-800">รอการอนุมัติ</h1>
-          <p className="text-xs text-gray-400">Waiting for Approval</p>
-        </div>
-        <div className="w-6"></div>
-      </div>
+      <TransactionHeader title="รอการอนุมัติ" subtitle="Waiting for Approval" />
 
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Clock className="w-10 h-10 text-amber-500" />
+      <div className="flex-1 flex flex-col items-center justify-top p-4">
+        <div className="bg-background rounded-xl p-4 text-center max-w-sm w-full">
+          <div className="w-32 h-32 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-24 h-24 text-amber-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">รอนักลงทุนอนุมัติ</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">รอนักลงทุนอนุมัติ</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             คำขอเพิ่มเงินต้นของคุณถูกส่งไปยังนักลงทุนแล้ว<br />
             กรุณารอการพิจารณา
           </p>
 
           {requestDetails && (
-            <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6 text-left">
+            <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">รายการ:</span>
+                  <span className="text-foreground-subtle">รายการ:</span>
                   <span className="font-bold">{item?.brand} {item?.model}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">จำนวนที่ขอเพิ่ม:</span>
-                  <span className="font-bold text-[#B85C38]">
+                  <span className="text-foreground-subtle">จำนวนที่ขอเพิ่ม:</span>
+                  <span className="font-bold text-primary">
                     {requestDetails.increase_amount?.toLocaleString()} บาท
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">สถานะ:</span>
+                  <span className="text-foreground-subtle">สถานะ:</span>
                   <span className="font-bold text-amber-600">
                     รอการอนุมัติ
                   </span>
@@ -292,14 +361,13 @@ export default function PrincipalIncreaseWaitingPage() {
             </div>
           )}
 
-          <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-            <div className="flex items-center justify-center gap-2 text-gray-600">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+          <div className="bg-background-subtle rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-center gap-2 text-foreground-subtle">
               <span className="text-sm">กำลังรอการตอบกลับ...</span>
             </div>
           </div>
 
-          <div className="bg-amber-50 rounded-xl p-3 mb-6">
+          <div className="bg-amber-50 rounded-lg p-3 mb-6 border border-amber-200">
             <div className="flex gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-amber-700 text-left">
@@ -311,7 +379,7 @@ export default function PrincipalIncreaseWaitingPage() {
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl py-4 font-bold transition-colors"
+            className="w-full bg-primary text-primary-fg rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>

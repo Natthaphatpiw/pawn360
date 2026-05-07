@@ -347,13 +347,13 @@ export default function InvestorRegister() {
 
     const checkUser = async () => {
       // ── Mock mode ────────────────────────────────────────────────────────────
-      // if (process.env.NEXT_PUBLIC_LIFF_MOCK === 'true') {
-      //   console.info('[Mock] Using mock investor data for UI preview');
-      //   setInvestorData(loadMockInvestor());
-      //   setPinVerified(true); // ข้าม PIN modal ไปเลยตอน mock
-      //   setLoading(false);
-      //   return;
-      // }
+      if (process.env.NEXT_PUBLIC_LIFF_MOCK === 'true') {
+        console.info('[Mock] Using mock investor data for UI preview');
+        setInvestorData(loadMockInvestor());
+        setPinVerified(true); // ข้าม PIN modal ไปเลยตอน mock
+        setLoading(false);
+        return;
+      }
 
       // ── Real API ─────────────────────────────────────────────────────────────
       try {

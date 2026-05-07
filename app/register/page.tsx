@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import { ChevronDown } from 'lucide-react';
+import { getMockCustomer, isMockPawnerMode, waitMock } from '@/lib/mock-pawner';
 
 interface PawnerData {
   customer_id: string;
@@ -46,6 +48,7 @@ interface RegisterFormData {
 export default function PawnerRegister() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
+  const mockMode = isMockPawnerMode();
   const [loading, setLoading] = useState(true);
   const [pawnerData, setPawnerData] = useState<PawnerData | null>(null);
   const [formData, setFormData] = useState<RegisterFormData>({
@@ -86,6 +89,30 @@ export default function PawnerRegister() {
   useEffect(() => {
     if (liffLoading) return;
 
+    if (mockMode) {
+      const loadMockProfile = async () => {
+        await waitMock(250);
+        const mockCustomer = getMockCustomer();
+        const [firstname, ...lastnameParts] = mockCustomer.fullName.split(' ');
+        setPawnerData({
+          customer_id: mockCustomer._id,
+          line_id: mockCustomer.lineId,
+          firstname: firstname || 'สมหญิง',
+          lastname: lastnameParts.join(' ') || 'ทดสอบ',
+          kyc_status: 'VERIFIED',
+          stats: {
+            totalContracts: 6,
+            activeContracts: 2,
+            endedContracts: 4,
+          },
+        });
+        setLoading(false);
+      };
+
+      loadMockProfile();
+      return;
+    }
+
     if (liffError) {
       setError('ไม่สามารถเชื่อมต่อ LINE LIFF ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
@@ -115,10 +142,10 @@ export default function PawnerRegister() {
     };
 
     checkUser();
-  }, [liffLoading, liffError, profile?.userId]);
+  }, [liffLoading, liffError, profile?.userId, mockMode]);
 
   useEffect(() => {
-    if (!profile?.userId || pawnerData?.kyc_status !== 'VERIFIED') return;
+    if (mockMode || !profile?.userId || pawnerData?.kyc_status !== 'VERIFIED') return;
     const resume = getPawnerEstimateResume(profile.userId);
     if (!resume?.returnAfterVerify || !resume.draftId) return;
 
@@ -130,7 +157,7 @@ export default function PawnerRegister() {
       fallbackPath: `/estimate?draftId=${resume.draftId}`,
       statePath: `/estimate?draftId=${resume.draftId}`,
     });
-  }, [profile?.userId, pawnerData?.kyc_status]);
+  }, [profile?.userId, pawnerData?.kyc_status, mockMode]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -196,8 +223,8 @@ export default function PawnerRegister() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      <div className="theme-liff page-pawner h-dvh min-h-dvh w-full bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
@@ -205,101 +232,95 @@ export default function PawnerRegister() {
   // If user exists, show profile page
   if (pawnerData) {
     return (
-      <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center">
-        
-        {/* Member Card Container */}
-        <div className="w-full max-w-sm bg-[#F9EFE6] rounded-3xl p-6 pt-10 pb-8 shadow-sm mb-6 relative mt-4">
-          
-          {/* Inner White Card (Profile Info) */}
-          <div className="bg-white rounded-2xl p-6 text-center shadow-sm mb-6 mx-2">
-            <h1 className="text-lg font-bold text-gray-800 mb-1">
-              {pawnerData.firstname} {pawnerData.lastname}
-            </h1>
-            <p className="text-gray-400 text-xs font-light">
+      <div className="theme-liff page-pawner h-dvh min-h-dvh w-full bg-background-white font-sans p-4 flex flex-col items-center pb-8">
+        <div className="w-full max-w-sm my-3 rounded-xl border border-primary-border bg-primary-soft/50 shadow-soft">
+          <div className="inline-flex rounded-full border border-primary-border bg-background-white/90 mt-4 ml-4 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary">
+            Pawner Profile
+          </div>
+          <div className="m-4 overflow-hidden rounded-lg border border-background-white/90 bg-background-white/90 px-5 py-6 text-center shadow-soft">
+            <p className="text-xl font-medium text-foreground">{pawnerData.firstname} {pawnerData.lastname}</p>
+            <p className="mt-2 text-sm font-light text-foreground-subtle">
               Member ID: {pawnerData.customer_id.substring(0, 8)}
             </p>
           </div>
+        </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-3 gap-2 text-center divide-x divide-[#E0C8B6]">
-            <div className="px-1">
-              <div className="text-xl font-bold text-gray-700 mb-1">
-                {pawnerData.stats.totalContracts}
-              </div>
-              <div className="text-[10px] text-gray-600 font-medium">
-                สัญญาทั้งหมด
-              </div>
+        <div className="w-full max-w-sm space-y-3">
+          <div className="w-full rounded-xl border border-primary-border bg-primary-soft/50 p-4 text-center shadow-soft">
+            <h2 className="text-lg font-medium text-foreground-muted">สัญญาและสถานะ</h2>
+            <div className="my-4 grid grid-cols-3 gap-2 text-center divide-x divide-primary-border">
+              {[
+                { value: pawnerData.stats.totalContracts, label: 'สัญญาทั้งหมด' },
+                { value: pawnerData.stats.activeContracts, label: 'สัญญาที่ยังไม่สิ้นสุด' },
+                { value: pawnerData.stats.endedContracts, label: 'สัญญาสิ้นสุดแล้ว' },
+              ].map((stat) => (
+                <div key={stat.label} className="px-2">
+                  <div className="mb-1 text-2xl font-bold text-foreground-muted font-english">{stat.value}</div>
+                  <div className="text-xs font-base text-foreground-subtle">{stat.label}</div>
+                </div>
+              ))}
             </div>
 
-            <div className="px-1">
-              <div className="text-xl font-bold text-gray-700 mb-1">
-                {pawnerData.stats.activeContracts}
-              </div>
-              <div className="text-[10px] text-gray-600 font-medium">
-                สัญญายังไม่สิ้นสุด
-              </div>
-            </div>
-
-            <div className="px-1">
-              <div className="text-xl font-bold text-gray-700 mb-1">
-                {pawnerData.stats.endedContracts}
-              </div>
-              <div className="text-[10px] text-gray-600 font-medium">
-                สัญญาสิ้นสุดแล้ว
+            <div className="rounded-lg border border-background-white bg-background-white p-4">
+              <div className="text-center text-sm font-medium text-foreground-muted">สถานะบัญชี</div>
+              <div className="mt-3 flex items-center justify-between rounded-md bg-background-subtle px-4 py-3 text-sm">
+                <span className="text-foreground-subtle">KYC status</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  pawnerData.kyc_status === 'VERIFIED'
+                    ? 'bg-success-soft text-success'
+                    : pawnerData.kyc_status === 'PENDING'
+                    ? 'bg-warning-soft text-warning'
+                    : 'bg-background-subtle text-foreground-subtle'
+                }`}>
+                  {pawnerData.kyc_status === 'VERIFIED'
+                    ? 'ยืนยันแล้ว'
+                    : pawnerData.kyc_status === 'PENDING'
+                    ? 'รอตรวจสอบ'
+                    : 'ยังไม่ยืนยัน'}
+                </span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="w-full max-w-sm space-y-3">
-
-          {/* Pawn Entry Button */}
-          <button
-            onClick={() => navigateToLiff(process.env.NEXT_PUBLIC_LIFF_ID_PAWN, '/estimate')}
-            className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
-          >
-            <span className="text-base font-bold">ขอสินเชื่อ</span>
-            <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
-          </button>
-
-          {/* Contract List Button */}
-          <button
-            onClick={() => navigateToLiff(process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS, '/contracts')}
-            className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
-          >
-            <span className="text-base font-bold">รายการขอสินเชื่อ</span>
-            <span className="text-[10px] opacity-80 font-light">Contract list</span>
-          </button>
-
-          {/* Edit Profile Button */}
-          <button
-            onClick={() => router.push('/register/edit')}
-            className="w-full bg-white border border-[#C08D6E] hover:bg-gray-50 text-[#C0562F] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
-          >
-            <span className="text-base font-bold">แก้ไขข้อมูล</span>
-            <span className="text-[10px] opacity-80 font-light">Edit profile</span>
-          </button>
-
-          {/* Verify Identity Button - show when not VERIFIED */}
-          {pawnerData.kyc_status !== 'VERIFIED' && (
+          <div className="space-y-2 pt-3">
             <button
-              onClick={() => {
-                if (pawnerData.kyc_status === 'PENDING') {
-                  router.push('/ekyc/waiting');
-                } else {
-                  router.push('/ekyc');
-                }
-              }}
-              className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
+              onClick={() => router.push('/estimate')}
+              className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 flex flex-col items-center justify-center text-primary-fg active:scale-[0.98]"
             >
-              <span className="text-base font-bold">ยืนยันตัวตน</span>
-              <span className="text-[10px] opacity-80 font-light">Verify identity</span>
+              <span className="text-base font-medium">ขอสินเชื่อ</span>
+              <span className="text-xs font-light opacity-80">Pawn entry</span>
             </button>
-          )}
-
+            <button
+              onClick={() => router.push('/contracts')}
+              className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 flex flex-col items-center justify-center text-primary"
+            >
+              <span className="text-base font-medium">รายการสัญญา</span>
+              <span className="text-xs font-light opacity-80">Contract list</span>
+            </button>
+            <button
+              onClick={() => router.push('/register/edit')}
+              className="btn-transition w-full rounded-full bg-primary-soft py-3 flex flex-col items-center justify-center text-primary"
+            >
+              <span className="text-base font-medium">แก้ไขข้อมูล</span>
+              <span className="text-xs font-light opacity-80">Edit profile</span>
+            </button>
+            {pawnerData.kyc_status !== 'VERIFIED' && (
+              <button
+                onClick={() => {
+                  if (pawnerData.kyc_status === 'PENDING') {
+                    router.push('/ekyc/waiting');
+                  } else {
+                    router.push('/ekyc');
+                  }
+                }}
+                className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-3 flex flex-col items-center justify-center text-primary-fg"
+              >
+                <span className="text-base font-medium">ยืนยันตัวตน</span>
+                <span className="text-xs font-light opacity-80">Verify identity</span>
+              </button>
+            )}
+          </div>
         </div>
-
       </div>
     );
   }
@@ -334,8 +355,8 @@ const RegisterField = ({
 }) => (
   <div className="mb-4">
     <div className="mb-1">
-      <div className="text-gray-800 font-bold text-sm md:text-base">{labelEn}</div>
-      <div className="text-gray-500 text-xs font-light">{labelTh}</div>
+      <div className="text-sm font-medium text-foreground md:text-base">{labelEn}</div>
+      <div className="text-xs font-light text-foreground-subtle">{labelTh}</div>
     </div>
     <input
       type={type}
@@ -343,10 +364,103 @@ const RegisterField = ({
       placeholder={placeholder}
       value={value}
       onChange={onChange}
-      className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800"
+      className="w-full rounded-xl border border-primary-border bg-background-white px-3 py-3 text-foreground focus:outline-none focus:ring-1 focus:ring-primary autofill:bg-background-white autofill:text-foreground autofill:[-webkit-text-fill-color:var(--color-foreground)] autofill:[box-shadow:inset_0_0_0px_1000px_var(--color-background-white)]"
     />
   </div>
 );
+
+function DropdownField({
+  labelEn,
+  labelTh,
+  name,
+  value,
+  placeholder,
+  options,
+  onChange,
+}: {
+  labelEn: string;
+  labelTh: string;
+  name: string;
+  value: string;
+  placeholder: string;
+  options: string[];
+  onChange: (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLSelectElement>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleSelect = (nextValue: string) => {
+    const syntheticEvent = {
+      target: { name, value: nextValue },
+    } as React.ChangeEvent<HTMLSelectElement>;
+    onChange(syntheticEvent);
+    setOpen(false);
+  };
+
+  return (
+    <div className="mb-4" ref={containerRef}>
+      <div className="mb-1">
+        <div className="text-sm font-medium text-foreground md:text-base">{labelEn}</div>
+        <div className="text-xs font-light text-foreground-subtle">{labelTh}</div>
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between rounded-xl border border-primary-border bg-background-white px-3 py-3 text-left text-base text-foreground shadow-soft focus:outline-none focus:ring-1 focus:ring-primary"
+          aria-expanded={open}
+        >
+          <span className={value ? 'text-foreground' : 'text-foreground-subtle'}>{value || placeholder}</span>
+          <ChevronDown className={`h-4 w-4 text-foreground-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+
+        {open && (
+          <div className="dropdown-slide-down absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-primary-border bg-background-white shadow-soft">
+            <div className="max-h-60 overflow-y-auto py-1">
+              {options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleSelect(option)}
+                  className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option ? 'bg-primary-soft text-primary' : 'text-foreground-muted hover:bg-background-subtle'}`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const BANKS = [
+  'ธนาคารกสิกรไทย (KBANK)', 'ธนาคารไทยพาณิชย์ (SCB)', 'ธนาคารกรุงเทพ (BBL)',
+  'ธนาคารกรุงไทย (KTB)', 'ธนาคารกรุงศรีอยุธยา (BAY)', 'ธนาคารทหารไทยธนชาต (TTB)',
+  'ธนาคารออมสิน (GSB)', 'ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร (BAAC)',
+  'ธนาคารอาคารสงเคราะห์ (GH Bank)', 'ธนาคารเกียรตินาคินภัทร (KKP)',
+  'ธนาคารซีไอเอ็มบี ไทย (CIMB)', 'ธนาคารยูโอบี (UOB)',
+  'ธนาคารแลนด์ แอนด์ เฮ้าส์ (LH Bank)', 'ธนาคารทิสโก้ (TISCO)', 'พร้อมเพย์ (PromptPay)',
+];
+
+const ACCOUNT_TYPE_OPTIONS = [
+  'บัญชีออมทรัพย์',
+  'บัญชีเงินฝากประจำ',
+  'บัญชีกระแสรายวัน',
+  'บัญชีเงินตราต่างประเทศ',
+];
 
 function RegisterForm({
   formData,
@@ -362,10 +476,31 @@ function RegisterForm({
   error: string | null;
 }) {
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 flex justify-center">
+    <div className="theme-liff h-dvh min-h-dvh w-full bg-background-white font-sans px-4 py-4 flex justify-center">
       <div className="w-full max-w-md pb-20">
+
+        {/* Header */}
+        <div className="mb-6 rounded-xl border border-primary-border bg-primary-soft/50 p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+          <div className="rounded-[var(--radius-lg)] border border-background-white/80 bg-background-white/90 px-4 py-4">
+            <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+              Pawner Register
+            </div>
+            <div className="mt-3 text-primary bg-clip-text text-3xl font-semibold tracking-[0.08em]">
+              ลงทะเบียนผู้ขอสินเชื่อ
+            </div>
+            <p className="mt-1 text-xs text-foreground-subtle">
+              กรอกข้อมูลส่วนตัว ที่อยู่ และบัญชีรับเงินเพื่อเริ่มต้นใช้งาน
+            </p>
+          </div>
+        </div>
         
         {/* Personal Info Group */}
+        <div className="rounded-xl border border-primary-border bg-primary-soft/50 p-4">
+          <div className="">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-primary font-english">Personal info</h2>
+              <p className="text-xs text-foreground-subtle">ข้อมูลส่วนตัว</p>
+            </div>
         <div className="space-y-1">
           <RegisterField
             labelEn="First name"
@@ -401,174 +536,158 @@ function RegisterForm({
             onChange={handleInputChange}
           />
         </div>
-
-        <div className="h-px bg-gray-300 my-6"></div>
-
-        {/* Address Header */}
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-gray-800">Address</h2>
-          <p className="text-gray-500 text-xs">ที่อยู่</p>
+          </div>
         </div>
 
-        {/* Address Fields Group */}
-        <div className="space-y-1">
-          <RegisterField
-            labelEn="Address (เลขที่)"
-            labelTh=""
-            placeholder="บ้านเลขที่"
-            name="addr_houseNo"
-            value={formData.address.houseNo}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="Village/Building (หมู่บ้าน/อาคาร)"
-            labelTh=""
-            placeholder="ชื่อหมู่บ้าน/อาคาร"
-            name="addr_village"
-            value={formData.address.village}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="Street (ตรอก/ซอย/ถนน)"
-            labelTh=""
-            placeholder="ถนน/ตรอก/ซอย"
-            name="addr_street"
-            value={formData.address.street}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="Sub-district (แขวง/ตำบล)"
-            labelTh=""
-            placeholder="แขวง/ตำบล"
-            name="addr_subDistrict"
-            value={formData.address.subDistrict}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="District (เขต/อำเภอ)"
-            labelTh=""
-            placeholder="เขต/อำเภอ"
-            name="addr_district"
-            value={formData.address.district}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="Province (จังหวัด)"
-            labelTh=""
-            placeholder="จังหวัด"
-            name="addr_province"
-            value={formData.address.province}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="Country (ประเทศ)"
-            labelTh=""
-            placeholder="ประเทศ"
-            name="addr_country"
-            value={formData.address.country}
-            onChange={handleInputChange}
-          />
-          <RegisterField
-            labelEn="Postcode (รหัสไปรษณีย์)"
-            labelTh=""
-            placeholder="XXXXX"
-            name="addr_postcode"
-            value={formData.address.postcode}
-            onChange={handleInputChange}
-          />
+        <div className="h-px bg-line-soft my-3"></div>
+
+        <div className="rounded-xl border border-primary-border bg-primary-soft/50 p-4">
+          {/* Address Header */}
+          <div className="mb-4 px-1">
+            <h2 className="text-lg font-bold text-primary font-english">Address</h2>
+            <p className="text-xs text-foreground-subtle">ที่อยู่</p>
+          </div>
+
+          {/* Address Fields Group */}
+          <div className="space-y-1">
+            <RegisterField
+              labelEn="Address (เลขที่)"
+              labelTh=""
+              placeholder="บ้านเลขที่"
+              name="addr_houseNo"
+              value={formData.address.houseNo}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="Village/Building (หมู่บ้าน/อาคาร)"
+              labelTh=""
+              placeholder="ชื่อหมู่บ้าน/อาคาร"
+              name="addr_village"
+              value={formData.address.village}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="Street (ตรอก/ซอย/ถนน)"
+              labelTh=""
+              placeholder="ถนน/ตรอก/ซอย"
+              name="addr_street"
+              value={formData.address.street}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="Sub-district (แขวง/ตำบล)"
+              labelTh=""
+              placeholder="แขวง/ตำบล"
+              name="addr_subDistrict"
+              value={formData.address.subDistrict}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="District (เขต/อำเภอ)"
+              labelTh=""
+              placeholder="เขต/อำเภอ"
+              name="addr_district"
+              value={formData.address.district}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="Province (จังหวัด)"
+              labelTh=""
+              placeholder="จังหวัด"
+              name="addr_province"
+              value={formData.address.province}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="Country (ประเทศ)"
+              labelTh=""
+              placeholder="ประเทศ"
+              name="addr_country"
+              value={formData.address.country}
+              onChange={handleInputChange}
+            />
+            <RegisterField
+              labelEn="Postcode (รหัสไปรษณีย์)"
+              labelTh=""
+              placeholder="XXXXX"
+              name="addr_postcode"
+              value={formData.address.postcode}
+              onChange={handleInputChange}
+            />
+          </div>
         </div>
 
-        <div className="h-px bg-gray-300 my-6"></div>
+        <div className="h-px bg-line-soft my-3"></div>
 
-        {/* Bank Account Header */}
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-gray-800">Bank Account (Optional)</h2>
-          <p className="text-gray-500 text-xs">ข้อมูลบัญชีธนาคาร (ไม่บังคับ)</p>
-        </div>
+        <div className="rounded-xl border border-primary-border bg-primary-soft/50 p-4">
+          {/* Bank Account Header */}
+          <div className="mb-4 px-1">
+            <h2 className="text-lg font-bold text-foreground">Bank Account (Optional)</h2>
+            <p className="text-xs text-foreground-subtle">ข้อมูลบัญชีธนาคาร (ไม่บังคับ)</p>
+          </div>
 
-        {/* Bank Account Fields Group */}
-        <div className="space-y-1">
-          {/* Bank Name Dropdown */}
-          <div className="mb-4">
-            <div className="mb-1">
-              <div className="text-gray-800 font-bold text-sm md:text-base">Bank Name</div>
-              <div className="text-gray-500 text-xs font-light">ชื่อธนาคาร</div>
-            </div>
-            <select
+          {/* Bank Account Fields Group */}
+          <div className="space-y-1">
+            <DropdownField
+              labelEn="Bank name"
+              labelTh="ชื่อธนาคาร"
               name="bank_bankName"
               value={formData.bankInfo.bankName}
+              placeholder="เลือกธนาคาร"
+              options={BANKS}
               onChange={handleInputChange}
-              className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800"
-            >
-              <option value="">เลือกธนาคาร</option>
-              <option value="พร้อมเพย์">พร้อมเพย์</option>
-              <option value="กสิกรไทย">กสิกรไทย</option>
-              <option value="ไทยพาณิชย์">ไทยพาณิชย์</option>
-              <option value="กรุงเทพ">กรุงเทพ</option>
-              <option value="กรุงไทย">กรุงไทย</option>
-              <option value="ธนชาต">ธนชาต</option>
-            </select>
-          </div>
+            />
 
-          <RegisterField
-            labelEn="Account No."
-            labelTh="หมายเลขบัญชี"
-            placeholder="0000000000"
-            name="bank_accountNo"
-            type="text"
-            value={formData.bankInfo.accountNo}
-            onChange={handleInputChange}
-          />
+            <RegisterField
+              labelEn="Account No."
+              labelTh="หมายเลขบัญชี"
+              placeholder="0000000000"
+              name="bank_accountNo"
+              type="text"
+              value={formData.bankInfo.accountNo}
+              onChange={handleInputChange}
+            />
 
-          {/* Account Type Dropdown */}
-          <div className="mb-4">
-            <div className="mb-1">
-              <div className="text-gray-800 font-bold text-sm md:text-base">Account Type</div>
-              <div className="text-gray-500 text-xs font-light">ประเภทบัญชี</div>
-            </div>
-            <select
+            <DropdownField
+              labelEn="Account type"
+              labelTh="ประเภทบัญชี"
               name="bank_accountType"
               value={formData.bankInfo.accountType}
+              placeholder="เลือกประเภทบัญชี"
+              options={ACCOUNT_TYPE_OPTIONS}
               onChange={handleInputChange}
-              className="w-full p-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800"
-            >
-              <option value="">เลือกประเภทบัญชี</option>
-              <option value="บัญชีออมทรัพย์">บัญชีออมทรัพย์</option>
-              <option value="บัญชีเงินฝากประจำ">บัญชีเงินฝากประจำ</option>
-              <option value="บัญชีกระแสรายวัน">บัญชีกระแสรายวัน</option>
-              <option value="บัญชีเงินตราต่างประเทศ">บัญชีเงินตราต่างประเทศ</option>
-            </select>
-          </div>
+            />
 
-          <RegisterField
-            labelEn="Account Name"
-            labelTh="ชื่อเจ้าของบัญชี"
-            placeholder="ชื่อเจ้าของบัญชี"
-            name="bank_accountName"
-            value={formData.bankInfo.accountName}
-            onChange={handleInputChange}
-          />
+            <RegisterField
+              labelEn="Account Name"
+              labelTh="ชื่อเจ้าของบัญชี"
+              placeholder="ชื่อเจ้าของบัญชี"
+              name="bank_accountName"
+              value={formData.bankInfo.accountName}
+              onChange={handleInputChange}
+            />
+          </div>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="mt-4 rounded-xl border border-error-border bg-error-soft p-3 text-sm text-error">
             {error}
           </div>
         )}
 
         {/* Submit Button */}
-        <div className="mt-8 mb-4">
+        <div className="mt-6 mb-4">
           <button 
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-transition btn-sheen w-full min-h-12 rounded-full bg-primary py-4 text-primary-fg disabled:cursor-not-allowed disabled:opacity-50 flex flex-col items-center justify-center"
           >
-            <span className="text-base font-bold">
+            <span className="text-base font-medium">
               {submitting ? 'กำลังบันทึก...' : 'ดำเนินการต่อ'}
             </span>
             {!submitting && (
-              <span className="text-[10px] font-light opacity-90">Continue</span>
+              <span className="text-xs font-light opacity-90">Continue</span>
             )}
           </button>
         </div>

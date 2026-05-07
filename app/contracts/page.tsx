@@ -7,6 +7,11 @@ import axios from 'axios';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import {
+  getMockContracts,
+  getMockContractsEnabled,
+  getMockContractsUserName,
+} from '@/lib/mock-contracts';
 
 interface ContractItem {
   item_id: string;
@@ -42,6 +47,7 @@ const ENDED_CONTRACT_STATUSES = new Set(['COMPLETED', 'TERMINATED', 'LIQUIDATED'
 export default function PawnerContractList() {
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
+  const mockMode = getMockContractsEnabled();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +56,13 @@ export default function PawnerContractList() {
   const [pinModalOpen, setPinModalOpen] = useState(false);
 
   useEffect(() => {
+    if (mockMode) {
+      setPinVerified(true);
+      setPinModalOpen(false);
+      fetchContracts();
+      return;
+    }
+
     if (liffLoading) return;
 
     if (liffError) {
@@ -73,10 +86,17 @@ export default function PawnerContractList() {
       setPinModalOpen(true);
       setLoading(false);
     }
-  }, [liffLoading, liffError, profile?.userId]);
+  }, [liffLoading, liffError, profile?.userId, mockMode]);
 
   const fetchContracts = async () => {
     try {
+      if (mockMode) {
+        const mockContracts = await getMockContracts();
+        setUserName(getMockContractsUserName());
+        setContracts(mockContracts as Contract[]);
+        return;
+      }
+
       if (!profile?.userId) return;
 
       // Fetch customer info first
@@ -111,40 +131,40 @@ export default function PawnerContractList() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ปกติ':
-        return { text: 'ปกติ', bg: 'bg-[#E8F5E9]', textCol: 'text-[#4CAF50]' };
+        return { text: 'ปกติ', bg: 'bg-success-soft', textCol: 'text-success' };
       case 'ครบกำหนด':
-        return { text: 'ครบกำหนด', bg: 'bg-[#FFEBEE]', textCol: 'text-[#EF5350]' };
+        return { text: 'ครบกำหนด', bg: 'bg-error-soft', textCol: 'text-error' };
       case 'ใกล้ครบกำหนด':
-        return { text: 'ใกล้ครบกำหนด', bg: 'bg-[#FFF3E0]', textCol: 'text-[#FF9800]' };
+        return { text: 'ใกล้ครบกำหนด', bg: 'bg-warning-soft', textCol: 'text-warning' };
       case 'เสร็จสิ้น':
-        return { text: 'เสร็จสิ้น', bg: 'bg-gray-100', textCol: 'text-gray-600' };
+        return { text: 'เสร็จสิ้น', bg: 'bg-background-subtle', textCol: 'text-foreground-muted' };
       case 'รอรับนักลงทุน':
-        return { text: 'รอรับนักลงทุน', bg: 'bg-[#E3F2FD]', textCol: 'text-[#1E88E5]' };
+        return { text: 'รอรับนักลงทุน', bg: 'bg-s2-soft', textCol: 'text-s2' };
       case 'รอการโอนเงิน':
-        return { text: 'รอการโอนเงิน', bg: 'bg-[#FFF8E1]', textCol: 'text-[#F59E0B]' };
+        return { text: 'รอการโอนเงิน', bg: 'bg-warning-soft', textCol: 'text-warning' };
       case 'รอยืนยันรับเงิน':
-        return { text: 'รอยืนยันรับเงิน', bg: 'bg-[#FFF8E1]', textCol: 'text-[#F59E0B]' };
+        return { text: 'รอยืนยันรับเงิน', bg: 'bg-warning-soft', textCol: 'text-warning' };
       case 'รอส่งสินค้า':
-        return { text: 'รอส่งสินค้า', bg: 'bg-[#F3E8FF]', textCol: 'text-[#7C3AED]' };
+        return { text: 'รอส่งสินค้า', bg: 'bg-primary-soft', textCol: 'text-primary' };
       case 'รอนำส่งสินค้า':
-        return { text: 'รอนำส่งสินค้า', bg: 'bg-[#F3E8FF]', textCol: 'text-[#7C3AED]' };
+        return { text: 'รอนำส่งสินค้า', bg: 'bg-primary-soft', textCol: 'text-primary' };
       case 'กำลังนำส่งสินค้า':
-        return { text: 'กำลังนำส่งสินค้า', bg: 'bg-[#E0F2F1]', textCol: 'text-[#00897B]' };
+        return { text: 'กำลังนำส่งสินค้า', bg: 'bg-s3-soft', textCol: 'text-s3' };
       case 'กำลังขนส่ง':
-        return { text: 'กำลังขนส่ง', bg: 'bg-[#E0F2F1]', textCol: 'text-[#00897B]' };
+        return { text: 'กำลังขนส่ง', bg: 'bg-s3-soft', textCol: 'text-s3' };
       case 'รอตรวจสอบสินค้า':
-        return { text: 'รอตรวจสอบสินค้า', bg: 'bg-[#E0F7FA]', textCol: 'text-[#00838F]' };
+        return { text: 'รอตรวจสอบสินค้า', bg: 'bg-s2-soft', textCol: 'text-s2' };
       case 'ยกเลิก':
-        return { text: 'ยกเลิก', bg: 'bg-gray-100', textCol: 'text-gray-500' };
+        return { text: 'ยกเลิก', bg: 'bg-background-subtle', textCol: 'text-foreground-subtle' };
       case 'ขายทอดตลาด':
-        return { text: 'ขายทอดตลาด', bg: 'bg-[#FCE4EC]', textCol: 'text-[#AD1457]' };
+        return { text: 'ขายทอดตลาด', bg: 'bg-error-soft', textCol: 'text-error' };
       case 'เกินกำหนด':
       case 'เลยกำหนด':
-        return { text: 'เลยกำหนด', bg: 'bg-[#FFEBEE]', textCol: 'text-[#EF5350]' };
+        return { text: 'เลยกำหนด', bg: 'bg-error-soft', textCol: 'text-error' };
       case 'ส่งคืน':
-        return { text: 'ส่งคืน', bg: 'bg-gray-100', textCol: 'text-gray-500' };
+        return { text: 'ส่งคืน', bg: 'bg-background-subtle', textCol: 'text-foreground-subtle' };
       default:
-        return { text: status, bg: 'bg-gray-100', textCol: 'text-gray-500' };
+        return { text: status, bg: 'bg-background-subtle', textCol: 'text-foreground-subtle' };
     }
   };
 
@@ -163,18 +183,18 @@ export default function PawnerContractList() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      <div className="min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{error}</p>
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
+        <div className="max-w-md rounded-xl border border-error-border bg-error-soft p-6 text-error shadow-soft">
+          <h2 className="mb-2 text-lg font-semibold">เกิดข้อผิดพลาด</h2>
+          <p>{error}</p>
         </div>
       </div>
     );
@@ -182,26 +202,31 @@ export default function PawnerContractList() {
 
   if (!pinVerified) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
-          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
-          <p className="text-sm text-gray-500 mt-2">
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-xl border border-primary-border bg-primary-soft/50 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white px-6 py-6 text-center shadow-soft">
+            <div className="inline-flex rounded-full border border-primary-border bg-primary-soft px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-primary">
+              Secure Contracts
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-foreground">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+            <p className="mt-2 text-sm text-foreground-subtle">
             เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการสัญญา
-          </p>
-          <button
-            type="button"
-            onClick={() => setPinModalOpen(true)}
-            className="mt-4 w-full rounded-2xl bg-[#C0562F] py-3 text-sm font-bold text-white"
-          >
-            ยืนยัน PIN
-          </button>
+            </p>
+            <button
+              type="button"
+              onClick={() => setPinModalOpen(true)}
+              className="btn-transition btn-sheen mt-5 w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-3 text-sm font-bold text-primary-fg shadow-soft"
+            >
+              ยืนยัน PIN
+            </button>
+          </div>
         </div>
 
-        {profile?.userId && (
+        {(profile?.userId || mockMode) && (
           <PinModal
             open={pinModalOpen}
             role="PAWNER"
-            lineId={profile.userId}
+            lineId={profile?.userId || 'mock-pawner-line-id'}
             onClose={() => setPinModalOpen(false)}
             onVerified={() => {
               setPinVerified(true);
@@ -215,88 +240,100 @@ export default function PawnerContractList() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 flex flex-col">
+    <div className="min-h-screen bg-background-white px-4 py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col">
 
-      {/* Header */}
-      <div className="mb-4 flex justify-between items-end">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800 leading-tight">รายการสัญญาสินเชื่อ</h1>
-          <p className="text-gray-500 text-sm font-light mt-1">
-            {userName || profile?.displayName || 'ผู้ใช้'}
-          </p>
-        </div>
-        <div className="text-gray-400 text-xs font-light mb-1">
-          ทั้งหมด {visibleContracts.length} รายการ
-        </div>
-      </div>
-
-      {/* List Container */}
-      <div className="flex-1 overflow-y-auto space-y-3 pb-24 no-scrollbar">
-        {visibleContracts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
-          </div>
-        ) : (
-          visibleContracts.map((contract) => {
-            const status = getStatusBadge(contract.displayStatus);
-            return (
-              <div
-                key={contract.contract_id}
-                className="bg-white rounded-2xl p-5 shadow-sm relative cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push(`/contracts/${contract.contract_id}`)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-gray-800 text-lg">
-                    {getItemName(contract.items)}
-                  </h3>
-                  <span className="text-gray-400 text-xs font-light">{contract.contract_number}</span>
-                </div>
-
-                <div className="space-y-1 mb-1">
-                  <div className="text-gray-500 text-sm">
-                    มูลค่า: <span className="text-gray-700">{contract.loan_principal_amount.toLocaleString()} บาท</span>
-                  </div>
-                  <div className="text-gray-500 text-sm">
-                    วันครบกำหนด: <span className="text-gray-700">{formatDate(contract.contract_end_date)}</span>
-                  </div>
-                </div>
-
-                {/* Status Badge */}
-                <div className="flex justify-end mt-2">
-                  <span className={`${status.bg} ${status.textCol} text-xs font-bold px-4 py-1.5 rounded-full`}>
-                    {status.text}
-                  </span>
+        {/* Contract Header */}
+        <div className="mb-5 rounded-xl border border-primary-border bg-primary-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+              Pawnly Contracts
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-primary">
+                  รายการสัญญา
                 </div>
               </div>
-            );
-          })
-        )}
-      </div>
+            </div>
+          </div>
+        </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-transparent p-4 flex flex-col gap-3 max-w-md mx-auto w-full">
-        <button
-          onClick={() => router.push('/contracts/actions')}
-          className="w-full bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
-        >
-          <span className="text-base font-bold">สถานะคำขอ</span>
-          <span className="text-[10px] opacity-70 font-light">Request status</span>
-        </button>
-        {/* Pawn Entry Button */}
-        <button
-          onClick={() => openLiffEntry({
-            liffIdCandidates: [
-              process.env.NEXT_PUBLIC_LIFF_ID_PAWN,
-            ],
-            fallbackPath: '/estimate',
-          })}
-          className="w-full bg-[#F9EFE6] hover:bg-[#F0E0D0] text-[#A0522D] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors shadow-sm active:scale-[0.98]"
-        >
-          <span className="text-base font-bold">ขอสินเชื่อ</span>
-          <span className="text-[10px] opacity-80 font-light">Pawn entry</span>
-        </button>
-      </div>
+        {/* Contract List */}
+        <div className="flex-1 space-y-3 pb-28 no-scrollbar">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-lg font-medium text-foreground">
+              สัญญา
+            </h2>
+            <div className="text-sm font-light text-foreground-subtle">
+                {visibleContracts.length} รายการ
+              </div>
+          </div>
+          {visibleContracts.length === 0 ? (
+            <div className="rounded-xl border border-primary-border bg-background p-8 text-center">
+              <p className="text-foreground-subtle">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
+            </div>
+          ) : (
+            visibleContracts.map((contract) => {
+              const status = getStatusBadge(contract.displayStatus);
+              return (
+                <div
+                  key={contract.contract_id}
+                  className="hover-card cursor-pointer rounded-xl border border-primary-border bg-primary-soft p-4 shadow-soft transition-colors hover:bg-primary-soft/80"
+                  onClick={() => router.push(`/contracts/${contract.contract_id}`)}
+                >
+                  <div className="flex items-center justify-between gap-3 flex-nowrap mb-1">
+                    <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
+                      {getItemName(contract.items)}
+                    </h3>
+                    {/* Status Badge */}
+                    <div className="shrink-0 rounded-full px-2 py-1 bg-background-white">
+                      <span className={`${status.bg} ${status.textCol} whitespace-nowrap text-xs font-medium px-4 py-1.5 rounded-full`}>
+                        {status.text}
+                      </span>
+                    </div>
+                  </div>
 
+                  <div className="space-y-1 mb-1">
+                    <div className="text-sm text-foreground-subtle">
+                      มูลค่า: <span className="text-foreground-muted">{contract.loan_principal_amount.toLocaleString()} บาท</span>
+                    </div>
+                    <div className="text-sm text-foreground-subtle">
+                      วันครบกำหนด: <span className="text-foreground-muted">{formatDate(contract.contract_end_date)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 w-full rounded-full bg-primary/20 px-3 py-1 text-center text-xs font-light text-primary">
+                    {contract.contract_number}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 mx-auto flex w-full max-w-md flex-col gap-3 bg-transparent p-4">
+          <button
+            onClick={() => router.push('/contracts/actions')}
+            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-3 text-base font-medium text-primary transition-colors hover:bg-primary-soft active:scale-[0.98] flex flex-col items-center justify-center"
+          >
+            <span className="text-base font-medium">สถานะคำขอ</span>
+            <span className="text-xs font-light opacity-90">Request status</span>
+          </button>
+          <button
+            onClick={() => openLiffEntry({
+              liffIdCandidates: [
+                process.env.NEXT_PUBLIC_LIFF_ID_PAWN,
+              ],
+              fallbackPath: '/estimate',
+            })}
+            className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-3 text-primary-fg shadow-soft active:scale-[0.98]"
+          >
+            <span className="text-base font-medium">ขอสินเชื่อ</span>
+            <span className="text-xs font-light opacity-90">Pawn entry</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,12 +4,17 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
-import { ChevronLeft } from 'lucide-react';
+import { getMockActionRequests, getMockContractsEnabled } from '@/lib/mock-contracts';
+import { withPreview } from '../[contractId]/_lib/preview';
 
 interface ActionItem {
   request_id: string;
   request_type: string;
   request_status: string;
+  preview_status?: string;
+  preview_note?: string;
+  investor_name?: string;
+  transfer_due_at?: string;
   increase_amount?: number | null;
   reduction_amount?: number | null;
   interest_to_pay?: number | null;
@@ -42,8 +47,8 @@ const statusLabel: Record<string, string> = {
   SLIP_VERIFIED: 'สลิปผ่านแล้ว',
   SLIP_REJECTED: 'สลิปไม่ผ่าน',
   SLIP_REJECTED_FINAL: 'สลิปไม่ผ่าน (ปิดงาน)',
-  AWAITING_SIGNATURE: 'รอเซ็นสัญญา',
-  PENDING_INVESTOR_APPROVAL: 'รอส่งให้นักลงทุน',
+  AWAITING_SIGNATURE: 'กำลังยืนยันรายการ',
+  PENDING_INVESTOR_APPROVAL: 'รอนักลงทุนอนุมัติ',
   AWAITING_INVESTOR_APPROVAL: 'รอนักลงทุนอนุมัติ',
   INVESTOR_APPROVED: 'นักลงทุนอนุมัติแล้ว',
   INVESTOR_REJECTED: 'นักลงทุนปฏิเสธ',
@@ -57,6 +62,42 @@ const statusLabel: Record<string, string> = {
   COMPLETED: 'เสร็จสิ้น',
   CANCELLED: 'ยกเลิก',
   VOIDED: 'โมฆะ',
+};
+
+const getListDisplayStatus = (item: ActionItem) => {
+  switch (item.request_status) {
+    case 'AWAITING_PAYMENT':
+    case 'SLIP_REJECTED':
+      return 'รอผู้ขอสินเชื่ออัปโหลดสลิป';
+    case 'PENDING_INVESTOR_APPROVAL':
+    case 'AWAITING_INVESTOR_APPROVAL':
+    case 'INVESTOR_APPROVED':
+    case 'AWAITING_INVESTOR_PAYMENT':
+    case 'INVESTOR_SLIP_UPLOADED':
+    case 'INVESTOR_SLIP_VERIFIED':
+      return 'รอนักลงทุนโอนเงิน';
+    case 'INVESTOR_TRANSFERRED':
+    case 'AWAITING_PAWNER_CONFIRM':
+      return 'รอผู้ขอสินเชื่อยืนยันรับเงิน';
+    default:
+      return null;
+  }
+};
+
+const principalIncreasePreviewStatuses = [
+  'PENDING_INVESTOR_APPROVAL',
+  'INVESTOR_REJECTED',
+  'AWAITING_PAYMENT',
+  'INVESTOR_TRANSFERRED',
+  'COMPLETED',
+] as const;
+
+const principalIncreasePreviewStatusNote: Record<string, string> = {
+  PENDING_INVESTOR_APPROVAL: 'คำขอถูกส่งแล้ว รอให้นักลงทุนพิจารณา',
+  INVESTOR_REJECTED: 'นักลงทุนปฏิเสธคำขอพร้อมเหตุผลประกอบ',
+  AWAITING_PAYMENT: 'อนุมัติแล้วและรอผู้ขอสินเชื่ออัปโหลดสลิปดอกเบี้ย',
+  INVESTOR_TRANSFERRED: 'นักลงทุนโอนเงินเพิ่มให้แล้ว รอยืนยันรับเงิน',
+  COMPLETED: 'รายการสำเร็จ เงินต้นใหม่มีผลแล้ว',
 };
 
 const getAmountLabel = (item: ActionItem) => {
@@ -83,19 +124,47 @@ const formatDate = (dateString: string) => {
 export default function ActionStatusListPage() {
   const router = useRouter();
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
+  const mockMode = getMockContractsEnabled();
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<ActionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const pendingRequests = requests.filter((req) => ![
-    'COMPLETED',
-    'CANCELLED',
-    'VOIDED',
-    'SLIP_REJECTED_FINAL',
-    'INVESTOR_SLIP_REJECTED_FINAL',
-  ].includes(req.request_status));
+  const previewPrincipalIncreaseRequests: ActionItem[] = mockMode
+    ? principalIncreasePreviewStatuses.map((status, index) => ({
+        request_id: `preview-principal-increase-${index + 1}`,
+        request_type: 'PRINCIPAL_INCREASE',
+        request_status: status,
+        preview_status: status,
+        preview_note: principalIncreasePreviewStatusNote[status],
+        investor_name: status === 'PENDING_INVESTOR_APPROVAL' ? 'Investor Demo' : 'คุณนักลงทุนตัวอย่าง',
+        transfer_due_at: new Date(Date.now() + (index + 1) * 60 * 60 * 1000).toISOString(),
+        increase_amount: 3000,
+        total_amount: 400,
+        created_at: new Date(Date.now() - (index + 1) * 60 * 60 * 1000).toISOString(),
+        contract: {
+          contract_id: 'mock-contract-001',
+          contract_number: `CT-MOCK-PI-${index + 1}`,
+          items: {
+            item_id: `mock-pi-item-${index + 1}`,
+            brand: 'Apple',
+            model: 'iPhone 13',
+            capacity: '128GB',
+            image_urls: [],
+          },
+        },
+      }))
+    : [];
+
+  const actionRequests = mockMode ? [...previewPrincipalIncreaseRequests, ...requests] : requests;
+
+  const pendingRequests = actionRequests.filter((req) => Boolean(getListDisplayStatus(req)));
 
   useEffect(() => {
+    if (mockMode) {
+      fetchRequests();
+      return;
+    }
+
     if (liffLoading) return;
 
     if (liffError) {
@@ -111,11 +180,16 @@ export default function ActionStatusListPage() {
     }
 
     fetchRequests();
-  }, [liffLoading, liffError, profile?.userId]);
+  }, [liffLoading, liffError, profile?.userId, mockMode]);
 
   const fetchRequests = async () => {
     try {
       setLoading(true);
+      if (mockMode) {
+        const mockRequests = await getMockActionRequests();
+        setRequests(mockRequests);
+        return;
+      }
       const response = await axios.get(`/api/contract-actions/by-pawner?lineId=${profile?.userId}`);
       if (response.data.success) {
         setRequests(response.data.requests);
@@ -130,40 +204,47 @@ export default function ActionStatusListPage() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      <div className="min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{error}</p>
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
+        <div className="max-w-md rounded-3xl border border-error-border bg-error-soft p-6 text-error shadow-soft">
+          <h2 className="mb-2 text-lg font-semibold">เกิดข้อผิดพลาด</h2>
+          <p>{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 flex flex-col">
-      <div className="mb-4 flex items-center gap-3">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-700 cursor-pointer"
-          onClick={() => router.push('/contracts')}
-        />
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">สถานะคำขอ</h1>
-          <p className="text-gray-500 text-xs">Request Status</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background-white px-4 py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col">
 
-      <div className="flex-1 overflow-y-auto space-y-3 pb-20 no-scrollbar">
+      {/* Contract Header */}
+        <div className="mb-5 rounded-xl border border-primary-border bg-primary-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+              Request Status
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-primary">
+                  สถานะคำขอ
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      <div className="flex-1 space-y-3 pb-20 no-scrollbar">
         {pendingRequests.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">ไม่มีคำขอที่รอดำเนินการ</p>
+          <div className="rounded-[28px] border border-line-soft bg-background p-8 text-center shadow-soft">
+            <p className="text-foreground-subtle">ไม่มีคำขอที่รอดำเนินการ</p>
           </div>
         ) : (
           pendingRequests.map((req) => {
@@ -172,40 +253,59 @@ export default function ActionStatusListPage() {
               ? `${item.brand} ${item.model} ${item.capacity}`
               : `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim();
             const amount = getAmountLabel(req);
+            const displayStatus = getListDisplayStatus(req);
             return (
               <div
                 key={req.request_id}
-                className="bg-white rounded-2xl p-5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push(`/contracts/actions/${req.request_id}`)}
+                className="hover-card cursor-pointer rounded-lg border border-primary-border bg-primary-soft/50 p-4 shadow-soft transition-colors hover:bg-primary-soft/80"
+                onClick={() => {
+                  if (mockMode && req.preview_status && req.contract?.contract_id) {
+                    router.push(withPreview(
+                      `/contracts/actions/${req.request_id}`,
+                      'status',
+                      req.preview_status
+                    ) + `&contractId=${req.contract.contract_id}`);
+                    return;
+                  }
+                  router.push(`/contracts/actions/${req.request_id}`);
+                }}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-gray-800 text-lg">
+                <div className="flex items-center justify-between gap-3 flex-nowrap">
+                  <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
                     {actionTypeLabel[req.request_type] || req.request_type}
                   </h3>
-                  <span className="text-gray-400 text-xs font-light">
-                    {req.contract?.contract_number || '-'}
-                  </span>
+                  <div className="shrink-0 rounded-full bg-primary-soft px-3 py-1 text-center text-xs font-bold text-primary">
+                    {displayStatus}
+                  </div>
                 </div>
 
-                <div className="text-gray-500 text-sm mb-1">
-                  รายการ: <span className="text-gray-700">{itemName || '-'}</span>
-                </div>
-                <div className="text-gray-500 text-sm mb-1">
-                  จำนวนเงิน: <span className="text-gray-700">{amount.toLocaleString()} บาท</span>
-                </div>
-                <div className="text-gray-500 text-sm">
-                  วันที่ทำรายการ: <span className="text-gray-700">{formatDate(req.created_at)}</span>
+                <div className="space-y-1 mb-1">
+                  <div className="text-sm text-foreground-subtle">
+                    รายการ: <span className="text-foreground-muted">{itemName || '-'}</span>
+                  </div>
+                  <div className="text-sm text-foreground-subtle">
+                    จำนวนเงิน: <span className="text-foreground-muted">{amount.toLocaleString()} บาท</span>
+                  </div>
+                  <div className="text-sm text-foreground-subtle">
+                    วันที่ทำรายการ: <span className="text-foreground-muted">{formatDate(req.created_at)}</span>
+                  </div>
+                  {req.preview_note && (
+                    <div className="text-sm text-foreground-subtle">
+                      หมายเหตุ: <span className="text-foreground-muted">{req.preview_note}</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex justify-end mt-3">
-                  <span className="bg-gray-100 text-gray-600 text-xs font-bold px-4 py-1.5 rounded-full">
-                    {statusLabel[req.request_status] || req.request_status}
-                  </span>
+                <div className="mt-3 w-full rounded-full bg-primary/20 px-3 py-1 text-center text-xs font-light text-primary">
+                  {mockMode && req.preview_status
+                    ? `Preview: ${statusLabel[req.preview_status] || req.preview_status}`
+                    : req.contract?.contract_number || '-'}
                 </div>
               </div>
             );
           })
         )}
+      </div>
       </div>
     </div>
   );

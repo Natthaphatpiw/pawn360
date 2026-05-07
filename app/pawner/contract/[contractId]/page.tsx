@@ -93,22 +93,22 @@ const PawnContractDetail = () => {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (!contract) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
         <p className="text-gray-600">ไม่พบข้อมูลสัญญา</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans relative flex flex-col">
+    <div className="theme-liff min-h-screen bg-background font-sans relative flex flex-col">
 
       {/* ================= HEADER ================= */}
       <div className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10 sticky top-0">
@@ -135,15 +135,15 @@ const PawnContractDetail = () => {
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center animate-fade-in shadow-xl relative">
 
               <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                  <span className="text-4xl text-[#C0562F] font-bold">!</span>
+                <div className="w-16 h-16 rounded-full border-4 border-primary flex items-center justify-center">
+                  <span className="text-4xl text-primary font-bold">!</span>
                 </div>
               </div>
 
               <h3 className="text-lg font-bold text-gray-800">ยืนยันรายการต่อดอกเบี้ย</h3>
               <p className="text-xs text-gray-500 mb-2 font-light">Confirm Interest rate extension</p>
 
-              <p className="text-[#C0562F] font-bold text-sm mb-4">ยอดชำระรวม 2,000 Baht</p>
+              <p className="text-primary font-bold text-sm mb-4">ยอดชำระรวม 2,000 Baht</p>
 
               <p className="text-[10px] text-red-500 mb-6 px-4 leading-relaxed font-light">
                 เมื่อกดยืนยันแล้วกรุณารอการยืนยันจากร้าน<br/>
@@ -151,7 +151,7 @@ const PawnContractDetail = () => {
               </p>
 
               <div className="space-y-3">
-                <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                <button className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm shadow-sm transition-colors">
                   ยืนยัน
                 </button>
                 <button onClick={closeModal} className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors">
@@ -181,15 +181,15 @@ const PawnContractDetail = () => {
                     <input
                       type="text"
                       defaultValue="5,000"
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800 font-medium text-sm"
+                      className="w-full min-h-12 p-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary text-gray-800 font-medium text-sm"
                     />
                     <p className="text-[10px] text-gray-500 mt-1 font-light">เงินต้นปัจจุบัน 10,000 บาท</p>
                   </div>
                   <div className="space-y-3">
-                    <button onClick={nextStep} className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                    <button onClick={nextStep} className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm shadow-sm transition-colors">
                       ถัดไป
                     </button>
-                    <button onClick={closeModal} className="w-full bg-white border border-[#C0562F] text-[#C0562F] rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors">
+                    <button onClick={closeModal} className="w-full min-h-12 bg-white border border-primary text-primary rounded-2xl py-3 font-bold text-sm hover:bg-background-subtle transition-colors">
                       ยกเลิก
                     </button>
                   </div>
@@ -200,15 +200,15 @@ const PawnContractDetail = () => {
               {modalStep === 2 && (
                 <div className="text-center">
                   <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                      <span className="text-4xl text-[#C0562F] font-bold">!</span>
+                    <div className="w-16 h-16 rounded-full border-4 border-primary flex items-center justify-center">
+                      <span className="text-4xl text-primary font-bold">!</span>
                     </div>
                   </div>
 
                   <h3 className="text-lg font-bold text-gray-800">ยืนยันการลดเงินต้น</h3>
                   <p className="text-xs text-gray-500 mb-2 font-light">Confirm principal reduction</p>
 
-                  <p className="text-[#C0562F] font-bold text-sm mb-4">ยอดชำระรวม 7,000 Baht</p>
+                  <p className="text-primary font-bold text-sm mb-4">ยอดชำระรวม 7,000 Baht</p>
 
                   <p className="text-[10px] text-red-500 mb-6 px-4 leading-relaxed font-light">
                     เมื่อกดยืนยันแล้วกรุณารอการร้านยืนยัน<br/>
@@ -216,7 +216,7 @@ const PawnContractDetail = () => {
                   </p>
 
                   <div className="space-y-3">
-                    <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                    <button className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm shadow-sm transition-colors">
                       ยืนยัน
                     </button>
                     <button onClick={closeModal} className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors">
@@ -235,32 +235,32 @@ const PawnContractDetail = () => {
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center animate-fade-in shadow-xl relative">
 
               <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                  <span className="text-4xl text-[#C0562F] font-bold">!</span>
+                <div className="w-16 h-16 rounded-full border-4 border-primary flex items-center justify-center">
+                  <span className="text-4xl text-primary font-bold">!</span>
                 </div>
               </div>
 
               <h3 className="text-lg font-bold text-gray-800">ยืนยันการไถ่ถอน</h3>
               <p className="text-xs text-gray-500 mb-2 font-light">Confirm redemption</p>
-              <p className="text-[#C0562F] font-bold text-sm mb-6">ยอดชำระรวม 22,000 Baht</p>
+              <p className="text-primary font-bold text-sm mb-6">ยอดชำระรวม 22,000 Baht</p>
 
               <div className="text-left mb-6">
                 <label className="text-xs font-bold text-gray-800 block mb-1">การจัดส่ง*</label>
                 <div className="relative">
-                  <select className="w-full p-3 pr-10 bg-white border border-gray-300 rounded-xl text-gray-800 text-xs appearance-none focus:outline-none focus:border-[#C0562F]">
+                  <select className="w-full min-h-12 p-3 pr-10 bg-white border border-line-soft rounded-2xl text-gray-800 text-xs appearance-none focus:outline-none focus:border-primary">
                     <option>บริการจัดส่ง (+40บาท)</option>
                     <option>ดำเนินการด้วยตัวเอง</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
-                <p className="text-[10px] text-[#C0562F] mt-2 leading-tight font-light">
+                <p className="text-[10px] text-primary mt-2 leading-tight font-light">
                   *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &ldquo;ดำเนินการด้วยตัวเอง&rdquo;<br/>
                   แล้วเรียกบริการส่งของด้วยตัวเองได้
                 </p>
               </div>
 
               <div className="space-y-3">
-                <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                <button className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm shadow-sm transition-colors">
                   ยืนยัน
                 </button>
                 <button onClick={closeModal} className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors">
@@ -290,21 +290,21 @@ const PawnContractDetail = () => {
                     <input
                       type="text"
                       defaultValue="5,000"
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800 font-medium text-sm"
+                      className="w-full min-h-12 p-3 border border-line-soft rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary text-gray-800 font-medium text-sm"
                     />
                     <p className="text-[10px] text-gray-500 mt-1 font-light">ยอดสูงสุดไม่เกิน 10,000 บาท</p>
                   </div>
                   <div className="flex items-center gap-2 mb-6 text-left">
                     <div className="relative flex items-center">
-                      <input type="checkbox" id="pay-interest" className="peer w-4 h-4 rounded border-gray-300 accent-[#C0562F] cursor-pointer" />
+                      <input type="checkbox" id="pay-interest" className="peer w-4 h-4 rounded border-gray-300 accent-primary cursor-pointer" />
                     </div>
                     <label htmlFor="pay-interest" className="text-xs text-gray-600 cursor-pointer">ต้องการชำระดอกเบี้ยแยกต่างหาก</label>
                   </div>
                   <div className="space-y-3">
-                    <button onClick={nextStep} className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                    <button onClick={nextStep} className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm shadow-sm transition-colors">
                       ถัดไป
                     </button>
-                    <button onClick={closeModal} className="w-full bg-white border border-[#C0562F] text-[#C0562F] rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors">
+                    <button onClick={closeModal} className="w-full min-h-12 bg-white border border-primary text-primary rounded-2xl py-3 font-bold text-sm hover:bg-background-subtle transition-colors">
                       ยกเลิก
                     </button>
                   </div>
@@ -315,8 +315,8 @@ const PawnContractDetail = () => {
               {modalStep === 2 && (
                 <div className="text-center">
                   <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                      <span className="text-4xl text-[#C0562F] font-bold">!</span>
+                    <div className="w-16 h-16 rounded-full border-4 border-primary flex items-center justify-center">
+                      <span className="text-4xl text-primary font-bold">!</span>
                     </div>
                   </div>
 
@@ -325,7 +325,7 @@ const PawnContractDetail = () => {
 
                   <div className="my-4">
                     <p className="text-gray-700 text-sm font-medium">ยอดที่ขอเพิ่มไป 5,000 Baht</p>
-                    <p className="text-[#C0562F] font-bold text-sm">ยอดชำระดอกเบี้ย 1,000 Baht</p>
+                    <p className="text-primary font-bold text-sm">ยอดชำระดอกเบี้ย 1,000 Baht</p>
                   </div>
 
                   <p className="text-[10px] text-red-500 mb-6 px-4 leading-relaxed font-light">
@@ -334,7 +334,7 @@ const PawnContractDetail = () => {
                   </p>
 
                   <div className="space-y-3">
-                    <button className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors">
+                    <button className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm shadow-sm transition-colors">
                       ยืนยัน
                     </button>
                     <button onClick={closeModal} className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors">
@@ -366,7 +366,7 @@ const PawnContractDetail = () => {
           <div className="space-y-2">
             <InfoRow label="หมายเลขสัญญา" value={contract.details.contractId} />
             <InfoRow label="สินค้า" value={contract.details.item} />
-            <InfoRow label="สถานะ" value={contract.details.status} valueColor="text-[#7CAB4A]" isBoldValue />
+            <InfoRow label="สถานะ" value={contract.details.status} valueColor="text-success" isBoldValue />
             <InfoRow label="มูลค่า" value={contract.details.value} />
             <InfoRow label="ดอกเบี้ย" value={contract.details.interest} />
             <InfoRow label="ระยะเวลา" value={contract.details.duration} />
@@ -384,9 +384,9 @@ const PawnContractDetail = () => {
         </div>
 
         {/* 4. Remaining Days Card */}
-        <div className="bg-[#EBCDBF] rounded-2xl p-6 mb-6 flex justify-between items-center text-[#B85C38] relative overflow-hidden shadow-sm">
+        <div className="bg-primary-soft rounded-2xl p-6 mb-6 flex justify-between items-center text-primary relative overflow-hidden shadow-sm">
           {/* Background gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#EBCDBF] via-[#EBCDBF] to-[#E6C2B0]"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-[#fff0e9] via-[#fff0e9] to-[#ffc5b0]"></div>
 
           <div className="relative z-10">
             <div className="font-bold text-lg mb-1">ระยะเวลาคงเหลือ</div>
@@ -404,7 +404,7 @@ const PawnContractDetail = () => {
           {/* Redeem (ไถ่ถอน) */}
           <button
             onClick={() => openModal('redeem')}
-            className="bg-[#7CAB4A] hover:bg-[#689F38] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            className="min-h-12 bg-success hover:bg-success-hover text-success-fg rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
           >
             <span className="text-sm font-bold">ไถ่ถอน</span>
             <span className="text-[10px] font-light opacity-90">Redeem</span>
@@ -413,7 +413,7 @@ const PawnContractDetail = () => {
           {/* Pay Interest (ต่อดอกเบี้ย) */}
           <button
             onClick={() => openModal('interest')}
-            className="bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            className="min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
           >
             <span className="text-sm font-bold">ต่อดอกเบี้ย</span>
             <span className="text-[10px] font-light opacity-90">Pay interest</span>
@@ -422,7 +422,7 @@ const PawnContractDetail = () => {
           {/* Decrease Loan (ลดเงินต้น) */}
           <button
             onClick={() => openModal('decrease')}
-            className="bg-[#F4B95F] hover:bg-[#E0A850] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            className="min-h-12 bg-warning hover:bg-warning-hover text-warning-fg rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
           >
             <span className="text-sm font-bold">ลดเงินต้น</span>
             <span className="text-[10px] font-light opacity-90">Decrease loan</span>
@@ -431,7 +431,7 @@ const PawnContractDetail = () => {
           {/* Increase Loan (เพิ่มเงินต้น) */}
           <button
             onClick={() => openModal('increase')}
-            className="bg-[#E56363] hover:bg-[#D35252] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
+            className="min-h-12 bg-error hover:bg-error-hover text-error-fg rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98]"
           >
             <span className="text-sm font-bold">เพิ่มเงินต้น</span>
             <span className="text-[10px] font-light opacity-90">Increase loan</span>
@@ -440,13 +440,13 @@ const PawnContractDetail = () => {
 
         {/* 6. Bottom Outline Buttons */}
         <div className="space-y-3">
-          <button className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]">
+          <button className="w-full min-h-12 bg-white border border-primary hover:bg-background-subtle text-primary rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]">
             <span className="text-sm font-bold">ที่ตั้ง Drop point</span>
           </button>
 
           <button
             onClick={() => router.push(`/pawn-ticket/${contractId}`)}
-            className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
+            className="w-full min-h-12 bg-white border border-primary hover:bg-background-subtle text-primary rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
           >
             <span className="text-sm font-bold">ดูสัญญา</span>
             <span className="text-[10px] opacity-80 font-light">See contract</span>

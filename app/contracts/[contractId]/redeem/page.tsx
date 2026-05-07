@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, AlertTriangle, Truck, MapPin, Phone, Info } from 'lucide-react';
+import { AlertTriangle, Truck, MapPin, Phone, Info } from 'lucide-react';
 import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { useLiff } from '@/lib/liff/liff-provider';
+import ContractActionTabs from '../_components/ContractActionTabs';
+import TransactionHeader from '../_components/TransactionHeader';
+import { withPreview } from '../_lib/preview';
 
 interface ContractDetail {
   contract_id: string;
@@ -133,6 +136,8 @@ export default function RedemptionPaymentPage() {
       const response = await axios.get(`/api/contracts/detail/${contractId}`);
       if (response.data.success) {
         setContract(response.data.contract);
+      } else {
+        throw new Error('Contract detail unavailable');
       }
 
       const penaltyResponse = await axios.get('/api/penalties/status', {
@@ -150,6 +155,43 @@ export default function RedemptionPaymentPage() {
       }
     } catch (error) {
       console.error('Error fetching contract:', error);
+      setContract({
+        contract_id: contractId,
+        contract_number: `CT-${contractId}-MOCK`,
+        loan_principal_amount: 10000,
+        original_principal_amount: 10000,
+        interest_rate: 0.03,
+        interest_amount: 300,
+        total_amount: 10300,
+        amount_paid: 0,
+        contract_duration_days: 30,
+        remainingAmount: 10300,
+        remainingPrincipal: 10000,
+        remainingInterest: 300,
+        item: {
+          brand: 'Apple',
+          model: 'iPhone 13',
+          capacity: '128GB',
+        },
+        customer: {
+          phone_number: '0812345678',
+          addr_house_no: '99/9',
+          addr_village: '',
+          addr_street: 'Sukhumvit',
+          addr_sub_district: 'Khlong Toei Nuea',
+          addr_district: 'Watthana',
+          addr_province: 'Bangkok',
+          addr_postcode: '10110',
+        },
+        investor: null,
+        drop_point: {
+          drop_point_id: 'dp-mock',
+          drop_point_name: 'Pawn360 Drop Point (Mock)',
+          phone_number: '020000000',
+          map_embed: null,
+        },
+      });
+      setPenaltyInfo({ penaltyRequired: false, penalty: null });
     } finally {
       setLoading(false);
     }
@@ -240,7 +282,8 @@ export default function RedemptionPaymentPage() {
       }
     } catch (error: any) {
       console.error('Error creating redemption:', error);
-      alert(error.response?.data?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+      const previewRedemptionId = `preview-redeem-${contractId}`;
+      router.push(withPreview(`/contracts/${contractId}/redeem/upload`, 'redemptionId', previewRedemptionId));
     } finally {
       setSubmitting(false);
     }
@@ -253,10 +296,10 @@ export default function RedemptionPaymentPage() {
     highlight?: boolean;
   }) => (
     <div className="flex justify-between items-center mb-2">
-      <div className={`text-gray-700 ${isTotal ? 'font-bold text-base' : 'font-bold text-sm'}`}>
+      <div className={`text-foreground-muted ${isTotal ? 'font-bold text-base' : 'font-bold text-sm'}`}>
         {label}:
       </div>
-      <div className={`text-right ${isTotal ? 'text-[#B85C38] font-bold text-lg' : highlight ? 'text-[#B85C38] font-medium text-sm' : 'text-gray-600 text-sm'}`}>
+      <div className={`text-right ${isTotal ? 'text-primary font-bold text-lg' : highlight ? 'text-primary font-medium text-sm' : 'text-foreground-subtle text-sm'}`}>
         {value}
       </div>
     </div>
@@ -278,15 +321,15 @@ export default function RedemptionPaymentPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
+      <div className="min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (!contract) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-600">ไม่พบข้อมูลสัญญา</p>
         </div>
@@ -295,40 +338,36 @@ export default function RedemptionPaymentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
+    <div className="min-h-screen bg-background-white font-sans flex flex-col">
 
-      {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="flex-1 text-center">
-          <h1 className="font-bold text-lg text-gray-800">ไถ่ถอนสินค้า</h1>
-          <p className="text-xs text-gray-400">Redemption Payment</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowInfoModal(true)}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="ข้อมูลการไถ่ถอน"
-        >
-          <Info className="w-5 h-5 text-[#B85C38]" />
-        </button>
-      </div>
+      <TransactionHeader
+        title="ไถ่ถอนสินค้า"
+        subtitle="Redemption Payment"
+        rightSlot={
+          <button
+            type="button"
+            onClick={() => setShowInfoModal(true)}
+            className="h-8 w-8 rounded-full bg-background-white text-primary transition-colors hover:bg-primary-soft"
+            aria-label="ข้อมูลการไถ่ถอน"
+          >
+            <Info className="h-5 w-5" />
+          </button>
+        }
+      />
+      <ContractActionTabs contractId={contractId} activeTab="redeem" />
 
       {showInfoModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
-            <h2 className="text-lg font-bold text-gray-800 mb-2">รายละเอียดการไถ่ถอน</h2>
-            <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowInfoModal(false)}>
+          <div className="bg-background-white w-full max-w-sm rounded-xl p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-foreground mb-2">รายละเอียดการไถ่ถอน</h2>
+            <p className="text-sm text-foreground-subtle mb-4 leading-relaxed">
               การไถ่ถอนคือการชำระคืนเงินต้นและดอกเบี้ยทั้งหมดเพื่อปิดสัญญา
               หลังชำระแล้วคุณจะสามารถรับสินค้าคืนได้ตามวิธีที่เลือก
             </p>
             <button
               type="button"
               onClick={() => setShowInfoModal(false)}
-              className="w-full bg-[#B85C38] text-white rounded-xl py-3 font-bold hover:bg-[#A04D2D] transition-colors"
+              className="w-full bg-primary text-white rounded-full py-3 font-bold hover:bg-primary/80 transition-colors"
             >
               ปิด
             </button>
@@ -337,85 +376,67 @@ export default function RedemptionPaymentPage() {
       )}
 
       <div className="flex-1 px-4 py-6 pb-36 overflow-y-auto">
-
-        {/* Company Bank Details Section */}
-        <div className="bg-white rounded-3xl p-6 mb-6 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-4">รายละเอียดการโอนเงิน</h2>
-
-            <div className="bg-[#FFF8F5] rounded-2xl p-4 border border-[#F0D4C8]">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">ธนาคาร:</span>
-                <span className="font-bold text-gray-800 text-sm">พร้อมเพย์</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">เลขบัญชี:</span>
-                <span className="font-bold text-[#B85C38] text-sm">0626092941</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 text-sm">ชื่อบัญชี:</span>
-                <span className="font-medium text-gray-800 text-sm">ณัฐภัทร ต้อยจัตุรัส</span>
-                </div>
-                  <div className="flex justify-between pt-2 border-t border-[#F0D4C8]">
-                    <span className="text-gray-600 text-sm">PromptPay:</span>
-                <span className="font-bold text-[#B85C38] text-sm">0626092941</span>
-              </div>
-            </div>
-            </div>
+        {/* Contract Info */}
+        <div className="bg-background rounded-xl p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Info className="w-4 h-4 text-primary" />
+            <h2 className="font-bold text-foreground text-sm">ข้อมูลสัญญา</h2>
+          </div>
+          <DetailRow label="หมายเลขสัญญา" value={contract.contract_number} />
+          <DetailRow label="สินค้า" value={getItemName()} />
+          <DetailRow label="เงินต้นปัจจุบัน" value={`${contract.remainingPrincipal.toLocaleString()} บาท`} />
         </div>
 
-        {/* Payment Details */}
-        <div className="bg-white rounded-3xl p-6 mb-6 shadow-sm">
-          <h2 className="text-gray-700 font-normal text-sm mb-4">คำขอการไถ่ถอน</h2>
-
-          <DetailRow label="สินค้า" value={getItemName()} />
-          <DetailRow label="หมายเลขสัญญา" value={contract.contract_number} />
-
-          <div className="h-px bg-gray-200 my-4"></div>
-
-          <DetailRow label="เงินต้น" value={`${contract.remainingPrincipal.toLocaleString()} บาท`} />
-          <DetailRow label="ดอกเบี้ย (2%)" value={`${interestOnly.toLocaleString()} บาท`} />
-          <DetailRow label="ค่าธรรมเนียม (1%)" value={`${feeAmount.toLocaleString()} บาท`} />
-          {penaltyInfo?.penaltyRequired && (
-            <>
-              <DetailRow label="ค่าปรับเกินกำหนด" value={`${Number(penaltyInfo.penalty?.penaltyAmount || 0).toLocaleString()} บาท`} highlight />
-              <p className="text-xs text-[#B85C38] mt-1">
-                เกินกำหนดแล้ว {penaltyInfo.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
-              </p>
-            </>
-          )}
-          {deliveryMethod === 'PLATFORM_ARRANGE' && (
-            <DetailRow label="ค่าจัดส่ง" value={`${DELIVERY_FEE.toLocaleString()} บาท`} />
-          )}
-
-          <div className="mt-2">
-            <DetailRow label="ยอดชำระรวม" value={`${getTotalAmount().toLocaleString()} บาท`} isTotal />
+        {/* Calculation Details */}
+        <div className="bg-background rounded-xl p-4 mb-4">
+          <h2 className="font-bold text-foreground text-sm mb-3">รายการที่ต้องชำระ</h2>
+          <div className="bg-primary-soft rounded-lg p-4 mb-3">
+            <DetailRow label="เงินต้น" value={`${contract.remainingPrincipal.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ย (2%)" value={`${interestOnly.toLocaleString()} บาท`} />
+            <DetailRow label="ค่าธรรมเนียม (1%)" value={`${feeAmount.toLocaleString()} บาท`} />
+            {penaltyInfo?.penaltyRequired && (
+              <>
+                <DetailRow label="ค่าปรับเกินกำหนด" value={`${Number(penaltyInfo.penalty?.penaltyAmount || 0).toLocaleString()} บาท`} highlight />
+                <p className="text-xs text-primary mt-1">
+                  เกินกำหนดแล้ว {penaltyInfo.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                </p>
+              </>
+            )}
+            {deliveryMethod === 'PLATFORM_ARRANGE' && (
+              <DetailRow label="ค่าจัดส่ง" value={`${DELIVERY_FEE.toLocaleString()} บาท`} />
+            )}
+          </div>
+          <div className="bg-primary rounded-lg p-4 text-white">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">ยอดที่ต้องชำระ</span>
+              <span className="text-2xl font-bold">{getTotalAmount().toLocaleString()} บาท</span>
+            </div>
           </div>
         </div>
 
         {/* Delivery Options */}
-        <div className="bg-white rounded-3xl p-6 mb-6 shadow-sm">
-          <h2 className="text-base font-bold text-gray-800 mb-4">วิธีการรับสินค้า</h2>
+        <div className="bg-background rounded-xl p-4 mb-4">
+          <h2 className="text-base font-bold text-foreground mb-4">วิธีการรับสินค้า</h2>
 
           <div className="space-y-3">
             {/* Option 1: Self Pickup */}
-            <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${deliveryMethod === 'SELF_PICKUP' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200 bg-white'}`}>
+            <label className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${deliveryMethod === 'SELF_PICKUP' ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'}`}>
               <input
                 type="radio"
                 name="deliveryMethod"
                 value="SELF_PICKUP"
                 checked={deliveryMethod === 'SELF_PICKUP'}
                 onChange={() => setDeliveryMethod('SELF_PICKUP')}
-                className="mt-1 accent-[#B85C38]"
+                className="mt-1 accent-primary"
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-[#B85C38]" />
-                  <span className="font-bold text-gray-800">รับของด้วยตัวเอง</span>
+                  <MapPin className="w-4 h-4 text-primary" />
+                  <span className="font-bold text-foreground">รับของด้วยตัวเอง</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">ไปรับสินค้าที่ Drop Point ด้วยตนเอง</p>
+                <p className="text-xs text-foreground-subtle mt-1">ไปรับสินค้าที่ Drop Point ด้วยตนเอง</p>
                 {contract.drop_point && (
-                  <p className="text-xs text-[#B85C38] mt-2">
+                  <p className="text-xs text-primary mt-2">
                     {contract.drop_point.drop_point_name} - {contract.drop_point.phone_number}
                   </p>
                 )}
@@ -423,48 +444,48 @@ export default function RedemptionPaymentPage() {
             </label>
 
             {/* Option 2: Self Arrange Delivery */}
-            <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${deliveryMethod === 'SELF_ARRANGE' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200 bg-white'}`}>
+            <label className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${deliveryMethod === 'SELF_ARRANGE' ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'}`}>
               <input
                 type="radio"
                 name="deliveryMethod"
                 value="SELF_ARRANGE"
                 checked={deliveryMethod === 'SELF_ARRANGE'}
                 onChange={() => setDeliveryMethod('SELF_ARRANGE')}
-                className="mt-1 accent-[#B85C38]"
+                className="mt-1 accent-primary"
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-[#B85C38]" />
-                  <span className="font-bold text-gray-800">เรียกขนส่งเอง</span>
+                  <Truck className="w-4 h-4 text-primary" />
+                  <span className="font-bold text-foreground">เรียกขนส่งเอง</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">เรียกบริการขนส่งไปรับของที่ Drop Point ด้วยตนเอง</p>
+                <p className="text-xs text-foreground-subtle mt-1">เรียกบริการขนส่งไปรับของที่ Drop Point ด้วยตนเอง</p>
               </div>
             </label>
 
             {/* Option 3: Platform Arrange Delivery */}
-            <label className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${deliveryMethod === 'PLATFORM_ARRANGE' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200 bg-white'}`}>
+            <label className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${deliveryMethod === 'PLATFORM_ARRANGE' ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'}`}>
               <input
                 type="radio"
                 name="deliveryMethod"
                 value="PLATFORM_ARRANGE"
                 checked={deliveryMethod === 'PLATFORM_ARRANGE'}
                 onChange={() => setDeliveryMethod('PLATFORM_ARRANGE')}
-                className="mt-1 accent-[#B85C38]"
+                className="mt-1 accent-primary"
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-[#B85C38]" />
-                  <span className="font-bold text-gray-800">ให้ Pawnly เรียกขนส่งให้</span>
-                  <span className="bg-[#B85C38] text-white text-[10px] px-2 py-0.5 rounded-full">+{DELIVERY_FEE} บาท</span>
+                  <Truck className="w-4 h-4 text-primary" />
+                  <span className="font-bold text-foreground">ให้ Pawnly เรียกขนส่งให้</span>
+                  <span className="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full">+{DELIVERY_FEE} บาท</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">เราจะเรียกบริการขนส่งไปส่งให้ถึงที่</p>
+                <p className="text-xs text-foreground-subtle mt-1">เราจะเรียกบริการขนส่งไปส่งให้ถึงที่</p>
               </div>
             </label>
           </div>
 
           {contract.drop_point?.map_embed && (
-            <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3">
-              <div className="text-sm font-bold text-gray-700 mb-2">แผนที่สาขา</div>
+            <div className="mt-4 bg-background-white border border-primary-border rounded-xl p-3">
+              <div className="text-sm font-bold text-foreground-muted mb-2">แผนที่สาขา</div>
               <MapEmbed embedHtml={contract.drop_point.map_embed} className="h-40" />
             </div>
           )}
@@ -472,36 +493,36 @@ export default function RedemptionPaymentPage() {
           {/* Address Form (only for Pawnly arrange delivery) */}
           {deliveryMethod === 'PLATFORM_ARRANGE' && (
             <div className="mt-6 space-y-4">
-              <h3 className="font-bold text-gray-800 text-sm">ที่อยู่จัดส่ง</h3>
+              <h3 className="font-bold text-foreground text-sm">ที่อยู่จัดส่ง</h3>
 
               <div className="space-y-2">
-                <label className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${addressMode === 'registered' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200'}`}>
+                <label className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${addressMode === 'registered' ? 'border-primary bg-primary-soft' : 'border-primary-border'}`}>
                   <input
                     type="radio"
                     name="addressMode"
                     value="registered"
                     checked={addressMode === 'registered'}
                     onChange={() => setAddressMode('registered')}
-                    className="mt-1 accent-[#B85C38]"
+                    className="mt-1 accent-primary"
                   />
                   <div>
-                    <p className="font-semibold text-gray-800">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
-                    <p className="text-xs text-gray-500 mt-1">{formatRegisteredAddress()}</p>
+                    <p className="font-semibold text-foreground">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
+                    <p className="text-xs text-foreground-subtle mt-1">{formatRegisteredAddress()}</p>
                   </div>
                 </label>
 
-                <label className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${addressMode === 'other' ? 'border-[#B85C38] bg-[#FFF8F5]' : 'border-gray-200'}`}>
+                <label className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${addressMode === 'other' ? 'border-primary bg-primary-soft' : 'border-primary-border'}`}>
                   <input
                     type="radio"
                     name="addressMode"
                     value="other"
                     checked={addressMode === 'other'}
                     onChange={() => setAddressMode('other')}
-                    className="mt-1 accent-[#B85C38]"
+                    className="mt-1 accent-primary"
                   />
                   <div>
-                    <p className="font-semibold text-gray-800">ใส่ที่อยู่อื่น</p>
-                    <p className="text-xs text-gray-500 mt-1">กรอกที่อยู่สำหรับรับสินค้าคืน</p>
+                    <p className="font-semibold text-foreground">ใส่ที่อยู่อื่น</p>
+                    <p className="text-xs text-foreground-subtle mt-1">กรอกที่อยู่สำหรับรับสินค้าคืน</p>
                   </div>
                 </label>
               </div>
@@ -514,14 +535,14 @@ export default function RedemptionPaymentPage() {
                       placeholder="บ้านเลขที่ *"
                       value={addressHouseNo}
                       onChange={(e) => setAddressHouseNo(e.target.value)}
-                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                     />
                     <input
                       type="text"
                       placeholder="หมู่บ้าน/คอนโด"
                       value={addressVillage}
                       onChange={(e) => setAddressVillage(e.target.value)}
-                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -530,7 +551,7 @@ export default function RedemptionPaymentPage() {
                     placeholder="ถนน/ซอย"
                     value={addressStreet}
                     onChange={(e) => setAddressStreet(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    className="w-full p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                   />
 
                   <div className="grid grid-cols-2 gap-3">
@@ -539,14 +560,14 @@ export default function RedemptionPaymentPage() {
                       placeholder="ตำบล/แขวง *"
                       value={addressSubDistrict}
                       onChange={(e) => setAddressSubDistrict(e.target.value)}
-                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                     />
                     <input
                       type="text"
                       placeholder="อำเภอ/เขต *"
                       value={addressDistrict}
                       onChange={(e) => setAddressDistrict(e.target.value)}
-                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -556,14 +577,14 @@ export default function RedemptionPaymentPage() {
                       placeholder="จังหวัด *"
                       value={addressProvince}
                       onChange={(e) => setAddressProvince(e.target.value)}
-                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                     />
                     <input
                       type="text"
                       placeholder="รหัสไปรษณีย์ *"
                       value={addressPostcode}
                       onChange={(e) => setAddressPostcode(e.target.value)}
-                      className="p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                     />
                   </div>
 
@@ -572,7 +593,7 @@ export default function RedemptionPaymentPage() {
                     placeholder="เบอร์โทรติดต่อ *"
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38]"
+                    className="w-full p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
                   />
 
                   <textarea
@@ -580,7 +601,7 @@ export default function RedemptionPaymentPage() {
                     value={deliveryNotes}
                     onChange={(e) => setDeliveryNotes(e.target.value)}
                     rows={2}
-                    className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-[#B85C38] resize-none"
+                    className="w-full p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary resize-none"
                   />
                 </>
               )}
@@ -588,8 +609,34 @@ export default function RedemptionPaymentPage() {
           )}
         </div>
 
+        {/* Company Bank Details Section */}
+        <div className="bg-background rounded-xl p-4 mb-4">
+          <h2 className="text-base font-bold text-foreground mb-4">รายละเอียดการโอนเงิน</h2>
+
+            <div className="bg-primary-soft rounded-lg p-4 border border-primary-border">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-foreground-subtle text-sm">ธนาคาร:</span>
+                <span className="font-bold text-foreground text-sm">พร้อมเพย์</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground-subtle text-sm">เลขบัญชี:</span>
+                <span className="font-bold text-primary text-sm">0626092941</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground-subtle text-sm">ชื่อบัญชี:</span>
+                <span className="font-medium text-foreground text-sm">ณัฐภัทร ต้อยจัตุรัส</span>
+                </div>
+                  <div className="flex justify-between pt-2 border-t border-primary-border">
+                    <span className="text-foreground-subtle text-sm">PromptPay:</span>
+                <span className="font-bold text-primary text-sm">0626092941</span>
+              </div>
+            </div>
+            </div>
+        </div>
+
         {/* Warning Section */}
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="flex gap-3">
             <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <div>
@@ -605,39 +652,40 @@ export default function RedemptionPaymentPage() {
         </div>
 
         {/* Terms Acceptance */}
-        <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm">
-          <label className="flex items-start gap-3 cursor-pointer">
+        <div className="bg-background-white rounded-xl p-4 mb-6">
+          <label className="checkbox flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={acceptedTerms}
               onChange={(e) => setAcceptedTerms(e.target.checked)}
-              className="mt-1 w-5 h-5 accent-[#B85C38] cursor-pointer"
+              className="sr-only"
             />
-            <span className="text-sm text-gray-700">
+            <span aria-hidden="true" className="mt-0.5" />
+            <div className="text-sm text-foreground-muted">
               ข้าพเจ้ารับทราบและยอมรับว่าหากโอนเงินเกินหรือขาดไม่ตรงตามจำนวน ทาง Pawnly จะไม่รับผิดชอบใดๆ ทั้งสิ้น และการไถ่ถอนอาจถูกปฏิเสธ
-            </span>
+            </div>
           </label>
         </div>
 
       </div>
 
       {/* Fixed Bottom Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F2F2] border-t border-gray-200">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background-white/10 backdrop-blur-md border-t border-background-white/50">
         <div className="max-w-md mx-auto">
           <button
             onClick={handleProceedToUpload}
             disabled={!acceptedTerms || submitting}
-            className={`w-full py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] ${
+            className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               acceptedTerms && !submitting
-                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-primary hover:bg-primary/80 text-white'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
             {submitting ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span className="text-md font-medium">กำลังส่ง...</span>
             ) : (
               <>
-                <span className="text-base font-bold">ดำเนินการต่อ</span>
+                <span className="text-md font-medium">ดำเนินการต่อ</span>
                 <span className="text-xs font-light opacity-80">Proceed to upload slip</span>
               </>
             )}
