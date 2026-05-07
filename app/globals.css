@@ -442,6 +442,7 @@
 
 html,
 body {
+  color-scheme: light;
   background: var(--white);
 }
 
