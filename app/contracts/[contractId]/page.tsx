@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, X } from 'lucide-react';
 import axios from 'axios';
+import { SearchX } from 'lucide-react';
 import MapEmbed from '@/components/MapEmbed';
+import { getMockContractDetail, getMockContractsEnabled } from '@/lib/mock-contracts';
 
 interface Customer {
   customer_id: string;
@@ -90,6 +91,7 @@ export default function PawnContractDetail() {
   const router = useRouter();
   const params = useParams();
   const contractId = params.contractId as string;
+  const mockMode = getMockContractsEnabled();
 
   const [contract, setContract] = useState<ContractDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,16 +100,20 @@ export default function PawnContractDetail() {
   // Modal states
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [modalStep, setModalStep] = useState(1);
-  const [decreaseAmount, setDecreaseAmount] = useState('');
 
   useEffect(() => {
     if (contractId) {
       fetchContractDetail();
     }
-  }, [contractId]);
+  }, [contractId, mockMode]);
 
   const fetchContractDetail = async () => {
     try {
+      if (mockMode) {
+        const mockContract = await getMockContractDetail(contractId);
+        setContract(mockContract as ContractDetail | null);
+        return;
+      }
       const response = await axios.get(`/api/contracts/detail/${contractId}`);
       if (response.data.success) {
         setContract(response.data.contract);
@@ -142,6 +148,28 @@ export default function PawnContractDetail() {
     return phone;
   };
 
+  const getStatusTone = (status: string) => {
+    switch (status) {
+      case 'ปกติ':
+        return 'text-success';
+      case 'ใกล้ครบกำหนด':
+        return 'text-warning';
+      case 'เลยกำหนด':
+      case 'เกินกำหนด':
+        return 'text-error';
+      case 'ไถ่ถอน':
+        return 'text-grey-3';
+      case 'หลุดจำนำ':
+        return 'text-foreground';
+      case 'ส่งคืน':
+      case 'ยกเลิก':
+      case 'เสร็จสิ้น':
+        return 'text-foreground-subtle';
+      default:
+        return 'text-s3';
+    }
+  };
+
   const openModal = (modalType: ModalType) => {
     setActiveModal(modalType);
     setModalStep(1);
@@ -150,35 +178,48 @@ export default function PawnContractDetail() {
   const closeModal = () => {
     setActiveModal(null);
     setModalStep(1);
-    setDecreaseAmount('');
   };
 
-  const InfoRow = ({ label, value, valueColor = 'text-gray-600', isBoldValue = false }: {
+  const InfoRow = ({ label, value, valueColor = 'text-foreground-muted', isBoldValue = false }: {
     label: string;
     value: React.ReactNode;
     valueColor?: string;
     isBoldValue?: boolean;
   }) => (
     <div className="flex justify-between items-start mb-2">
-      <div className="font-bold text-gray-800 text-sm w-1/3">{label}</div>
-      <div className={`text-right w-2/3 text-sm ${valueColor} ${isBoldValue ? 'font-medium' : ''}`}>{value}</div>
+      <div className="w-1/3 text-sm font-medium text-foreground">{label}</div>
+      <div className={`text-right w-2/3 text-sm text-foreground-subtle ${valueColor} ${isBoldValue ? 'font-base' : ''}`}>{value}</div>
     </div>
   );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      <div className="min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (error || !contract) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{error || 'ไม่พบข้อมูลสัญญา'}</p>
+      <div className="theme-liff min-h-screen bg-background px-4 py-6">
+        <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+          <div className="w-full max-w-sm rounded-xl border border-primary-border bg-primary-soft px-6 py-8 text-center shadow-soft">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-error-border bg-error-soft text-error">
+              <SearchX className="h-8 w-8" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground">ไม่พบข้อมูลสัญญาสินเชื่อ</h2>
+            <p className="mt-2 text-sm leading-relaxed text-foreground-subtle">
+              กรุณาตรวจสอบรหัสสัญญาอีกครั้ง หรือกลับไปยังหน้ารายการสัญญา
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push('/contracts')}
+              className="btn-transition mt-6 inline-flex min-h-12 items-center justify-center rounded-full border border-primary bg-primary-soft px-5 py-3 text-sm font-medium text-primary"
+            >
+              กลับหน้าหลัก
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -238,66 +279,61 @@ export default function PawnContractDetail() {
   const feeAmount = Math.round(feeBase * feeRate * durationMonths * 100) / 100;
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans relative flex flex-col">
-
-      {/* ================= HEADER ================= */}
-      <div className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10 sticky top-0">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="text-center">
-          <h1 className="font-bold text-lg text-gray-800">รายการขอสินเชื่อ</h1>
-          <p className="text-xs text-gray-400">www.pawnly.io</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border border-gray-400 rounded flex items-center justify-center text-[10px] font-bold text-gray-600">
-            1
+    <div className="min-h-screen bg-background-white relative px-4 py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col">
+        <div className="mb-5 rounded-xl border border-primary-border bg-primary-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+              Contract Detail
+            </div>
+            <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-primary">
+              รายการขอสินเชื่อ
+            </div>
+            <p className="mt-2 text-xs text-foreground-subtle">{contract.contract_number}</p>
           </div>
-          <X
-            className="w-6 h-6 text-gray-800 cursor-pointer"
-            onClick={() => router.push('/contracts')}
-          />
         </div>
-      </div>
 
-      <div className="p-4 pb-20 overflow-y-auto">
+      <div className="pb-8">
 
         {/* ================= MODALS ================= */}
 
         {/* 1. Modal: ต่อดอกเบี้ย (Pay Interest) */}
         {activeModal === 'interest' && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center animate-fade-in shadow-xl relative">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
+            onClick={closeModal}
+          >
+            <div
+              className="modal-pop-in relative w-full max-w-sm rounded-xl bg-background-white p-6 text-center shadow-strong"
+              onClick={(e) => e.stopPropagation()}
+            >
 
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                  <span className="text-4xl text-[#C0562F] font-bold">!</span>
+              <div className="flex justify-center mb-2">
+                <div className="flex h-24 w-24 items-center justify-center text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24"><g fill="none">
+                    <path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z"/>
+                    <path fill="currentColor" d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12S6.477 2 12 2m0 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16m0 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2m0-9a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1"/></g>
+                  </svg>
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold text-gray-800">ยืนยันรายการต่อดอกเบี้ย</h3>
-              <p className="text-xs text-gray-500 mb-2 font-light">Confirm Interest rate extension</p>
+              <h3 className="text-lg font-bold text-foreground">ยืนยันรายการต่อดอกเบี้ย</h3>
+              <p className="mb-4 text-xs font-light text-foreground-subtle">Confirm Interest rate extension</p>
 
-              <p className="text-[#C0562F] font-bold text-sm mb-4">
-                ยอดชำระรวม {contract.remainingInterest.toLocaleString()} Baht
+              <p className="mb-6 text-lg font-bold text-primary">
+                ยอดชำระรวม {contract.remainingInterest.toLocaleString()} บาท
               </p>
 
-              <p className="text-[10px] text-red-500 mb-6 px-4 leading-relaxed font-light">
-                เมื่อกดยืนยันแล้วกรุณารอการยืนยันจากร้าน<br />
-                เมื่อร้านยืนยันแล้วข้อมูลการชำระเงินจะอยู่หน้าแรก
-              </p>
-
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <button
                   onClick={() => router.push(`/contracts/${contractId}/interest-payment`)}
-                  className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                  className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-fg"
                 >
                   ยืนยัน
                 </button>
                 <button
                   onClick={closeModal}
-                  className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
+                  className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 text-sm font-medium text-primary"
                 >
                   ยกเลิก
                 </button>
@@ -308,122 +344,93 @@ export default function PawnContractDetail() {
 
         {/* 2. Modal: ลดเงินต้น (Decrease Loan) */}
         {activeModal === 'decrease' && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 animate-fade-in shadow-xl relative">
-
-              {modalStep === 1 && (
-                <>
-                  <div className="flex items-center gap-2 mb-6 text-left">
-                    <h3 className="text-lg font-bold text-gray-800">ลดเงินต้น</h3>
-                    <span className="bg-gray-200 text-gray-500 text-[10px] px-2 py-0.5 rounded-md font-medium">Decrease loan</span>
-                  </div>
-
-                  <div className="mb-6 text-left">
-                    <label className="text-xs font-bold text-gray-800 block mb-2">
-                      ระบุจำนวนเงินต้นที่ต้องการลด(บาท)
-                    </label>
-                    <input
-                      type="text"
-                      value={decreaseAmount}
-                      onChange={(e) => setDecreaseAmount(e.target.value)}
-                      placeholder="0"
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#C0562F] text-gray-800 font-medium text-sm"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-1 font-light">
-                      เงินต้นปัจจุบัน {contract.remainingPrincipal.toLocaleString()} บาท
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => router.push(`/contracts/${contractId}/principal-reduction?amount=${decreaseAmount}`)}
-                      disabled={!decreaseAmount || parseFloat(decreaseAmount) <= 0}
-                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      ถัดไป
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="w-full bg-white border border-[#C0562F] text-[#C0562F] rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      ยกเลิก
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {modalStep === 2 && (
-                <div className="text-center">
-                  <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 rounded-full border-4 border-[#C0562F] flex items-center justify-center">
-                      <span className="text-4xl text-[#C0562F] font-bold">!</span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-bold text-gray-800">ยืนยันการลดเงินต้น</h3>
-                  <p className="text-xs text-gray-500 mb-2 font-light">Confirm principal reduction</p>
-
-                  <p className="text-[#C0562F] font-bold text-sm mb-4">
-                    ยอดชำระรวม {(parseFloat(decreaseAmount.replace(/,/g, '')) || 0).toLocaleString()} Baht
-                  </p>
-
-                  <p className="text-[10px] text-red-500 mb-6 px-4 leading-relaxed font-light">
-                    เมื่อกดยืนยันแล้วกรุณารอการร้านยืนยัน<br />
-                    เมื่อร้านยืนยันแล้วข้อมูลการชำระเงินจะอยู่หน้าแรก
-                  </p>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => router.push(`/contracts/${contractId}/principal-reduction?amount=${decreaseAmount}`)}
-                      className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
-                    >
-                      ยืนยัน
-                    </button>
-                    <button
-                      onClick={closeModal}
-                      className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      ยกเลิก
-                    </button>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
+            onClick={closeModal}
+          >
+            <div
+              className="modal-pop-in relative w-full max-w-sm rounded-xl bg-background-white p-6 text-center shadow-strong"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <div className="mb-2 flex justify-center">
+                  <div className="flex h-24 w-24 items-center justify-center text-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24">
+                      <g fill="none">
+                        <path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z" />
+                        <path fill="currentColor" d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12S6.477 2 12 2m0 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16m0 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2m0-9a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1" />
+                      </g>
+                    </svg>
                   </div>
                 </div>
-              )}
+
+                <h3 className="text-lg font-bold text-foreground">ลดเงินต้น</h3>
+                <p className="mb-2 text-xs font-light text-foreground-subtle">Decrease loan</p>
+
+                <p className="mb-6 px-4 text-sm font-light leading-relaxed text-foreground-subtle">
+                  ไปยังหน้าถัดไปเพื่อระบุจำนวนเงินต้นที่ต้องการลด
+                </p>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={() => router.push(`/contracts/${contractId}/principal-reduction`)}
+                    className="btn-transition w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-fg"
+                  >
+                    ดำเนินการต่อ
+                  </button>
+                  <button
+                    onClick={closeModal}
+                    className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 text-sm font-medium text-primary"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* 3. Modal: ไถ่ถอน (Redeem) */}
         {activeModal === 'redeem' && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center animate-fade-in shadow-xl relative">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
+            onClick={closeModal}
+          >
+            <div
+              className="modal-pop-in relative w-full max-w-sm rounded-xl bg-background-white p-6 text-center shadow-strong"
+              onClick={(e) => e.stopPropagation()}
+            >
 
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 rounded-full border-4 border-[#B85C38] flex items-center justify-center">
-                  <span className="text-4xl text-[#B85C38] font-bold">!</span>
+              <div className="mb-2 flex justify-center">
+                <div className="flex h-24 w-24 items-center justify-center text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24">
+                    <g fill="none">
+                      <path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z" />
+                      <path fill="currentColor" d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12S6.477 2 12 2m0 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16m0 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2m0-9a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1" />
+                    </g>
+                  </svg>
                 </div>
               </div>
 
-              <h3 className="text-lg font-bold text-gray-800">ยืนยันการไถ่ถอน</h3>
-              <p className="text-xs text-gray-500 mb-2 font-light">Confirm redemption</p>
-              <p className="text-[#B85C38] font-bold text-sm mb-4">
+              <h3 className="text-lg font-bold text-foreground">ยืนยันการไถ่ถอน</h3>
+              <p className="mb-2 text-xs font-light text-foreground-subtle">Confirm redemption</p>
+              <p className="mb-4 text-lg font-bold text-primary">
                 ยอดชำระรวม {contract.remainingAmount.toLocaleString()} Baht
               </p>
-
-              <p className="text-[10px] text-gray-500 mb-6 px-4 leading-relaxed font-light">
-                เมื่อกดยืนยันคุณจะเข้าสู่หน้ารายละเอียดการโอนเงิน<br />
+              <p className="mb-6 px-4 text-sm font-light leading-relaxed text-error">
                 กรุณาตรวจสอบยอดให้ถูกต้องก่อนทำรายการ
               </p>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <button
-                  onClick={() => router.push(`/contracts/${contractId}/redeem?type=FULL_REDEMPTION`)}
-                  className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                  onClick={() => router.push(`/contracts/${contractId}/redeem`)}
+                  className="btn-transition w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-fg"
                 >
                   ดำเนินการต่อ
                 </button>
                 <button
                   onClick={closeModal}
-                  className="w-full bg-white border border-gray-300 text-gray-500 rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
+                  className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 text-sm font-medium text-primary"
                 >
                   ยกเลิก
                 </button>
@@ -434,32 +441,47 @@ export default function PawnContractDetail() {
 
         {/* 4. Modal: เพิ่มเงินต้น (Increase Loan) */}
         {activeModal === 'increase' && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 animate-fade-in shadow-xl relative">
-              <div className="flex items-center gap-2 mb-4 text-left">
-                <h3 className="text-lg font-bold text-gray-800">เพิ่มเงินต้น</h3>
-                <span className="bg-gray-200 text-gray-500 text-[10px] px-2 py-0.5 rounded-md font-medium">Increase loan</span>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
+            onClick={closeModal}
+          >
+            <div
+              className="modal-pop-in relative w-full max-w-sm rounded-xl bg-background-white p-6 text-center shadow-strong"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-2 flex justify-center">
+                <div className="flex h-24 w-24 items-center justify-center text-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24">
+                    <g fill="none">
+                      <path d="m12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035q-.016-.005-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427q-.004-.016-.017-.018m.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093q.019.005.029-.008l.004-.014l-.034-.614q-.005-.018-.02-.022m-.715.002a.02.02 0 0 0-.027.006l-.006.014l-.034.614q.001.018.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01z" />
+                      <path fill="currentColor" d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12S6.477 2 12 2m0 2a8 8 0 1 0 0 16a8 8 0 0 0 0-16m0 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2m0-9a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0V7a1 1 0 0 1 1-1" />
+                    </g>
+                  </svg>
+                </div>
               </div>
 
-              <p className="text-sm text-gray-600 mb-4">
+              <h3 className="text-lg font-bold text-foreground">เพิ่มเงินต้น</h3>
+              <p className="mb-4 text-xs font-light text-foreground-subtle">Increase loan</p>
+
+              <p className="mb-4 text-sm text-foreground-muted">
                 คุณจะระบุจำนวนเงินที่ต้องการเพิ่มในขั้นตอนถัดไป
                 และต้องชำระดอกเบี้ยที่เกิดขึ้นถึงวันนี้ทันที
               </p>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 mb-5">
+              <div className="mb-5 rounded-xl border border-warning-border bg-warning-soft p-3 text-xs text-warning">
                 ดอกเบี้ยที่ค้างถึงวันนี้จะถูกเรียกเก็บก่อนส่งคำขอให้นักลงทุนพิจารณา
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <button
                   onClick={() => router.push(`/contracts/${contractId}/principal-increase`)}
-                  className="w-full bg-[#C0562F] hover:bg-[#A04D2D] text-white rounded-full py-3 font-bold text-sm shadow-sm transition-colors"
+                  className="btn-transition w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-fg"
                 >
                   ดำเนินการต่อ
                 </button>
                 <button
                   onClick={closeModal}
-                  className="w-full bg-white border border-[#C0562F] text-[#C0562F] rounded-full py-3 font-bold text-sm hover:bg-gray-50 transition-colors"
+                  className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 text-sm font-medium text-primary"
                 >
                   ยกเลิก
                 </button>
@@ -471,9 +493,9 @@ export default function PawnContractDetail() {
         {/* ================= MAIN CONTENT ================= */}
 
         {/* 1. Customer Info Section */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-gray-800 mb-3">ข้อมูลลูกค้า</h2>
-          <div className="space-y-2">
+        <div className="mb-4 p-4 pb-2 rounded-lg bg-background-subtle">
+          <h2 className="mb-2 text-base font-bold text-foreground">ข้อมูลลูกค้า</h2>
+          <div className="space-y-1.5">
             <InfoRow
               label="ชื่อ"
               value={`${contract.customer.firstname} ${contract.customer.lastname}`}
@@ -487,19 +509,21 @@ export default function PawnContractDetail() {
               value={formatPhoneNumber(contract.customer.phone_number)}
             />
           </div>
-          <div className="h-px bg-gray-200 my-4"></div>
         </div>
 
         {/* 2. Contract Details Section */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-gray-800 mb-3">รายละเอียดสัญญา</h2>
-          <div className="space-y-2">
+        <div className="mb-4 p-4 pb-2 rounded-lg bg-background-subtle">
+          <h2 className="mb-2 text-base font-bold text-foreground">รายละเอียดสัญญา</h2>
+          <div className="space-y-1.5">
             <InfoRow label="หมายเลขสัญญา" value={contract.contract_number} />
             <InfoRow label="สินค้า" value={getItemName()} />
             <InfoRow
               label="สถานะ"
-              value={contract.displayStatus}
-              valueColor="text-[#7CAB4A]"
+              value={(
+                <div className={`inline-flex w-fit items-center justify-center rounded-full bg-background-white px-3 py-1 ${getStatusTone(contract.displayStatus)}`}>
+                  {contract.displayStatus}
+                </div>
+              )}
               isBoldValue
             />
             <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount.toLocaleString()} บาท`} />
@@ -508,7 +532,7 @@ export default function PawnContractDetail() {
               value={(
                 <div className="text-right">
                   <div>{interestAmount.toLocaleString()} บาท ({(interestRatePawner * 100).toFixed(2)}%)</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-foreground-subtle">
                     ค่าธรรมเนียม {feeAmount.toLocaleString()} บาท ({(feeRate * 100).toFixed(2)}%)
                   </div>
                 </div>
@@ -518,28 +542,27 @@ export default function PawnContractDetail() {
             <InfoRow label="วันเริ่มต้น" value={formatDate(contract.contract_start_date)} />
             <InfoRow label="วันสิ้นสุด" value={formatDate(contract.contract_end_date)} />
           </div>
-          <div className="h-px bg-gray-200 my-4"></div>
         </div>
 
         {/* 3. Remarks */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-gray-800 mb-1">หมายเหตุ</h2>
-          <p className="text-gray-600 text-sm">
+        <div className="mb-4 p-4 rounded-lg bg-background-subtle">
+          <h2 className="mb-1 text-base font-bold text-foreground">หมายเหตุ</h2>
+          <p className="text-sm text-foreground-muted">
             {contract.item.notes || contract.item.defects || 'ไม่มี'}
           </p>
         </div>
 
         {/* 4. Remaining Days Card */}
-        <div className="bg-[#EBCDBF] rounded-2xl p-6 mb-6 flex justify-between items-center text-[#B85C38] relative overflow-hidden shadow-sm">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#EBCDBF] via-[#EBCDBF] to-[#E6C2B0]"></div>
+        <div className="relative mb-4 flex items-center justify-between overflow-hidden rounded-lg border border-primary-border bg-primary-soft p-4 text-primary shadow-soft">
+          <div className="absolute inset-0 bg-[image:var(--background-image-grad-primary)] opacity-10"></div>
 
           <div className="relative z-10">
             <div className="font-bold text-lg mb-1">ระยะเวลาคงเหลือ</div>
-            <div className="text-xs opacity-80 font-light">Remaining days</div>
+            <div className="text-sm opacity-80 font-light">Remaining days</div>
           </div>
 
           <div className="relative z-10 text-right flex flex-col items-end">
-            <div className="text-xs opacity-80 mb-0 font-light">วัน</div>
+            <div className="text-sm opacity-80 mb-0 font-light">วัน</div>
             <div className="text-5xl font-bold leading-none tracking-tight">
               {contract.remainingDays > 0 ? contract.remainingDays : 0}
             </div>
@@ -547,69 +570,69 @@ export default function PawnContractDetail() {
         </div>
 
         {!actionsEnabled && (
-          <div className="mb-4 rounded-2xl border border-orange-200 bg-orange-50 p-4 text-xs text-orange-700">
+          <div className="mb-3 rounded-2xl border border-warning-border bg-warning-soft p-4 text-xs text-warning">
             {actionBlockedReason}
           </div>
         )}
 
         {/* 5. Action Buttons Grid */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <button
             onClick={() => actionsEnabled && openModal('redeem')}
             disabled={!actionsEnabled}
-            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98] ${
               actionsEnabled
-                ? 'bg-[#7CAB4A] hover:bg-[#689F38] text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-success text-white'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
-            <span className="text-sm font-bold">ไถ่ถอน</span>
-            <span className="text-[10px] font-light opacity-90">Redeem</span>
+            <span className="text-sm font-medium">ไถ่ถอน</span>
+            <span className="text-xs font-light opacity-90">Redeem</span>
           </button>
 
           <button
             onClick={() => actionsEnabled && openModal('interest')}
             disabled={!actionsEnabled}
-            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98] ${
               actionsEnabled
-                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-primary text-primary-fg'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
-            <span className="text-sm font-bold">ต่อดอกเบี้ย</span>
-            <span className="text-[10px] font-light opacity-90">Pay interest</span>
+            <span className="text-sm font-medium">ต่อดอกเบี้ย</span>
+            <span className="text-xs font-light opacity-90">Pay interest</span>
           </button>
 
           <button
             onClick={() => actionsEnabled && openModal('decrease')}
             disabled={!actionsEnabled}
-            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98] ${
               actionsEnabled
-                ? 'bg-[#F4B95F] hover:bg-[#E0A850] text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-warning text-white'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
-            <span className="text-sm font-bold">ลดเงินต้น</span>
-            <span className="text-[10px] font-light opacity-90">Decrease loan</span>
+            <span className="text-sm font-medium">ลดเงินต้น</span>
+            <span className="text-xs font-light opacity-90">Decrease loan</span>
           </button>
 
           <button
             onClick={() => actionsEnabled && openModal('increase')}
             disabled={!actionsEnabled}
-            className={`rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-transform active:scale-[0.98] ${
+            className={`rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98] ${
               actionsEnabled
-                ? 'bg-[#E56363] hover:bg-[#D35252] text-white'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-error text-error-fg'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
-            <span className="text-sm font-bold">เพิ่มเงินต้น</span>
-            <span className="text-[10px] font-light opacity-90">Increase loan</span>
+            <span className="text-sm font-medium">เพิ่มเงินต้น</span>
+            <span className="text-xs font-light opacity-90">Increase loan</span>
           </button>
         </div>
 
         {contract.drop_point?.map_embed && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-            <div className="text-sm font-bold text-gray-700 mb-2">แผนที่สาขา</div>
+          <div className="mb-3 rounded-[24px] border border-line-soft bg-background-white p-4 shadow-soft">
+            <div className="mb-2 text-sm font-bold text-foreground-muted">แผนที่สาขา</div>
             <MapEmbed embedHtml={contract.drop_point.map_embed} className="h-40" />
           </div>
         )}
@@ -619,33 +642,34 @@ export default function PawnContractDetail() {
           {contract.drop_point && contract.drop_point.google_map_url && (
             <button
               onClick={() => window.open(contract.drop_point!.google_map_url!, '_blank')}
-              className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
+              className="btn-transition flex w-full min-h-12 items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary active:scale-[0.98]"
             >
-              <span className="text-sm font-bold">ที่ตั้ง Drop point</span>
+              <span className="text-sm font-medium">ที่ตั้ง Drop point</span>
             </button>
           )}
 
           <button
             onClick={() => router.push(`/pawn-ticket/${contractId}`)}
-            className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
+            className="btn-transition flex w-full min-h-12 flex-col items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary active:scale-[0.98]"
           >
-            <span className="text-sm font-bold">ดูสัญญาสินเชื่อ</span>
-            <span className="text-[10px] opacity-80 font-light">Pawn ticket</span>
+            <span className="text-sm font-medium">ดูสัญญาสินเชื่อ</span>
+            {/* <span className="text-[10px] font-light opacity-80">Pawn ticket</span> */}
           </button>
 
           {contract.contract_file_url && (
             <button
               onClick={() => window.open(contract.contract_file_url!, '_blank')}
-              className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-transform active:scale-[0.98]"
+              className="btn-transition flex w-full min-h-12 flex-col items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary active:scale-[0.98]"
             >
-              <span className="text-sm font-bold">ดูสัญญา</span>
-              <span className="text-[10px] opacity-80 font-light">See contract</span>
+              <span className="text-sm font-medium">ดูสัญญา</span>
+              {/* <span className="text-[10px] font-light opacity-80">See contract</span> */}
             </button>
           )}
         </div>
 
       </div>
 
+      </div>
     </div>
   );
 }

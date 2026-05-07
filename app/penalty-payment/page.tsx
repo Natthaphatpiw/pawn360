@@ -211,21 +211,21 @@ function PenaltyPaymentContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (errorMessage) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 text-center shadow-md max-w-sm w-full">
           <h2 className="text-lg font-bold text-gray-800 mb-2">ไม่สามารถโหลดข้อมูล</h2>
           <p className="text-sm text-gray-500 mb-4">{errorMessage}</p>
           <button
             onClick={() => router.back()}
-            className="w-full bg-[#B85C38] text-white rounded-xl py-3 font-bold hover:bg-[#A04D2D] transition-colors"
+            className="w-full min-h-12 bg-primary text-primary-fg rounded-2xl py-3 font-bold hover:bg-primary-hover transition-colors"
           >
             กลับ
           </button>
@@ -236,7 +236,7 @@ function PenaltyPaymentContent() {
 
   if (showVoided) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
+      <div className="theme-liff min-h-screen bg-background font-sans flex flex-col items-center justify-center p-6">
         <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <X className="w-10 h-10 text-red-500" />
@@ -256,7 +256,7 @@ function PenaltyPaymentContent() {
 
           <button
             onClick={handleContinue}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-full py-4 font-bold transition-colors"
           >
             กลับไปหน้าสัญญา
           </button>
@@ -267,7 +267,7 @@ function PenaltyPaymentContent() {
 
   if (showSuccess || alreadyPaid) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
+      <div className="theme-liff min-h-screen bg-background font-sans flex flex-col items-center justify-center p-6">
         <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-500" />
@@ -280,7 +280,7 @@ function PenaltyPaymentContent() {
 
           <button
             onClick={handleContinue}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-full py-4 font-bold transition-colors"
           >
             ดำเนินการต่อ
           </button>
@@ -291,7 +291,7 @@ function PenaltyPaymentContent() {
 
   if (!penaltyInfo || penaltyInfo.daysOverdue <= 0) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
+      <div className="theme-liff min-h-screen bg-background font-sans flex flex-col items-center justify-center p-6">
         <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
           <h1 className="text-xl font-bold text-gray-800 mb-2">ไม่มีค่าปรับค้างชำระ</h1>
           <p className="text-gray-500 text-sm mb-6">
@@ -299,7 +299,7 @@ function PenaltyPaymentContent() {
           </p>
           <button
             onClick={handleContinue}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-4 font-bold transition-colors"
           >
             กลับไปหน้าสัญญา
           </button>
@@ -314,7 +314,7 @@ function PenaltyPaymentContent() {
   const requiredAmount = verificationResult?.expectedAmount ?? penaltyInfo.penaltyAmount;
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
+    <div className="theme-liff min-h-screen bg-background font-sans flex flex-col">
       <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
         <ChevronLeft
           className="w-6 h-6 text-gray-800 cursor-pointer"
@@ -355,7 +355,7 @@ function PenaltyPaymentContent() {
             วันนี้วันที่ {todayText} ซึ่งเกินกำหนดมาแล้ว {penaltyInfo.daysOverdue} วัน
             ค่าปรับวันละ 100 บาท รวมเป็น {penaltyInfo.penaltyAmount.toLocaleString()} บาท
           </p>
-          <div className="bg-[#FFF8F5] rounded-xl p-4">
+          <div className="bg-primary-soft rounded-2xl p-4">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-500">วันเกินกำหนด</span>
               <span className="font-medium text-gray-800">{penaltyInfo.daysOverdue} วัน</span>
@@ -364,10 +364,10 @@ function PenaltyPaymentContent() {
               <span className="text-gray-500">ค่าปรับ/วัน</span>
               <span className="font-medium text-gray-800">100 บาท</span>
             </div>
-            <div className="border-t border-[#F0D4C8] my-2"></div>
+            <div className="border-t border-primary-border my-2"></div>
             <div className="flex justify-between text-base">
               <span className="font-semibold text-gray-700">ยอดค่าปรับรวม</span>
-              <span className="font-bold text-[#B85C38]">{penaltyInfo.penaltyAmount.toLocaleString()} บาท</span>
+              <span className="font-bold text-primary">{penaltyInfo.penaltyAmount.toLocaleString()} บาท</span>
             </div>
           </div>
         </div>
@@ -375,7 +375,7 @@ function PenaltyPaymentContent() {
         {companyBank && (
           <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-sm mb-4">
             <h2 className="font-bold text-gray-800 text-sm mb-3">รายละเอียดการโอนเงิน</h2>
-            <div className="bg-[#FFF8F5] rounded-xl p-4 border border-[#F0D4C8] text-sm text-gray-700">
+            <div className="bg-primary-soft rounded-2xl p-4 border border-primary-border text-sm text-gray-700">
               <div className="flex justify-between mb-2">
                 <span>ธนาคาร</span>
                 <span className="font-medium">{companyBank.bank_name}</span>
@@ -429,7 +429,7 @@ function PenaltyPaymentContent() {
           <button
             onClick={handleSubmit}
             disabled={!slipFile || uploading || !paymentId}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-xl py-3 font-bold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full min-h-12 bg-primary hover:bg-primary-hover text-primary-fg rounded-2xl py-3 font-bold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {uploading ? 'กำลังตรวจสอบ...' : 'ยืนยันการชำระค่าปรับ'}
           </button>
@@ -441,8 +441,8 @@ function PenaltyPaymentContent() {
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
+    <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
   );
 }

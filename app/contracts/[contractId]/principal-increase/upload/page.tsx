@@ -2,9 +2,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Upload, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Upload, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
+import TransactionHeader from '../../_components/TransactionHeader';
+import { getMockPrincipalIncreaseRequest, isPreviewMode, withPreview } from '../../_lib/preview';
 
 interface CompanyBank {
   bank_name: string;
@@ -19,6 +21,7 @@ export default function PrincipalIncreaseUploadPage() {
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const requestId = searchParams.get('requestId');
+  const previewMode = isPreviewMode(searchParams);
   const { profile } = useLiff();
 
   const [slipImage, setSlipImage] = useState<string | null>(null);
@@ -34,11 +37,13 @@ export default function PrincipalIncreaseUploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (requestId) {
+    if (previewMode) {
+      setRequestDetails(getMockPrincipalIncreaseRequest(requestId || `preview-increase-${contractId}`, contractId));
+    } else if (requestId) {
       fetchRequestDetails();
     }
     fetchCompanyBank();
-  }, [requestId]);
+  }, [requestId, previewMode, contractId]);
 
   const fetchRequestDetails = async () => {
     try {
@@ -96,6 +101,16 @@ export default function PrincipalIncreaseUploadPage() {
       return;
     }
 
+    if (previewMode) {
+      setUploading(true);
+      setVerificationResult({ success: true, expectedAmount: requestDetails?.total_amount });
+      setTimeout(() => {
+        setShowSuccess(true);
+        setUploading(false);
+      }, 400);
+      return;
+    }
+
     setUploading(true);
     setVerificationResult(null);
 
@@ -137,7 +152,8 @@ export default function PrincipalIncreaseUploadPage() {
   };
 
   const handleProceed = () => {
-    router.push(`/contracts/${contractId}/principal-increase/waiting?requestId=${requestId}`);
+    const nextPath = `/contracts/${contractId}/principal-increase/waiting`;
+    router.push(previewMode ? withPreview(nextPath, 'requestId', requestId || `preview-increase-${contractId}`) : `${nextPath}?requestId=${requestId}`);
   };
 
   const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.total_amount;
@@ -146,18 +162,18 @@ export default function PrincipalIncreaseUploadPage() {
 
   if (showVoided) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
+      <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-4">
+        <div className="bg-background-white rounded-xl p-4 text-center max-w-sm w-full">
           <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <X className="w-10 h-10 text-red-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">การดำเนินการเป็นโมฆะ</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">การดำเนินการเป็นโมฆะ</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             เนื่องจากคุณโอนเงินไม่ตรงตามจำนวนถึง 2 ครั้ง
           </p>
 
-          <div className="bg-red-50 rounded-2xl p-4 mb-6">
+          <div className="bg-red-50 rounded-xl p-4 mb-6">
             <p className="text-sm text-red-700">
               กรุณาติดต่อฝ่าย Support<br />
               <span className="font-bold text-lg">โทร: 0626092941</span>
@@ -166,7 +182,7 @@ export default function PrincipalIncreaseUploadPage() {
 
           <button
             onClick={() => router.push('/contracts')}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full bg-primary hover:bg-primary/80 text-white rounded-full py-4 font-bold transition-colors"
           >
             กลับหน้าสัญญา
           </button>
@@ -177,20 +193,20 @@ export default function PrincipalIncreaseUploadPage() {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+      <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-6">
+        <div className="bg-background-white rounded-xl p-4 text-center max-w-sm w-full">
+          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ตรวจสอบสลิปสำเร็จ</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            ระบบส่งคำขอไปยังนักลงทุนเพื่ออนุมัติแล้ว
+          <h1 className="text-xl font-bold text-foreground mb-2">ส่งคำขอแล้ว</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
+            กรุณารอการตอบรับจากนักลงทุน โดยจะมีการแจ้งเตือนผ่าน LINE เมื่อมีการอัปเดตสถานะคำขอของคุณ
           </p>
 
           <button
             onClick={handleProceed}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full bg-primary hover:bg-primary/80 text-white rounded-full py-4 font-medium transition-colors"
           >
             ดูสถานะคำขอ
           </button>
@@ -200,22 +216,12 @@ export default function PrincipalIncreaseUploadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="flex-1 text-center">
-          <h1 className="font-bold text-lg text-gray-800">ชำระดอกเบี้ยวันนี้</h1>
-          <p className="text-xs text-gray-400">Upload payment slip</p>
-        </div>
-        <div className="w-6"></div>
-      </div>
+    <div className="min-h-screen bg-background-white font-sans flex flex-col">
+      <TransactionHeader title="ชำระดอกเบี้ยวันนี้" subtitle="Upload Payment Slip" />
 
-      <div className="flex-1 flex flex-col items-center p-6 pb-32 overflow-y-auto">
+      <div className="flex-1 flex flex-col items-center p-4 pb-20 overflow-y-auto">
         {showRetry && (
-          <div className="w-full max-w-sm bg-red-50 rounded-2xl p-4 mb-4 border border-red-200">
+          <div className="w-full max-w-sm bg-red-50 rounded-xl p-4 mb-4 border border-red-200">
             <div className="flex gap-3">
               <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
@@ -234,45 +240,46 @@ export default function PrincipalIncreaseUploadPage() {
           </div>
         )}
 
-        {companyBank && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <h3 className="font-bold text-gray-800 text-sm mb-2">โอนเงินไปที่</h3>
-            <div className="bg-[#FFF8F5] rounded-xl p-3 border border-[#F0D4C8]">
-              <p className="text-sm"><span className="text-gray-600">ธนาคาร:</span> <span className="font-bold">{companyBank.bank_name}</span></p>
-              <p className="text-sm"><span className="text-gray-600">เลขบัญชี:</span> <span className="font-bold text-[#B85C38]">{companyBank.bank_account_no}</span></p>
-              <p className="text-sm"><span className="text-gray-600">ชื่อบัญชี:</span> <span className="font-bold">{companyBank.bank_account_name}</span></p>
-            </div>
-          </div>
-        )}
-
         {requestDetails && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
+          <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600 text-sm">ดอกเบี้ยและค่าธรรมเนียม:</span>
-              <span className="font-medium text-gray-800">
+              <span className="text-foreground-subtle text-sm">ดอกเบี้ยและค่าธรรมเนียม:</span>
+              <span className="font-medium text-foreground">
                 {baseAmount.toLocaleString()} บาท
               </span>
             </div>
             {penaltyAmount > 0 && (
               <div className="flex justify-between items-center mb-2">
-                <span className="text-gray-600 text-sm">ค่าปรับเกินกำหนด:</span>
-                <span className="font-medium text-[#B85C38]">
+                <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
+                <span className="font-medium text-primary">
                   {penaltyAmount.toLocaleString()} บาท
                 </span>
               </div>
             )}
             <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600 text-sm">ยอดดอกเบี้ยที่ต้องชำระวันนี้:</span>
-              <span className="font-bold text-[#B85C38] text-lg">
+              <span className="text-foreground-subtle text-sm">ยอดดอกเบี้ยที่ต้องชำระวันนี้:</span>
+              <span className="font-bold text-primary text-lg">
                 {requestDetails.total_amount?.toLocaleString()} บาท
               </span>
             </div>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-foreground-subtle">
               เพิ่มเงินต้น {requestDetails.increase_amount?.toLocaleString()} บาท
             </p>
           </div>
         )}
 
+        {companyBank && (
+          <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
+            <h3 className="font-bold text-foreground text-sm mb-2">โอนเงินไปที่</h3>
+            <div className="bg-primary-soft rounded-lg p-3 border border-primary-border">
+              <p className="text-sm"><span className="text-foreground-subtle">ธนาคาร:</span> <span className="font-bold">{companyBank.bank_name}</span></p>
+              <p className="text-sm"><span className="text-foreground-subtle">เลขบัญชี:</span> <span className="font-bold text-primary">{companyBank.bank_account_no}</span></p>
+              <p className="text-sm"><span className="text-foreground-subtle">ชื่อบัญชี:</span> <span className="font-bold">{companyBank.bank_account_name}</span></p>
+            </div>
+          </div>
+        )}
+
+        {/* Upload Area */}
         <div className="w-full max-w-sm">
           <input
             ref={fileInputRef}
@@ -284,8 +291,8 @@ export default function PrincipalIncreaseUploadPage() {
 
           <div
             onClick={() => !slipImage && fileInputRef.current?.click()}
-            className={`bg-white rounded-3xl p-4 h-64 mb-6 shadow-sm flex flex-col items-center justify-center border-2 border-dashed transition-all cursor-pointer ${
-              slipImage ? 'border-[#B85C38]' : 'border-gray-300 hover:border-[#B85C38]'
+            className={`bg-background rounded-xl h-72 mb-4 flex flex-col items-center justify-center border-2 border-dashed transition-all cursor-pointer ${
+              slipImage ? 'border-primary' : 'border-primary-border hover:border-primary'
             }`}
           >
             {slipImage ? (
@@ -293,66 +300,59 @@ export default function PrincipalIncreaseUploadPage() {
                 <img
                   src={slipImage}
                   alt="Slip Preview"
-                  className="w-full h-full object-contain rounded-2xl"
+                  className="w-full h-full object-contain rounded-xl"
                 />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveImage();
-                  }}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
-                >
-                  <X className="w-5 h-5 text-white" />
-                </button>
               </div>
             ) : (
               <div className="flex flex-col items-center">
-                <div className="w-16 h-16 mb-4 text-gray-400">
+                <div className="w-16 h-16 mb-4 text-foreground-subtle">
                   <Upload className="w-full h-full" />
                 </div>
-                <span className="text-gray-600 font-medium">แตะเพื่ออัปโหลดสลิป</span>
-                <span className="text-xs text-gray-400 mt-1">Tap to upload slip</span>
+                <span className="text-foreground-subtle font-medium">แตะเพื่ออัปโหลดสลิป</span>
+                <span className="text-xs text-foreground-subtle mt-1">Tap to upload slip</span>
               </div>
             )}
           </div>
 
-          {slipImage && (
+          {/* Remove Button */}
+          {slipImage && !showRetry && (
             <button
               onClick={handleRemoveImage}
-              className="w-full bg-[#F2E8E3] border border-[#B85C38] hover:bg-[#EBDDD5] text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center mb-8 transition-colors active:scale-[0.98]"
+              className="w-full bg-background-white border border-primary text-primary rounded-full py-2 flex flex-col items-center justify-center mb-4 transition-colors"
             >
-              <span className="text-base font-bold">ลบ</span>
-              <span className="text-[10px] font-light opacity-80">Remove</span>
+              <span className="text-base font-medium">ลบ</span>
+              <span className="text-xs font-light opacity-80">Remove</span>
             </button>
           )}
 
-          <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6">
-            <h3 className="font-bold text-gray-800 text-sm mb-2">คำแนะนำ:</h3>
-            <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+          {/* Instructions */}
+          <div className="bg-primary-soft rounded-xl p-4 mb-4 border border-primary-border">
+            <h3 className="font-bold text-foreground text-sm mb-2">คำแนะนำ:</h3>
+            <ul className="text-xs text-foreground space-y-1 list-disc list-inside">
               <li>ถ่ายภาพสลิปให้ชัดเจน เห็นยอดเงินและวันที่</li>
               <li>ตรวจสอบยอดเงินให้ตรงกับที่ระบุ</li>
-              <li>หากยอดไม่ตรง คุณต้องอัปโหลดสลิปใหม่</li>
+              <li>หากยอดไม่ตรง การไถ่ถอนจะถูกระงับ</li>
             </ul>
           </div>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F2F2]">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background-white/10 backdrop-blur-md border-t border-background-white/50">
         <div className="max-w-sm mx-auto">
           <button
             onClick={handleSubmit}
             disabled={!slipImage || uploading}
-            className={`w-full py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] ${
+            className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               slipImage && !uploading
-                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-primary hover:bg-primary/80 text-white'
+                : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
             {uploading ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span className="text-md font-medium">กำลังส่ง...</span>
             ) : (
               <>
-                <span className="text-lg font-bold">ส่ง</span>
+                <span className="text-md font-medium">ส่ง</span>
                 <span className="text-xs font-light opacity-80">Submit</span>
               </>
             )}

@@ -11,30 +11,31 @@ interface SuccessConfirmationProps {
 
 export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHome, onContinue }: SuccessConfirmationProps) {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4 font-sans">
+    <div className="theme-liff min-h-screen bg-background-white flex items-center justify-center p-4 font-sans">
 
       {/* Main Card Container */}
-      <div className="w-full max-w-md bg-[#F2F2F2] rounded-3xl p-8 flex flex-col items-center text-center shadow-sm">
+      <div className="w-full max-w-md rounded-[var(--radius-xl)] border border-primary-border/60 bg-primary-soft/50 p-4 shadow-[0_22px_60px_rgba(219,71,16,0.14)]">
+        <div className="rounded-[var(--radius-lg)] border border-white/90 bg-background-white/90 p-8 flex flex-col items-center text-center shadow-[0_10px_24px_rgba(219,71,16,0.06)]">
 
         {/* Success Icon */}
         <div className="mb-8">
-          <div className="w-32 h-32 rounded-full border-4 border-[#c2410c] flex items-center justify-center">
-            <Check className="w-16 h-16 text-[#c2410c] stroke-[3]" />
+          <div className="w-32 h-32 rounded-full border-4 border-primary flex items-center justify-center bg-primary-soft">
+            <Check className="w-16 h-16 text-primary stroke-[3]" />
           </div>
         </div>
 
         {/* Main Title */}
-        <h1 className="text-xl md:text-2xl font-bold text-gray-700 mb-2">
+        <h1 className="mb-2 text-xl font-medium text-foreground-muted md:text-2xl">
           ระบบรับข้อมูลเรียบร้อย
         </h1>
 
         {/* Subtitle */}
-        <p className="text-gray-600 text-sm md:text-base mb-8 font-medium">
+        <p className="mb-8 text-sm font-medium text-foreground-muted md:text-base">
           กรุณารอการตอบรับข้อเสนอภายใน 4 ชั่วโมง
         </p>
 
         {/* Footer Note */}
-        <p className="text-gray-500 text-xs md:text-sm leading-relaxed px-4 mb-6">
+        <p className="mb-6 px-4 text-xs leading-relaxed text-foreground-subtle md:text-sm">
           หากเกินระยะเวลาที่กำหนด สามารถกดเสนออีกครั้งได้ที่หน้ารายละเอียดข้อเสนอ
         </p>
 
@@ -61,18 +62,18 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
                 window.location.href = liffUrl;
               }
             }}
-            className="w-full bg-[#c2410c] hover:bg-[#b5370a] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98]"
+            className="w-full min-h-12 rounded-full bg-primary px-4 py-3 text-base font-medium text-primary-fg transition-colors hover:bg-primary-hover active:scale-[0.98] flex flex-col items-center justify-center"
           >
-            <span className="text-base font-bold">ดำเนินการต่อ</span>
+            <span className="text-base font-medium">ดำเนินการต่อ</span>
             <span className="text-[10px] font-light opacity-90">Continue</span>
           </button>
 
           {/* Back to Home Button */}
           <button
             onClick={onBackToHome}
-            className="w-full bg-white border border-[#c2410c] hover:bg-gray-50 text-[#c2410c] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-3 text-base font-medium text-primary transition-colors hover:bg-background-subtle active:scale-[0.98] flex flex-col items-center justify-center"
           >
-            <span className="text-base font-bold">กลับหน้าหลัก</span>
+            <span className="text-base font-medium">กลับหน้าหลัก</span>
             <span className="text-[10px] font-light opacity-90">Back to Home</span>
           </button>
         </div>
@@ -83,6 +84,7 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
           <span>Item ID: {itemId}</span>
         </div>
 
+        </div>
       </div>
     </div>
   );

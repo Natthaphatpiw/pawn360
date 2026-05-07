@@ -254,8 +254,8 @@ function PawnDeliveryPageContent() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F4F2]">
-        <div className="text-center text-[#686360]">
+      <div className="theme-liff min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center text-foreground-muted">
           <Loader2 className="h-8 w-8 animate-spin mx-auto" />
           <p className="mt-3 text-sm">กำลังโหลด...</p>
         </div>
@@ -265,7 +265,7 @@ function PawnDeliveryPageContent() {
 
   if (liffError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F4F2] p-6">
+      <div className="theme-liff min-h-screen flex items-center justify-center bg-background p-6">
         <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
           <p className="text-red-500">{liffError}</p>
         </div>
@@ -275,20 +275,20 @@ function PawnDeliveryPageContent() {
 
   if (!contractId || !contract) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F4F2]">
-        <p className="text-sm text-[#686360]">ไม่พบข้อมูลสัญญา</p>
+      <div className="theme-liff min-h-screen flex items-center justify-center bg-background">
+        <p className="text-sm text-foreground-muted">ไม่พบข้อมูลสัญญา</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F4F2] text-[#686360] px-4 py-6">
+    <div className="theme-liff min-h-screen bg-background text-foreground-muted px-4 py-6">
       <div className="mx-auto w-full max-w-md">
         <div className="mb-6 rounded-3xl bg-white p-5 shadow-sm">
-          <p className="text-xs text-[#9a9694]">สัญญา</p>
-          <h1 className="text-lg font-bold text-[#C0562F]">{contract.contract_number}</h1>
-          <p className="mt-1 text-sm text-[#7f7b78]">สินค้า: {itemName}</p>
-          <p className="text-xs text-[#9a9694]">Drop Point: {contract.drop_point?.drop_point_name || '-'}</p>
+          <p className="text-xs text-foreground-subtle">สัญญา</p>
+          <h1 className="text-lg font-bold text-primary">{contract.contract_number}</h1>
+          <p className="mt-1 text-sm text-foreground-muted">สินค้า: {itemName}</p>
+          <p className="text-xs text-foreground-subtle">Drop Point: {contract.drop_point?.drop_point_name || '-'}</p>
         </div>
 
         {error && (
@@ -299,34 +299,34 @@ function PawnDeliveryPageContent() {
 
         {step === 'address' && (
           <div className="rounded-3xl bg-white p-5 shadow-sm">
-            <h2 className="text-base font-bold text-[#686360] mb-4">ที่อยู่สำหรับให้รถรับสินค้า</h2>
+            <h2 className="text-base font-bold text-foreground-muted mb-4">ที่อยู่สำหรับให้รถรับสินค้า</h2>
             <div className="space-y-2 mb-4 text-sm">
-              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${addressMode === 'registered' ? 'border-[#C0562F] bg-[#FFF7F2]' : 'border-[#e0dcd8]'}`}>
+              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${addressMode === 'registered' ? 'border-primary bg-primary-soft' : 'border-line-soft'}`}>
                 <input
                   type="radio"
                   name="addressMode"
                   value="registered"
                   checked={addressMode === 'registered'}
                   onChange={() => setAddressMode('registered')}
-                  className="mt-1 accent-[#C0562F]"
+                  className="mt-1 accent-primary"
                 />
                 <div>
-                  <p className="font-semibold text-[#686360]">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
-                  <p className="text-xs text-[#9a9694] mt-1">{registeredAddressLabel}</p>
+                  <p className="font-semibold text-foreground-muted">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
+                  <p className="text-xs text-foreground-subtle mt-1">{registeredAddressLabel}</p>
                 </div>
               </label>
-              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${addressMode === 'other' ? 'border-[#C0562F] bg-[#FFF7F2]' : 'border-[#e0dcd8]'}`}>
+              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${addressMode === 'other' ? 'border-primary bg-primary-soft' : 'border-line-soft'}`}>
                 <input
                   type="radio"
                   name="addressMode"
                   value="other"
                   checked={addressMode === 'other'}
                   onChange={() => setAddressMode('other')}
-                  className="mt-1 accent-[#C0562F]"
+                  className="mt-1 accent-primary"
                 />
                 <div>
-                  <p className="font-semibold text-[#686360]">ใส่ที่อยู่อื่น</p>
-                  <p className="text-xs text-[#9a9694] mt-1">กรอกที่อยู่สำหรับให้รถเข้ารับสินค้า</p>
+                  <p className="font-semibold text-foreground-muted">ใส่ที่อยู่อื่น</p>
+                  <p className="text-xs text-foreground-subtle mt-1">กรอกที่อยู่สำหรับให้รถเข้ารับสินค้า</p>
                 </div>
               </label>
             </div>
@@ -338,55 +338,55 @@ function PawnDeliveryPageContent() {
                 value={address.houseNo}
                 onChange={(e) => setAddress((prev) => ({ ...prev, houseNo: e.target.value }))}
                 placeholder="บ้านเลขที่ / อาคาร"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={address.village}
                 onChange={(e) => setAddress((prev) => ({ ...prev, village: e.target.value }))}
                 placeholder="หมู่บ้าน / ซอย"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={address.street}
                 onChange={(e) => setAddress((prev) => ({ ...prev, street: e.target.value }))}
                 placeholder="ถนน"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={address.subDistrict}
                 onChange={(e) => setAddress((prev) => ({ ...prev, subDistrict: e.target.value }))}
                 placeholder="ตำบล/แขวง"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={address.district}
                 onChange={(e) => setAddress((prev) => ({ ...prev, district: e.target.value }))}
                 placeholder="อำเภอ/เขต"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={address.province}
                 onChange={(e) => setAddress((prev) => ({ ...prev, province: e.target.value }))}
                 placeholder="จังหวัด"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={address.postcode}
                 onChange={(e) => setAddress((prev) => ({ ...prev, postcode: e.target.value }))}
                 placeholder="รหัสไปรษณีย์"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <input
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder="เบอร์ติดต่อ"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
               />
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="รายละเอียดเพิ่มเติม (เช่น เวลาเข้ารับ)"
-                className="w-full rounded-xl border border-[#e0dcd8] px-4 py-3"
+                className="w-full min-h-12 rounded-2xl border border-line-soft px-4 py-3"
                 rows={3}
               />
                 </>
@@ -396,7 +396,7 @@ function PawnDeliveryPageContent() {
             <button
               onClick={handleAddressSubmit}
               disabled={saving}
-              className="mt-5 w-full rounded-2xl bg-[#C0562F] py-3 text-sm font-semibold text-white shadow-sm"
+              className="mt-5 w-full min-h-12 rounded-2xl bg-primary py-3 text-sm font-semibold text-primary-fg shadow-sm hover:bg-primary-hover"
             >
               {saving ? 'กำลังบันทึก...' : 'บันทึกที่อยู่และไปขั้นตอนถัดไป'}
             </button>
@@ -405,31 +405,31 @@ function PawnDeliveryPageContent() {
 
         {step === 'status' && (
           <div className="rounded-3xl bg-white p-5 shadow-sm">
-            <h2 className="text-base font-bold text-[#686360]">เช็คสถานะการเข้ารับสินค้า</h2>
-            <p className="text-xs text-[#9a9694] mt-1">{statusLabel}</p>
+            <h2 className="text-base font-bold text-foreground-muted">เช็คสถานะการเข้ารับสินค้า</h2>
+            <p className="text-xs text-foreground-subtle mt-1">{statusLabel}</p>
 
             <div className="mt-6">
               {STATUS_STEPS.map((label, index) => {
                 const active = index <= stepIndex;
-                const circleColor = index === 0 || index === 3 ? '#365314' : '#C0562F';
+                const circleColor = index === 0 || index === 3 ? 'var(--success)' : 'var(--primary)';
                 return (
                   <div key={label} className="relative flex items-start gap-3 pb-6 last:pb-0">
                     <div className="relative z-10 mt-0.5">
                       <div
                         className="flex h-7 w-7 items-center justify-center rounded-full border-2"
                         style={{
-                          borderColor: active ? circleColor : '#e0dcd8',
-                          backgroundColor: active ? circleColor : '#ffffff',
+                          borderColor: active ? circleColor : 'var(--line-soft)',
+                          backgroundColor: active ? circleColor : 'var(--surface)',
                         }}
                       >
                         {active && <CheckCircle className="h-4 w-4 text-white" />}
                       </div>
                     </div>
                     <div>
-                      <p className={`text-sm ${active ? 'text-[#686360]' : 'text-[#b0aca9]'}`}>{label}</p>
+                      <p className={`text-sm ${active ? 'text-foreground-muted' : 'text-foreground-subtle'}`}>{label}</p>
                     </div>
                     {index < STATUS_STEPS.length - 1 && (
-                      <div className="absolute left-3 top-7 h-full w-px bg-[#e0dcd8]" />
+                      <div className="absolute left-3 top-7 h-full w-px bg-line-soft" />
                     )}
                   </div>
                 );
@@ -439,17 +439,17 @@ function PawnDeliveryPageContent() {
             {statusRequest?.status === 'DRIVER_ASSIGNED' && (
               <button
                 onClick={handleConfirmPickup}
-                className="mt-4 w-full rounded-2xl bg-[#C0562F] py-3 text-sm font-semibold text-white"
+                className="mt-4 w-full min-h-12 rounded-2xl bg-primary py-3 text-sm font-semibold text-primary-fg hover:bg-primary-hover"
               >
                 ยืนยันว่ารับสินค้าแล้ว
               </button>
             )}
 
-            <div className="mt-4 rounded-2xl border border-[#e0dcd8] bg-[#faf7f5] p-4 text-xs text-[#7f7b78]">
+            <div className="mt-4 rounded-2xl border border-line-soft bg-background-subtle p-4 text-xs text-foreground-muted">
               <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-[#C0562F] mt-0.5" />
+                <MapPin className="h-4 w-4 text-primary mt-0.5" />
                 <div>
-                  <p className="font-semibold text-[#686360]">ที่อยู่รับสินค้า</p>
+                  <p className="font-semibold text-foreground-muted">ที่อยู่รับสินค้า</p>
                   <p>{statusRequest?.address_full || deliveryRequest?.address_full || '-'}</p>
                 </div>
               </div>
@@ -465,8 +465,8 @@ export default function PawnDeliveryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#F5F4F2]">
-          <div className="text-center text-[#686360]">
+        <div className="theme-liff min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center text-foreground-muted">
             <Loader2 className="h-8 w-8 animate-spin mx-auto" />
             <p className="mt-3 text-sm">กำลังโหลด...</p>
           </div>

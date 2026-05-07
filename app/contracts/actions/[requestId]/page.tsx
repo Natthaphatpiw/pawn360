@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { ChevronLeft } from 'lucide-react';
+import { getMockActionRequestById, getMockContractsEnabled } from '@/lib/mock-contracts';
+import { getMockPrincipalIncreaseRequest, isPreviewMode, withPreview } from '../../[contractId]/_lib/preview';
 
 const actionTypeLabel: Record<string, string> = {
   PRINCIPAL_INCREASE: 'เพิ่มเงินต้น',
@@ -18,8 +19,8 @@ const statusLabel: Record<string, string> = {
   SLIP_VERIFIED: 'สลิปผ่านแล้ว',
   SLIP_REJECTED: 'สลิปไม่ผ่าน',
   SLIP_REJECTED_FINAL: 'สลิปไม่ผ่าน (ปิดงาน)',
-  AWAITING_SIGNATURE: 'รอเซ็นสัญญา',
-  PENDING_INVESTOR_APPROVAL: 'รอส่งให้นักลงทุน',
+  AWAITING_SIGNATURE: 'กำลังยืนยันรายการ',
+  PENDING_INVESTOR_APPROVAL: 'รอนักลงทุนอนุมัติ',
   AWAITING_INVESTOR_APPROVAL: 'รอนักลงทุนอนุมัติ',
   INVESTOR_APPROVED: 'นักลงทุนอนุมัติแล้ว',
   INVESTOR_REJECTED: 'นักลงทุนปฏิเสธ',
@@ -35,6 +36,19 @@ const statusLabel: Record<string, string> = {
   VOIDED: 'โมฆะ',
 };
 
+const principalIncreaseWaitingStatuses = new Set([
+  'PENDING_INVESTOR_APPROVAL',
+  'AWAITING_INVESTOR_APPROVAL',
+  'INVESTOR_APPROVED',
+  'AWAITING_INVESTOR_PAYMENT',
+  'INVESTOR_SLIP_UPLOADED',
+  'INVESTOR_SLIP_VERIFIED',
+  'INVESTOR_TRANSFERRED',
+  'AWAITING_PAWNER_CONFIRM',
+  'AWAITING_PAYMENT',
+  'SLIP_REJECTED',
+]);
+
 const formatDateTime = (dateString?: string) => {
   if (!dateString) return '-';
   const date = new Date(dateString);
@@ -49,7 +63,12 @@ const formatDateTime = (dateString?: string) => {
 export default function ActionStatusDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const requestId = params.requestId as string;
+  const mockMode = getMockContractsEnabled();
+  const previewMode = isPreviewMode(searchParams);
+  const previewStatus = searchParams.get('status');
+  const previewContractId = searchParams.get('contractId') || 'mock-contract-001';
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,11 +77,29 @@ export default function ActionStatusDetailPage() {
     if (requestId) {
       fetchRequest();
     }
-  }, [requestId]);
+  }, [requestId, mockMode, previewMode, previewStatus, previewContractId]);
 
   const fetchRequest = async () => {
     try {
       setLoading(true);
+      if (mockMode) {
+        const mockRequest = await getMockActionRequestById(requestId);
+        if (!mockRequest && previewMode && requestId.startsWith('preview-principal-increase-')) {
+          const previewRequest = getMockPrincipalIncreaseRequest(requestId, previewContractId);
+          setRequest({
+            ...previewRequest,
+            request_type: 'PRINCIPAL_INCREASE',
+            request_status: previewStatus || previewRequest.request_status,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          setError(null);
+          return;
+        }
+        setRequest(mockRequest);
+        setError(mockRequest ? null : 'ไม่พบข้อมูลคำขอ');
+        return;
+      }
       const response = await axios.get(`/api/contract-actions/${requestId}`);
       if (response.data.success) {
         setRequest(response.data.request);
@@ -77,18 +114,18 @@ export default function ActionStatusDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C0562F]"></div>
+      <div className="min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (error || !request) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{error || 'ไม่พบข้อมูลคำขอ'}</p>
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
+        <div className="max-w-md rounded-xl border border-error-border bg-error-soft p-4 text-error shadow-soft">
+          <h2 className="mb-2 text-lg font-semibold">เกิดข้อผิดพลาด</h2>
+          <p>{error || 'ไม่พบข้อมูลคำขอ'}</p>
         </div>
       </div>
     );
@@ -105,55 +142,149 @@ export default function ActionStatusDetailPage() {
     : request.request_type === 'PRINCIPAL_REDUCTION'
       ? request.reduction_amount
       : request.interest_to_pay || request.total_amount;
+  const principalIncreaseContractId = request.contract_id || contract?.contract_id;
+  const contractId = request.contract_id || contract?.contract_id;
+  const canViewPrincipalIncreaseWaiting =
+    request.request_type === 'PRINCIPAL_INCREASE' &&
+    principalIncreaseContractId &&
+    principalIncreaseWaitingStatuses.has(request.request_status) &&
+    !['AWAITING_PAYMENT', 'SLIP_REJECTED'].includes(request.request_status);
+  const isWaitingForSlipUpload = ['AWAITING_PAYMENT', 'SLIP_REJECTED'].includes(request.request_status);
+  const isWaitingForPostSlipProcessing = ['AWAITING_SIGNATURE', 'SLIP_VERIFIED'].includes(request.request_status);
+  const uploadPathByType: Record<string, string> = {
+    PRINCIPAL_INCREASE: 'principal-increase/upload',
+    PRINCIPAL_REDUCTION: 'principal-reduction/upload',
+    INTEREST_PAYMENT: 'interest-payment/upload',
+  };
+  const signPathByType: Record<string, string> = {
+    PRINCIPAL_REDUCTION: 'principal-reduction/sign',
+    INTEREST_PAYMENT: 'interest-payment/sign',
+  };
+  const uploadPath =
+    contractId && uploadPathByType[request.request_type]
+      ? `/contracts/${contractId}/${uploadPathByType[request.request_type]}?requestId=${requestId}`
+      : null;
+  const signPath =
+    contractId && signPathByType[request.request_type]
+      ? `/contracts/${contractId}/${signPathByType[request.request_type]}?requestId=${requestId}`
+      : null;
+  const nextWaitingPath =
+    previewMode && principalIncreaseContractId
+      ? withPreview(
+        `/contracts/${principalIncreaseContractId}/principal-increase/waiting`,
+        'requestId',
+        requestId
+      ) + `&status=${request.request_status}`
+      : principalIncreaseContractId
+        ? `/contracts/${principalIncreaseContractId}/principal-increase/waiting?requestId=${requestId}&status=${request.request_status}`
+        : null;
+  const nextUploadPath =
+    previewMode && contractId && uploadPathByType[request.request_type]
+      ? withPreview(
+        `/contracts/${contractId}/${uploadPathByType[request.request_type]}`,
+        'requestId',
+        requestId
+      )
+      : uploadPath;
+  const nextSignPath =
+    previewMode && contractId && signPathByType[request.request_type]
+      ? withPreview(
+        `/contracts/${contractId}/${signPathByType[request.request_type]}`,
+        'requestId',
+        requestId
+      )
+      : signPath;
+  const canConfirmReceiving =
+    request.request_type === 'PRINCIPAL_INCREASE' &&
+    request.request_status === 'INVESTOR_SLIP_UPLOADED' &&
+    Boolean(nextWaitingPath);
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans px-4 py-6 flex flex-col">
-      <div className="mb-4 flex items-center gap-3">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-700 cursor-pointer"
-          onClick={() => router.push('/contracts/actions')}
-        />
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">รายละเอียดคำขอ</h1>
-          <p className="text-gray-500 text-xs">Action Detail</p>
+    <div className="min-h-screen bg-background-white px-4 py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col">
+        <div className="mb-5 rounded-xl border border-primary-border bg-primary-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
+              Request Status
+            </div>
+            <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-primary">
+              รายละเอียดคำขอ
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">ประเภทคำขอ:</span>
-          <span className="font-bold text-gray-800">
-            {actionTypeLabel[request.request_type] || request.request_type}
-          </span>
+        <div className="mb-4 p-4 rounded-lg bg-background-subtle space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">ประเภทคำขอ:</span>
+            <span className="font-medium text-foreground">
+              {actionTypeLabel[request.request_type] || request.request_type}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">สถานะ:</span>
+            <span className="font-medium text-primary">
+              {statusLabel[request.request_status] || request.request_status}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">จำนวนเงิน:</span>
+            <span className="font-medium text-foreground">
+              {(amount || 0).toLocaleString()} บาท
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">เลขสัญญา:</span>
+            <span className="font-medium text-foreground">{contract?.contract_number || '-'}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">สินค้า:</span>
+            <span className="font-medium text-foreground">{itemName || '-'}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">วันที่ทำรายการ:</span>
+            <span className="font-medium text-foreground">{formatDateTime(request.created_at)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-foreground-subtle">อัปเดตล่าสุด:</span>
+            <span className="font-medium text-foreground">{formatDateTime(request.updated_at)}</span>
+          </div>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">สถานะ:</span>
-          <span className="font-bold text-[#B85C38]">
-            {statusLabel[request.request_status] || request.request_status}
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">จำนวนเงิน:</span>
-          <span className="font-bold text-gray-800">
-            {(amount || 0).toLocaleString()} บาท
-          </span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">เลขสัญญา:</span>
-          <span className="font-bold text-gray-800">{contract?.contract_number || '-'}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">สินค้า:</span>
-          <span className="font-bold text-gray-800">{itemName || '-'}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">วันที่ทำรายการ:</span>
-          <span className="font-bold text-gray-800">{formatDateTime(request.created_at)}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">อัปเดตล่าสุด:</span>
-          <span className="font-bold text-gray-800">{formatDateTime(request.updated_at)}</span>
-        </div>
+
+        {canConfirmReceiving && (
+          <button
+            onClick={() => router.push(nextWaitingPath!)}
+            className="w-full rounded-full bg-primary py-4 text-sm font-medium text-white transition-colors hover:bg-primary/80"
+          >
+            ไปหน้ายืนยันรับเงิน
+          </button>
+        )}
+
+        {!canConfirmReceiving && canViewPrincipalIncreaseWaiting && nextWaitingPath && (
+          <button
+            onClick={() => router.push(nextWaitingPath)}
+            className="w-full rounded-full bg-primary py-4 text-sm font-medium text-white transition-colors hover:bg-primary/80"
+          >
+            ดูรายละเอียดและสถานะคำขอ
+          </button>
+        )}
+
+        {isWaitingForSlipUpload && nextUploadPath && (
+          <button
+            onClick={() => router.push(nextUploadPath)}
+            className="mt-3 w-full rounded-full bg-primary py-4 text-sm font-medium text-white transition-colors hover:bg-primary/80"
+          >
+            อัปโหลดสลิป
+          </button>
+        )}
+
+        {isWaitingForPostSlipProcessing && nextSignPath && (
+          <button
+            onClick={() => router.push(nextSignPath)}
+            className="mt-3 w-full rounded-full bg-primary py-4 text-sm font-medium text-white transition-colors hover:bg-primary/80"
+          >
+            ดูผลการทำรายการ
+          </button>
+        )}
       </div>
     </div>
   );

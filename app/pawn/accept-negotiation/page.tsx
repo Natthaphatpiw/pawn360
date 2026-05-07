@@ -41,17 +41,17 @@ function AcceptNegotiationContent() {
 
   if (liffLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-green-50 to-white">
+      <div className="theme-liff min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-[#e6f9ed] to-white">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="text-green-600 text-6xl mb-4">✓</div>
+          <div className="text-success text-6xl mb-4">✓</div>
           <h1 className="text-2xl font-bold text-gray-800 mb-2">ยอมรับเงื่อนไขแล้ว!</h1>
           <p className="text-gray-600 mb-4">QR Code ใหม่ได้ถูกส่งไปยังแชทของคุณแล้ว</p>
           <p className="text-sm text-gray-500">นำ QR Code ไปแสดงที่ร้านเพื่อทำรายการต่อ</p>
@@ -61,11 +61,11 @@ function AcceptNegotiationContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-8 px-4">
+    <div className="theme-liff min-h-screen bg-gradient-to-b from-[#fff0e9] to-white py-6 px-4">
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-soft rounded-full mb-4">
               <span className="text-3xl">🔄</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-2">ยืนยันเงื่อนไขใหม่</h1>
@@ -84,7 +84,7 @@ function AcceptNegotiationContent() {
             <button
               onClick={handleAccept}
               disabled={isAccepting}
-              className="w-full py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              className="w-full min-h-12 py-3 bg-primary text-primary-fg rounded-2xl font-semibold hover:bg-primary-hover disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
               {isAccepting ? 'กำลังดำเนินการ...' : '✅ ยอมรับเงื่อนไขใหม่'}
             </button>
@@ -95,7 +95,7 @@ function AcceptNegotiationContent() {
                   window.liff.closeWindow();
                 }
               }}
-              className="w-full py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+              className="w-full min-h-12 py-3 border border-line-soft text-gray-700 rounded-2xl font-semibold hover:bg-background-subtle transition-colors"
             >
               ยกเลิก
             </button>
@@ -109,8 +109,8 @@ function AcceptNegotiationContent() {
 export default function AcceptNegotiationPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <div className="theme-liff min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     }>
       <AcceptNegotiationContent />
