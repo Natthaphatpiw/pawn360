@@ -2,11 +2,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { ChevronLeft, CheckCircle, AlertTriangle, TrendingDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle, TrendingDown } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import { getMockPrincipalReductionRequest, isPreviewMode } from '../../_lib/preview';
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -51,12 +52,12 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
         x: (touch.clientX - rect.left) * scaleX,
         y: (touch.clientY - rect.top) * scaleY,
       };
-    } else {
-      return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY,
-      };
     }
+
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -105,8 +106,7 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
   const saveSignature = () => {
     const canvas = canvasRef.current;
     if (canvas) {
-      const dataURL = canvas.toDataURL('image/png');
-      onSave(dataURL);
+      onSave(canvas.toDataURL('image/png'));
       onClose();
     }
   };
@@ -114,16 +114,16 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-[#FFF8F5]">
-          <h3 className="text-lg font-bold text-center text-gray-800">{title}</h3>
+    <div className="fixed inset-0 bg-black/35 bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-background-white rounded-xl max-w-sm w-full overflow-hidden">
+        <div className="p-4 border-b border-primary-border bg-primary-soft">
+          <h3 className="text-lg font-bold text-center text-foreground">{title}</h3>
         </div>
 
         <div className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-700">เซ็นลายเซ็นของคุณ</label>
-            <div className="border-2 border-dashed border-[#B85C38] rounded-xl bg-white overflow-hidden">
+            <label className="block text-sm font-medium mb-2 text-foreground-muted">เซ็นลายเซ็นของคุณ</label>
+            <div className="border-2 border-dashed border-primary rounded-xl bg-background-white overflow-hidden">
               <canvas
                 ref={canvasRef}
                 width={300}
@@ -139,25 +139,25 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
                 style={{ touchAction: 'none' }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">ใช้นิ้วหรือเมาส์วาดลายเซ็น</p>
+            <p className="text-xs text-foreground-subtle mt-2 text-center">ใช้นิ้วหรือเมาส์วาดลายเซ็น</p>
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={clearCanvas}
-              className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+              className="flex-1 py-3 px-4 bg-background-white text-primary rounded-full hover:bg-gray-200 transition-colors font-medium border border-primary"
             >
               ล้าง
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+              className="flex-1 py-3 px-4 bg-primary-soft text-primary rounded-full hover:bg-gray-200 transition-colors font-medium"
             >
               ยกเลิก
             </button>
             <button
               onClick={saveSignature}
-              className="flex-1 py-3 px-4 bg-[#B85C38] text-white rounded-xl hover:bg-[#A04D2D] transition-colors font-medium"
+              className="flex-1 py-3 px-4 bg-primary text-white rounded-full hover:bg-primary/80 transition-colors font-medium"
             >
               บันทึก
             </button>
@@ -174,31 +174,40 @@ export default function PrincipalReductionSignPage() {
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const requestId = searchParams.get('requestId');
+  const previewMode = isPreviewMode(searchParams);
   const { profile } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [requestDetails, setRequestDetails] = useState<any>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
-    if (requestId) {
+    if (previewMode) {
+      const mockRequest = getMockPrincipalReductionRequest(requestId || `preview-reduction-${contractId}`, contractId);
+      setRequestDetails(mockRequest);
+      setLoading(false);
+    } else if (requestId) {
       fetchRequestDetails();
     }
-  }, [requestId]);
+  }, [requestId, previewMode, contractId]);
 
   const fetchRequestDetails = async () => {
     try {
       setLoading(true);
       const response = await axios.get(`/api/contract-actions/${requestId}`);
       if (response.data.success) {
-        setRequestDetails(response.data.request);
+        const request = response.data.request;
+        setRequestDetails(request);
+        if (request.pawner_signature_url || request.signature_url) {
+          setSignature(request.pawner_signature_url || request.signature_url);
+        }
       }
     } catch (error) {
       console.error('Error fetching request:', error);
@@ -209,7 +218,18 @@ export default function PrincipalReductionSignPage() {
   };
 
   const submitWithPin = async (pinToken: string) => {
-    if (!termsAccepted || !signature || !requestId) {
+    const effectiveSignature = signature || requestDetails?.pawner_signature_url || requestDetails?.signature_url;
+    if (!effectiveSignature || !requestId) {
+      return;
+    }
+
+    if (previewMode) {
+      setSubmitting(true);
+      setError(null);
+      setTimeout(() => {
+        setShowSuccess(true);
+        setSubmitting(false);
+      }, 400);
       return;
     }
 
@@ -217,24 +237,27 @@ export default function PrincipalReductionSignPage() {
     setError(null);
 
     try {
-      // Upload signature to S3
-      const signatureBlob = await fetch(signature).then(r => r.blob());
-      const formData = new FormData();
-      formData.append('file', signatureBlob, 'signature.png');
-      formData.append('folder', 'signatures');
+      let signatureUrl: string | undefined;
+      if (signature?.startsWith('data:')) {
+        const signatureBlob = await fetch(signature).then((r) => r.blob());
+        const formData = new FormData();
+        formData.append('file', signatureBlob, 'signature.png');
+        formData.append('folder', 'signatures');
 
-      const uploadRes = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        const uploadRes = await axios.post('/api/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
 
-      if (!uploadRes.data.url) {
-        throw new Error('Failed to upload signature');
+        if (!uploadRes.data.url) {
+          throw new Error('Failed to upload signature');
+        }
+        signatureUrl = uploadRes.data.url;
       }
 
       // Complete the action
       const response = await axios.post('/api/contract-actions/complete', {
         requestId,
-        signatureUrl: uploadRes.data.url,
+        signatureUrl,
         pawnerLineId: profile?.userId,
         pinToken,
       });
@@ -252,7 +275,18 @@ export default function PrincipalReductionSignPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const startAutoComplete = async () => {
+    const effectiveTermsAccepted = Boolean(requestDetails?.terms_accepted);
+    const effectiveSignature = signature || requestDetails?.pawner_signature_url || requestDetails?.signature_url;
+
+    if (previewMode) {
+      if (!effectiveTermsAccepted || !effectiveSignature) {
+        return;
+      }
+      await submitWithPin('preview-pin');
+      return;
+    }
+
     if (!profile?.userId) {
       setError('กรุณาเข้าสู่ระบบ LINE');
       return;
@@ -270,46 +304,66 @@ export default function PrincipalReductionSignPage() {
     setPinModalOpen(true);
   };
 
+  useEffect(() => {
+    if (loading || showSuccess || !requestDetails || startedRef.current) {
+      return;
+    }
+
+    const effectiveTermsAccepted = Boolean(requestDetails?.terms_accepted);
+    const effectiveSignature = signature || requestDetails?.pawner_signature_url || requestDetails?.signature_url;
+
+    if (!effectiveTermsAccepted || !effectiveSignature) {
+      return;
+    }
+
+    if (!previewMode && !profile?.userId) {
+      return;
+    }
+
+    startedRef.current = true;
+    void startAutoComplete();
+  }, [loading, requestDetails, showSuccess, previewMode, profile?.userId, signature]);
+
   const handleGoToContracts = () => {
     router.push('/contracts');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#B85C38]"></div>
+      <div className="min-h-screen bg-background-white font-sans flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+      <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-6">
+        <div className="bg-background-white rounded-xl p-4 text-center max-w-sm w-full">
+          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ลดเงินต้นสำเร็จ</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">ลดเงินต้นสำเร็จ</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             เงินต้นของสัญญาได้รับการปรับลดเรียบร้อยแล้ว
           </p>
 
           {requestDetails?.contract && (
-            <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-6 text-left">
+            <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">เลขที่สัญญา:</span>
+                  <span className="text-foreground-subtle">เลขที่สัญญา:</span>
                   <span className="font-bold">{requestDetails.contract.contract_number}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">เงินต้นใหม่:</span>
-                  <span className="font-bold text-[#B85C38]">
+                  <span className="text-foreground-subtle">เงินต้นใหม่:</span>
+                  <span className="font-bold text-primary">
                     {(requestDetails.principal_after_reduction || requestDetails.new_principal_amount)?.toLocaleString()} บาท
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">ลดไป:</span>
+                  <span className="text-foreground-subtle">ลดไป:</span>
                   <span className="font-bold text-green-600">
                     {requestDetails.reduction_amount?.toLocaleString()} บาท
                   </span>
@@ -320,7 +374,7 @@ export default function PrincipalReductionSignPage() {
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-[#B85C38] hover:bg-[#A04D2D] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="w-full bg-primary hover:bg-primary/80 text-white rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>
@@ -329,35 +383,24 @@ export default function PrincipalReductionSignPage() {
     );
   }
 
-  const contract = requestDetails?.contract;
-  const item = contract?.items;
+  const effectiveTermsAccepted = Boolean(requestDetails?.terms_accepted);
+  const effectiveSignature = signature || requestDetails?.pawner_signature_url || requestDetails?.signature_url;
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] font-sans flex flex-col">
-      {/* Signature Modal */}
+    <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-6">
       <SignatureModal
         isOpen={showSignatureModal}
         onClose={() => setShowSignatureModal(false)}
-        onSave={(sig) => setSignature(sig)}
+        onSave={(sig) => {
+          setSignature(sig);
+          setError(null);
+        }}
         title="เซ็นลายเซ็น"
       />
 
-      {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="flex-1 text-center">
-          <h1 className="font-bold text-lg text-gray-800">เซ็นสัญญาลดเงินต้น</h1>
-          <p className="text-xs text-gray-400">Sign Reduction Contract</p>
-        </div>
-        <div className="w-6"></div>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center p-6 pb-32">
+      <div className="bg-background-white rounded-xl p-4 text-center max-w-sm w-full">
         {error && (
-          <div className="w-full max-w-sm bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
             <div className="flex gap-3">
               <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
               <p className="text-sm text-red-700">{error}</p>
@@ -365,144 +408,66 @@ export default function PrincipalReductionSignPage() {
           </div>
         )}
 
-        {/* Contract Summary */}
-        {requestDetails && contract && (
-          <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <TrendingDown className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-800">รายละเอียดการลดเงินต้น</h3>
-                <p className="text-xs text-gray-500">{item?.brand} {item?.model}</p>
-              </div>
-            </div>
+        <div className="mx-auto mb-5 flex h-32 w-32 items-center justify-center rounded-full bg-success/10 text-3xl text-success">
+          <TrendingDown className="w-16 h-16 text-success" />
+        </div>
 
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">เลขที่สัญญา:</span>
-                <span className="font-bold">{contract.contract_number}</span>
-              </div>
+        <h1 className="text-xl font-bold text-foreground mb-2">กำลังยืนยันการลดเงินต้น</h1>
+        <p className="text-foreground-subtle text-sm mb-6">
+          ระบบกำลังดำเนินการลดเงินต้นให้คุณอัตโนมัติ
+        </p>
 
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">เงินต้นเดิม:</span>
-                <span className="font-bold">{(contract.current_principal_amount || contract.loan_principal_amount)?.toLocaleString()} บาท</span>
+        {requestDetails?.contract && (
+          <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-foreground-subtle">เลขที่สัญญา:</span>
+                <span className="font-bold">{requestDetails.contract.contract_number}</span>
               </div>
-
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">จำนวนที่ลด:</span>
-                <span className="font-bold text-green-600">- {requestDetails.reduction_amount?.toLocaleString()} บาท</span>
+              <div className="flex justify-between">
+                <span className="text-foreground-subtle">เงินต้นใหม่:</span>
+                <span className="font-bold text-primary">
+                  {(requestDetails.principal_after_reduction || requestDetails.new_principal_amount)?.toLocaleString()} บาท
+                </span>
               </div>
-
-              <div className="border-t pt-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">เงินต้นใหม่:</span>
-                  <span className="font-bold text-[#B85C38] text-lg">
-                    {(requestDetails.principal_after_reduction || requestDetails.new_principal_amount)?.toLocaleString()} บาท
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-green-50 rounded-xl p-3 mt-2">
-                <p className="text-xs text-green-700">
-                  <span className="font-bold">ประหยัดดอกเบี้ย/เดือน:</span>{' '}
-                  {((requestDetails.reduction_amount || 0) * (contract.interest_rate || 0) / 100).toLocaleString()} บาท
-                </p>
+              <div className="flex justify-between">
+                <span className="text-foreground-subtle">ลดไป:</span>
+                <span className="font-bold text-green-600">
+                  {requestDetails.reduction_amount?.toLocaleString()} บาท
+                </span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Terms and Conditions */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">ข้อตกลงและเงื่อนไข</h3>
-
-          <div className="bg-[#FFF8F5] rounded-xl p-3 mb-4 text-xs text-gray-600 space-y-2 max-h-48 overflow-y-auto">
-            <p className="font-bold text-gray-800">สัญญาลดเงินต้น</p>
-            <p>
-              ข้าพเจ้ายืนยันว่าได้ชำระเงินตามจำนวนที่กำหนดเรียบร้อยแล้ว
-              และยินยอมให้ปรับลดเงินต้นตามเงื่อนไขดังนี้:
-            </p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>เงินต้นจะลดลงตามจำนวนที่ระบุ</li>
-              <li>ดอกเบี้ยจะคำนวณใหม่ตามเงินต้นที่ลดลง</li>
-              <li>วันครบกำหนดสัญญาคงเดิม</li>
-              <li>อัตราดอกเบี้ยคงเดิมตามสัญญาเดิม</li>
-            </ul>
-            <p className="font-bold text-red-600 mt-2">
-              คำเตือน: การลดเงินต้นไม่สามารถยกเลิกได้หลังจากยืนยัน
-            </p>
+        {submitting && (
+          <div className="flex items-center justify-center py-2">
+            <div className="dot-bricks" />
           </div>
+        )}
 
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="w-5 h-5 mt-0.5 rounded border-gray-300 text-[#B85C38] focus:ring-[#B85C38]"
-            />
-            <span className="text-sm text-gray-700">
-              ข้าพเจ้าได้อ่านและยอมรับข้อตกลงและเงื่อนไขทั้งหมดแล้ว
-            </span>
-          </label>
-        </div>
-
-        {/* Signature Section */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">ลายเซ็นผู้ขอสินเชื่อ</h3>
-
-          {signature ? (
-            <div className="space-y-3">
-              <div className="border-2 border-[#B85C38] rounded-xl p-2 bg-white">
-                <img
-                  src={signature}
-                  alt="Signature"
-                  className="w-full h-32 object-contain"
-                />
-              </div>
-              <button
-                onClick={() => setShowSignatureModal(true)}
-                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-              >
-                เซ็นใหม่
-              </button>
-            </div>
-          ) : (
+        {!effectiveSignature && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-left">
+            <p className="text-sm text-amber-800">
+              คำขอนี้ยังไม่มีลายเซ็นที่บันทึกไว้ กรุณาเซ็นยืนยันหนึ่งครั้งเพื่อให้ระบบดำเนินการต่อ
+            </p>
             <button
               onClick={() => setShowSignatureModal(true)}
-              className="w-full py-4 border-2 border-dashed border-[#B85C38] rounded-xl text-[#B85C38] font-medium hover:bg-[#FFF8F5] transition-colors"
+              className="mt-3 w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-colors hover:bg-primary/80"
             >
-              แตะเพื่อเซ็นลายเซ็น
+              เซ็นยืนยันเพื่อดำเนินการต่อ
             </button>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* Fixed Bottom Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F2F2F2]">
-        <div className="max-w-sm mx-auto">
+        {(!effectiveTermsAccepted || !effectiveSignature || error) && (
           <button
-            onClick={handleSubmit}
-            disabled={!termsAccepted || !signature || submitting}
-            className={`w-full py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] ${
-              termsAccepted && signature && !submitting
-                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            onClick={handleGoToContracts}
+            className="w-full bg-background-white text-primary border border-primary rounded-full py-4 font-medium transition-colors hover:bg-primary-soft"
           >
-            {submitting ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mb-1"></div>
-                <span className="text-xs">กำลังดำเนินการ...</span>
-              </>
-            ) : (
-              <>
-                <span className="text-lg font-bold">ยืนยันลดเงินต้น</span>
-                <span className="text-xs font-light opacity-80">Confirm Reduction</span>
-              </>
-            )}
+            กลับหน้าสัญญา
           </button>
-        </div>
+        )}
       </div>
 
       <PinModal

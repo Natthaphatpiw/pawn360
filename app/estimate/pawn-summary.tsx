@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, MapPin, Phone, ExternalLink } from 'lucide-react';
 import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { haversineDistanceMeters } from '@/lib/services/geo';
 import { openLiffEntry } from '@/lib/liff/navigation';
 import { savePawnerEstimateResume } from '@/lib/pawner-estimate-resume';
+import {
+  createMockLoanRequest,
+  getMockBranches,
+  isMockPawnerMode,
+  saveMockDraft,
+  waitMock,
+} from '@/lib/mock-pawner';
 
 const SERIAL_OPTIONAL_TYPES = new Set([
   'อุปกรณ์เสริมโทรศัพท์',
@@ -67,8 +74,82 @@ interface PawnSummaryProps {
   onSuccess: (loanRequestId: string, itemId: string) => void;
 }
 
+function DropdownField({
+  value,
+  placeholder,
+  options,
+  onChange,
+  disabled = false,
+  className = '',
+  menuClassName = '',
+}: {
+  value: string;
+  placeholder: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (nextValue: string) => void;
+  disabled?: boolean;
+  className?: string;
+  menuClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleSelect = (nextValue: string) => {
+    onChange(nextValue);
+    setOpen(false);
+  };
+
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        disabled={disabled}
+        aria-expanded={open}
+        className={`flex w-full items-center justify-between rounded-xl border border-primary/70 bg-white px-3 py-3 text-left text-sm font-base text-grey-4 transition focus:outline-none focus:ring-1 focus:ring-primary-active disabled:cursor-not-allowed disabled:bg-background-grey-6 disabled:text-grey-4 ${className}`}
+      >
+        <span className={selectedOption ? 'text-foreground-subtle' : 'font-normal text-grey-5'}>
+          {selectedOption?.label || placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-foreground-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && !disabled && (
+        <div className={`dropdown-slide-down absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-lg border border-primary-border bg-white shadow-lg ${menuClassName}`}>
+          <div className="max-h-60 overflow-y-auto py-1">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option.value ? 'bg-primary-soft text-primary' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onSuccess }: PawnSummaryProps) {
   console.log('🎯 PawnSummary component rendered with:', { itemData, lineId });
+  const mockMode = isMockPawnerMode();
 
   const [loanAmount, setLoanAmount] = useState<string>('');
   const [serialNo, setSerialNo] = useState<string>(itemData.serialNo || '');
@@ -110,6 +191,10 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   const totalRepayment = loanAmountNum + totalInterest + deliveryFee;
 
   const currentBranch = branches.find(b => b.branch_id === selectedBranchId);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
 
   const getBranchDistanceKm = (
     origin: { latitude: number; longitude: number },
@@ -165,6 +250,16 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   }, [deliveryMethod, userLocation, currentBranch, deliveryLocationRequested]);
 
   const checkRegistration = async () => {
+    if (mockMode) {
+      const mockBranches = getMockBranches();
+      setIsLoading(true);
+      await waitMock(250);
+      setKycStatus('VERIFIED');
+      setIsRegistered(true);
+      setDefaultBranchId(mockBranches[0]?.branch_id || null);
+      setIsLoading(false);
+      return;
+    }
     try {
       setIsLoading(true);
       const response = await axios.get(`/api/pawners/check?lineId=${lineId}`);
@@ -188,6 +283,10 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   };
 
   const fetchBranches = async () => {
+    if (mockMode) {
+      setBranches(getMockBranches());
+      return;
+    }
     try {
       const response = await axios.get('/api/drop-points');
       setBranches(response.data.branches || []);
@@ -198,7 +297,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
   const handleBranchChange = async (branchId: string) => {
     setSelectedBranchId(branchId);
-    if (!lineId) return;
+    if (mockMode || !lineId) return;
     try {
       await axios.post('/api/pawners/default-branch', {
         lineId,
@@ -213,6 +312,29 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   const handleUseLocation = (options?: { setDefault?: boolean; context?: 'manual' | 'delivery' }) => {
     if (!lineId) {
       setLocationMessage('ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่');
+      return;
+    }
+    if (mockMode) {
+      const currentLocation = {
+        latitude: 13.7468,
+        longitude: 100.5329,
+      };
+      setUserLocation(currentLocation);
+      const mockBranches = branches.length ? branches : getMockBranches();
+      const nearestBranch = mockBranches[0];
+      if (nearestBranch) {
+        setSuggestedBranch({
+          branch_id: nearestBranch.branch_id,
+          branch_name: nearestBranch.branch_name,
+          distance_m: 2800,
+        });
+        setSelectedBranchId(nearestBranch.branch_id);
+        setDefaultBranchId(nearestBranch.branch_id);
+      }
+      setDeliveryDistanceKm(2.8);
+      setDeliveryEligible(true);
+      setDeliveryError(null);
+      setLocationMessage('Mock location loaded for frontend preview');
       return;
     }
     if (!navigator.geolocation) {
@@ -348,6 +470,13 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
     try {
       setIsSubmitting(true);
+      if (mockMode) {
+        await waitMock(500);
+        const mockSubmission = createMockLoanRequest();
+        onSuccess(mockSubmission.loanRequestId, mockSubmission.itemId);
+        return;
+      }
+
       const submissionData = {
         lineId,
         itemData: {
@@ -394,6 +523,17 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
   const handleSaveDraft = async () => {
     try {
+      if (mockMode) {
+        saveMockDraft({
+          lineId,
+          itemType: itemData.itemType,
+          brand: itemData.brand,
+          model: itemData.model,
+        });
+        alert('บันทึก mock draft เรียบร้อยแล้ว');
+        return;
+      }
+
       const normalizedSerial = serialNo.trim();
       const draftData = {
         lineId,
@@ -466,6 +606,10 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   });
 
   const handleRegister = async () => {
+    if (mockMode) {
+      alert('Mock mode: registration is treated as verified for frontend preview');
+      return;
+    }
     try {
       setIsSubmitting(true);
 
@@ -500,30 +644,34 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-white">
-        <div className="text-xl text-gray-600">กำลังโหลด...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center page-investor">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white pb-8 font-sans">
+    <div className="theme-liff min-h-screen bg-background-white pb-8 font-sans">
+
       {/* 1. Header Section */}
-      <div className="bg-[#E5E5E5] px-4 py-3 flex justify-between items-center text-gray-600 text-sm">
+      <div className="bg-primary-soft/50 rounded-lg p-4 flex justify-between items-center text-foreground text-sm border border-primary-border">
         <div>
-          <span className="font-bold text-gray-800">สินค้า</span>
-          <div className="text-xs text-gray-500">item</div>
+          <span className="font-bold text-foreground mb-1">สินค้า</span>
+          <div className="text-xs text-foreground-subtle">item</div>
         </div>
         <div className="text-right">
-          <div className="font-bold text-gray-800">{itemData.brand} {itemData.model}</div>
-          <div className="text-xs text-gray-500">สภาพ {Math.round(itemData.condition)}%</div>
+          <div className="font-bold text-foreground mb-1">{itemData.brand} {itemData.model}</div>
+          <div className="text-xs text-foreground-subtle">สภาพ {Math.round(itemData.condition)}%</div>
         </div>
       </div>
 
-      <div className="px-4 max-w-md mx-auto">
+
+      <div className="p-4 max-w-md mx-auto rounded-xl border border-primary-border bg-primary-soft/50 mt-4">
+        <div className="">
+
         {/* 2. Product Image */}
-        <div className="mt-4 mb-6 flex justify-center">
-          <div className="relative w-full h-48 bg-gray-100 rounded-2xl overflow-hidden shadow-sm">
+        <div className="mb-6 flex justify-center">
+          <div className="relative w-full h-48 bg-background-subtle rounded-2xl overflow-hidden">
             {itemData.images[0] && (
               <img
                 src={itemData.images[0]}
@@ -545,9 +693,9 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
             value={serialNo}
             onChange={(e) => setSerialNo(e.target.value)}
             placeholder={itemData.itemType === 'Apple' ? 'ระบุหมายเลขเครื่อง' : 'ระบุหมายเลขซีเรียล'}
-            className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 placeholder:text-gray-300"
+            className="w-full min-h-12 p-3 border border-primary/70 rounded-full bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder-grey-5 text-sm md:text-sm text-foreground-subtle"
           />
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-foreground-subtle mt-2">
             {isSerialRequiredForType(itemData.itemType)
               ? 'กรุณากรอก IMEI หรือ Serial ให้ครบถ้วนก่อนดำเนินการขอสินเชื่อ'
               : 'ถ้ามีหมายเลขซีเรียล สามารถกรอกได้เพื่อความถูกต้องของสัญญา'}
@@ -555,37 +703,37 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
         </div>
 
         <div className="mb-6">
-          <label className="block font-bold text-gray-800 mb-2">
-            รหัสล็อกเครื่อง <span className="text-gray-400 font-medium">(ถ้ามี)</span>
+          <label className="block font-bold text-foreground mb-2">
+            รหัสล็อกเครื่อง <span className="text-foreground-subtle font-light text-sm">(ถ้ามี)</span>
           </label>
           <input
             type="text"
             value={devicePasscode}
             onChange={(e) => setDevicePasscode(e.target.value)}
             placeholder="เช่น 1234 หรือ ABCD1234"
-            className="w-full p-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 placeholder:text-gray-300"
+            className="w-full min-h-12 p-3 border border-primary/70 rounded-full bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder-grey-5 text-sm md:text-sm text-foreground-subtle"
           />
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-foreground-subtle mt-2">
             หากมีการตั้งรหัสล็อกเครื่องไว้ กรุณานำออกหรือแจ้งในช่องกรอก
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-foreground-subtle mt-1">
             รหัสของคุณจะถูกเก็บเป็นความลับ นอกจากพนักงานตรวจเครื่อง
           </p>
         </div>
 
         {/* 3. AI Estimated Price Card */}
-        <div className="bg-[#EBCDBF] rounded-2xl p-6 text-center mb-8 shadow-sm relative overflow-hidden">
+        <div className="bg-white rounded-lg p-4 text-center mb-8 relative overflow-hidden border border-primary/70">
           {/* Decorative background circle */}
           <div className="absolute top-[-50px] right-[-50px] w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
 
-          <h2 className="text-[#C0562F] font-bold text-lg mb-1 relative z-10">ราคาประเมินจาก AI</h2>
-          <p className="text-[#C0562F] text-xs mb-4 opacity-80 relative z-10">AI-estimated price</p>
+          <h2 className="text-primary font-bold text-lg mb-1 relative z-10">ราคาประเมินจาก AI</h2>
+          <p className="text-primary text-xs mb-4 opacity-80 relative z-10">AI-estimated price</p>
 
-          <div className="text-[#C0562F] text-4xl font-bold mb-4 relative z-10">
+          <div className="text-primary text-4xl font-bold mb-4 relative z-10">
             {formatNumber(itemData.estimatedPrice)}
           </div>
 
-          <div className="text-[#C0562F] text-sm opacity-80 relative z-10">บาท</div>
+          <div className="text-primary text-sm opacity-80 relative z-10">บาท</div>
         </div>
 
         {/* 4. Loan Amount Input */}
@@ -597,35 +745,34 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
               value={loanAmount ? parseInt(loanAmount).toLocaleString('en-US') : ''}
               onChange={handleLoanAmountChange}
               placeholder={maxLoanAmount.toLocaleString('en-US')}
-              className="w-full p-4 text-lg border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C0562F] text-gray-800 font-bold placeholder:text-gray-300"
+              className="w-full min-h-12 p-3 border border-primary/70 rounded-full bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder-grey-5 text-sm md:text-sm text-foreground-subtle"
             />
-            <span className="absolute right-4 top-4.5 text-gray-400 text-sm">THB</span>
+            <span className="absolute right-4 top-4 text-foreground-subtle text-sm">THB</span>
           </div>
-          <p className="text-gray-500 text-xs mt-2 text-right">
+          <p className="text-foreground-subtle text-xs mt-2 text-right">
             วงเงินขั้นต่ำ {MIN_LOAN_AMOUNT.toLocaleString('en-US')} บาท • สูงสุด {maxLoanAmount.toLocaleString('en-US')} บาท
           </p>
         </div>
 
-        <div className="h-px bg-gray-200 my-6"></div>
+        <div className="h-px bg-primary my-6"></div>
 
         {/* 5. Delivery Section */}
         <div className="mb-4">
-          <label className="block font-bold text-gray-800 mb-2">
+          <label className="block font-bold text-foreground mb-2">
             การจัดส่ง*
           </label>
-          <div className="relative">
-            <select
-              value={deliveryMethod}
-              onChange={(e) => setDeliveryMethod(e.target.value as 'delivery' | 'pickup')}
-              className="w-full p-4 pr-10 bg-white border border-gray-300 rounded-xl text-gray-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#C0562F]"
-            >
-              <option value="delivery">บริการจัดส่ง (+40บาท)</option>
-              <option value="pickup">ดำเนินการด้วยตัวเอง (Walk-in)</option>
-            </select>
-            <ChevronDown className="absolute right-4 top-4.5 w-5 h-5 text-gray-400 pointer-events-none" />
-          </div>
+          <DropdownField
+            value={deliveryMethod}
+            placeholder="เลือกวิธีการจัดส่ง"
+            options={[
+              { value: 'delivery', label: 'บริการจัดส่ง (+40บาท)' },
+              { value: 'pickup', label: 'ดำเนินการด้วยตัวเอง (Walk-in)' },
+            ]}
+            onChange={(value) => setDeliveryMethod(value as 'delivery' | 'pickup')}
+            className="rounded-2xl px-4 py-4 text-gray-800"
+          />
 
-          <p className="text-[10px] text-gray-500 mt-2 leading-tight">
+          <p className="text-[10px] text-grey-4 mt-2 leading-tight">
             *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &quot;ดำเนินการด้วยตัวเอง&quot;<br/>
             แล้วเรียกบริการส่งของด้วยตัวเองได้ หรือติดต่อ &quot;ช่วยเหลือ/Support&quot;
           </p>
@@ -644,8 +791,8 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
         <div className="mb-6">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-bold text-gray-700">สาขาใกล้คุณ</div>
-              <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+              <div className="text-sm font-medium text-foreground-muted">สาขาใกล้คุณ</div>
+              <p className="text-[11px] text-grey-4 mt-1 leading-snug">
                 กดปุ่มเพื่อค้นหาจุดรับฝากที่ใกล้คุณที่สุด
               </p>
             </div>
@@ -653,7 +800,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
               type="button"
               onClick={() => handleUseLocation({ setDefault: true, context: 'manual' })}
               disabled={isLocating}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#C0562F] bg-[#FDF4EF] px-3 py-2 text-[11px] font-semibold text-[#C0562F] shadow-sm transition hover:bg-[#FBE8DD] disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-400"
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft px-3 py-2 text-[11px] font-semibold text-primary transition-colors hover:bg-primary-border disabled:cursor-not-allowed disabled:bg-grey-5 disabled:text-foreground-subtle"
             >
               <MapPin className="h-3.5 w-3.5" />
               {isLocating ? 'กำลังค้นหา...' : 'ใช้ตำแหน่งของฉัน'}
@@ -661,10 +808,10 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           </div>
 
           {locationMessage && (
-            <div className="mb-2 text-[11px] text-gray-500">
+            <div className="mb-2 text-[11px] text-grey-5">
               {locationMessage}
               {suggestedBranch?.distance_m != null && (
-                <span className="ml-1 text-gray-400">
+                <span className="ml-1 text-grey-5">
                   ({(suggestedBranch.distance_m / 1000).toFixed(1)} กม.)
                 </span>
               )}
@@ -673,38 +820,32 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
           {/* Branch Dropdown Selector */}
           <div className="mb-2">
-            <label className="text-sm font-bold text-gray-700 mb-1 block">เลือกสาขาที่สะดวก</label>
-            <div className="relative">
-              <select
-                value={selectedBranchId}
-                onChange={(e) => handleBranchChange(e.target.value)}
-                className="w-full p-3 pr-10 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#C0562F]"
-              >
-                <option value="">เลือกสาขา</option>
-                {branches.map(branch => (
-                  <option key={branch.branch_id} value={branch.branch_id}>{branch.branch_name}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-gray-500 pointer-events-none" />
-            </div>
+            <label className="text-sm font-medium text-foreground-muted mb-1 block">เลือกสาขาที่สะดวก</label>
+            <DropdownField
+              value={selectedBranchId}
+              placeholder="เลือกสาขา"
+              options={branches.map((branch) => ({ value: branch.branch_id, label: branch.branch_name }))}
+              onChange={handleBranchChange}
+              className="rounded-2xl bg-background-subtle text-foreground-muted"
+            />
           </div>
 
           {/* Branch Details Card */}
           {currentBranch && (
-            <div className="bg-[#F8F9FA] border border-gray-200 rounded-xl p-4 text-gray-700 text-sm shadow-sm transition-all duration-300">
+            <div className="rounded-[var(--radius-lg)] border border-primary-border bg-background-white p-4 text-sm text-foreground-muted transition-all duration-300">
               <div className="flex gap-3 mb-2 items-start">
-                <MapPin className="w-4 h-4 text-[#C0562F] mt-1 shrink-0" />
+                <MapPin className="w-4 h-4 text-primary mt-1 shrink-0" />
                 <div>
-                  <span className="font-bold block mb-1 text-gray-800">{currentBranch.branch_name}</span>
-                  <p className="text-gray-600 leading-relaxed text-xs">
+                  <span className="font-bold block mb-1 text-foreground-muted">{currentBranch.branch_name}</span>
+                  <p className="text-foreground-muted leading-relaxed text-xs">
                     {currentBranch.address}, {currentBranch.district}, {currentBranch.province} {currentBranch.postal_code}
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-3 mb-3 items-center">
-                <Phone className="w-4 h-4 text-[#C0562F] shrink-0" />
-                <span className="text-xs text-gray-600">{currentBranch.phone_number}</span>
+                <Phone className="w-4 h-4 text-primary shrink-0" />
+                <span className="text-xs text-foreground-muted">{currentBranch.phone_number}</span>
               </div>
 
               {/* Google Maps Button */}
@@ -713,7 +854,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
                   href={currentBranch.google_maps_link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                  className="flex w-full items-center justify-center gap-2 rounded-full border border-primary bg-background-white px-4 py-2 text-sm font-base text-primary transition-colors hover:bg-background-subtle"
                 >
                   <ExternalLink className="w-3 h-3" />
                   ดูแผนที่ Google Maps
@@ -731,61 +872,60 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
         {/* 6. Pawn Duration */}
         <div className="mb-4 flex items-center gap-2">
-          <label className="font-bold text-gray-800 whitespace-nowrap">
+          <label className="whitespace-nowrap font-bold text-foreground">
             ระยะเวลา*
           </label>
-          <span className="bg-[#EAEAEA] text-gray-600 text-[10px] px-2 py-0.5 rounded-full">Duration</span>
-          <span className="ml-auto text-gray-500 text-xs">วัน</span>
+          <span className="rounded-full bg-background-subtle px-2 py-0.5 text-[10px] text-foreground-subtle">Duration</span>
+          <span className="ml-auto text-xs text-foreground-subtle">วัน</span>
         </div>
-        <div className="relative mb-4">
-          <select
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            className="w-full p-4 pr-10 bg-white border border-gray-300 rounded-xl text-gray-800 appearance-none focus:outline-none focus:ring-2 focus:ring-[#C0562F]"
-          >
-            <option value="15">15 วัน</option>
-            <option value="30">30 วัน</option>
-            <option value="60">60 วัน</option>
-          </select>
-          <ChevronDown className="absolute right-4 top-4.5 w-5 h-5 text-gray-400 pointer-events-none" />
-        </div>
+        <DropdownField
+          value={duration}
+          placeholder="เลือกระยะเวลา"
+          options={[
+            { value: '15', label: '15 วัน' },
+            { value: '30', label: '30 วัน' },
+            { value: '60', label: '60 วัน' },
+          ]}
+          onChange={setDuration}
+          className="mb-4 rounded-2xl px-4 py-4 text-foreground"
+        />
 
         {/* 7. Interest & Fee */}
         <div className="mb-2 flex items-center gap-2">
-          <label className="font-bold text-gray-800 whitespace-nowrap">
+          <label className="whitespace-nowrap font-bold text-foreground">
             ดอกเบี้ย*
           </label>
-          <span className="bg-[#EAEAEA] text-gray-600 text-[10px] px-2 py-0.5 rounded-full">Interest</span>
-          <span className="ml-auto text-gray-500 text-xs">บาท</span>
+          <span className="rounded-full bg-background-subtle px-2 py-0.5 text-[10px] text-foreground-subtle">Interest</span>
+          <span className="ml-auto text-xs text-foreground-subtle">บาท</span>
         </div>
         <div className="relative mb-1">
           <input
             type="text"
             value={formatNumber(interestAmount)}
             readOnly
-            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 focus:outline-none font-medium"
+            className="w-full min-h-12 rounded-full border border-primary/70 bg-background-white p-3 text-sm text-foreground-subtle placeholder-grey-5 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary md:text-sm"
           />
         </div>
-        <p className="text-[11px] text-gray-500 mb-4">
+        <p className="mb-4 text-[11px] text-foreground-subtle">
           ดอกเบี้ย 2% ของมูลค่าสัญญา (คิดตามระยะเวลาที่เลือก)
         </p>
 
         <div className="mb-2 flex items-center gap-2">
-          <label className="font-bold text-gray-800 whitespace-nowrap">
+          <label className="whitespace-nowrap font-bold text-foreground">
             ค่าธรรมเนียม*
           </label>
-          <span className="bg-[#EAEAEA] text-gray-600 text-[10px] px-2 py-0.5 rounded-full">Fee</span>
-          <span className="ml-auto text-gray-500 text-xs">บาท</span>
+          <span className="rounded-full bg-background-subtle px-2 py-0.5 text-[10px] text-foreground-subtle">Fee</span>
+          <span className="ml-auto text-xs text-foreground-subtle">บาท</span>
         </div>
         <div className="relative mb-1">
           <input
             type="text"
             value={formatNumber(feeAmount)}
             readOnly
-            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 focus:outline-none font-medium"
+            className="w-full min-h-12 rounded-full border border-primary/70 bg-background-white p-3 text-sm text-foreground-subtle placeholder-grey-5 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary md:text-sm"
           />
         </div>
-        <p className="text-[11px] text-gray-500 mb-8">
+        <p className="mb-8 text-[11px] text-foreground-subtle">
           ค่าธรรมเนียมคำนวณจากมูลค่าสัญญา (คงที่ตามวงเงินเริ่มต้น)
         </p>
 
@@ -795,25 +935,25 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           <button
             onClick={handleSubmit}
             disabled={!isRegistered || isSubmitting || loanAmountNum < MIN_LOAN_AMOUNT}
-            className={`w-full rounded-2xl py-3 flex flex-col items-center justify-center shadow-md transition-all active:scale-[0.98] ${
+            className={`w-full min-h-12 rounded-full px-4 py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98] ${
               isRegistered && loanAmountNum >= MIN_LOAN_AMOUNT
-                ? 'bg-[#B85C38] hover:bg-[#A04D2D] text-white'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                ? 'bg-primary text-primary-fg hover:bg-primary-hover'
+                : 'bg-grey-5 text-foreground-subtle cursor-not-allowed'
             }`}
           >
-            <span className="text-base font-bold">
+            <span className="text-base font-medium">
               {isSubmitting ? 'กำลังส่งคำขอ...' : 'ดำเนินการต่อ'}
             </span>
-            <span className="text-[10px] font-light opacity-90">Continue</span>
+            <span className="text-xs font-light opacity-90">Continue</span>
           </button>
 
           {/* Register / Verify - Only show if not verified */}
           {!isRegistered && (
             <button
               onClick={handleRegister}
-              className="w-full bg-[#C97C5D] hover:bg-[#B85C38] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-all active:scale-[0.98]"
+              className="w-full min-h-12 rounded-full bg-primary-soft px-4 py-3 flex flex-col items-center justify-center text-base font-medium text-primary transition-colors hover:bg-primary-border active:scale-[0.98]"
             >
-              <span className="text-base font-bold">
+              <span className="text-base font-medium">
                 {kycStatus ? 'ยืนยันตัวตน' : 'ลงทะเบียน'}
               </span>
               <span className="text-[10px] font-light opacity-90">
@@ -825,19 +965,19 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           {/* Save Draft */}
           <button
             onClick={handleSaveDraft}
-            className="w-full bg-[#F5EBE5] hover:bg-[#EBDDD5] text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-3 flex flex-col items-center justify-center text-base font-medium text-primary transition-colors hover:bg-background-subtle active:scale-[0.98]"
           >
-            <span className="text-base font-bold">บันทึกชั่วคราว</span>
-            <span className="text-[10px] font-light opacity-80">Save draft</span>
+            <span className="text-base font-medium">บันทึกชั่วคราว</span>
+            <span className="text-xs font-light opacity-80">Save draft</span>
           </button>
 
           {/* Estimate Another */}
           <button
             onClick={onBack}
-            className="w-full bg-white border border-[#B85C38] hover:bg-gray-50 text-[#B85C38] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+            className="flex w-full min-h-12 flex-col items-center justify-center rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-line-soft active:scale-[0.98]"
           >
-            <span className="text-base font-bold">ประเมินสินค้าอื่น</span>
-            <span className="text-[10px] font-light opacity-80">Estimate another item</span>
+            <span className="text-base font-medium">ประเมินสินค้าอื่น</span>
+            <span className="text-xs font-light opacity-80 font-english">Estimate another item</span>
           </button>
         </div>
 
@@ -852,6 +992,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
             </p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
