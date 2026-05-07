@@ -154,11 +154,11 @@
 }
 
 .theme-liff {
-  --radius-xs: 8px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --radius-xl: 28px;
+  --radius-xs: 8px !important;
+  --radius-sm: 10px !important;
+  --radius-md: 14px !important;
+  --radius-lg: 18px !important;
+  --radius-xl: 28px !important;
   --radius-round: 9999px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
