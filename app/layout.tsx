@@ -12,10 +12,10 @@ const notoSansThai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "Pawnly",
-  description: "Pawnly",
+  title: "Astly",
+  description: "Astly is a p2p platform for investors and borrowers in Thailand.",
   icons: {
-    icon: "/landing/picon2.png",
+    icon: "/assets/astly_logo_3Dcircle.png",
   },
 };
 
