@@ -33,8 +33,8 @@ export default function InvestorPage() {
           <div className="flex items-center gap-4">
             <Link href="/">
               <Image
-                src="/landing/pawnly_logo.png"
-                alt="Pawnly"
+                src="/assets/astly_logo_primary.png"
+                alt="Astly"
                 width={302}
                 height={80}
                 priority
@@ -189,13 +189,13 @@ export default function InvestorPage() {
           <div className="h-px w-full max-w-[320px] bg-primary" />
         </div>
 
-        {/* Why Pawnly */}
+        {/* Why Astly */}
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-14">
           <div className="grid gap-8 md:grid-cols-[0.95fr_1.05fr] lg:gap-12">
             <div className="fade-up text-center lg:text-left" style={{ transitionDelay: '0.3s' }}>
-              <p className="text-xs uppercase tracking-[0.3em] text-primary-border">Why Pawnly</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-primary-border">Why Astly</p>
               <h2 className="mt-3 text-3xl font-medium text-s1 sm:text-4xl lg:text-[40px] font-english">
-                Why <span className="text-primary font-bold">Pawnly</span> for You?
+                Why <span className="text-primary font-bold">Astly</span> for You?
               </h2>
               <p className="mt-4 max-w-[560px] text-sm leading-7 text-foreground-subtle font-light">
                 บริการของเราถูกออกแบบเพื่อให้ผู้ขอสินเชื่อเข้าถึงเงินทุนได้อย่างรวดเร็ว ปลอดภัย และสะดวกสบายจากทุกที่
@@ -204,7 +204,7 @@ export default function InvestorPage() {
             <div className="fade-up" style={{ transitionDelay: '0.4s' }}>
               <div className="flex flex-wrap gap-6 justify-center">
                 {[
-                  { en: 'List of pawners', th: 'รายชื่อผู้ขอสินเชื่อทั้งหมด' },
+                  { en: 'List of borrowers', th: 'รายชื่อผู้ขอสินเชื่อทั้งหมด' },
                   { en: 'Evaluation system', th: 'ระบบประเมินราคา' },
                   { en: 'Asset storage', th: 'การจัดเก็บทรัพย์' },
                   { en: 'Status tracking', th: 'การติดตามสถานะ' },
@@ -251,7 +251,7 @@ export default function InvestorPage() {
                 { title: 'Asset-Backed Security', desc: "Your investments are secured by tangible, verifiable assets physically held.\nการลงทุนของคุณได้รับการคุ้มครอง โดยสินทรัพย์ที่จับต้องได้และตรวจ สอบได้ซึ่งได้รับการถือครอง" },
                 { title: 'More Competitive Offers', desc: "Add a new layer of stability and opportunity to your investments with secured, short-term loans.\nค้นพบทางเลือกการลงทุนอันเป็น เอกลักษณ์ที่ให้ดอกเบี้ยที่น่าดึงดูดและ ผลตอบแทนคงที่" },
                 { title: 'Diversify Your Portfolio', desc: "Add a new layer of stability and opportunity to your investments with secured, short-term loans.\nเรียกดูรายการที่ผู้ขอสินเชื่อเสนอ ดูการประเมินราคาโดยละเอียด และมีส่วนร่วมโดยตรงในการระดมทุนสินเชื่อที่ตรงตามเกณฑ์ของคุณ" },
-                { title: 'Direct & Transparent Access', desc: "Browse items posted by pawners, view detailed appraisals, and engage directly to fund loans that meet your criteria.\nเรียกดูรายการที่ผู้ขอสินเชื่อเสนอ ดูการประเมินราคาโดยละเอียด และมีส่วนร่วมโดยตรงในการระดมทุนสินเชื่อที่ตรงตามเกณฑ์ของคุณ" },
+                { title: 'Direct & Transparent Access', desc: "Browse items posted by borrowers, view detailed appraisals, and engage directly to fund loans that meet your criteria.\nเรียกดูรายการที่ผู้ขอสินเชื่อเสนอ ดูการประเมินราคาโดยละเอียด และมีส่วนร่วมโดยตรงในการระดมทุนสินเชื่อที่ตรงตามเกณฑ์ของคุณ" },
                 { title: 'Manage Your Portfolio', desc: "Utilize an intuitive dashboard to track your investments, disburse funds, and monitor your returns with ease.\nใช้แดชบอร์ดที่ใช้งานง่ายเพื่อติดตามการลงทุนของคุณ จ่ายเงิน และตรวจสอบผลตอบแทนของคุณได้อย่างง่ายดาย" },
               ].map((item, index) => {
                 const [english, thai] = item.desc.split('\n');
@@ -361,7 +361,7 @@ export default function InvestorPage() {
             <div className="fade-up overflow-hidden rounded-[24px]">
               <Image
                 src="/landing/com4.png"
-                alt="Contact Pawnly"
+                alt="Contact Astly"
                 width={1200}
                 height={936}
                 className="h-full w-full object-fill mx-auto h-auto w-full max-w-[420px] object-cover lg:max-w-none"
@@ -401,8 +401,8 @@ export default function InvestorPage() {
             <div className="grid gap-10 text-center items-center justify-items-center lg:grid-cols-[minmax(180px,260px)_1fr] lg:items-start lg:justify-items-stretch">
               <div className="flex w-full items-center justify-center lg:items-start lg:justify-start">
                 <Image
-                  src="/landing/pawnly_foot.png"
-                  alt="Pawnly"
+                  src="/assets/astly_logo_light.png"
+                  alt="Astly"
                   width={600}
                   height={96}
                   className="h-6 w-auto sm:h-7"
@@ -469,7 +469,7 @@ export default function InvestorPage() {
             </div>
           </div>
           <div className="border-t border-line-soft py-6 text-center text-xs">
-            <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">Pawnly Platform</p>
+            <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">Astly Platform</p>
           </div>
         </footer>
       </div>

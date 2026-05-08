@@ -22,8 +22,8 @@ export default function AboutPage() {
           <div className="flex items-center gap-4">
             <Link href="/">
               <Image
-                src="/landing/pawnly_logo.png"
-                alt="Pawnly"
+                src="/assets/astly_logo_primary.png"
+                alt="Astly"
                 width={302}
                 height={80}
                 priority
@@ -144,13 +144,13 @@ export default function AboutPage() {
           <div className="fade-up reveal-left text-center sm:text-center lg:text-left lg:self-center lg:pt-8 lg:pb-10">
             <p className={`${bellotaText.className} text-xl font-light text-s1 sm:text-3xl lg:text-[60px]`}>About</p>
             <h1 className="mt-2 text-[44px] font-semibold leading-[1.05] text-primary sm:text-[70px] lg:text-[125px]">
-              Pawnly
+              Astly
             </h1>
           </div>
           <div className="fade-up reveal-right flex flex-col items-center gap-2 sm:items-center lg:items-end sm:gap-3" style={{ transitionDelay: '0.2s' }}>
             <Image
               src={com1About}
-              alt="About Pawnly"
+              alt="About Astly"
               className="h-auto w-full max-w-[360px] sm:max-w-[420px] lg:max-w-[460px]"
               priority
             />
@@ -174,13 +174,13 @@ export default function AboutPage() {
                 Revolutionizing Asset-Backed Lending
               </h3>
               <p className="mt-2 text-sm leading-6 text-s1 font-english">
-              Pawnly is a forward-thinking Fintech startup based in Bangkok, Thailand. We were founded with a singular mission: to modernize the traditional secured lending industry through cutting-edge AI technology and a transparent Peer-to-Peer (P2P) ecosystem. We bridge the gap between asset owners and smart investors, making liquidity accessible, safe, and entirely digital.
+              Astly is a forward-thinking Fintech startup based in Bangkok, Thailand. We were founded with a singular mission: to modernize the traditional secured lending industry through cutting-edge AI technology and a transparent Peer-to-Peer (P2P) ecosystem. We bridge the gap between asset owners and smart investors, making liquidity accessible, safe, and entirely digital.
               </p>
               <h3 className="mt-8 text-sm font-base text-s1 sm:text-base">
                 ปฏิวัติวงการสินเชื่อมีหลักประกัน
               </h3>
               <p className="mt-2 text-sm leading-6 text-s1 font-light">
-              Pawnly คือสตาร์ทอัพด้านฟินเทค (Fintech) ที่ตั้งอยู่ในกรุงเทพฯ ประเทศไทย เราก่อตั้งขึ้นด้วยพันธกิจเดียวคือ การยกระดับอุตสาหกรรมสินเชื่อมีหลักประกันให้ทันสมัยด้วยเทคโนโลยี AI ที่ล้ำสมัย และระบบนิเวศแบบ Peer-to-Peer (P2P) ที่โปร่งใส เราทำหน้าที่เป็นสะพานเชื่อมระหว่างเจ้าของทรัพย์สินและนักลงทุนที่ชาญฉลาด เพื่อให้การเปลี่ยนทรัพย์สินเป็นทุนนั้นเข้าถึงง่าย ปลอดภัย และเป็นดิจิทัลอย่างเต็มรูปแบบ
+              Astly คือสตาร์ทอัพด้านฟินเทค (Fintech) ที่ตั้งอยู่ในกรุงเทพฯ ประเทศไทย เราก่อตั้งขึ้นด้วยพันธกิจเดียวคือ การยกระดับอุตสาหกรรมสินเชื่อมีหลักประกันให้ทันสมัยด้วยเทคโนโลยี AI ที่ล้ำสมัย และระบบนิเวศแบบ Peer-to-Peer (P2P) ที่โปร่งใส เราทำหน้าที่เป็นสะพานเชื่อมระหว่างเจ้าของทรัพย์สินและนักลงทุนที่ชาญฉลาด เพื่อให้การเปลี่ยนทรัพย์สินเป็นทุนนั้นเข้าถึงง่าย ปลอดภัย และเป็นดิจิทัลอย่างเต็มรูปแบบ
               </p>
             </div>
           </div>
@@ -241,10 +241,10 @@ export default function AboutPage() {
             <h3 className="text-lg font-medium sm:text-xl lg:text-[28px] font-english font-bold">Our Commitment to Trust</h3>
             <p className="mt-1 text-lg text-s1/90 sm:text-[18px]">คำมั่นสัญญาแห่งความเชื่อมั่น</p>
             <p className="mt-4 text-sm font-light leading-6 text-s1 font-english">
-            At Pawnly, trust is our currency. Every transaction is backed by Thai legal frameworks, every asset is secured in premium vaults, and every valuation is verified by AI trained on global market data. We are not just a platform; we are your local partner in financial growth.
+            At Astly, trust is our currency. Every transaction is backed by Thai legal frameworks, every asset is secured in premium vaults, and every valuation is verified by AI trained on global market data. We are not just a platform; we are your local partner in financial growth.
             </p>
             <p className="mt-4 text-sm font-light leading-6 text-s1 font-english">
-            ที่ Pawnly "ความไว้วางใจ" คือหัวใจสำคัญของเรา ทุกธุรกรรมได้รับการคุ้มครองภายใต้กรอบกฎหมายไทย ทรัพย์สินทุกชิ้นถูกจัดเก็บในห้องมั่นคงระดับพรีเมียม และทุกการประเมินราคาถูกยืนยันโดย AI ที่ฝึกฝนจากข้อมูลตลาดโลก เราไม่ได้เป็นเพียงแค่แพลตฟอร์ม แต่เราคือพันธมิตรท้องถิ่นที่จะช่วยให้คุณเติบโตทางการเงิน
+            ที่ Astly "ความไว้วางใจ" คือหัวใจสำคัญของเรา ทุกธุรกรรมได้รับการคุ้มครองภายใต้กรอบกฎหมายไทย ทรัพย์สินทุกชิ้นถูกจัดเก็บในห้องมั่นคงระดับพรีเมียม และทุกการประเมินราคาถูกยืนยันโดย AI ที่ฝึกฝนจากข้อมูลตลาดโลก เราไม่ได้เป็นเพียงแค่แพลตฟอร์ม แต่เราคือพันธมิตรท้องถิ่นที่จะช่วยให้คุณเติบโตทางการเงิน
             </p>
           </div>
         </section>
@@ -255,7 +255,7 @@ export default function AboutPage() {
             <div className="fade-up overflow-hidden rounded-[24px]">
               <Image
                 src="/landing/com4.png"
-                alt="Contact Pawnly"
+                alt="Contact Astly"
                 width={1200}
                 height={936}
                 className="h-full w-full object-fill mx-auto h-auto w-full max-w-[420px] object-cover lg:max-w-none"
@@ -298,8 +298,8 @@ export default function AboutPage() {
               {/* Logo Section - อยู่ตรงกลางเสมอใน Mobile/Tablet และชิดซ้ายใน Desktop */}
               <div className="flex w-full items-center justify-center lg:items-start lg:justify-start">
                 <Image
-                  src="/landing/pawnly_foot.png"
-                  alt="Pawnly"
+                  src="/assets/astly_logo_light.png"
+                  alt="Astly"
                   width={600}
                   height={96}
                   className="h-6 w-auto sm:h-7" 
@@ -376,7 +376,7 @@ export default function AboutPage() {
           
           <div className="border-t border-line-soft py-6 text-center text-xs">
             <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">
-              Pawnly Platform
+              Astly Platform
             </p>
           </div>
         </footer>
