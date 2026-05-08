@@ -26,8 +26,8 @@ export default function Home() {
         <header className="mx-auto flex w-full max-w-[1216px] items-center justify-between px-4 py-4 sm:px-6 sm:py-6 lg:px-14">
           <div className="flex items-center gap-4">
             <Image
-              src="/landing/pawnly_logo.png"
-              alt="Pawnly"
+              src="/assets/astly_logo_primary.png"
+              alt="Astly"
               width={302}
               height={80}
               priority
@@ -145,7 +145,7 @@ export default function Home() {
         <section className="mx-auto grid w-full max-w-[1216px] items-center gap-12 px-4 pb-24 pt-16 sm:px-6 sm:pb-28 lg:grid-cols-[1.1fr_0.9fr] lg:px-14">
           <div className="fade-up reveal-left text-center lg:text-left">
             <p className="mb-3 text-xs tracking-[0.3em] text-primary-border">
-              Pawnly Platform
+              Astly Platform
             </p>
             <h1 className="text-3xl font-extralight leading-[1.5] text-foreground sm:text-4xl lg:text-[50px]">
               ปลดล็อกมูลค่าทรัพย์สิน
@@ -172,7 +172,7 @@ export default function Home() {
           <div className="fade-up reveal-right flex justify-center lg:justify-end" style={{ transitionDelay: '0.2s' }}>
             <Image
               src="/landing/com1.png"
-              alt="Pawnly app previews"
+              alt="Astly app previews"
               width={1068}
               height={1068}
               className="h-auto w-full max-w-[360px] drop-shadow-[0_24px_40px_rgba(59,59,59,0.18)] transition-all duration-500 sm:max-w-[420px] lg:max-w-[460px]"
@@ -181,13 +181,13 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── App Preview + What is Pawnly ── */}
+        {/* ── App Preview + What is Astly ── */}
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-24 sm:px-6 sm:pb-28 lg:px-14">
           <div className="relative flex flex-col items-center">
             <div className="fade-up reveal-scale relative z-10 flex w-full justify-center" style={{ transitionDelay: '0.3s' }}>
               <Image
                 src="/landing/com2.png"
-                alt="Pawnly UI overview"
+                alt="Astly UI overview"
                 width={534}
                 height={434}
                 className="h-auto w-full max-w-[534px] scale-[0.95]"
@@ -195,17 +195,17 @@ export default function Home() {
             </div>
             <div className="fade-up relative z-0 mx-auto -mt-10 w-full max-w-[1216px] rounded-[40px] border border-primary-border bg-primary-soft px-4 pb-10 pt-12 text-center text-s1 sm:-mt-16 sm:px-12 sm:pt-16 lg:-mt-20">
               <h2 className="text-2xl font-base sm:text-3xl lg:text-[40px] font-english">
-                What is <span className="text-primary font-bold font-english">Pawnly</span>?
+                What is <span className="text-primary font-bold font-english">Astly</span>?
               </h2>
-              <p className="mt-1 text-xl text-foreground-subtle font-light">พอว์นลี่คืออะไร</p>
+              <p className="mt-1 text-xl text-foreground-subtle font-light">แอสท์ลี่คืออะไร</p>
               <p className="mt-4 leading-6 xs:text-sm font-english text-foreground font-light">
-                Pawnly is an innovative, fully digital P2P Secured Lending Platform that operates primarily through a
+                Astly is an innovative, fully digital P2P Secured Lending Platform that operates primarily through a
                 Line Official Account (Line OA) interface. Its core function is to connect individuals seeking loans
-                against their assets (Pawners) directly with private investors who fund those loans.
+                against their assets (Borrowers) directly with private investors who fund those loans.
               </p>
               <p className="mt-4 leading-6 xs:text-sm text-foreground font-extralight">
-                Pawnly คือ แพลตฟอร์มสินเชื่อมีหลักประกันแบบ P2P ที่ทำงานผ่าน Line Official Account (Line OA) เป็นหลัก
-                โดยเน้นการสร้างความสะดวกสบายและความรวดเร็วแก่ ผู้ขอสินเชื่อ (Pawners) และการจัดหาสิ่งอำนวยความสะดวก
+                Astly คือ แพลตฟอร์มสินเชื่อมีหลักประกันแบบ P2P ที่ทำงานผ่าน Line Official Account (Line OA) เป็นหลัก
+                โดยเน้นการสร้างความสะดวกสบายและความรวดเร็วแก่ ผู้ขอสินเชื่อ (Borrowers) และการจัดหาสิ่งอำนวยความสะดวก
                 สำหรับ นักลงทุน (Investors) เพื่อให้สามารถให้สินเชื่อโดยตรงได้ง่ายขึ้น
               </p>
               <Link href="/about" className="mt-6 inline-block">
@@ -230,7 +230,7 @@ export default function Home() {
           </div>
           <div className="fade-up mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 sm:justify-items-center" style={{ transitionDelay: '0.2s' }}>
             {[
-              { href: '/pawner', src: sub1, alt: 'Access to funding for pawners' },
+              { href: '/pawner', src: sub1, alt: 'Access to funding for borrowers' },
               { href: '/investor', src: sub2, alt: 'Stable investment for investors' },
               { href: '/drop-point-page', src: sub3, alt: 'Business partnerships for drop points' },
             ].map((item) => (
@@ -245,10 +245,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Why Pawnly ── */}
+        {/* ── Why Astly ── */}
         <section className="py-16 sm:py-20">
           <div className="mx-auto w-full bg-background-dark px-4 py-15 text-center text-s1 sm:px-6 lg:px-14">
-            <h3 className="text-xl font-medium text-white sm:text-[36px] leading-[1] font-english">Why Pawnly?</h3>
+            <h3 className="text-xl font-medium text-white sm:text-[36px] leading-[1] font-english">Why Astly?</h3>
             <div className="mx-auto flex flex-wrap gap-6 justify-center mt-4 sm:mt-6 lg:mt-8 max-w-[1216px]">
               {[
                 {
@@ -312,7 +312,7 @@ export default function Home() {
             <div className="fade-up overflow-hidden rounded-[24px]">
               <Image
                 src="/landing/com4.png"
-                alt="Contact Pawnly"
+                alt="Contact Astly"
                 width={1200}
                 height={936}
                 className="h-full w-full object-fill mx-auto h-auto w-full max-w-[420px] object-cover lg:max-w-none"
@@ -355,8 +355,8 @@ export default function Home() {
               {/* Logo Section - อยู่ตรงกลางเสมอใน Mobile/Tablet และชิดซ้ายใน Desktop */}
               <div className="flex w-full items-center justify-center lg:items-start lg:justify-start">
                 <Image
-                  src="/landing/pawnly_foot.png"
-                  alt="Pawnly"
+                  src="/assets/astly_logo_light.png"
+                  alt="Astly"
                   width={600}
                   height={96}
                   className="h-6 w-auto sm:h-7" 
@@ -433,7 +433,7 @@ export default function Home() {
           
           <div className="border-t border-line-soft py-6 text-center text-xs">
             <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">
-              Pawnly Platform
+              Astly Platform
             </p>
           </div>
         </footer>

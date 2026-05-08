@@ -24,8 +24,8 @@ export default function DropPointPage() {
           <div className="flex items-center gap-4">
             <Link href="/">
               <Image
-                src="/landing/pawnly_logo.png"
-                alt="Pawnly"
+                src="/assets/astly_logo_primary.png"
+                alt="Astly"
                 width={302}
                 height={80}
                 priority
@@ -151,7 +151,7 @@ export default function DropPointPage() {
               <br />ให้เป็นรายได้ใหม่กับเรา
             </h1>
             <p className="mt-5 max-w-[620px] text-base font-light text-foreground-subtle sm:text-lg mx-auto sm:mx-0">
-              ร่วมเป็นเครือข่ายจุดรับฝากทรัพย์สิน (Drop Point) ของ Pawnly
+              ร่วมเป็นเครือข่ายจุดรับฝากทรัพย์สิน (Drop Point) ของ Astly
               <br className="hidden sm:block" />
               เพื่อรับค่าธรรมเนียมและเพิ่มฐานลูกค้าให้ร้าน
             </p>
@@ -171,13 +171,13 @@ export default function DropPointPage() {
           </div>
         </section>
 
-        {/* Why Pawnly */}
+        {/* Why Astly */}
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-14">
           <div className="grid gap-8 md:grid-cols-[0.95fr_1.05fr] lg:gap-12">
             <div className="fade-up text-center lg:text-left" style={{ transitionDelay: '0.3s' }}>
-              <p className="text-xs uppercase tracking-[0.3em] text-primary-border">Why Pawnly</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-primary-border">Why Astly</p>
               <h2 className="mt-3 text-3xl font-medium text-s1 sm:text-4xl lg:text-[40px] font-english">
-                Why <span className="text-primary font-bold">Pawnly</span> for You?
+                Why <span className="text-primary font-bold">Astly</span> for You?
               </h2>
               <p className="mt-4 max-w-[560px] text-sm leading-7 text-foreground-subtle font-light">
                 บริการของเราถูกออกแบบเพื่อให้ผู้ขอสินเชื่อเข้าถึงเงินทุนได้อย่างรวดเร็ว ปลอดภัย และสะดวกสบายจากทุกที่
@@ -188,7 +188,7 @@ export default function DropPointPage() {
                 {[
                   { en: 'Additional Income', th: 'เพิ่มรายได้', desc: 'รับค่าธรรมเนียมจากการรับฝากและตรวจสอบเบื้องต้นผ่านระบบ'  },
                   { en: 'Simple Tech', th: 'เทคโนโลยีใช้งานง่าย', desc: 'ไม่ต้องลงทุนระบบเพิ่ม จัดการทุกอย่างผ่าน Line OA สำหรับร้านค้า'  },
-                  { en: 'Marketing Support', th: 'ทีมช่วยดูแลการตลาด', desc: 'ช่วยโปรโมทร้านของคุณผ่านแคมเปญและสื่อของ Pawnly'  },
+                  { en: 'Marketing Support', th: 'ทีมช่วยดูแลการตลาด', desc: 'ช่วยโปรโมทร้านของคุณผ่านแคมเปญและสื่อของ Astly'  },
                   { en: 'Scalable Partnership', th: 'เติบโตไปพร้อมกัน', desc: 'ร่วมเติบโตเป็นส่วนหนึ่งของเครือข่ายพันธมิตรอย่างยั่งยืน'  },
                   // { en: 'Contract management', th: 'จัดการสัญญา', desc: 'รับค่าธรรมเนียมจากการรับฝากและตรวจสอบเบื้องต้นผ่านระบบ' },
                 ].map((item) => (
@@ -234,7 +234,7 @@ export default function DropPointPage() {
                   { title: 'Seamless Digital Management', desc: "No complex software or hardware needed. Manage all transactions efficiently via our dedicated Line OA for partners.\nไม่ต้องติดตั้งโปรแกรมหรือซื้ออุปกรณ์เพิ่ม จัดการทุกขั้นตอนได้อย่างรวดเร็วและมีประสิทธิภาพผ่าน Line OA สำหรับพันธมิตรโดยเฉพาะ" },
                   { title: 'Optimized Space Utilization', desc: "Transform small, unused areas of your counter or store into a high-value financial service hub with minimal effort.\nเปลี่ยนเคาน์เตอร์หรือพื้นที่ว่างเพียงเล็กน้อยที่มีอยู่เดิม ให้กลายเป็นจุดบริการทางการเงินที่มีมูลค่าสูงได้ทันที" },
                   { title: 'Strategic Network Synergy', desc: "Become part of a modern Fintech ecosystem with future opportunities to integrate with leading courier networks.\nร่วมเป็นส่วนหนึ่งของระบบนิเวศฟินเทคที่ทันสมัย พร้อมโอกาสในการเชื่อมต่อกับเครือข่ายขนส่งพัสดุชั้นนำในอนาคต" },
-                  { title: 'Enhanced Business Profile', desc: "Boost your local reputation by becoming a \"Pawnly Certified\" point, trusted for secure asset handling and logistics.\nเสริมภาพลักษณ์ร้านค้าของคุณให้เป็นจุดบริการที่น่าเชื่อถือในฐานะ \"Pawnly Certified\" ที่เชี่ยวชาญด้านการจัดการทรัพย์สินที่ปลอดภัย" },
+                  { title: 'Enhanced Business Profile', desc: "Boost your local reputation by becoming a \"Astly Certified\" point, trusted for secure asset handling and logistics.\nเสริมภาพลักษณ์ร้านค้าของคุณให้เป็นจุดบริการที่น่าเชื่อถือในฐานะ \"Astly Certified\" ที่เชี่ยวชาญด้านการจัดการทรัพย์สินที่ปลอดภัย" },
                 ].map((item, index) => {
                   const [english, thai] = item.desc.split('\n');
                   return (
@@ -267,7 +267,7 @@ export default function DropPointPage() {
             <div className="fade-up grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 { step: '1', title: 'Register', desc: 'แอดไลน์ ลงทะเบียนและส่งเอกสารเพื่อยืนยันตัวตนร้านค้า', href: lineUrl },
-                { step: '2', title: 'Setup', desc: 'รับอุปกรณ์มาตรฐานและสติกเกอร์สัญลักษณ์ Pawnly Drop Point' },
+                { step: '2', title: 'Setup', desc: 'รับอุปกรณ์มาตรฐานและสติกเกอร์สัญลักษณ์ Astly Drop Point' },
                 { step: '3', title: 'Receive', desc: 'ให้บริการรับทรัพย์สินจากลูกค้า และตรวจสอบความถูกต้องเบื้องต้นตามคำแนะนำในระบบ' },
                 { step: '4', title: 'Earn', desc: 'รับรายได้ค่าตอบแทนสะสม และถอนเงินได้ทันทีตามรอบบัญชี' },
               ].map((item) => {
@@ -315,7 +315,7 @@ export default function DropPointPage() {
               <div className="fade-up overflow-hidden rounded-[24px]">
                 <Image
                   src="/landing/com4.png"
-                  alt="Contact Pawnly"
+                  alt="Contact Astly"
                   width={1200}
                   height={936}
                   className="h-full w-full object-fill mx-auto h-auto w-full max-w-[420px] object-cover lg:max-w-none"
@@ -355,8 +355,8 @@ export default function DropPointPage() {
               <div className="grid gap-10 text-center items-center justify-items-center lg:grid-cols-[minmax(180px,260px)_1fr] lg:items-start lg:justify-items-stretch">
                 <div className="flex w-full items-center justify-center lg:items-start lg:justify-start">
                   <Image
-                    src="/landing/pawnly_foot.png"
-                    alt="Pawnly"
+                    src="/assets/astly_logo_light.png"
+                    alt="Astly"
                     width={600}
                     height={96}
                     className="h-6 w-auto sm:h-7"
@@ -423,7 +423,7 @@ export default function DropPointPage() {
               </div>
             </div>
             <div className="border-t border-line-soft py-6 text-center text-xs">
-              <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">Pawnly Platform</p>
+              <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">Astly Platform</p>
             </div>
           </footer>
       </div>

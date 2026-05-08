@@ -21,8 +21,8 @@ export default function PawnerPage() {
           <div className="flex items-center gap-4">
             <Link href="/">
               <Image
-                src="/landing/pawnly_logo.png"
-                alt="Pawnly"
+                src="/assets/astly_logo_primary.png"
+                alt="Astly"
                 width={302}
                 height={80}
                 priority
@@ -142,7 +142,7 @@ export default function PawnerPage() {
 
         <section className="mx-auto grid w-full max-w-[1216px] items-center gap-12 px-4 pb-24 pt-16 sm:px-6 sm:pb-28 lg:grid-cols-[1.1fr_0.9fr] lg:px-14">
           <div className="fade-up reveal-left text-center lg:text-left">
-            <p className="mb-3 text-xs tracking-[0.3em] text-primary-border">Pawner</p>
+            <p className="mb-3 text-xs tracking-[0.3em] text-primary-border">Borrower</p>
             <h1 className="text-3xl font-extralight leading-[1.5] text-foreground sm:text-4xl lg:text-[50px]">
               เปลี่ยนทรัพย์สินของคุณ
               <br />เป็นเงินทุน... ง่ายๆ
@@ -165,7 +165,7 @@ export default function PawnerPage() {
             <div className="relative float-slow">
               <Image
                 src="/landing/com1_pawner.png"
-                alt="Pawner app preview"
+                alt="Borrower app preview"
                 width={1068}
                 height={1068}
                 className="h-auto w-full max-w-[360px] sm:max-w-[420px] lg:max-w-[460px]"
@@ -179,13 +179,13 @@ export default function PawnerPage() {
           <div className="h-px w-full max-w-[320px] bg-primary" />
         </div>
 
-        {/* Why Pawnly */}
+        {/* Why Astly */}
         <section className="mx-auto w-full max-w-[1216px] px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10 lg:px-14">
           <div className="grid gap-8 md:grid-cols-[0.95fr_1.05fr] lg:gap-12">
             <div className="fade-up text-center lg:text-left" style={{ transitionDelay: '0.3s' }}>
-              <p className="text-xs uppercase tracking-[0.3em] text-primary-border">Why Pawnly</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-primary-border">Why Astly</p>
               <h2 className="mt-3 text-3xl font-medium text-s1 sm:text-4xl lg:text-[40px] font-english">
-                Why <span className="text-primary font-bold">Pawnly</span> for You?
+                Why <span className="text-primary font-bold">Astly</span> for You?
               </h2>
               <p className="mt-4 max-w-[560px] text-sm leading-7 text-foreground-subtle font-light">
                 บริการของเราถูกออกแบบเพื่อให้ผู้ขอสินเชื่อเข้าถึงเงินทุนได้อย่างรวดเร็ว ปลอดภัย และสะดวกสบายจากทุกที่
@@ -325,7 +325,7 @@ export default function PawnerPage() {
             <div className="fade-up overflow-hidden rounded-[24px]">
               <Image
                 src="/landing/com4.png"
-                alt="Contact Pawnly"
+                alt="Contact Astly"
                 width={1200}
                 height={936}
                 className="h-full w-full object-fill mx-auto h-auto w-full max-w-[420px] object-cover lg:max-w-none"
@@ -365,8 +365,8 @@ export default function PawnerPage() {
             <div className="grid gap-10 text-center items-center justify-items-center lg:grid-cols-[minmax(180px,260px)_1fr] lg:items-start lg:justify-items-stretch">
               <div className="flex w-full items-center justify-center lg:items-start lg:justify-start">
                 <Image
-                  src="/landing/pawnly_foot.png"
-                  alt="Pawnly"
+                  src="/assets/astly_logo_light.png"
+                  alt="Astly"
                   width={600}
                   height={96}
                   className="h-6 w-auto sm:h-7"
@@ -433,7 +433,7 @@ export default function PawnerPage() {
             </div>
           </div>
           <div className="border-t border-line-soft py-6 text-center text-xs">
-            <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">Pawnly Platform</p>
+            <p className="text-xs tracking-[0.3em] text-primary-border/65 font-light">Astly Platform</p>
           </div>
         </footer>
       </div>
