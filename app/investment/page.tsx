@@ -5,6 +5,7 @@ import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import { getMockInvestorContracts, isInvestorPreviewMode } from '@/lib/mock-investment';
 
 type ContractItem = {
   item_type?: string;
@@ -109,6 +110,12 @@ export default function InvestmentDashboard() {
 
   useEffect(() => {
     if (!profile?.userId) return;
+    if (isInvestorPreviewMode()) {
+      setPinVerified(true);
+      setContracts(getMockInvestorContracts());
+      setLoading(false);
+      return;
+    }
     const session = getPinSession('INVESTOR', profile.userId);
     if (session?.token) {
       setPinVerified(true);
@@ -123,6 +130,11 @@ export default function InvestmentDashboard() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      if (isInvestorPreviewMode()) {
+        setContracts(getMockInvestorContracts());
+        setError(null);
+        return;
+      }
       const response = await axios.get(`/api/contracts/by-investor/${profile?.userId}`);
       setContracts(response.data.contracts || []);
     } catch (fetchError: any) {
@@ -276,20 +288,19 @@ export default function InvestmentDashboard() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+      <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6">
+        <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+          <div className="w-full max-w-sm rounded-xl border border-s2-border bg-s2-soft px-6 py-8 text-center shadow-soft">
+            <p className="text-error mb-4">{error}</p>
+          </div>
         </div>
       </div>
     );
@@ -297,19 +308,24 @@ export default function InvestmentDashboard() {
 
   if (!pinVerified) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
-          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
-          <p className="text-sm text-gray-500 mt-2">
-            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการขอสินเชื่อของคุณ
-          </p>
-          <button
-            type="button"
-            onClick={() => setPinModalOpen(true)}
-            className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white"
-          >
-            ยืนยัน PIN
-          </button>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white px-6 py-6 text-center shadow-soft">
+            <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-s2">
+              Secure Dashboard
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-foreground">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+            <p className="mt-2 text-sm text-foreground-subtle">
+              เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการขอสินเชื่อของคุณ
+            </p>
+            <button
+              type="button"
+              onClick={() => setPinModalOpen(true)}
+              className="btn-transition btn-sheen mt-5 w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-3 text-sm font-bold text-s2-fg shadow-soft"
+            >
+              ยืนยัน PIN
+            </button>
+          </div>
         </div>
 
         {profile?.userId && (
@@ -333,156 +349,191 @@ export default function InvestmentDashboard() {
   const totalCurrent = Object.values(analytics.currentCounts).reduce((sum, value) => sum + value, 0);
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6">
-      <div className="max-w-sm mx-auto space-y-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-gray-800">สินค้าทั้งหมด</h2>
-            <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">All items</span>
-          </div>
-          <div className="flex gap-4 items-center">
-            <div className="relative w-20 h-20">
-              <div
-                className="w-20 h-20 rounded-full"
-                style={{ background: buildDonutGradient(analytics.allCounts) }}
-              />
-              <div className="absolute inset-2 rounded-full bg-white flex flex-col items-center justify-center text-xs text-gray-500">
-                <span className="text-lg font-bold text-gray-700">{totalAll}</span>
-                total
-              </div>
+    <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col space-y-4 mb-12">
+        <div className="rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
+              Investment Dashboard
             </div>
-            <div className="flex-1 space-y-2 text-xs">
-              {CATEGORY_CONFIG.map((category) => (
-                <div key={category.key} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: category.color }}></span>
-                    <span className="text-gray-600">{category.label}</span>
-                  </div>
-                  <span className="text-gray-700 font-medium">{analytics.allCounts[category.key]}</span>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-s2">
+                  สรุปการลงทุน
                 </div>
-              ))}
+                <p className="mt-2 text-xs text-foreground-subtle">
+                  ภาพรวมพอร์ตและกำไรของสัญญาลงทุน
+                </p>
+              </div>
+              <div className="text-right text-sm font-light text-foreground-subtle">
+                {contracts.length} รายการ
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-gray-800">สินค้าที่ลงทุนปัจจุบัน</h2>
-            <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Current items in portfolio</span>
-          </div>
-          <div className="flex gap-4 items-center">
-            <div className="relative w-20 h-20">
-              <div
-                className="w-20 h-20 rounded-full"
-                style={{ background: buildDonutGradient(analytics.currentCounts) }}
-              />
-              <div className="absolute inset-2 rounded-full bg-white flex flex-col items-center justify-center text-xs text-gray-500">
-                <span className="text-lg font-bold text-gray-700">{totalCurrent}</span>
-                total
-              </div>
+        <div className="rounded-xl bg-background-white p-4 border border-s2-border">
+          <div className="rounded-lg border border-background-white">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">สินค้าทั้งหมด</h2>
+              <span className="rounded-full bg-s2-soft px-2 py-1 text-[10px] font-medium text-s2">All items</span>
             </div>
-            <div className="flex-1 space-y-2 text-xs">
-              {CATEGORY_CONFIG.map((category) => (
-                <div key={category.key} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full" style={{ background: category.color }}></span>
-                    <span className="text-gray-600">{category.label}</span>
-                  </div>
-                  <span className="text-gray-700 font-medium">{analytics.currentCounts[category.key]}</span>
+            <div className="flex items-center gap-4">
+              <div className="relative h-24 w-24 shrink-0">
+                <div
+                  className="h-24 w-24 rounded-full"
+                  style={{ background: buildDonutGradient(analytics.allCounts) }}
+                />
+                <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-background-white text-[10px] text-foreground-subtle">
+                  <span className="text-xl font-bold text-foreground">{totalAll}</span>
+                  total
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-bold text-gray-800">มูลค่า</span>
-            <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Value</span>
-          </div>
-          <div className="space-y-3">
-            <div className="rounded-xl bg-[#EDE9FE] px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-[#5B21B6]">ยอดรวมสะสมทั้งหมด</div>
-                <div className="text-[10px] text-[#5B21B6]/70">Cumulative contract value</div>
               </div>
-              <div className="text-right">
-                <div className="text-xs text-[#5B21B6]/70">THB</div>
-                <div className="text-lg font-bold text-[#5B21B6]">{formatCurrency(analytics.cumulativeValue)}</div>
-              </div>
-            </div>
-            <div className="rounded-xl bg-[#BFD1EA] px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-[#1E3A8A]">มูลค่ารวมปัจจุบัน</div>
-                <div className="text-[10px] text-[#1E3A8A]/70">Current total value</div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-[#1E3A8A]/70">THB</div>
-                <div className="text-lg font-bold text-[#1E3A8A]">{formatCurrency(analytics.currentValue)}</div>
-              </div>
-            </div>
-            <div className="rounded-xl bg-[#CDEECE] px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-[#207B2A]">กำไรรวมปัจจุบัน</div>
-                <div className="text-[10px] text-[#207B2A]/70">Current total profit</div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-[#207B2A]/70">THB</div>
-                <div className="text-lg font-bold text-[#207B2A]">{formatCurrency(analytics.currentProfit)}</div>
-              </div>
-            </div>
-            <div className="rounded-xl bg-[#E5E5E5] px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-bold text-gray-600">กำไรสะสม</div>
-                <div className="text-[10px] text-gray-500">Accumulated profit</div>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-500">THB</div>
-                <div className="text-lg font-bold text-gray-700">{formatCurrency(analytics.accumulatedProfit)}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-bold text-gray-800">แจ้งเตือนสัญญา</span>
-            <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Contract notification</span>
-          </div>
-          {analytics.notifications.length === 0 ? (
-            <div className="text-sm text-gray-500 text-center py-6">ไม่มีสัญญาที่ใกล้ครบกำหนด</div>
-          ) : (
-            <div className="space-y-3">
-              {analytics.notifications.map(({ contract, statusLabel, statusColor, unrealized }) => {
-                const itemName = contract.items?.brand && contract.items?.model
-                  ? `${contract.items.brand} ${contract.items.model}`
-                  : 'ไม่ระบุสินค้า';
-                const dueDate = contract.contract_end_date
-                  ? new Date(contract.contract_end_date).toLocaleDateString('th-TH')
-                  : '-';
-                const value = Number(contract.loan_principal_amount) || 0;
-                return (
-                  <div key={contract.contract_id} className="border-b border-gray-100 pb-3 last:border-none last:pb-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-semibold text-gray-800">{itemName}</div>
-                        <div className="text-xs text-gray-500">มูลค่า: {formatCurrency(value)} บาท</div>
-                        <div className="text-xs text-gray-500">รับครบกำหนด: {dueDate}</div>
-                        <div className="text-xs text-gray-500">กำไรปัจจุบัน: {formatCurrency(unrealized)} บาท</div>
-                      </div>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${statusColor}`}>
-                        {statusLabel}
-                      </span>
+              <div className="flex-1 space-y-2 text-xs">
+                {CATEGORY_CONFIG.map((category) => (
+                  <div key={category.key} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: category.color }}></span>
+                      <span className="text-foreground-subtle">{category.label}</span>
                     </div>
+                    <span className="font-medium text-foreground">{analytics.allCounts[category.key]}</span>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          )}
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-background-white p-4 border border-s2-border">
+          <div className="rounded-lg border border-background-white">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">สินค้าที่ลงทุนปัจจุบัน</h2>
+              <span className="rounded-full bg-s2-soft px-2 py-1 text-[10px] font-medium text-s2">Current</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative h-24 w-24 shrink-0">
+                <div
+                  className="h-24 w-24 rounded-full"
+                  style={{ background: buildDonutGradient(analytics.currentCounts) }}
+                />
+                <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-background-white text-[10px] text-foreground-subtle">
+                  <span className="text-xl font-bold text-foreground">{totalCurrent}</span>
+                  total
+                </div>
+              </div>
+              <div className="flex-1 space-y-2 text-xs">
+                {CATEGORY_CONFIG.map((category) => (
+                  <div key={category.key} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: category.color }}></span>
+                      <span className="text-foreground-subtle">{category.label}</span>
+                    </div>
+                    <span className="font-medium text-foreground">{analytics.currentCounts[category.key]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-background-white p-4 border border-s2-border">
+          <div className="rounded-lg border border-background-white">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">มูลค่า</h2>
+              <span className="rounded-full bg-s2-soft px-2 py-1 text-[10px] font-medium text-s2">Value</span>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-purple-800">ยอดรวมสะสมทั้งหมด</div>
+                    <div className="text-xs text-purple-700/70">Cumulative contract value</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-purple-700/70">THB</div>
+                    <div className="text-lg font-bold text-purple-800">{formatCurrency(analytics.cumulativeValue)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-s2-border bg-s2-soft px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-s2">มูลค่ารวมปัจจุบัน</div>
+                    <div className="text-xs text-s2/70">Current total value</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-s2/70">THB</div>
+                    <div className="text-lg font-bold text-s2">{formatCurrency(analytics.currentValue)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-success">กำไรรวมปัจจุบัน</div>
+                    <div className="text-xs text-success/70">Current total profit</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-success/70">THB</div>
+                    <div className="text-lg font-bold text-success">{formatCurrency(analytics.currentProfit)}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-line-soft bg-background px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-foreground-muted">กำไรสะสม</div>
+                    <div className="text-xs text-foreground-subtle">Accumulated profit</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-foreground-subtle">THB</div>
+                    <div className="text-lg font-bold text-foreground">{formatCurrency(analytics.accumulatedProfit)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-background-white p-4 border border-s2-border">
+          <div className="rounded-lg border border-background-white">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">แจ้งเตือนสัญญา</h2>
+              <span className="rounded-full bg-s2-soft px-2 py-1 text-[10px] font-medium text-s2">Notification</span>
+            </div>
+            {analytics.notifications.length === 0 ? (
+              <div className="rounded-lg border border-s2-border bg-s2-soft px-4 py-6 text-center text-sm text-foreground-subtle">
+                ไม่มีสัญญาที่ใกล้ครบกำหนด
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {analytics.notifications.map(({ contract, statusLabel, statusColor, unrealized }) => {
+                  const itemName = contract.items?.brand && contract.items?.model
+                    ? `${contract.items.brand} ${contract.items.model}`
+                    : 'ไม่ระบุสินค้า';
+                  const dueDate = contract.contract_end_date
+                    ? new Date(contract.contract_end_date).toLocaleDateString('th-TH')
+                    : '-';
+                  const value = Number(contract.loan_principal_amount) || 0;
+                  return (
+                    <div key={contract.contract_id} className="rounded-lg border border-s2-border bg-s2-soft/45 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">{itemName}</div>
+                          <div className="mt-1 text-xs text-foreground-subtle">มูลค่า: {formatCurrency(value)} บาท</div>
+                          <div className="text-xs text-foreground-subtle">ครบกำหนด: {dueDate}</div>
+                          <div className="text-xs text-foreground-subtle">กำไรปัจจุบัน: {formatCurrency(unrealized)} บาท</div>
+                        </div>
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

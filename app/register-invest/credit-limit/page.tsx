@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { ChevronLeft } from 'lucide-react';
 import { isMockMode, loadMockInvestor, updateMockInvestor } from '@/lib/mock-investor';
 
 interface InvestorData {
@@ -428,7 +427,7 @@ export default function CreditLimitPage() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center page-investor">
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks"></div>
       </div>
     );
@@ -436,12 +435,12 @@ export default function CreditLimitPage() {
 
   if (error && !investor) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-error mb-4">{error}</p>
           <button
             onClick={() => router.back()}
-            className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+            className="register-primary-btn rounded-lg px-6 py-3"
           >
             กลับ
           </button>
@@ -475,35 +474,35 @@ export default function CreditLimitPage() {
   );
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-background-white font-sans text-foreground">
       <div className="px-4 pt-6 flex justify-center">
         <div className="w-full max-w-md pb-10 space-y-4">
-          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-            <div className="mb-5 rounded-[24px] border border-white/80 bg-white/70 px-4 py-4">
-              <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+          <div className="register-shell rounded-xl p-4">
+            <div className="register-inner-card mb-5 rounded-lg px-4 py-4">
+              <div className="register-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                 Configure Investment
               </div>
-              <div className="mt-3 bg-gradient-to-r from-[#0B3B82] via-[#1E4FA3] to-[#6D8FC8] bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+              <div className="register-title mt-3 text-3xl font-semibold tracking-[0.08em]">
                 ตั้งค่าการลงทุน
               </div>
-              <p className="mt-1 text-xs text-[#6F7E97]">กำหนดวงเงินรวม วงเงินรายหมวดหมู่ และการจัดการคำขออัตโนมัติ</p>
+              <p className="register-subtle mt-1 text-xs">กำหนดวงเงินรวม วงเงินรายหมวดหมู่ และการจัดการคำขออัตโนมัติ</p>
             </div>
 
-            <div className="rounded-[24px] border border-white/90 bg-white/80 p-4 text-center shadow-[0_8px_20px_rgba(11,59,130,0.06)]">
-              <h2 className="text-lg font-medium text-[#1E4FA3] mb-1">วงเงินปัจจุบัน</h2>
-              <div className="text-2xl font-bold text-[#0B3B82]">{currentLimit.toLocaleString()}</div>
+            <div className="register-inner-card rounded-lg p-4 text-center">
+              <h2 className="register-accent mb-1 text-lg font-medium">วงเงินปัจจุบัน</h2>
+              <div className="register-accent text-2xl font-bold">{currentLimit.toLocaleString()}</div>
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+          <div className="register-shell rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-gray-800 font-semibold text-base">วงเงินใหม่</span>
-              <span className="bg-white text-[#6F7E97] text-xs px-3 py-1 rounded-full border border-[#D9E3F2]">
+              <span className="text-foreground font-semibold text-base">วงเงินใหม่</span>
+              <span className="register-pill rounded-full px-3 py-1 text-xs">
                 New credit limit
               </span>
             </div>
-            <span className="text-gray-500 text-sm">บาท</span>
+            <span className="text-foreground-subtle text-sm">บาท</span>
           </div>
 
           <input
@@ -511,27 +510,27 @@ export default function CreditLimitPage() {
             value={limitInput}
             onChange={(e) => setLimitInput(formatAmount(e.target.value))}
             placeholder="100,000"
-            className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-xl text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
+            className="register-input w-full rounded-xl px-3 py-3 text-center text-xl"
           />
-          <div className="mt-2 text-xs text-[#6F7E97]">สูงสุดไม่เกิน 1,000,000 บาท</div>
+          <div className="register-subtle mt-2 text-xs">สูงสุดไม่เกิน 1,000,000 บาท</div>
           {isJuzmatchInvestor && (
-            <div className="mt-3 rounded-[20px] border border-[#D9E3F2] bg-white/80 px-4 py-4 text-sm text-[#42597D] shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
-              <div className="font-semibold text-[#243B62]">การใช้วงเงินสำหรับลูกค้า JUZMATCH</div>
+            <div className="register-panel mt-3 rounded-[20px] px-4 py-4 text-sm text-foreground-muted">
+              <div className="register-heading font-semibold">การใช้วงเงินสำหรับลูกค้า JUZMATCH</div>
               <p className="mt-2 leading-6">
                 คุณสามารถตั้งวงเงินรวมมากกว่ายอดใน JUZMATCH Pool ได้ ระบบจะใช้วงเงินจาก Pool ก่อนเสมอ และหากวงเงินรวมสูงกว่า Pool ระบบจะสลับไปใช้บัญชีส่วนตัวของคุณโดยอัตโนมัติ
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-2xl border border-[#D9E3F2] bg-[#F8FBFF] px-3 py-3">
-                  <div className="text-[#6F7E97]">ยอดใน JUZMATCH Pool</div>
-                  <div className="mt-1 text-base font-semibold text-[#0B3B82]">{juzmatchPoolAmount.toLocaleString()} บาท</div>
+                <div className="register-panel rounded-lg px-3 py-3">
+                  <div className="register-subtle">ยอดใน JUZMATCH Pool</div>
+                  <div className="register-accent mt-1 text-base font-semibold">{juzmatchPoolAmount.toLocaleString()} บาท</div>
                 </div>
-                <div className="rounded-2xl border border-[#D9E3F2] bg-[#F8FBFF] px-3 py-3">
-                  <div className="text-[#6F7E97]">วงเงินจากบัญชีส่วนตัว</div>
-                  <div className="mt-1 text-base font-semibold text-[#0B3B82]">{topUpAmount.toLocaleString()} บาท</div>
+                <div className="register-panel rounded-lg px-3 py-3">
+                  <div className="register-subtle">วงเงินจากบัญชีส่วนตัว</div>
+                  <div className="register-accent mt-1 text-base font-semibold">{topUpAmount.toLocaleString()} บาท</div>
                 </div>
               </div>
               {topUpAmount > 0 && (
-                <div className="mt-3 rounded-2xl border border-[#CFE0F5] bg-[#F4F8FD] px-3 py-3 text-xs leading-5 text-[#5C76A6]">
+                <div className="register-surface rounded-xl mt-3 px-3 py-3 text-xs leading-5 register-accent-soft border border-s2-border">
                   ระบบจะหักจาก JUZMATCH Pool ก่อนจำนวน {poolFirstCoverage.toLocaleString()} บาท และเมื่อ Pool ใช้ครบแล้ว จะสลับไปยังบัญชีส่วนตัว{hasPersonalBankAccount ? 'ที่บันทึกไว้' : ''}อีก {topUpAmount.toLocaleString()} บาท พร้อมแจ้งให้คุณโอนเงินเข้าหาผู้จำนำในดีลนั้นด้วยตนเอง
                 </div>
               )}
@@ -539,70 +538,73 @@ export default function CreditLimitPage() {
           )}
           </div>
 
-          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+          <div className="register-shell rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-base text-gray-800 font-semibold">ยอดรวมวงเงินจากหมวดหมู่</div>
-            <span className="text-sm text-gray-500">บาท</span>
+            <div className="text-base text-foreground font-semibold">ยอดรวมวงเงินจากหมวดหมู่</div>
+            <span className="text-sm text-foreground-subtle">บาท</span>
           </div>
           <input
             type="text"
             value={totalCategorySum.toLocaleString()}
             readOnly
-            className="w-full rounded-xl bg-white px-3 py-3 text-center text-xl text-gray-600 focus:outline-none focus:ring-0"
+            className="register-input w-full rounded-xl px-3 py-3 text-center text-xl text-foreground-muted focus:ring-0"
           />
           {totalLimit > 0 && totalCategorySum > totalLimit && (
-            <p className="mt-2 text-xs text-red-600">ยอดรวมหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</p>
+            <p className="mt-2 text-xs text-error">ยอดรวมหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</p>
           )}
           </div>
 
-          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+          <div className="register-shell rounded-xl p-4">
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-gray-800 font-bold text-lg">สินค้าที่ต้องการ</span>
-            <span className="bg-white text-[#6F7E97] text-xs px-3 py-1 rounded-full border border-[#D9E3F2]">Item preferences</span>
+            <span className="text-foreground font-bold text-lg">สินค้าที่ต้องการ</span>
+            <span className="register-pill rounded-full px-3 py-1 text-xs">Item preferences</span>
           </div>
 
           <div className="space-y-3">
             {!hasSelectedCategory && (
-              <div className="rounded-2xl border border-dashed border-[#C8D6EC] bg-white/75 px-4 py-3 text-sm text-[#5C76A6]">
+              <div className="register-panel rounded-lg border-dashed px-4 py-3 text-sm register-accent-soft">
                 หากไม่เลือกหมวดหมู่ ระบบจะเปิดรับทุกข้อเสนอและใช้วงเงินรวมก้อนเดียว โดยไม่แยกวงเงินตามหมวดหมู่
               </div>
             )}
             {CATEGORY_OPTIONS.map((category) => {
               const entry = preferences[category.key] || { enabled: false, sub: [], limitAmount: '' };
               const isEnabled = entry.enabled || entry.sub.length > 0;
+              const categoryAmount = parseAmount(entry.limitAmount);
               const remainingForCategory = totalLimit > 0
-                ? Math.max(0, totalLimit - (totalCategorySum - parseAmount(entry.limitAmount)))
+                ? Math.max(0, totalLimit - (totalCategorySum - categoryAmount))
                 : 0;
+              const exceedsNewLimit = isEnabled && totalLimit > 0 && categoryAmount > remainingForCategory;
               const noCreditLeft = isEnabled && totalLimit > 0 && remainingForCategory <= 0;
+              const showLimitWarning = exceedsNewLimit || noCreditLeft;
               return (
                 <div
                   key={category.key}
-                  className={`rounded-2xl border p-4 transition-colors ${
-                    noCreditLeft
-                      ? 'border-[#FD5661] bg-[#FEEDEE]'
+                  className={`rounded-lg border p-4 transition-colors ${
+                    showLimitWarning
+                      ? 'border-error-border bg-error-soft'
                       : isEnabled
-                      ? 'border-[#1E3A8A]/50 bg-[#E6EBF2]'
-                      : 'border-gray-200 bg-white'
+                      ? 'border-s2/80 register-surface-strong'
+                      : 'border-s2-border bg-background-white'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-semibold text-gray-800">{category.labelTh}</div>
-                      <div className="text-xs text-gray-500">{category.labelEn}</div>
+                      <div className="font-semibold text-foreground">{category.labelTh}</div>
+                      <div className="text-xs text-foreground-subtle">{category.labelEn}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => toggleCategory(category.key)}
-                      className={`w-11 h-6 rounded-full p-1 transition-colors ${isEnabled ? 'bg-[#1E3A8A]' : 'bg-gray-200'}`}
+                      className={`h-6 w-11 rounded-full p-1 transition-colors bg-background-subtle ${isEnabled ? 'bg-s2-active' : 'bg-line-soft'}`}
                       aria-pressed={isEnabled}
                     >
                       <span
-                        className={`block h-4 w-4 rounded-full bg-white transition-transform ${isEnabled ? 'translate-x-5' : ''}`}
+                        className={`block h-4 w-4 rounded-full bg-background-white transition-transform ${isEnabled ? 'translate-x-5' : ''}`}
                       ></span>
                     </button>
                   </div>
 
-                  <div className="mt-3 text-[10px] text-gray-400">
+                  <div className="mt-3 text-[10px] text-foreground-subtle">
                     เลือกย่อย ({category.subLabelTh} / {category.subLabelEn}) หากไม่เลือกย่อย = ทั้งหมด
                   </div>
 
@@ -614,7 +616,7 @@ export default function CreditLimitPage() {
                           key={option}
                           type="button"
                           onClick={() => toggleSubOption(category.key, option)}
-                          className={`px-3 py-1 rounded-full text-xs border transition-colors ${selected ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]' : 'bg-white text-gray-600 border-gray-200'}`}
+                          className={`px-3 py-1 rounded-full text-xs border transition-colors bg-background-subtle ${selected ? 'register-chip-selected' : 'register-chip-unselected'}`}
                           aria-pressed={selected}
                         >
                           {option}
@@ -625,7 +627,7 @@ export default function CreditLimitPage() {
 
                   {isEnabled && (
                     <div className="mt-4">
-                      <label className="text-sm font-medium text-gray-700">วงเงินสำหรับหมวดนี้</label>
+                      <label className="text-sm font-medium text-foreground-muted">วงเงินสำหรับหมวดนี้</label>
                       <div className="mt-2 flex items-center gap-2">
                         <input
                           type="text"
@@ -634,11 +636,11 @@ export default function CreditLimitPage() {
                           value={entry.limitAmount}
                           onChange={(e) => setCategoryLimitAmount(category.key, e.target.value)}
                           placeholder="0"
-                          className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-[#1E3A8A] bg-white"
+                          className={`w-full rounded-xl px-4 py-3 text-sm ${showLimitWarning ? 'border-error-border bg-background-white text-foreground focus:outline-none focus:ring-1 focus:ring-error' : 'register-input'}`}
                         />
-                        <span className="text-sm text-gray-500">บาท</span>
+                        <span className="text-sm text-foreground-subtle">บาท</span>
                       </div>
-                      <div className={`mt-2 text-xs ${noCreditLeft ? 'text-[#D13F49]' : 'text-gray-500'}`}>
+                      <div className={`mt-2 text-xs ${showLimitWarning ? 'text-error' : 'text-foreground-subtle'}`}>
                         {totalLimit > 0 ? `เหลืออีก ${remainingForCategory.toLocaleString()} บาท สำหรับหมวดนี้` : 'กรุณากรอกวงเงินรวมก่อนเพื่อดูยอดที่เหลือ'}
                       </div>
                     </div>
@@ -649,15 +651,15 @@ export default function CreditLimitPage() {
           </div>
           </div>
 
-          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)] space-y-4">
+          <div className="register-shell rounded-xl p-4 space-y-2">
           <div
-            className={`rounded-2xl border px-4 py-3 cursor-pointer ${autoMatchAllowed ? 'border-[#DCE4F0] bg-white' : 'border-[#FAD7D7] bg-[#FEF2F2]'}`}
+            className={`cursor-pointer rounded-lg border px-4 py-3 ${autoMatchAllowed ? 'border-s2-border bg-background-white' : 'border-error-border bg-error-soft'}`}
             onClick={() => setAutoMatchInfoOpen((prev) => !prev)}
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-semibold text-gray-800">จับคู่อัตโนมัติ</div>
-                <div className="text-xs text-gray-500">Auto matching</div>
+                <div className="font-semibold text-foreground">จับคู่อัตโนมัติ</div>
+                <div className="text-xs text-foreground-subtle">Auto matching</div>
               </div>
               <button
                 type="button"
@@ -666,37 +668,37 @@ export default function CreditLimitPage() {
                   if (!autoMatchAllowed) return;
                   setAutoMatchEnabled((prev) => !prev);
                 }}
-                className={`w-12 h-7 rounded-full p-1 transition-colors ${autoMatchAllowed ? (autoMatchEnabled ? 'bg-[#0B3B82]' : 'bg-gray-200') : 'bg-gray-100 cursor-not-allowed'}`}
+                className={`h-7 w-12 rounded-full p-1 transition-colors bg-background-subtle ${autoMatchAllowed ? (autoMatchEnabled ? 'bg-s2-active' : 'bg-line-soft') : 'bg-background-subtle cursor-not-allowed'}`}
                 aria-pressed={autoMatchEnabled}
                 disabled={!autoMatchAllowed}
               >
                 <span
-                  className={`block h-5 w-5 rounded-full bg-white transition-transform ${autoMatchEnabled ? 'translate-x-5' : ''}`}
+                  className={`block h-5 w-5 rounded-full bg-background-white transition-transform ${autoMatchEnabled ? 'translate-x-5' : ''}`}
                 ></span>
               </button>
             </div>
 
             {!autoMatchAllowed && (
-              <div className="mt-2 text-[11px] text-[#B91C1C]">
+              <div className="mt-2 text-[11px] text-error">
                 คุณอยู่ระดับ {tierLabel} ต้องปล่อยสัญญาอีก {remainingToNext.toLocaleString()} บาทเพื่อปลดล็อก Auto matching และรับผลตอบแทนเพิ่มขึ้น
               </div>
             )}
 
             {autoMatchInfoOpen && (
-              <div className="mt-3 text-xs text-gray-600">
+              <div className="mt-3 text-xs text-foreground-muted">
                 เมื่อเปิด ระบบจะจับคู่สินค้าที่ตรงกับ Item preferences และวงเงินคงเหลือเพียงพอ แล้วสร้างสัญญาให้อัตโนมัติทันที
               </div>
             )}
           </div>
 
           <div
-            className="rounded-2xl border border-[#DCE4F0] bg-white px-4 py-3 cursor-pointer"
+            className="cursor-pointer rounded-lg border border-s2-border bg-background-white px-4 py-3"
             onClick={() => setLiquidationInfoOpen((prev) => !prev)}
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-semibold text-gray-800">ขายทอดตลาดโดย Pawnly</div>
-                <div className="text-xs text-gray-500">Liquidated by Pawnly</div>
+                <div className="font-semibold text-foreground">ขายทอดตลาดโดย Pawnly</div>
+                <div className="text-xs text-foreground-subtle">Liquidated by Pawnly</div>
               </div>
               <button
                 type="button"
@@ -704,16 +706,16 @@ export default function CreditLimitPage() {
                   event.stopPropagation();
                   setAutoLiquidationEnabled((prev) => !prev);
                 }}
-                className={`w-12 h-7 rounded-full p-1 transition-colors ${autoLiquidationEnabled ? 'bg-[#0B3B82]' : 'bg-gray-200'}`}
+                className={`h-7 w-12 rounded-full p-1 transition-colors bg-background-subtle ${autoLiquidationEnabled ? 'bg-s2-active' : 'bg-line-soft'}`}
                 aria-pressed={autoLiquidationEnabled}
               >
                 <span
-                  className={`block h-5 w-5 rounded-full bg-white transition-transform ${autoLiquidationEnabled ? 'translate-x-5' : ''}`}
+                  className={`block h-5 w-5 rounded-full bg-background-white transition-transform ${autoLiquidationEnabled ? 'translate-x-5' : ''}`}
                 ></span>
               </button>
             </div>
             {liquidationInfoOpen && (
-              <div className="mt-3 text-xs text-gray-600">
+              <div className="mt-3 text-xs text-foreground-muted">
                 เมื่อเปิด หากสัญญาเกินกำหนด Pawnly จะดำเนินการขายทอดตลาดให้โดยอัตโนมัติ ลดภาระการจัดการของคุณ
               </div>
             )}
@@ -721,40 +723,40 @@ export default function CreditLimitPage() {
           </div>
 
           {!autoLiquidationEnabled && (
-            <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)] space-y-4">
+            <div className="register-shell rounded-xl p-4 space-y-4">
             <div>
-              <div className="font-semibold text-gray-800">ที่อยู่สำหรับส่งคืนสินค้า</div>
-              <div className="text-xs text-gray-500">ใช้เมื่อปิดการขายทอดตลาดโดย Pawnly</div>
+              <div className="font-semibold text-foreground">ที่อยู่สำหรับส่งคืนสินค้า</div>
+              <div className="text-xs text-foreground-subtle">ใช้เมื่อปิดการขายทอดตลาดโดย Pawnly</div>
             </div>
 
             <div className="space-y-2 text-sm">
-              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${returnAddressMode === 'registered' ? 'border-[#1E3A8A] bg-[#F5F7FA]' : 'border-gray-200 bg-white'}`}>
+              <label className={`flex items-start gap-2 rounded-lg border p-3 ${returnAddressMode === 'registered' ? 'border-s2 register-surface-muted' : 'border-s2-border bg-background-white'}`}>
                 <input
                   type="radio"
                   name="returnAddressMode"
                   value="registered"
                   checked={returnAddressMode === 'registered'}
                   onChange={() => setReturnAddressMode('registered')}
-                  className="mt-1 accent-[#1E3A8A]"
+                  className="mt-1 accent-s2-active"
                 />
                 <div>
-                  <p className="font-semibold text-gray-800">จัดส่งตามที่อยู่ที่ลงทะเบียนไว้</p>
-                  <p className="text-xs text-gray-500 mt-1">{registeredAddressLabel}</p>
+                  <p className="font-semibold text-foreground">จัดส่งตามที่อยู่ที่ลงทะเบียนไว้</p>
+                  <p className="mt-1 text-xs text-foreground-subtle">{registeredAddressLabel}</p>
                 </div>
               </label>
 
-              <label className={`flex items-start gap-2 rounded-2xl border p-3 ${returnAddressMode === 'custom' ? 'border-[#1E3A8A] bg-[#F5F7FA]' : 'border-gray-200 bg-white'}`}>
+              <label className={`flex items-start gap-2 rounded-lg border p-3 ${returnAddressMode === 'custom' ? 'border-s2 register-surface-muted' : 'border-s2-border bg-background-white'}`}>
                 <input
                   type="radio"
                   name="returnAddressMode"
                   value="custom"
                   checked={returnAddressMode === 'custom'}
                   onChange={() => setReturnAddressMode('custom')}
-                  className="mt-1 accent-[#1E3A8A]"
+                  className="mt-1 accent-s2-active"
                 />
                 <div>
-                  <p className="font-semibold text-gray-800">ใส่ที่อยู่อื่น</p>
-                  <p className="text-xs text-gray-500 mt-1">กรอกที่อยู่สำหรับส่งคืนสินค้า</p>
+                  <p className="font-semibold text-foreground">ใส่ที่อยู่อื่น</p>
+                  <p className="mt-1 text-xs text-foreground-subtle">กรอกที่อยู่สำหรับส่งคืนสินค้า</p>
                 </div>
               </label>
             </div>
@@ -766,21 +768,21 @@ export default function CreditLimitPage() {
                   placeholder="บ้านเลขที่ *"
                   value={returnAddress.houseNo}
                   onChange={(e) => setReturnAddress((prev) => ({ ...prev, houseNo: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                  className="register-input w-full rounded-xl px-4 py-3"
                 />
                 <input
                   type="text"
                   placeholder="หมู่บ้าน/คอนโด"
                   value={returnAddress.village}
                   onChange={(e) => setReturnAddress((prev) => ({ ...prev, village: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                  className="register-input w-full rounded-xl px-4 py-3"
                 />
                 <input
                   type="text"
                   placeholder="ถนน/ซอย"
                   value={returnAddress.street}
                   onChange={(e) => setReturnAddress((prev) => ({ ...prev, street: e.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                  className="register-input w-full rounded-xl px-4 py-3"
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -788,14 +790,14 @@ export default function CreditLimitPage() {
                     placeholder="ตำบล/แขวง *"
                     value={returnAddress.subDistrict}
                     onChange={(e) => setReturnAddress((prev) => ({ ...prev, subDistrict: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                    className="register-input w-full rounded-xl px-4 py-3"
                   />
                   <input
                     type="text"
                     placeholder="อำเภอ/เขต *"
                     value={returnAddress.district}
                     onChange={(e) => setReturnAddress((prev) => ({ ...prev, district: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                    className="register-input w-full rounded-xl px-4 py-3"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -804,7 +806,7 @@ export default function CreditLimitPage() {
                     placeholder="จังหวัด *"
                     value={returnAddress.province}
                     onChange={(e) => setReturnAddress((prev) => ({ ...prev, province: e.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                    className="register-input w-full rounded-xl px-4 py-3"
                   />
                   <input
                     type="text"
@@ -814,7 +816,7 @@ export default function CreditLimitPage() {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={5}
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-400 bg-white"
+                    className="register-input w-full rounded-xl px-4 py-3"
                   />
                 </div>
               </div>
@@ -828,13 +830,13 @@ export default function CreditLimitPage() {
               inputMode="tel"
               pattern="[0-9]*"
               maxLength={10}
-              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400 bg-white"
+              className="register-input w-full rounded-xl px-4 py-3 text-sm"
             />
             </div>
           )}
 
           {error && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            <div className="register-status-error rounded-xl p-3 text-sm">
               {error}
             </div>
           )}
@@ -842,7 +844,7 @@ export default function CreditLimitPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex w-full flex-col items-center justify-center rounded-full bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-2 text-white transition-all active:scale-[0.98] disabled:opacity-50 hover:from-[#18448F] hover:to-[#08306A]"
+            className="register-primary-btn flex w-full flex-col items-center justify-center rounded-full py-2 transition-all active:scale-[0.98] disabled:opacity-50"
           >
             <span className="text-base font-medium">{saving ? 'กำลังบันทึก...' : 'บันทึก'}</span>
             <span className="text-xs opacity-80 font-light">Save</span>

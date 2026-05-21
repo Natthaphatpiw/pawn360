@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import Image from 'next/image';
+import { getMockItemActionData, isInvestorPreviewMode } from '@/lib/mock-investment';
 
 interface Item {
   _id: string;
@@ -41,6 +42,7 @@ interface Customer {
 }
 
 export default function ItemActionsPage() {
+  const router = useRouter();
   const params = useParams();
   const itemId = params.itemId as string;
   const { profile, isLoading, error: liffError } = useLiff();
@@ -65,6 +67,10 @@ export default function ItemActionsPage() {
 
   const fetchItemDetails = async () => {
     try {
+      if (isInvestorPreviewMode()) {
+        setItem(getMockItemActionData().item);
+        return;
+      }
       const response = await axios.get(`/api/items/${itemId}`);
       setItem(response.data.item);
     } catch (err: any) {
@@ -74,6 +80,10 @@ export default function ItemActionsPage() {
 
   const fetchStores = async () => {
     try {
+      if (isInvestorPreviewMode()) {
+        setStores(getMockItemActionData().stores);
+        return;
+      }
       const response = await axios.get('/api/stores');
       setStores(response.data.stores);
     } catch (err: any) {
@@ -83,6 +93,10 @@ export default function ItemActionsPage() {
 
   const checkCustomerExists = async () => {
     try {
+      if (isInvestorPreviewMode()) {
+        setCustomer(getMockItemActionData().customer);
+        return;
+      }
       const response = await axios.get(`/api/users/check?lineId=${profile.userId}`);
       if (response.data.exists) {
         setCustomer(response.data.customer);
@@ -138,20 +152,19 @@ export default function ItemActionsPage() {
 
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (liffError || error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">{liffError || error}</p>
+      <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6">
+        <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+          <div className="w-full max-w-sm rounded-xl border border-s2-border bg-s2-soft px-6 py-8 text-center shadow-soft">
+            <p className="text-error">{liffError || error}</p>
+          </div>
         </div>
       </div>
     );
@@ -159,69 +172,72 @@ export default function ItemActionsPage() {
 
   if (!item) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">ไม่พบข้อมูลสินค้า</p>
+      <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6">
+        <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+          <div className="w-full max-w-sm rounded-xl border border-s2-border bg-s2-soft px-6 py-8 text-center shadow-soft">
+            <p className="text-error">ไม่พบข้อมูลสินค้า</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-md mx-auto bg-white min-h-screen">
-        {/* Header */}
-        <div className="bg-blue-600 text-white p-4">
-          <h1 className="text-xl font-bold text-center">เลือกการดำเนินการ</h1>
+    <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6 pb-10">
+      <div className="mx-auto flex w-full max-w-md flex-col">
+        <div className="mb-5 rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
+              Item Action
+            </div>
+            <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-s2">
+              เลือกการดำเนินการ
+            </div>
+            <p className="mt-2 text-xs text-foreground-subtle">ตั้งค่าจุดรับฝาก ระยะเวลา และรายละเอียดก่อนดำเนินการต่อ</p>
+          </div>
         </div>
 
-        {/* Item Details */}
-        <div className="p-4">
-          {/* Item Image */}
+        <div className="space-y-4">
           {item.images && item.images.length > 0 && (
-            <div className="mb-6">
+            <div className="rounded-xl border border-s2-border bg-background-white p-4 shadow-soft">
               <Image
                 src={item.images[0]}
                 alt={item.brand + ' ' + item.model}
-                width={200}
-                height={200}
-                className="w-full max-w-xs mx-auto rounded-lg object-cover"
+                width={320}
+                height={320}
+                className="w-full rounded-xl object-cover"
               />
             </div>
           )}
 
-          {/* Item Info */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-lg mb-2">{item.brand} {item.model}</h3>
-            <div className="space-y-1 text-sm text-gray-600">
-              <p><span className="font-medium">ประเภท:</span> {item.type}</p>
-              {item.serialNo && <p><span className="font-medium">ซีเรียล:</span> {item.serialNo}</p>}
-              <p><span className="font-medium">สภาพ:</span> {item.condition}%</p>
-              {item.accessories && <p><span className="font-medium">อุปกรณ์เสริม:</span> {item.accessories}</p>}
-              {item.defects && <p><span className="font-medium">ตำหนิ:</span> {item.defects}</p>}
-              {item.note && <p><span className="font-medium">หมายเหตุ:</span> {item.note}</p>}
+          <div className="rounded-xl border border-s2-border bg-background-white p-4 shadow-soft">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">Item Detail</h3>
+            <div className="mb-3 text-xl font-semibold text-foreground">{item.brand} {item.model}</div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3"><span className="text-foreground-subtle">ประเภท</span><span className="text-right text-foreground-muted">{item.type}</span></div>
+              {item.serialNo && <div className="flex justify-between gap-3"><span className="text-foreground-subtle">ซีเรียล</span><span className="text-right text-foreground-muted">{item.serialNo}</span></div>}
+              <div className="flex justify-between gap-3"><span className="text-foreground-subtle">สภาพ</span><span className="text-right text-foreground-muted">{item.condition}%</span></div>
+              {item.accessories && <div className="flex justify-between gap-3"><span className="text-foreground-subtle">อุปกรณ์เสริม</span><span className="text-right text-foreground-muted">{item.accessories}</span></div>}
+              {item.defects && <div className="flex justify-between gap-3"><span className="text-foreground-subtle">ตำหนิ</span><span className="text-right text-foreground-muted">{item.defects}</span></div>}
+              {item.note && <div className="flex justify-between gap-3"><span className="text-foreground-subtle">หมายเหตุ</span><span className="text-right text-foreground-muted">{item.note}</span></div>}
             </div>
           </div>
 
-          {/* Price Info */}
           {item.estimatedValue && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-center">
-              <p className="text-sm text-green-600 mb-2">ราคาประเมิน</p>
-              <p className="text-2xl font-bold text-green-700">
-                ฿{item.estimatedValue.toLocaleString()}
-              </p>
+            <div className="rounded-xl border border-s2-border bg-s2-soft/50 p-5 text-center shadow-soft">
+              <p className="text-sm text-foreground-subtle mb-2">ราคาประเมิน</p>
+              <p className="text-3xl font-semibold text-s2">฿{item.estimatedValue.toLocaleString()}</p>
             </div>
           )}
 
-          {/* Store Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              จุดรับฝาก*
+          <div className="rounded-xl border border-s2-border bg-background-white p-4 shadow-soft">
+            <label className="mb-2 block text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">
+              จุดรับฝาก
             </label>
             <select
               value={selectedStore}
               onChange={(e) => handleStoreSelect(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-s2-border bg-background-white px-4 py-3 text-foreground outline-none focus:border-s2"
             >
               <option value="">เลือกจุดรับฝาก</option>
               {stores.map(store => (
@@ -232,15 +248,14 @@ export default function ItemActionsPage() {
             </select>
           </div>
 
-          {/* Pawn Duration */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              ระยะเวลาที่ต้องการขอสินเชื่อ*
+          <div className="rounded-xl border border-s2-border bg-background-white p-4 shadow-soft">
+            <label className="mb-2 block text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">
+              ระยะเวลาที่ต้องการขอสินเชื่อ
             </label>
             <select
               value={pawnDuration}
               onChange={(e) => setPawnDuration(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-s2-border bg-background-white px-4 py-3 text-foreground outline-none focus:border-s2"
             >
               <option value="7">7 วัน</option>
               <option value="14">14 วัน</option>
@@ -250,72 +265,65 @@ export default function ItemActionsPage() {
             </select>
           </div>
 
-          {/* Interest Calculation */}
           {selectedStore && item.estimatedValue && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-blue-600">ราคาประเมิน:</span>
-                <span className="font-semibold">฿{item.estimatedValue.toLocaleString()}</span>
+                <span className="text-sm text-foreground-subtle">ราคาประเมิน</span>
+                <span className="font-semibold text-foreground">฿{item.estimatedValue.toLocaleString()}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm text-blue-600">ดอกเบี้ย ({calculateInterest() > 0 ? '10%' : '0%'}):</span>
-                <span className="font-semibold">฿{calculateInterest().toLocaleString()}</span>
+                <span className="text-sm text-foreground-subtle">ดอกเบี้ย</span>
+                <span className="font-semibold text-foreground">฿{calculateInterest().toLocaleString()}</span>
               </div>
-              <hr className="my-2" />
+              <hr className="my-3 border-s2-border" />
               <div className="flex justify-between">
-                <span className="text-sm font-semibold text-blue-700">รวม:</span>
-                <span className="font-bold text-blue-700">
+                <span className="text-sm font-semibold text-s2">รวม</span>
+                <span className="font-bold text-s2">
                   ฿{(item.estimatedValue + calculateInterest()).toLocaleString()}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Success/Error Messages */}
           {success && (
-            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+            <div className="rounded-xl border border-success-border bg-success-soft p-3 text-success shadow-soft">
               {success}
             </div>
           )}
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            <div className="rounded-xl border border-error-border bg-error-soft p-3 text-error shadow-soft">
               {error}
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="space-y-3">
-            {/* 1. ดำเนินการต่อ - disabled ถ้ายังไม่มี customer */}
             <button
               onClick={handleContinue}
               disabled={!selectedStore || !customer}
-              className="w-full py-3 px-4 rounded-lg transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
+              className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-3 text-s2-fg shadow-soft disabled:cursor-not-allowed disabled:opacity-50"
             >
               ดำเนินการต่อ
             </button>
 
-            {/* 2. ลงทะเบียน */}
             <button
               onClick={handleRegister}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors"
+              className="btn-transition w-full rounded-full border border-s2 bg-background-white py-3 text-s2"
             >
               ลงทะเบียน
             </button>
 
-            {/* 3. บันทึกชั่วคราว (สำหรับ temporary items) */}
             <button
               onClick={handleSaveTemporary}
               disabled={isSubmitting}
-              className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed transition-colors"
+              className="btn-transition w-full rounded-full border border-s2-border bg-s2-soft py-3 text-s2 disabled:opacity-50"
             >
               {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกชั่วคราว'}
             </button>
 
-            {/* 4. ประเมินสินค้าอื่นๆ */}
             <button
-              onClick={() => window.location.href = '/estimate'}
-              className="w-full bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors"
+              onClick={() => router.push('/estimate')}
+              className="btn-transition w-full rounded-full border border-line-soft bg-background-white py-3 text-foreground-muted"
             >
               ประเมินสินค้าอื่นๆ
             </button>
