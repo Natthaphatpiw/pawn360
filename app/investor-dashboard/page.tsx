@@ -4,9 +4,16 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { Wallet, ChevronRight } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import {
+  getMockInvestorContracts,
+  getMockInvestorProfile,
+  getMockPrincipalIncreaseRequestForContract,
+  INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES,
+  isInvestorPreviewMode,
+} from '@/lib/mock-investment';
 
 const resolveNetInvestorRate = (contract: {
   investor_rate?: number | null;
@@ -36,9 +43,18 @@ function InvestorDashboardContent() {
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [investor, setInvestor] = useState<any>(null);
   const [myContracts, setMyContracts] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
     if (!profile?.userId) return;
+
+    if (isInvestorPreviewMode()) {
+      setPinVerified(true);
+      setInvestor(getMockInvestorProfile());
+      setMyContracts(getMockInvestorContracts());
+      setLoading(false);
+      return;
+    }
 
     const session = getPinSession('INVESTOR', profile.userId);
     if (session?.token) {
@@ -55,6 +71,12 @@ function InvestorDashboardContent() {
   const fetchInvestorData = async () => {
     try {
       setLoading(true);
+
+      if (isInvestorPreviewMode()) {
+        setInvestor(getMockInvestorProfile());
+        setMyContracts(getMockInvestorContracts());
+        return;
+      }
 
       console.log('LIFF Profile userId:', profile?.userId);
 
@@ -77,21 +99,49 @@ function InvestorDashboardContent() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'PENDING_INVESTOR_APPROVAL':
+      case 'AWAITING_INVESTOR_APPROVAL':
+        return { label: 'รออนุมัติ', tone: 'text-warning' };
       case 'CONFIRMED':
-        return { text: 'กำลังดำเนินการ', color: 'bg-[#D1FAE5] text-[#065F46]' };
+        return { label: 'กำลังดำเนินการ', tone: 'text-s2' };
+      case 'PENDING':
       case 'ACTIVE':
       case 'EXTENDED':
-        return { text: 'ปกติ', color: 'bg-[#D1FAE5] text-[#065F46]' };
+        return { label: 'ปกติ', tone: 'text-success' };
       case 'PENDING_SIGNATURE':
-        return { text: 'รอลงนาม', color: 'bg-[#FEF3C7] text-[#92400E]' };
+        return { label: 'รอลงนาม', tone: 'text-warning' };
       case 'COMPLETED':
-        return { text: 'เสร็จสิ้น', color: 'bg-[#DBEAFE] text-[#1E40AF]' };
+        return { label: 'เสร็จสิ้น', tone: 'text-foreground-subtle' };
       case 'DEFAULTED':
-        return { text: 'เลยกำหนด', color: 'bg-[#FEE2E2] text-[#991B1B]' };
+        return { label: 'เลยกำหนด', tone: 'text-error' };
       case 'TERMINATED':
-        return { text: 'ยกเลิก', color: 'bg-gray-100 text-gray-600' };
+        return { label: 'ยกเลิก', tone: 'text-foreground-subtle' };
       default:
-        return { text: status, color: 'bg-gray-100 text-gray-600' };
+        return { label: status, tone: 'text-foreground-subtle' };
+    }
+  };
+
+  const getStatusGroup = (status?: string) => {
+    switch (status) {
+      case 'PENDING_INVESTOR_APPROVAL':
+      case 'AWAITING_INVESTOR_APPROVAL':
+        return { key: 'approval', label: 'รออนุมัติ' };
+      case 'CONFIRMED':
+        return { key: 'confirmed', label: 'กำลังดำเนินการ' };
+      case 'PENDING':
+      case 'ACTIVE':
+      case 'EXTENDED':
+        return { key: 'active', label: 'ปกติ' };
+      case 'PENDING_SIGNATURE':
+        return { key: 'pending-signature', label: 'รอลงนาม' };
+      case 'COMPLETED':
+        return { key: 'completed', label: 'เสร็จสิ้น' };
+      case 'DEFAULTED':
+        return { key: 'defaulted', label: 'เลยกำหนด' };
+      case 'TERMINATED':
+        return { key: 'terminated', label: 'ยกเลิก' };
+      default:
+        return { key: 'other', label: status || 'อื่นๆ' };
     }
   };
 
@@ -102,11 +152,48 @@ function InvestorDashboardContent() {
     return diff;
   };
 
-  const activeContracts = myContracts.filter((contract) => !['COMPLETED', 'TERMINATED'].includes(contract.contract_status));
-  const completedContracts = myContracts.filter((contract) => ['COMPLETED', 'TERMINATED'].includes(contract.contract_status));
+  const getPrincipalIncreaseRequestForContract = (contract: any) => {
+    if (isInvestorPreviewMode()) {
+      return getMockPrincipalIncreaseRequestForContract(contract.contract_id);
+    }
+
+    return (
+      contract.principalIncreaseRequest ||
+      contract.principal_increase_request ||
+      contract.pending_principal_increase_request ||
+      null
+    );
+  };
+
+  const getDashboardDisplayStatus = (contract: any) => {
+    const requestStatus = getPrincipalIncreaseRequestForContract(contract)?.request_status;
+    if (INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES.has(requestStatus)) {
+      return requestStatus;
+    }
+
+    return contract.contract_status;
+  };
+
+  const statusTabs = [
+    { key: 'all', label: 'ทั้งหมด', count: myContracts.length },
+    ...Array.from(
+      new Map(
+        myContracts.map((contract) => {
+          const group = getStatusGroup(getDashboardDisplayStatus(contract));
+          const count = myContracts.filter((item) => getStatusGroup(getDashboardDisplayStatus(item)).key === group.key).length;
+          return [group.key, { ...group, count }];
+        })
+      ).values()
+    ),
+  ];
+
+  const filteredContracts = activeTab === 'all'
+    ? myContracts
+    : myContracts.filter((contract) => getStatusGroup(getDashboardDisplayStatus(contract)).key === activeTab);
 
   const renderContractCard = (contract: any) => {
-    const badge = getStatusBadge(contract.contract_status);
+    const displayStatus = getDashboardDisplayStatus(contract);
+    const badge = getStatusBadge(displayStatus);
     const daysRemaining = getDaysRemaining(contract.contract_end_date);
     const principal = Number(contract.loan_principal_amount || 0);
     const durationDays = Number(contract.contract_duration_days || 0);
@@ -118,45 +205,37 @@ function InvestorDashboardContent() {
       <div
         key={contract.contract_id}
         onClick={() => router.push(`/investor-dashboard/contract/${contract.contract_id}`)}
-        className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 cursor-pointer active:scale-[0.99] transition-transform"
+        className="hover-card cursor-pointer rounded-xl border border-s2-border bg-s2-soft p-4 shadow-soft transition-colors hover:bg-s2-soft/80"
       >
-        <div className="flex justify-between items-start gap-3 mb-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-2 h-2 rounded-full bg-[#1E3A8A] shrink-0"></div>
-            <h3 className="font-bold text-gray-800 text-base truncate">
-              {contract.items?.brand} {contract.items?.model}
-            </h3>
-          </div>
-          <span className={`${badge.color} shrink-0 whitespace-nowrap text-[10px] font-bold px-2.5 py-1 rounded-full`}>
-            {badge.text}
-          </span>
-        </div>
-
-        <div className="pl-4 border-l-2 border-gray-100 ml-1 my-3 space-y-1">
-          <div className="flex justify-between text-sm gap-3">
-            <span className="text-gray-500 text-xs">เงินต้น:</span>
-            <span className="font-bold text-gray-700 text-right">{contract.loan_principal_amount?.toLocaleString()} บาท</span>
-          </div>
-          <div className="flex justify-between text-sm gap-3">
-            <span className="text-gray-500 text-xs">ดอกเบี้ยรับ:</span>
-            <span className="font-bold text-[#1E3A8A] text-right">
-              +{investorInterest.toLocaleString()} บาท ({investorRatePercent.toFixed(2)}%)
+        <div className="mb-1 flex items-center justify-between gap-3 flex-nowrap">
+          <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
+            {contract.items?.brand} {contract.items?.model}
+          </h3>
+          <div className="shrink-0 rounded-full px-2 py-1 bg-background-white">
+            <span className={`${badge.tone} whitespace-nowrap text-xs font-medium px-4 py-1.5 rounded-full`}>
+              {badge.label}
             </span>
           </div>
-          <div className="flex justify-between text-sm pt-1 gap-3">
-            <span className="text-gray-400 text-[10px]">ครบกำหนด:</span>
-            <span className="text-gray-600 text-[10px] text-right">
+        </div>
+
+        <div className="mb-1 space-y-1">
+          <div className="text-sm text-foreground-subtle">
+            เงินต้น: <span className="text-foreground-muted">{principal.toLocaleString()} บาท</span>
+          </div>
+          <div className="text-sm text-foreground-subtle">
+            ดอกเบี้ยรับ: <span className="text-s2">{investorInterest.toLocaleString()} บาท ({investorRatePercent.toFixed(2)}%)</span>
+          </div>
+          <div className="text-sm text-foreground-subtle">
+            วันครบกำหนด:{' '}
+            <span className="text-foreground-muted">
               {new Date(contract.contract_end_date).toLocaleDateString('th-TH')}
               {daysRemaining > 0 ? ` (อีก ${daysRemaining} วัน)` : daysRemaining === 0 ? ' (วันนี้)' : ` (เลย ${Math.abs(daysRemaining)} วัน)`}
             </span>
           </div>
         </div>
 
-        <div className="flex gap-2 mt-3">
-          <button className="flex-1 py-2 bg-[#E9EFF6] text-[#1E3A8A] rounded-lg text-xs font-bold flex items-center justify-center gap-1">
-            ดูสัญญา
-            <ChevronRight className="w-3 h-3" />
-          </button>
+        <div className="mt-3 w-full rounded-full bg-s2/20 px-3 py-1 text-center text-xs font-light text-s2">
+          {contract.contract_number || contract.contract_id}
         </div>
       </div>
     );
@@ -164,30 +243,32 @@ function InvestorDashboardContent() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (!pinVerified) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm max-w-md w-full text-center">
-          <h2 className="text-lg font-bold text-gray-800">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
-          <p className="text-sm text-gray-500 mt-2">
-            เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการสินเชื่อของคุณ
-          </p>
-          <button
-            type="button"
-            onClick={() => setPinModalOpen(true)}
-            className="mt-4 w-full rounded-2xl bg-[#1E3A8A] py-3 text-sm font-bold text-white"
-          >
-            ยืนยัน PIN
-          </button>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center p-6">
+        <div className="w-full max-w-md rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white px-6 py-6 text-center shadow-soft">
+            <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-s2">
+              Secure Portfolio
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-foreground">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+            <p className="mt-2 text-sm text-foreground-subtle">
+              เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูรายการสินเชื่อของคุณ
+            </p>
+            <button
+              type="button"
+              onClick={() => setPinModalOpen(true)}
+              className="btn-transition btn-sheen mt-5 w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-3 text-sm font-bold text-s2-fg shadow-soft"
+            >
+              ยืนยัน PIN
+            </button>
+          </div>
         </div>
 
         {profile?.userId && (
@@ -208,67 +289,86 @@ function InvestorDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6 flex flex-col relative pb-6">
+    <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col">
 
-      {/* Header */}
-      <div className="mb-4">
-        <div className="flex justify-between items-end mb-4">
-          <div>
-            <h1 className="text-xl font-bold text-[#1E3A8A] leading-tight">
-              พอร์ตการลงทุน
-            </h1>
-            <p className="text-gray-500 text-xs font-light mt-1">
-              Investor: คุณ{investor?.firstname || profile?.displayName} {investor?.lastname || ''}
-            </p>
-          </div>
-          <div className="text-gray-400 text-xs font-light mb-1">
-            {myContracts.length} สัญญา
+        <div className="mb-5 rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
+              Investor Portfolio
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-s2">
+                  พอร์ตการลงทุน
+                </div>
+                <p className="mt-2 text-xs text-foreground-subtle">
+                  Investor: คุณ{investor?.firstname || profile?.displayName} {investor?.lastname || ''}
+                </p>
+              </div>
+              <div className="text-right text-sm font-light text-foreground-subtle">
+                {myContracts.length} รายการ
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* List Content Area */}
-      <div className="flex-1 overflow-y-auto space-y-3 pb-4">
-        {myContracts.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            <Wallet className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>คุณยังไม่มีสัญญาการลงทุน</p>
-            <button
-              onClick={() => router.push('/investor-offers')}
-              className="mt-4 text-[#1E3A8A] font-medium"
-            >
-              ดูข้อเสนอใหม่
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-gray-700">สัญญาที่ยังดำเนินการอยู่</h2>
-                <span className="text-xs text-gray-400">{activeContracts.length} รายการ</span>
-              </div>
-              {activeContracts.length === 0 ? (
-                <div className="bg-white rounded-2xl p-4 text-sm text-gray-500 text-center">ไม่มีสัญญาที่กำลังดำเนินการ</div>
-              ) : (
-                activeContracts.map(renderContractCard)
-              )}
+        <div className="flex-1 space-y-3 pb-8 no-scrollbar">
+          {myContracts.length === 0 ? (
+            <div className="rounded-xl border border-s2-border bg-background p-8 text-center">
+              <Wallet className="mx-auto mb-3 h-12 w-12 text-s2/45" />
+              <p className="text-foreground-subtle">คุณยังไม่มีสัญญาการลงทุน</p>
+              <button
+                onClick={() => router.push('/investor-offers')}
+                className="btn-transition mt-5 inline-flex min-h-12 items-center justify-center rounded-full border border-s2 bg-s2-soft px-5 py-3 text-sm font-medium text-s2"
+              >
+                ดูข้อเสนอใหม่
+              </button>
             </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-gray-700">สัญญาที่จบแล้ว</h2>
-                <span className="text-xs text-gray-400">{completedContracts.length} รายการ</span>
+          ) : (
+            <>
+              <div className="overflow-x-auto pb-1 no-scrollbar scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex gap-2 min-w-max">
+                  {statusTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`btn-transition rounded-full border px-4 py-2 text-sm ${
+                        activeTab === tab.key
+                          ? 'border-s2 bg-s2 text-s2-fg'
+                          : 'border-s2-border bg-background-white text-s2'
+                      }`}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
               </div>
-              {completedContracts.length === 0 ? (
-                <div className="bg-white rounded-2xl p-4 text-sm text-gray-500 text-center">ยังไม่มีสัญญาที่จบแล้ว</div>
-              ) : (
-                completedContracts.map(renderContractCard)
-              )}
-            </div>
-          </>
-        )}
-      </div>
 
+              <div className="space-y-3 pt-1">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-lg font-medium text-foreground">
+                    {activeTab === 'all'
+                      ? 'สัญญาทั้งหมด'
+                      : statusTabs.find((tab) => tab.key === activeTab)?.label || 'รายการสัญญา'}
+                  </h2>
+                  <div className="text-sm font-light text-foreground-subtle">
+                    {filteredContracts.length} รายการ
+                  </div>
+                </div>
+                {filteredContracts.length === 0 ? (
+                  <div className="rounded-xl border border-s2-border bg-background p-8 text-center">
+                    <p className="text-foreground-subtle">ไม่มีสัญญาในหมวดนี้</p>
+                  </div>
+                ) : (
+                  filteredContracts.map(renderContractCard)
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -276,11 +376,8 @@ function InvestorDashboardContent() {
 export default function InvestorDashboardPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     }>
       <InvestorDashboardContent />

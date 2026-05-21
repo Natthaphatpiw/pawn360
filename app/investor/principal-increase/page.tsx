@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { isInvestorPreviewMode, MOCK_PRINCIPAL_INCREASE_REQUEST_ID } from '@/lib/mock-investment';
 
 // Force dynamic rendering to avoid SSR issues with useSearchParams
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,12 @@ function InvestorPrincipalIncreaseEntryInner() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (!resolvedRequestId && isInvestorPreviewMode()) {
+      setRequestId(MOCK_PRINCIPAL_INCREASE_REQUEST_ID);
+      router.replace(`/investor/principal-increase/${MOCK_PRINCIPAL_INCREASE_REQUEST_ID}`);
+      return;
+    }
+
     if (resolvedRequestId) {
       setRequestId(resolvedRequestId);
       router.replace(`/investor/principal-increase/${resolvedRequestId}`);
@@ -33,11 +40,8 @@ function InvestorPrincipalIncreaseEntryInner() {
 
   if (requestId) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังเปิดรายละเอียด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
@@ -63,11 +67,8 @@ function InvestorPrincipalIncreaseEntryInner() {
 export default function InvestorPrincipalIncreaseEntry() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     }>
       <InvestorPrincipalIncreaseEntryInner />

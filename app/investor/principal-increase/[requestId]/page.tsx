@@ -6,6 +6,7 @@ import { ChevronLeft, TrendingUp, User, AlertTriangle, CheckCircle, X, Wallet } 
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import { getInvestorPrincipalIncreaseStatusMeta, getMockPrincipalIncreaseRequest, isInvestorPreviewMode } from '@/lib/mock-investment';
 
 export default function InvestorPrincipalIncreaseApprovalPage() {
   const router = useRouter();
@@ -39,6 +40,11 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   const fetchRequestDetails = async () => {
     try {
       setLoading(true);
+      if (isInvestorPreviewMode()) {
+        setRequestDetails(getMockPrincipalIncreaseRequest(requestId));
+        setError(null);
+        return;
+      }
       const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`);
       if (response.data.success) {
         setRequestDetails(response.data.request);
@@ -63,6 +69,10 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
 
     setSubmitting(true);
     try {
+      if (isInvestorPreviewMode()) {
+        setRequestDetails((current: any) => current ? { ...current, request_status: 'INVESTOR_REJECTED' } : current);
+        return;
+      }
       const response = await axios.post('/api/contract-actions/investor-response', {
         requestId,
         action: 'REJECT',
@@ -86,8 +96,8 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F0F4F8] font-sans flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]"></div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
@@ -115,6 +125,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   const contract = requestDetails?.contract;
   const item = contract?.items;
   const status = requestDetails?.request_status;
+  const statusMeta = getInvestorPrincipalIncreaseStatusMeta(status);
 
   // Show different states based on status
   if (status === 'COMPLETED' || status === 'INVESTOR_TRANSFERRED') {
@@ -234,6 +245,16 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
               <h2 className="font-bold text-gray-800">สัญญาเลขที่ {contract?.contract_number}</h2>
               <p className="text-xs text-gray-500">{item?.brand} {item?.model}</p>
             </div>
+          </div>
+
+          <div className="mb-4 rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-[#1D4ED8]">สถานะคำขอ</span>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1D4ED8]">
+                {statusMeta.label}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-[#1E3A8A]">{statusMeta.description}</p>
           </div>
 
           <div className="space-y-3 text-sm">

@@ -100,11 +100,11 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
 };
 
 const CREDIT_LIMIT_COLORS: Record<string, string> = {
-  Apple: '#0B3C8C',
-  'โทรศัพท์มือถือ': '#1F5FBF',
-  'โน้ตบุค': '#3E7FE0',
-  'กล้อง': '#6AA5F5',
-  'อุปกรณ์เสริมโทรศัพท์': '#9CC8FF',
+  Apple: 'var(--register-chart-1)',
+  'โทรศัพท์มือถือ': 'var(--register-chart-2)',
+  'โน้ตบุค': 'var(--register-chart-3)',
+  'กล้อง': 'var(--register-chart-4)',
+  'อุปกรณ์เสริมโทรศัพท์': 'var(--register-chart-5)',
 };
 
 const CREDIT_LIMIT_CATEGORIES = [
@@ -114,6 +114,10 @@ const CREDIT_LIMIT_CATEGORIES = [
   'กล้อง',
   'อุปกรณ์เสริมโทรศัพท์',
 ];
+
+const CREDIT_LIMIT_CATEGORY_ORDER = new Map(
+  CREDIT_LIMIT_CATEGORIES.map((category, index) => [category, index])
+);
 
 const REGISTER_CATEGORY_OPTIONS = [
   { key: 'Apple', labelTh: 'สินค้า Apple', labelEn: 'Apple products' },
@@ -478,7 +482,7 @@ export default function InvestorRegister() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center page-investor">
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />
       </div>
     );
@@ -487,12 +491,12 @@ export default function InvestorRegister() {
   if (investorData) {
     if (postRegistrationView === 'verified') {
       return (
-        <div className="min-h-screen bg-white flex items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-[30px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_22px_60px_rgba(11,59,130,0.14)]">
-            <div className="rounded-[24px] border border-white/90 bg-white/80 px-4 py-6 text-center shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3B82] text-3xl text-white">✓</div>
-              <h2 className="mt-4 text-2xl font-semibold text-[#243B62]">ยืนยันตัวตนสำเร็จ</h2>
-              <p className="mt-2 text-sm text-[#6F7E97]">
+        <div className="min-h-screen bg-background-white flex items-center justify-center p-6">
+          <div className="register-shell-strong w-full max-w-md rounded-[30px] p-4">
+            <div className="register-inner-card rounded-[24px] px-4 py-6 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-s2-active text-3xl text-s2-fg">✓</div>
+              <h2 className="register-heading mt-4 text-2xl font-semibold">ยืนยันตัวตนสำเร็จ</h2>
+              <p className="register-subtle mt-2 text-sm">
                 บัญชีนักลงทุนของคุณพร้อมใช้งานแล้ว สามารถกลับสู่หน้าหลักเพื่อดูข้อมูลสมาชิกได้ทันที
               </p>
               <button
@@ -501,7 +505,7 @@ export default function InvestorRegister() {
                   clearPostRegistrationEkycFlow();
                   setPinVerified(true);
                 }}
-                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition-transform active:scale-[0.98]"
+                className="register-primary-btn mt-5 w-full rounded-2xl py-3 text-sm font-medium transition-transform active:scale-[0.98]"
               >
                 กลับสู่หน้าหลัก
               </button>
@@ -513,12 +517,12 @@ export default function InvestorRegister() {
 
     if (postRegistrationView === 'pending') {
       return (
-        <div className="min-h-screen bg-white flex items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-[30px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_22px_60px_rgba(11,59,130,0.14)]">
-            <div className="rounded-[24px] border border-white/90 bg-white/80 px-4 py-6 text-center shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#E6EBF2] text-3xl text-[#0B3B82]">…</div>
-              <h2 className="mt-4 text-2xl font-semibold text-[#243B62]">Please wait for eKYC approving</h2>
-              <p className="mt-2 text-sm text-[#6F7E97]">
+        <div className="min-h-screen bg-background-white flex items-center justify-center p-6">
+          <div className="register-shell-strong w-full max-w-md rounded-[30px] p-4">
+            <div className="register-inner-card rounded-[24px] px-4 py-6 text-center">
+              <div className="register-surface-strong register-accent mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl">…</div>
+              <h2 className="register-heading mt-4 text-2xl font-semibold">Please wait for eKYC approving</h2>
+              <p className="register-subtle mt-2 text-sm">
                 ระบบกำลังตรวจสอบผลการยืนยันตัวตนของคุณ กรุณารอผลอนุมัติภายใน 24 ชั่วโมง
               </p>
               <button
@@ -530,7 +534,7 @@ export default function InvestorRegister() {
                     (window as any).liff.closeWindow();
                   }
                 }}
-                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition-transform active:scale-[0.98]"
+                className="register-primary-btn mt-5 w-full rounded-2xl py-3 text-sm font-medium transition-transform active:scale-[0.98]"
               >
                 ปิดหน้าต่าง
               </button>
@@ -542,20 +546,20 @@ export default function InvestorRegister() {
 
     if (!pinVerified) {
       return (
-        <div className="min-h-screen bg-white flex items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-[30px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_22px_60px_rgba(11,59,130,0.14)]">
-            <div className="rounded-[24px] border border-white/90 bg-white/80 px-4 py-5 text-center shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
-              <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+        <div className="min-h-screen bg-background-white flex items-center justify-center p-6">
+          <div className="register-shell-strong w-full max-w-md rounded-[30px] p-4">
+            <div className="register-inner-card rounded-[24px] px-4 py-5 text-center">
+              <div className="register-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                 Secure Access
               </div>
-              <h2 className="mt-3 text-xl font-semibold text-[#243B62]">ยืนยัน PIN ก่อนเข้าดูข้อมูลสมาชิก</h2>
-              <p className="mt-2 text-sm text-[#6F7E97]">
+              <h2 className="register-heading mt-3 text-xl font-semibold">ยืนยัน PIN ก่อนเข้าดูข้อมูลสมาชิก</h2>
+              <p className="register-subtle mt-2 text-sm">
                 เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูข้อมูลบัญชีผู้ลงทุน
               </p>
               <button
                 type="button"
                 onClick={() => setPinModalOpen(true)}
-                className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#6D8FC8] via-[#1E4FA3] to-[#0B3B82] py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(11,59,130,0.18)] transition-transform active:scale-[0.98]"
+                className="register-primary-btn mt-5 w-full rounded-2xl py-3 text-sm font-medium transition-transform active:scale-[0.98]"
               >
                 ยืนยัน PIN
               </button>
@@ -607,7 +611,7 @@ export default function InvestorRegister() {
           key,
           label: ITEM_TYPE_LABELS[key] || key,
           amount,
-          color: CREDIT_LIMIT_COLORS[key] || '#9DB5D9',
+          color: CREDIT_LIMIT_COLORS[key] || 'var(--register-chart-5)',
         };
       })
       .filter((category) => category.amount > 0);
@@ -626,10 +630,16 @@ export default function InvestorRegister() {
         key,
         label: ITEM_TYPE_LABELS[key] || key,
         amount,
-        color: CREDIT_LIMIT_COLORS[key] || '#9DB5D9',
+        color: CREDIT_LIMIT_COLORS[key] || 'var(--register-chart-5)',
       };
     });
-    const categoryLimits = [...configuredCategoryLimits, ...inferredCategoryLimits].filter((category) => category.amount > 0);
+    const categoryLimits = [...configuredCategoryLimits, ...inferredCategoryLimits]
+      .filter((category) => category.amount > 0)
+      .sort((left, right) => {
+        const leftOrder = CREDIT_LIMIT_CATEGORY_ORDER.get(left.key) ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = CREDIT_LIMIT_CATEGORY_ORDER.get(right.key) ?? Number.MAX_SAFE_INTEGER;
+        return leftOrder - rightOrder;
+      });
     const totalCategoryLimit = categoryLimits.reduce((sum, category) => sum + category.amount, 0);
     const unallocatedAmount = Math.max(0, maxLimit - totalCategoryLimit);
     const chartCategories = unallocatedAmount > 0
@@ -639,7 +649,7 @@ export default function InvestorRegister() {
             key: 'unallocated',
             label: 'Unallocated',
             amount: unallocatedAmount,
-            color: '#D3DCEB',
+            color: 'var(--register-chart-unallocated)',
           },
         ]
       : categoryLimits;
@@ -652,12 +662,12 @@ export default function InvestorRegister() {
     const autoLiquidationEnabled = !!investorData.auto_liquidation_enabled;
 
     return (
-      <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center pb-8">
-        <div className="w-full max-w-sm my-3 rounded-[28px] bg-gradient-to-br from-white via-[#E6EBF2] to-[#E4ECF8] shadow-[0_10px_30px_rgba(30,58,138,0.08)] border border-[#E4ECF8]">
-          <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white/90 mt-4 ml-4 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+      <div className="min-h-screen bg-background-white font-sans p-4 flex flex-col items-center pb-8 text-foreground">
+        <div className="register-shell w-full max-w-sm my-3 rounded-[28px]">
+          <div className="register-pill mt-4 ml-4 inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
             Investor Profile
           </div>
-          <button onClick={() => setTierModalOpen(true)} className="m-4 block overflow-hidden rounded-3xl active:scale-[0.98] transition-transform shadow-[0_10px_30px_rgba(30,58,138,0.15)]">
+          <button onClick={() => setTierModalOpen(true)} className="m-4 block overflow-hidden rounded-3xl active:scale-[0.98] transition-transform shadow-[0_10px_30px_color-mix(in_srgb,var(--s2-active)_15%,transparent)]">
             <Image
               src={tierImage}
               alt={`${TIER_LABELS[investorTier]} tier`}
@@ -665,48 +675,48 @@ export default function InvestorRegister() {
               className="block h-auto w-full"
             />
           </button>
-          <div className="bg-white/80 border border-white/90 rounded-2xl mx-4 p-4 text-center mb-4 shadow-[0_10px_24px_rgba(11,59,130,0.06)]">
-              <p className="text-xl font-medium text-gray-800 mb-2">{investorData.firstname} {investorData.lastname}</p>
-              <p className="text-[#393939] text-sm font-light">Member ID: {investorData.investor_id.slice(0, 8)}</p>
+          <div className="register-inner-card mx-4 mb-4 rounded-2xl p-4 text-center">
+              <p className="mb-2 text-xl font-medium text-foreground">{investorData.firstname} {investorData.lastname}</p>
+              <p className="text-sm font-light text-foreground-muted">Member ID: {investorData.investor_id.slice(0, 8)}</p>
             </div>
         </div>
         <div className="w-full max-w-sm space-y-3">
           {/* Current Limit */}
-          <div className="w-full bg-[#E6EBF2] rounded-3xl p-4 text-center">
-            <h2 className="text-gray-600 text-lg font-medium">วงเงินปัจจุบัน</h2>
-            {/* <span className="bg-white text-gray-500 text-xs px-3 py-1 rounded-full">
+          <div className="register-surface-strong w-full rounded-3xl p-4 text-center">
+            <h2 className="text-foreground-muted text-lg font-medium">วงเงินปัจจุบัน</h2>
+            {/* <span className="bg-background-white text-foreground-subtle text-xs px-3 py-1 rounded-full">
                 Credit limit
             </span> */}
             <div className="flex items-baseline justify-start gap-2 mt-3">
-              <span className="text-3xl font-medium text-[#06367B]">{currentLimit.toLocaleString()}</span>
-              <span className="text-gray-500 text-sm font-base">/ {maxLimit.toLocaleString()}</span>
+              <span className="register-accent text-3xl font-medium">{currentLimit.toLocaleString()}</span>
+              <span className="text-foreground-subtle text-sm font-base">/ {maxLimit.toLocaleString()}</span>
             </div>
             <div className="mt-1 w-full mx-auto">
-              <div className="mb-2 h-4 overflow-hidden rounded-full bg-[#D3DCEB]">
+              <div className="register-track mb-2 h-4 overflow-hidden rounded-full">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#1E3A8A] to-[#4F78C6] transition-all duration-300"
+                  className="register-progress h-full rounded-full transition-all duration-300"
                   style={{ width: `${usedPercent}%` }}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs text-[#5878A7]">
+              <div className="register-accent-soft flex items-center justify-between text-xs">
                 <span>วงเงินที่ใช้อยู่</span>
                 <span>{usedPercentDisplay}%</span>
               </div>
             </div>
-            <div className="mt-4 border-t border-white/70 pt-4">
+            <div className="register-divider mt-4 border-t pt-4">
               <button
                 type="button"
                 onClick={() => setCreditLimitsOpen((prev) => !prev)}
-                className="w-full rounded-2xl bg-white px-4 py-3 text-left transition-colors active:scale-[0.99]"
+                className="bg-background-white w-full rounded-2xl px-4 py-3 text-left transition-colors active:scale-[0.99]"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-[#06367B]">วงเงินเครดิตแยกตามหมวดหมู่</div>
-                    <div className="text-[11px] text-[#5878A7]">
+                    <div className="register-accent text-sm font-medium">วงเงินเครดิตแยกตามหมวดหมู่</div>
+                    <div className="register-accent-soft text-[11px]">
                       {categoryLimits.length > 0 ? `${categoryLimits.length} categories configured` : 'No category limit set yet'}
                     </div>
                   </div>
-                  <span className="rounded-full border border-[#B8C6DD] px-3 py-1 text-xs font-medium text-[#1E3A8A]">
+                  <span className="register-pill rounded-full px-3 py-1 text-xs font-medium">
                     {creditLimitsOpen ? 'ซ่อน' : 'แสดงเพิ่ม'}
                   </span>
                 </div>
@@ -714,17 +724,17 @@ export default function InvestorRegister() {
 
               <div className={`grid transition-all duration-[250ms] ease-in-out ${creditLimitsOpen ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'}`}>
                 <div className="overflow-hidden">
-                  <div className="rounded-2xl bg-white p-4 text-left">
+                  <div className="bg-background-white rounded-lg p-4 text-left">
                     {chartCategories.length > 0 ? (
                       <>
                         <div className="flex items-center gap-4">
                           <CreditLimitDonutChart categories={chartCategories} />
                           <div className="min-w-0 flex-1">
-                            <div className="text-[11px] uppercase tracking-[0.16em] text-[#7A8FB8]">Category total</div>
-                            <div className="mt-1 text-2xl font-medium text-[#06367B]">
+                            <div className="register-accent-soft text-[11px] uppercase tracking-[0.16em]">Category total</div>
+                            <div className="register-accent mt-1 text-2xl font-medium">
                               {totalCategoryLimit.toLocaleString()}
                             </div>
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-foreground-subtle">
                               {unallocatedAmount.toLocaleString()} บาท คงเหลือจากวงเงินเครดิตทั้งหมด
                             </div>
                           </div>
@@ -734,17 +744,17 @@ export default function InvestorRegister() {
                           {chartCategories.map((category) => {
                             const percentage = maxLimit > 0 ? (category.amount / maxLimit) * 100 : 0;
                             return (
-                              <div key={category.key} className="flex items-center justify-between rounded-2xl bg-[#F5F7FA] px-3 py-2">
+                              <div key={category.key} className="register-surface-muted flex items-center justify-between rounded-2xl px-3 py-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span
                                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                                     style={{ backgroundColor: category.color }}
                                   />
-                                  <span className="truncate text-sm text-gray-700">{category.label}</span>
+                                  <span className="truncate text-sm text-foreground-muted">{category.label}</span>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-sm font-medium text-[#06367B]">{category.amount.toLocaleString()}</div>
-                                  <div className="text-[11px] text-gray-500">{percentage.toFixed(1)}%</div>
+                                  <div className="register-accent text-sm font-medium">{category.amount.toLocaleString()}</div>
+                                  <div className="text-[11px] text-foreground-subtle">{percentage.toFixed(1)}%</div>
                                 </div>
                               </div>
                             );
@@ -752,7 +762,7 @@ export default function InvestorRegister() {
                         </div>
                       </>
                     ) : (
-                      <div className="rounded-2xl bg-[#F5F7FA] px-4 py-6 text-center text-sm text-gray-500">
+                      <div className="register-surface-muted rounded-2xl px-4 py-6 text-center text-sm text-foreground-subtle">
                         ยังไม่ได้กำหนดวงเงินแยกตามหมวดหมู่
                       </div>
                     )}
@@ -763,51 +773,51 @@ export default function InvestorRegister() {
           </div>
 
           {/* Investor Info */}
-          <div className="w-full bg-[#E6EBF2] rounded-3xl p-3 text-center">
+          <div className="register-surface-strong w-full rounded-3xl p-3 text-center">
 
-            <h2 className="text-gray-600 text-lg font-medium">สัญญาและการลงทุน</h2>
-            <div className="my-4 grid grid-cols-3 gap-2 text-center divide-x divide-[#B2C1D6]">
+            <h2 className="text-foreground-muted text-lg font-medium">สัญญาและการลงทุน</h2>
+            <div className="my-4 grid grid-cols-3 gap-2 text-center divide-x divide-s2-border">
               {[
                 { value: investorData.stats.totalContracts,  label: 'สัญญาทั้งหมด' },
                 { value: investorData.stats.activeContracts, label: 'สัญญายังไม่สิ้นสุด' },
                 { value: investorData.stats.endedContracts,  label: 'สัญญาสิ้นสุดแล้ว' },
               ].map((stat) => (
                 <div key={stat.label} className="px-2">
-                  <div className="text-2xl font-bold text-gray-700 mb-1">{stat.value}</div>
-                  <div className="text-xs text-gray-600 font-medium">{stat.label}</div>
+                  <div className="mb-1 text-2xl font-bold text-foreground-muted">{stat.value}</div>
+                  <div className="text-xs text-foreground-muted font-medium">{stat.label}</div>
                 </div>
               ))}
             </div>
             
-            <div className="mt-6 bg-white rounded-2xl p-4">
-              <div className="text-center text-gray-600 font-medium mb-3">Item preferences</div>
+            <div className="bg-background-white mt-6 rounded-2xl p-4">
+              <div className="mb-3 text-center text-foreground-muted font-medium">Item preferences</div>
               <div className="flex flex-wrap gap-2 justify-center">
                 {selectedCategories.length === 0 ? (
-                  <span className="text-xs text-gray-400">ยังไม่ได้ตั้งค่า</span>
+                  <span className="text-xs text-foreground-subtle">ยังไม่ได้ตั้งค่า</span>
                 ) : (
                   selectedCategories.map((key) => (
-                    <span key={key} className="px-3 py-1 rounded-full text-xs font-medium bg-[#5D79B4] text-white">
+                    <span key={key} className="register-chip-selected rounded-full px-3 py-1 text-xs font-medium">
                       {ITEM_TYPE_LABELS[key] || key}
                     </span>
                   ))
                 )}
               </div>
 
-            <div className="h-px bg-gray-300 my-3"></div>
+            <div className="my-3 h-px bg-line-soft"></div>
             
-              <div className="mt-4 space-y-2 text-xs text-gray-600">
+              <div className="mt-4 space-y-2 text-xs text-foreground-muted">
                 <div className="flex items-center justify-between">
                   <span>Auto matching</span>
-                  <span className={`px-2 py-0.5 rounded-full ${autoMatchAllowed ? (autoMatchEnabled ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-gray-100 text-gray-500') : 'bg-[#FEF3C7] text-[#92400E]'}`}>
+                  <span className={`px-2 py-0.5 rounded-full ${autoMatchAllowed ? (autoMatchEnabled ? 'bg-success-soft text-success-active' : 'bg-background-subtle text-foreground-subtle') : 'bg-warning-soft text-warning-active'}`}>
                     {autoMatchAllowed ? (autoMatchEnabled ? 'เปิดใช้งาน' : 'ปิด') : 'ยังไม่ปลดล็อก'}
                   </span>
                 </div>
                 {!autoMatchAllowed && remainingToNext > 0 && (
-                  <div className="text-[10px] text-gray-400 text-right">ปล่อยสัญญาเพิ่มอีก {remainingToNext.toLocaleString()} บาท เพื่อปลดล็อก</div>
+                  <div className="text-[10px] text-foreground-subtle text-right">ปล่อยสัญญาเพิ่มอีก {remainingToNext.toLocaleString()} บาท เพื่อปลดล็อก</div>
                 )}
                 <div className="flex items-center justify-between">
                   <span>Liquidated by Pawnly</span>
-                  <span className={`px-2 py-0.5 rounded-full ${autoLiquidationEnabled ? 'bg-[#D1FAE5] text-[#065F46]' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`px-2 py-0.5 rounded-full ${autoLiquidationEnabled ? 'bg-success-soft text-success-active' : 'bg-background-subtle text-foreground-subtle'}`}>
                     {autoLiquidationEnabled ? 'เปิดใช้งาน' : 'ปิด'}
                   </span>
                 </div>
@@ -817,18 +827,18 @@ export default function InvestorRegister() {
 
           {/* JUZMATCH Pool */}
           {showJuzmatchPool && (
-            <div className="w-full bg-[#E6EBF2] rounded-3xl p-3">
-              <h2 className="text-gray-600 text-lg font-medium text-center">JUZMATCH Pool</h2>
+            <div className="register-surface-strong w-full rounded-3xl p-3">
+              <h2 className="text-foreground-muted text-lg font-medium text-center">JUZMATCH Pool</h2>
               <div className="mt-4 flex items-center gap-4">
                 <JuzmatchPoolDonut transferredPercentDisplay={transferredPercentDisplay} transferredPercent={transferredPercent} />
                 <div className="flex-1 space-y-2">
-                  <div className="rounded-2xl bg-white px-3 py-2">
-                    <div className="text-xs text-gray-500">เหลือใน JuzMatch pool</div>
-                    <div className="text-base font-medium text-[#06367B]">{leftInJuzMatchPool.toLocaleString()} บาท</div>
+                  <div className="bg-background-white rounded-2xl px-3 py-2">
+                    <div className="text-xs text-foreground-subtle">เหลือใน JuzMatch pool</div>
+                    <div className="register-accent text-base font-medium">{leftInJuzMatchPool.toLocaleString()} บาท</div>
                   </div>
-                  <div className="rounded-2xl bg-white px-3 py-2">
-                    <div className="text-xs text-gray-500">โอนเข้าแพลตฟอร์มแล้ว</div>
-                    <div className="text-base font-medium text-[#06367B]">{transferredAmount.toLocaleString()} บาท</div>
+                  <div className="bg-background-white rounded-2xl px-3 py-2">
+                    <div className="text-xs text-foreground-subtle">โอนเข้าแพลตฟอร์มแล้ว</div>
+                    <div className="register-accent text-base font-medium">{transferredAmount.toLocaleString()} บาท</div>
                   </div>
                 </div>
               </div>
@@ -837,18 +847,18 @@ export default function InvestorRegister() {
 
           {/* Button group */}
           <div className="space-y-2 pt-4">
-            <button onClick={() => router.push('/register-invest/credit-limit')} className="w-full bg-white border border-[#3B5BA5] text-[#1E3A8A] rounded-full py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98]">
+            <button onClick={() => router.push('/register-invest/credit-limit')} className="register-outline-btn w-full rounded-full py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98]">
               <span className="text-base font-medium">ตั้งค่าการลงทุน</span>
               <span className="text-xs opacity-80 font-light">Configure investment</span>
             </button>
-            <button onClick={() => router.push('/register-invest/edit')} className="w-full bg-[#E9EFF6] text-[#1E3A8A] rounded-full py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98]">
+            <button onClick={() => router.push('/register-invest/edit')} className="register-secondary-btn w-full rounded-full py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98]">
               <span className="text-base font-medium">แก้ไขข้อมูล</span>
               <span className="text-xs opacity-80 font-light">Edit profile</span>
             </button>
             {investorData.kyc_status !== 'VERIFIED' && (
               <button
                 onClick={() => router.push(investorData.kyc_status === 'PENDING' ? '/ekyc-invest/waiting' : '/ekyc-invest')}
-                className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-full py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
+                className="register-primary-btn w-full rounded-full py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98]"
               >
                 <span className="text-base font-medium">ยืนยันตัวตน</span>
                 <span className="text-xs opacity-80 font-light">Verify identity</span>
@@ -859,43 +869,43 @@ export default function InvestorRegister() {
 
         {tierModalOpen && (
           <div
-            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            className="register-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={() => setTierModalOpen(false)}
           >
             <div
-              className="w-full max-w-sm bg-white rounded-3xl shadow-xl p-5"
+              className="bg-background-white w-full max-w-sm rounded-3xl p-5 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <div className="text-xs text-gray-400">Tier ของคุณ</div>
-                  <div className="text-xl font-bold text-gray-800">{TIER_LABELS[investorTier]}</div>
-                  <div className="text-sm text-[#1E3A8A] mt-1">{`${(monthlyRate * 100).toFixed(2)}% / เดือน • ${annualRate.toFixed(2)}% / ปี`}</div>
+                  <div className="text-xs text-foreground-subtle">Tier ของคุณ</div>
+                  <div className="text-xl font-bold text-foreground">{TIER_LABELS[investorTier]}</div>
+                  <div className="register-accent mt-1 text-sm">{`${(monthlyRate * 100).toFixed(2)}% / เดือน • ${annualRate.toFixed(2)}% / ปี`}</div>
                 </div>
                 <button
                   onClick={() => setTierModalOpen(false)}
                   aria-label="Close tier modal"
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-foreground-subtle hover:text-foreground-muted transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
               <div className="space-y-3 text-sm">
                 {[
-                  { tier: 'SILVER', label: 'Silver', desc: 'เริ่มต้น • ผลตอบแทน 1.50%/เดือน (18%/ปี)', sub: 'รับข้อเสนอสินเชื่อทั่วไป', highlight: 'border-[#CBD6EA] bg-[#F5F7FA]' },
-                  { tier: 'GOLD',   label: 'Gold',   desc: 'ยอดสัญญารวม ≥ 400,000 บาท', sub: 'ผลตอบแทน 1.53%/เดือน (18.36%/ปี) + เปิดใช้ Auto matching', highlight: 'border-[#C9A33B] bg-[#FFF8E7]' },
-                  { tier: 'PLATINUM', label: 'Platinum', desc: 'ยอดสัญญารวม ≥ 1,000,000 บาท', sub: 'ผลตอบแทน 1.60%/เดือน (19.20%/ปี) • สิทธิ์สูงสุด', highlight: 'border-[#B4B4B4] bg-[#F7F7F7]' },
+                  { tier: 'SILVER', label: 'Silver', desc: 'เริ่มต้น • ผลตอบแทน 1.50%/เดือน (18%/ปี)', sub: 'รับข้อเสนอสินเชื่อทั่วไป', highlight: 'border-s2-border register-surface-muted' },
+                  { tier: 'GOLD',   label: 'Gold',   desc: 'ยอดสัญญารวม ≥ 400,000 บาท', sub: 'ผลตอบแทน 1.53%/เดือน (18.36%/ปี) + เปิดใช้ Auto matching', highlight: 'border-warning-border bg-warning-soft' },
+                  { tier: 'PLATINUM', label: 'Platinum', desc: 'ยอดสัญญารวม ≥ 1,000,000 บาท', sub: 'ผลตอบแทน 1.60%/เดือน (19.20%/ปี) • สิทธิ์สูงสุด', highlight: 'border-line-soft bg-background-subtle' },
                 ].map((t) => (
-                  <div key={t.tier} className={`rounded-2xl border px-4 py-3 ${investorTier === t.tier ? t.highlight : 'border-gray-200'}`}>
-                    <div className="font-semibold text-gray-800">{t.label}</div>
-                    <div className="text-xs text-gray-500">{t.desc}</div>
-                    <div className="text-xs text-gray-500 mt-1">{t.sub}</div>
+                  <div key={t.tier} className={`rounded-2xl border px-4 py-3 ${investorTier === t.tier ? t.highlight : 'border-line-soft'}`}>
+                    <div className="font-semibold text-foreground">{t.label}</div>
+                    <div className="text-xs text-foreground-subtle">{t.desc}</div>
+                    <div className="mt-1 text-xs text-foreground-subtle">{t.sub}</div>
                   </div>
                 ))}
               </div>
               {nextTier && (
-                <div className="mt-4 rounded-2xl bg-[#F1F5FB] px-4 py-3 text-xs text-gray-600">
-                  <div className="font-semibold text-gray-800 mb-1">Tier ถัดไป: {TIER_LABELS[nextTier]}</div>
+                <div className="register-surface-muted mt-4 rounded-2xl px-4 py-3 text-xs text-foreground-muted">
+                  <div className="mb-1 font-semibold text-foreground">Tier ถัดไป: {TIER_LABELS[nextTier]}</div>
                   <div>เพิ่มยอดสัญญาอีก {remainingToNext.toLocaleString()} บาทเพื่อเลื่อนระดับ</div>
                 </div>
               )}
@@ -931,21 +941,21 @@ const RegisterField = ({ labelEn, labelTh, placeholder, value, onChange, name, t
 }) => (
   <div className="mb-4">
     <div className="mb-1">
-      <div className="text-sm font-medium text-gray-800 md:text-base">{labelEn}</div>
-      <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>
+      <div className="text-sm font-medium text-foreground md:text-base">{labelEn}</div>
+      <div className="register-subtle text-xs font-light">{labelTh}</div>
     </div>
     <input type={type} name={name} placeholder={placeholder} value={value} onChange={onChange}
-      className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]" />
+      className="register-input w-full rounded-xl px-3 py-3" />
   </div>
 );
 
 const StaticInfoField = ({ labelEn, labelTh, value }: { labelEn: string; labelTh: string; value: string }) => (
   <div className="mb-4">
     <div className="mb-1">
-      <div className="text-sm font-medium text-gray-800 md:text-base">{labelEn}</div>
-      <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>
+      <div className="text-sm font-medium text-foreground md:text-base">{labelEn}</div>
+      <div className="register-subtle text-xs font-light">{labelTh}</div>
     </div>
-    <div className="w-full rounded-xl border border-[#D9E3F2] bg-[#F3F6FB] px-3 py-3 text-gray-700">
+    <div className="register-static-field w-full rounded-xl px-3 py-3">
       {value || '-'}
     </div>
   </div>
@@ -993,29 +1003,29 @@ function DropdownField({
   return (
     <div className="mb-4" ref={containerRef}>
       <div className="mb-1">
-        <div className="text-sm font-medium text-gray-800 md:text-base">{labelEn}</div>
-        <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>
+        <div className="text-sm font-medium text-foreground md:text-base">{labelEn}</div>
+        <div className="register-subtle text-xs font-light">{labelTh}</div>
       </div>
       <div className="relative">
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-left text-base text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
+          className="register-select-trigger flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base"
           aria-expanded={open}
         >
-          <span className={value ? 'text-gray-800' : 'text-gray-400'}>{value || placeholder}</span>
-          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+          <span className={value ? 'text-foreground' : 'register-select-placeholder'}>{value || placeholder}</span>
+          <ChevronDown className={`h-4 w-4 text-foreground-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
 
         {open && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+          <div className="register-select-menu absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl">
             <div className="max-h-60 overflow-y-auto py-1">
               {options.map((option) => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => handleSelect(option)}
-                  className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option ? 'bg-[#E8F0FF] text-[#1E3A8A]' : 'text-gray-700 hover:bg-gray-50'}`}
+                  className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option ? 'register-select-option-active' : 'text-foreground-muted hover:bg-background-subtle'}`}
                 >
                   {option}
                 </button>
@@ -1030,7 +1040,7 @@ function DropdownField({
 
 function StepBar({ currentStep, steps }: { currentStep: number; steps: Array<{ id: number; label: string }> }) {
   return (
-    <div className="mb-4 rounded-[24px] border border-[#D9E3F2] bg-white/90 p-2 shadow-[0_8px_18px_rgba(11,59,130,0.06)]">
+    <div className="register-panel mb-4 rounded-[24px] p-2">
       <div
         className="grid gap-2"
         style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}
@@ -1043,23 +1053,23 @@ function StepBar({ currentStep, steps }: { currentStep: number; steps: Array<{ i
                   key={step.id}
                   className={`flex min-h-[66px] flex-col items-center justify-center rounded-[18px] border px-2 py-3 text-center ${
                     completed
-                      ? 'border-[#1E4FA3] bg-[#1E4FA3]'
+                      ? 'register-step-done'
                       : current
-                      ? 'border-[#1E4FA3] bg-[rgba(30,79,163,0.5)]'
-                      : 'border-[#D9E3F2] bg-white'
+                      ? 'register-step-current'
+                      : 'register-step-idle'
                   }`}
                 >
                   <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
                     completed || current
-                      ? 'bg-white text-[#0B3B82]'
-                      : 'bg-[#E6EBF2] text-[#6F7E97]'
+                      ? 'bg-background-white text-s2-active'
+                      : 'register-surface-strong register-subtle'
                   }`}>
                     {step.id}
                   </div>
                   <span className={`mt-1 text-[11px] font-medium ${
                     completed || current
                       ? 'text-white'
-                      : 'text-[#8A98B2]'
+                      : 'text-foreground-subtle'
                   }`}>{step.label}</span>
                 </div>
             );
@@ -1099,7 +1109,7 @@ function CreditLimitDonutChart({ categories }: { categories: Array<{ key: string
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#D8E0ED"
+          stroke="var(--register-ring-track)"
           strokeWidth={strokeWidth}
         />
         {[...segments].reverse().map((category) => (
@@ -1117,9 +1127,9 @@ function CreditLimitDonutChart({ categories }: { categories: Array<{ key: string
           />
         ))}
       </svg>
-      <div className="absolute inset-[22px] rounded-full bg-white flex flex-col items-center justify-center">
-        <span className="text-xl font-medium text-[#06367B]">{categories.length}</span>
-        <span className="text-[10px] text-gray-500 text-center leading-tight">Categories</span>
+      <div className="absolute inset-[22px] rounded-full bg-background-white flex flex-col items-center justify-center">
+        <span className="register-accent text-xl font-medium">{categories.length}</span>
+        <span className="text-[10px] text-foreground-subtle text-center leading-tight">Categories</span>
       </div>
     </div>
   );
@@ -1140,7 +1150,7 @@ function JuzmatchPoolDonut({ transferredPercentDisplay, transferredPercent }: { 
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#C7D1E3"
+          stroke="var(--register-ring-track)"
           strokeWidth={strokeWidth}
         />
         {segmentLength > 0 && (
@@ -1149,16 +1159,16 @@ function JuzmatchPoolDonut({ transferredPercentDisplay, transferredPercent }: { 
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#1E3A8A"
+            stroke="var(--register-ring-fill)"
             strokeWidth={strokeWidth}
             strokeDasharray={`${segmentLength} ${circumference}`}
             strokeLinecap="round"
           />
         )}
       </svg>
-      <div className="absolute inset-[10px] rounded-full bg-[#D3DCEB] flex flex-col items-center justify-center">
-        <span className="text-xl font-medium text-[#06367B]">{transferredPercentDisplay}%</span>
-        <span className="text-[10px] text-gray-500">Transferred</span>
+      <div className="register-surface-strong absolute inset-[10px] flex rounded-full items-center justify-center flex-col">
+        <span className="register-accent text-xl font-medium">{transferredPercentDisplay}%</span>
+        <span className="text-[10px] text-foreground-subtle">Transferred</span>
       </div>
     </div>
   );
@@ -1321,7 +1331,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
   };
 
   return (
-    <div className={`min-h-screen font-sans ${stepKey === 'welcome' ? 'bg-gradient-to-br from-[#0F4FAE] via-[#2D69C7] to-[#8BB8F2]' : 'bg-white'}`}>
+    <div className={`min-h-screen font-sans ${stepKey === 'welcome' ? 'register-hero' : 'bg-background-white'} ${stepKey === 'welcome' ? 'text-white' : 'text-foreground'}`}>
       <style jsx>{`
         @keyframes step-enter-up {
           from { opacity: 0; transform: translateY(28px); }
@@ -1368,12 +1378,12 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             {stepKey === 'welcome' && (
               <div className="relative min-h-screen overflow-hidden px-6 py-10 text-white">
                 <div className="pointer-events-none absolute inset-0">
-                  <div className="absolute left-[-18px] top-8 h-28 w-28 rounded-full bg-white/14" style={{ animation: 'float-blob 6.2s ease-in-out infinite' }} />
-                  <div className="absolute right-[-12px] top-16 h-24 w-24 rounded-full bg-[#DCEAFE]/18" style={{ animation: 'float-blob 7.1s ease-in-out infinite' }} />
-                  <div className="absolute bottom-[-18px] left-16 h-32 w-32 rounded-full bg-white/10" style={{ animation: 'float-blob 8s ease-in-out infinite' }} />
-                  <div className="absolute right-10 top-8 h-2.5 w-2.5 rounded-full bg-white/70" style={{ animation: 'pulse-star 3.1s ease-in-out infinite' }} />
-                  <div className="absolute left-24 top-24 h-2 w-2 rounded-full bg-white/60" style={{ animation: 'pulse-star 2.7s ease-in-out infinite' }} />
-                  <div className="absolute bottom-20 right-20 h-3 w-3 rounded-full bg-[#EAF4FF]/80" style={{ animation: 'pulse-star 3.4s ease-in-out infinite' }} />
+                  <div className="register-blob-a absolute left-[-18px] top-8 h-28 w-28 rounded-full" style={{ animation: 'float-blob 6.2s ease-in-out infinite' }} />
+                  <div className="register-blob-b absolute right-[-12px] top-16 h-24 w-24 rounded-full" style={{ animation: 'float-blob 7.1s ease-in-out infinite' }} />
+                  <div className="register-blob-c absolute bottom-[-18px] left-16 h-32 w-32 rounded-full" style={{ animation: 'float-blob 8s ease-in-out infinite' }} />
+                  <div className="register-star-a absolute right-10 top-8 h-2.5 w-2.5 rounded-full" style={{ animation: 'pulse-star 3.1s ease-in-out infinite' }} />
+                  <div className="register-star-b absolute left-24 top-24 h-2 w-2 rounded-full" style={{ animation: 'pulse-star 2.7s ease-in-out infinite' }} />
+                  <div className="register-star-c absolute bottom-20 right-20 h-3 w-3 rounded-full" style={{ animation: 'pulse-star 3.4s ease-in-out infinite' }} />
                 </div>
                 <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-md flex-col justify-center">
                   <div className="mb-8 flex justify-center">
@@ -1384,19 +1394,19 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                       className="h-auto w-[180px]"
                     />
                   </div>
-                  <div className="inline-flex w-fit rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/90">
+                  <div className="register-hero-pill inline-flex w-fit rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                     Welcome To Pawnly
                   </div>
                   <h1 className="mt-4 text-3xl font-semibold leading-tight">เริ่มต้นเป็นสมาชิกนักลงทุนกับ Pawnly</h1>
-                  <p className="mt-3 max-w-sm text-sm text-white/90">
+                  <p className="register-hero-copy mt-3 max-w-sm text-sm">
                     เลือกเส้นทางที่เหมาะกับคุณก่อนเริ่มสมัครสมาชิก ระบบจะพาคุณไปทีละขั้นจนพร้อมเข้าสู่หน้าสมาชิก
                   </p>
-                  <div className="mt-8 rounded-[26px] border border-white/20 bg-white/14 p-4 backdrop-blur-[1px]">
+                  <div className="register-hero-panel mt-8 rounded-[26px] p-4 backdrop-blur-[1px]">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18 text-2xl">✦</div>
+                      <div className="register-hero-icon flex h-14 w-14 items-center justify-center rounded-2xl text-2xl">✦</div>
                       <div>
                         <div className="text-base font-medium">เส้นทางสมัครสมาชิกใหม่</div>
-                        <div className="text-xs text-white/80">รองรับทั้งนักลงทุนทั่วไปและลูกค้า JUZMATCH</div>
+                        <div className="register-hero-copy-soft text-xs">รองรับทั้งนักลงทุนทั่วไปและลูกค้า JUZMATCH</div>
                       </div>
                     </div>
                   </div>
@@ -1405,12 +1415,12 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             )}
 
             {stepKey === 'referral' && (
-              <div className="rounded-[32px] border border-[#D9E3F2] bg-gradient-to-br from-[#0F4FAE] via-[#2D69C7] to-[#8BB8F2] p-5 text-white shadow-[0_18px_45px_rgba(11,59,130,0.22)]">
-                <div className="inline-flex rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/90">
+              <div className="register-hero rounded-[32px] border border-s2-border p-5 text-white shadow-[0_18px_45px_color-mix(in_srgb,var(--s2-active)_22%,transparent)]">
+                <div className="register-hero-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                   Referral Entry
                 </div>
                 <h2 className="mt-4 text-2xl font-semibold">คุณมี Referral code หรือไม่</h2>
-                <p className="mt-2 text-sm text-white/85">หากมีรหัสจาก JUZMATCH หรือเพื่อน สามารถกรอกเพื่อกำหนดสิทธิ์และเส้นทางสมัครได้ทันที</p>
+                <p className="register-hero-copy mt-2 text-sm">หากมีรหัสจาก JUZMATCH หรือเพื่อน สามารถกรอกเพื่อกำหนดสิทธิ์และเส้นทางสมัครได้ทันที</p>
                 <div className="mt-6 space-y-3">
                   {[
                     { value: true, title: 'มี Referral code', desc: 'ใช้สำหรับลูกค้า JUZMATCH หรือรหัสแนะนำจากเพื่อน' },
@@ -1420,33 +1430,33 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                       key={String(option.value)}
                       type="button"
                       onClick={() => setHasReferralCode(option.value)}
-                      className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
+                        className={`w-full rounded-[24px] border px-4 py-4 text-left transition-all ${
                         hasReferralCode === option.value
-                          ? 'border-white bg-white text-[#0B3B82] shadow-[0_10px_24px_rgba(11,59,130,0.18)]'
-                          : 'border-white/25 bg-white/12 text-white'
+                          ? 'border-white bg-background-white text-s2-active shadow-[0_10px_24px_color-mix(in_srgb,var(--s2-active)_18%,transparent)]'
+                          : 'register-hero-panel text-white'
                       }`}
                     >
                       <div className="text-base font-medium">{option.title}</div>
-                      <div className={`mt-1 text-xs ${hasReferralCode === option.value ? 'text-[#5C76A6]' : 'text-white/78'}`}>{option.desc}</div>
+                      <div className={`mt-1 text-xs ${hasReferralCode === option.value ? 'register-accent-soft' : 'register-hero-copy-soft'}`}>{option.desc}</div>
                     </button>
                   ))}
                 </div>
                 {hasReferralCode && (
                   <div
-                    className="mt-5 rounded-[24px] bg-white p-4 text-[#243B62] shadow-[0_10px_24px_rgba(11,59,130,0.18)]"
+                    className="bg-background-white mt-5 rounded-[24px] p-4 text-foreground shadow-[0_10px_24px_color-mix(in_srgb,var(--s2-active)_18%,transparent)]"
                     style={{ animation: 'referral-reveal 220ms ease' }}
                   >
                     <div className="text-sm font-medium">Referral code</div>
-                    {/* <div className="mt-1 text-xs text-[#6F7E97]">ตัวอย่าง JUZMATCH: `JM260001` หรือรหัสเพื่อน: `FR260001`</div> */}
+                    {/* <div className="register-subtle mt-1 text-xs">ตัวอย่าง JUZMATCH: `JM260001` หรือรหัสเพื่อน: `FR260001`</div> */}
                     <input
                       type="text"
                       name="referralCode"
                       placeholder="AA260001"
                       value={formData.referralCode}
                       onChange={handleInputChange}
-                      className="mt-3 w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-base text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
+                      className="register-input mt-3 w-full rounded-xl px-3 py-3 text-base"
                     />
-                    <div className={`mt-2 text-xs ${referralPreview.isValid ? 'text-[#1E4FA3]' : 'text-[#B42318]'}`}>
+                    <div className={`mt-2 text-xs ${referralPreview.isValid ? 'text-s2-active' : 'text-error'}`}>
                       {referralPreview.isValid
                         ? referralPreview.source === 'JUZMATCH'
                           ? 'ตรวจพบรหัส JUZMATCH ระบบจะดึงข้อมูลที่ JUZMATCH บันทึกไว้มาแสดงแบบอัตโนมัติ'
@@ -1454,7 +1464,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                         : ''}
                     </div>
                     {referralPreview.source === 'JUZMATCH' && referralPreview.isValid && (
-                      <div className="mt-3 rounded-2xl border border-[#D9E3F2] bg-[#F4F8FD] px-3 py-3 text-xs text-[#5C76A6]">
+                      <div className="register-surface mt-3 rounded-2xl border border-s2-border px-3 py-3 text-xs register-accent-soft">
                         รหัสนี้จะใช้ค้นหาข้อมูลนักลงทุนจาก JUZMATCH console ซึ่งทีมงาน JUZMATCH บันทึกไว้ล่วงหน้า แล้วนำมา Autofill ในขั้นตอนถัดไป
                       </div>
                     )}
@@ -1465,27 +1475,27 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
 
             {stepKey === 'details' && (
               <>
-                <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-                  <div className="mb-5 rounded-[24px] border border-white/80 bg-white/70 px-4 py-4">
-                    <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+                <div className="register-shell rounded-[28px] p-4 pb-0">
+                  <div className="register-inner-card mb-5 rounded-[24px] px-4 py-4">
+                    <div className="register-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                       {isJuzmatchReferral ? 'JUZMATCH Investor' : 'Investor Register'}
                     </div>
-                    <div className="mt-3 bg-gradient-to-r from-[#0B3B82] via-[#1E4FA3] to-[#6D8FC8] bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+                    <div className="register-title mt-3 text-3xl font-semibold tracking-[0.08em]">
                       {isJuzmatchReferral ? 'สมาชิกจาก JUZMATCH' : 'สมัครสมาชิก'}
                     </div>
-                    <p className="mt-1 text-xs text-[#6F7E97]">
+                    <p className="register-subtle mt-1 text-xs">
                       {isJuzmatchReferral ? 'ข้อมูลชุดนี้มาจาก JUZMATCH ด้วย referral code ที่คุณกรอกไว้ และไม่สามารถแก้ไขในหน้านี้ได้' : 'กรอกข้อมูลส่วนตัว ที่อยู่ และบัญชีธนาคารก่อนตั้งค่าการลงทุน'}
                     </p>
                     {/* {isJuzmatchReferral && (
-                      <div className="mt-4 rounded-2xl border border-[#D9E3F2] bg-[#F4F8FD] px-4 py-3 text-xs text-[#5C76A6]">
+                      <div className="register-surface mt-4 rounded-2xl border border-s2-border px-4 py-3 text-xs register-accent-soft">
                         ข้อมูลส่วนตัว ที่อยู่ บัญชีธนาคาร และวงเงินรวมในเส้นทางนี้ เป็นข้อมูลที่ JUZMATCH admin กรอกไว้ในระบบก่อนส่งรหัส `JMYYXXXX` ให้คุณ
                       </div>
                     )} */}
                   </div>
 
                   <div className="mb-2">
-                    <h2 className="text-lg font-bold text-[#243B62]">Personal Information</h2>
-                    <p className="text-xs text-[#6F7E97]">ข้อมูลส่วนตัว</p>
+                    <h2 className="register-heading text-lg font-bold">Personal Information</h2>
+                    <p className="register-subtle text-xs">ข้อมูลส่วนตัว</p>
                   </div>
                   <div className="space-y-1">
                     {isJuzmatchReferral ? (
@@ -1506,10 +1516,10 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+                <div className="register-shell mt-4 rounded-[28px] p-4 pb-0">
                   <div className="mb-4">
-                    <h2 className="text-lg font-bold text-[#243B62]">Address</h2>
-                    <p className="text-xs text-[#6F7E97]">ที่อยู่</p>
+                    <h2 className="register-heading text-lg font-bold">Address</h2>
+                    <p className="register-subtle text-xs">ที่อยู่</p>
                   </div>
                   <div className="space-y-1">
                     {isJuzmatchReferral ? (
@@ -1540,21 +1550,21 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 pb-0 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+                <div className="register-shell mt-4 rounded-[28px] p-4 pb-0">
                   <div className="mb-4">
-                    <h2 className="text-lg font-bold text-[#243B62]">Bank Account</h2>
-                    <p className="text-xs text-[#6F7E97]">ข้อมูลบัญชีธนาคาร</p>
+                    <h2 className="register-heading text-lg font-bold">Bank Account</h2>
+                    <p className="register-subtle text-xs">ข้อมูลบัญชีธนาคาร</p>
                   </div>
                   {isJuzmatchReferral ? (
                     <>
-                      <div className="rounded-[24px] border border-[#D9E3F2] bg-white/80 px-4 py-4 shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
-                        <div className="inline-flex rounded-full border border-[#CFE0F5] bg-[#F4F8FD] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#5C76A6]">
+                      <div className="register-panel rounded-[24px] px-4 py-4">
+                        <div className="register-surface register-accent-soft inline-flex rounded-full border border-s2-border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]">
                           JUZMATCH Pool
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-[#42597D]">
+                        <p className="mt-3 text-sm leading-6 text-foreground-muted">
                           บัญชีลงทุนหลักของคุณมีเงิน Escrow หรือวงเงินที่ถืออยู่ใน JUZMATCH Pool อยู่แล้ว หากต้องการเพิ่มวงเงินลงทุนให้มากกว่ายอดใน Pool คุณสามารถเพิ่มบัญชีส่วนตัวไว้ล่วงหน้าได้
                         </p>
-                        {/* <p className="mt-2 text-xs leading-5 text-[#6F7E97]">
+                        {/* <p className="register-subtle mt-2 text-xs leading-5">
                           บัญชีนี้เป็นตัวเลือกเพิ่มเติม ระบบจะใช้ JUZMATCH Pool ก่อน และเมื่อ Pool ไม่พอ ระบบจะสลับไปใช้บัญชีส่วนตัวพร้อมแจ้งให้คุณโอนเงินเข้าดีลนั้นด้วยตนเอง หากยังไม่ต้องการเพิ่มตอนนี้ คุณสามารถกลับมาเพิ่มภายหลังได้ในหน้าแก้ไขข้อมูลสมาชิก
                         </p> */}
                       </div>
@@ -1564,18 +1574,18 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                         onClick={() => setAddPersonalBankAccount((prev) => !prev)}
                         className={`mt-4 flex w-full items-center justify-between rounded-[22px] border px-4 py-4 text-left transition-all ${
                           addPersonalBankAccount
-                            ? 'border-[#1E4FA3] bg-white shadow-[0_10px_22px_rgba(11,59,130,0.08)]'
-                            : 'border-[#D9E3F2] bg-white/70'
+                            ? 'border-s2-active bg-background-white shadow-[0_10px_22px_color-mix(in_srgb,var(--s2-active)_8%,transparent)]'
+                            : 'register-panel'
                         }`}
                         aria-pressed={addPersonalBankAccount}
                       >
                         <div>
-                          <div className="text-sm font-semibold text-[#243B62]">เพิ่มบัญชีส่วนตัว</div>
-                          <div className="mt-1 text-xs text-[#6F7E97]">
+                          <div className="register-heading text-sm font-semibold">เพิ่มบัญชีส่วนตัว</div>
+                          <div className="register-subtle mt-1 text-xs">
                             ตัวเลือกเสริมสำหรับนักลงทุนที่ต้องการใช้วงเงินเกินจาก JUZMATCH Pool
                           </div>
                         </div>
-                        <div className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors ${addPersonalBankAccount ? 'justify-end bg-[#1E4FA3]' : 'justify-start bg-[#D5DDE9]'}`}>
+                        <div className={`flex h-7 w-12 items-center rounded-full p-1 transition-colors ${addPersonalBankAccount ? 'justify-end bg-s2-active' : 'justify-start bg-line-soft'}`}>
                           <span className="h-5 w-5 rounded-full bg-white transition-transform" />
                         </div>
                       </button>
@@ -1587,14 +1597,14 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                             <RegisterField labelEn="Account no." labelTh="หมายเลขบัญชี" placeholder="0000000000" name="bank_accountNo" type="tel" value={formData.bankInfo.accountNo} onChange={handleInputChange} />
                             <DropdownField labelEn="Account type" labelTh="ประเภทบัญชี" name="bank_accountType" value={formData.bankInfo.accountType} placeholder="เลือกประเภทบัญชี" options={ACCOUNT_TYPE_OPTIONS} onChange={handleInputChange} />
                             <RegisterField labelEn="Account name" labelTh="ชื่อบัญชี" placeholder="ชื่อ-นามสกุลเจ้าของบัญชี" name="bank_accountName" value={formData.bankInfo.accountName} onChange={handleInputChange} />
-                            <div className="pb-4 text-xs text-[#6F7E97]">
+                            <div className="register-subtle pb-4 text-xs">
                               ไม่บังคับเพิ่มบัญชีส่วนตัว แต่หากเปิดใช้งาน กรุณากรอกข้อมูลให้ครบถ้วน หรือจะข้ามไปก่อนแล้วค่อยมาเพิ่มภายหลังที่หน้าแก้ไขข้อมูลสมาชิกก็ได้
                             </div>
                           </div>
                         </div>
                       </div>
                       {!addPersonalBankAccount && (
-                        <div className="my-4 rounded-[22px] border border-dashed border-[#C8D6EC] bg-white/75 px-4 py-4 text-sm text-[#5C76A6]">
+                        <div className="register-panel my-4 rounded-[22px] border-dashed px-4 py-4 text-sm register-accent-soft">
                           ระบบจะใช้เงินใน JUZMATCH Pool ของคุณเป็นแหล่งวงเงินหลักก่อน โดยยังไม่จำเป็นต้องเพิ่มบัญชีส่วนตัวในขั้นตอนนี้ และคุณสามารถเพิ่มภายหลังได้ที่หน้าแก้ไขข้อมูลสมาชิก
                         </div>
                       )}
@@ -1612,10 +1622,10 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             )}
 
             {stepKey === 'preferences' && (
-              <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-6 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+              <div className="register-shell rounded-[28px] p-6">
                 <div className="text-center">
-                  <h2 className="mt-0 text-2xl font-semibold text-[#243B62]">เลือกสินค้าที่ต้องการลงทุน</h2>
-                  <p className="mt-1 text-sm text-[#6F7E97]">แตะเลือกเป็นฟองรายการที่สนใจได้หลายหมวดหมู่</p>
+                  <h2 className="register-heading mt-0 text-2xl font-semibold">เลือกสินค้าที่ต้องการลงทุน</h2>
+                  <p className="register-subtle mt-1 text-sm">แตะเลือกเป็นฟองรายการที่สนใจได้หลายหมวดหมู่</p>
                 </div>
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   {REGISTER_CATEGORY_OPTIONS.map((category, index) => {
@@ -1637,10 +1647,10 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                             poppingBubbleKey === category.key ? 'bubble-select-pop 320ms cubic-bezier(0.2, 0.9, 0.25, 1)' : '',
                           ].filter(Boolean).join(', '),
                         }}
-                        className={`min-w-[132px] rounded-full px-5 py-3 text-center will-change-transform transition-[transform,colors,box-shadow,background-image] duration-300 ease-out focus:outline-none focus:ring-0 active:scale-[0.97] ${selected ? 'border border-[#0B3B82] bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] text-white shadow-[0_10px_24px_rgba(11,59,130,0.18)]' : 'border border-[#CCD6E6] bg-white text-[#35507A]'}`}
+                        className={`min-w-[132px] rounded-full px-5 py-3 text-center will-change-transform transition-[transform,colors,box-shadow,background-image] duration-300 ease-out focus:outline-none focus:ring-0 active:scale-[0.97] ${selected ? 'register-chip-selected shadow-[0_10px_24px_color-mix(in_srgb,var(--s2-active)_18%,transparent)]' : 'register-chip-unselected'}`}
                       >
                         <div className="text-sm font-medium">{category.labelTh}</div>
-                        <div className={`text-[11px] ${selected ? 'text-white/80' : 'text-[#6F7E97]'}`}>{category.labelEn}</div>
+                        <div className={`text-[11px] ${selected ? 'register-hero-copy-soft' : 'register-subtle'}`}>{category.labelEn}</div>
                       </button>
                     );
                   })}
@@ -1649,17 +1659,17 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             )}
 
             {stepKey === 'limits' && (
-              <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+              <div className="register-shell rounded-[28px] p-4">
                 <div className="mb-4">
-                  <h2 className="text-2xl font-semibold text-[#243B62]">กำหนดวงเงินลงทุน</h2>
-                  <p className="mt-1 text-sm text-[#6F7E97]">
+                  <h2 className="register-heading text-2xl font-semibold">กำหนดวงเงินลงทุน</h2>
+                  <p className="register-subtle mt-1 text-sm">
                     {isJuzmatchReferral ? 'วงเงินรวมจะถูกดึงจากข้อมูล JUZMATCH และคุณสามารถกำหนดวงเงินรายหมวดหมู่ได้' : 'ระบุวงเงินรวมและวงเงินรายหมวดหมู่สำหรับรายการที่เลือกไว้'}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
+                <div className="register-panel rounded-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-base font-semibold text-gray-800">วงเงินรวม <span className="text-[#D92D20]">*</span></div>
-                    <span className="text-sm text-gray-500">บาท</span>
+                    <div className="text-base font-semibold text-foreground">วงเงินรวม <span className="text-error">*</span></div>
+                    <span className="text-sm text-foreground-subtle">บาท</span>
                   </div>
                   <input
                     type="text"
@@ -1667,34 +1677,34 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                     onChange={(e) => setTotalLimitInput(formatAmount(Math.min(parseAmountInput(e.target.value), MAX_CREDIT_LIMIT)))}
                     disabled={isJuzmatchReferral}
                     placeholder="100,000"
-                    className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-xl text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B] disabled:bg-[#F3F6FB] disabled:text-[#6F7E97]"
+                    className="register-input w-full rounded-xl px-3 py-3 text-center text-xl disabled:bg-background-subtle disabled:text-foreground-subtle"
                   />
-                  <div className="mt-2 text-xs text-[#6F7E97]">สูงสุดไม่เกิน 1,000,000 บาท</div>
+                  <div className="register-subtle mt-2 text-xs">สูงสุดไม่เกิน 1,000,000 บาท</div>
                   {isJuzmatchReferral && (
-                    <div className="mt-2 text-xs text-[#6F7E97]">สำหรับลูกค้า JUZMATCH ระบบล็อกวงเงินรวมตามยอดในสัญญากระดาษจริงไว้แล้ว</div>
+                    <div className="register-subtle mt-2 text-xs">สำหรับลูกค้า JUZMATCH ระบบล็อกวงเงินรวมตามยอดในสัญญากระดาษจริงไว้แล้ว</div>
                   )}
                 </div>
-                <div className="mt-4 rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
+                <div className="register-panel mt-4 rounded-2xl p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-base font-semibold text-gray-800">แบ่งเท่ากันอัตโนมัติ</div>
-                      <div className="text-xs text-[#6F7E97]">กระจายวงเงินรวมให้หมวดที่เลือกอย่างเท่า ๆ กัน</div>
+                      <div className="text-base font-semibold text-foreground">แบ่งเท่ากันอัตโนมัติ</div>
+                      <div className="register-subtle text-xs">กระจายวงเงินรวมให้หมวดที่เลือกอย่างเท่า ๆ กัน</div>
                     </div>
-                    <button type="button" onClick={() => setDivideEqually((prev) => !prev)} className={`h-7 w-12 rounded-full p-1 transition-colors ${divideEqually ? 'bg-[#0B3B82]' : 'bg-gray-200'}`} aria-pressed={divideEqually}>
+                    <button type="button" onClick={() => setDivideEqually((prev) => !prev)} className={`h-7 w-12 rounded-full p-1 transition-colors ${divideEqually ? 'bg-s2-active' : 'bg-s2-soft'}`} aria-pressed={divideEqually}>
                       <span className={`block h-5 w-5 rounded-full bg-white transition-transform ${divideEqually ? 'translate-x-5' : ''}`} />
                     </button>
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
                   {selectedPreferenceKeys.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-[#CCD6E6] bg-white/70 px-4 py-8 text-center text-sm text-[#6F7E97]">ยังไม่ได้เลือกหมวดหมู่ในขั้นตอนก่อนหน้า</div>
+                    <div className="register-panel rounded-2xl border-dashed px-4 py-8 text-center text-sm register-subtle">ยังไม่ได้เลือกหมวดหมู่ในขั้นตอนก่อนหน้า</div>
                   ) : (
                     selectedPreferenceKeys.map((key) => (
-                      <div key={key} className="rounded-2xl border border-[#D9E3F2] bg-white/80 p-4">
+                      <div key={key} className="register-panel rounded-2xl p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="font-semibold text-gray-800">{REGISTER_CATEGORY_OPTIONS.find((item) => item.key === key)?.labelTh || key}</div>
-                            <div className="text-xs text-[#6F7E97]">{ITEM_TYPE_LABELS[key] || key}</div>
+                            <div className="font-semibold text-foreground">{REGISTER_CATEGORY_OPTIONS.find((item) => item.key === key)?.labelTh || key}</div>
+                            <div className="register-subtle text-xs">{ITEM_TYPE_LABELS[key] || key}</div>
                           </div>
                           <div className="w-[150px]">
                             <input
@@ -1703,7 +1713,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                               onChange={(e) => handleCategoryLimitChange(key, e.target.value)}
                               disabled={divideEqually}
                               placeholder="0"
-                              className="w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-center text-sm text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B] disabled:bg-[#F3F6FB] disabled:text-[#6F7E97]"
+                              className="register-input w-full rounded-xl px-3 py-3 text-center text-sm disabled:bg-background-subtle disabled:text-foreground-subtle"
                             />
                           </div>
                         </div>
@@ -1712,21 +1722,21 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                   )}
                 </div>
                 {computedPayload.categories === null && (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">ยอดรวมวงเงินรายหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</div>
+                  <div className="register-status-error mt-4 rounded-2xl p-3 text-sm">ยอดรวมวงเงินรายหมวดหมู่เกินวงเงินรวมแล้ว กรุณาปรับแก้</div>
                 )}
                 {!divideEqually && manualCategoryTotal > parseAmountInput(totalLimitInput) && parseAmountInput(totalLimitInput) > 0 && (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">ยอดรวมวงเงินแต่ละหมวดหมู่ต้องไม่เกินวงเงินรวม</div>
+                  <div className="register-status-error mt-4 rounded-2xl p-3 text-sm">ยอดรวมวงเงินแต่ละหมวดหมู่ต้องไม่เกินวงเงินรวม</div>
                 )}
               </div>
             )}
 
             {stepKey === 'ekyc' && (
-              <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-5 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-                <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+              <div className="register-shell rounded-[28px] p-5">
+                <div className="register-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                   eKYC Preparation
                 </div>
-                <h2 className="mt-4 text-2xl font-semibold text-[#243B62]">เตรียมตัวก่อนยืนยันตัวตน</h2>
-                <p className="mt-2 text-sm text-[#6F7E97]">ก่อนเข้าใช้งานเต็มรูปแบบ กรุณาเตรียมเอกสารและอุปกรณ์ให้พร้อมสำหรับ eKYC</p>
+                <h2 className="register-heading mt-4 text-2xl font-semibold">เตรียมตัวก่อนยืนยันตัวตน</h2>
+                <p className="register-subtle mt-2 text-sm">ก่อนเข้าใช้งานเต็มรูปแบบ กรุณาเตรียมเอกสารและอุปกรณ์ให้พร้อมสำหรับ eKYC</p>
                 <div className="mt-6 space-y-3">
                   {[
                     'บัตรประชาชนตัวจริงที่ยังไม่หมดอายุ',
@@ -1734,7 +1744,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                     'แสงสว่างเพียงพอ และเครือข่ายอินเทอร์เน็ตที่เสถียร',
                     'เวลาทำรายการประมาณ 3-5 นาที',
                   ].map((item) => (
-                    <div key={item} className="rounded-2xl border border-white/90 bg-white/80 px-4 py-3 text-sm text-[#35507A] shadow-[0_8px_18px_rgba(11,59,130,0.05)]">
+                    <div key={item} className="register-inner-card rounded-2xl px-4 py-3 text-sm text-foreground-muted">
                       {item}
                     </div>
                   ))}
@@ -1743,21 +1753,21 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             )}
 
             {stepKey === 'success' && (
-              <div className="rounded-[32px] border border-[#D9E3F2] bg-gradient-to-br from-[#0F4FAE] via-[#2D69C7] to-[#8BB8F2] p-6 text-white shadow-[0_18px_45px_rgba(11,59,130,0.22)]">
-                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/15 text-4xl">
+              <div className="register-hero rounded-[32px] border border-s2-border p-6 text-white shadow-[0_18px_45px_color-mix(in_srgb,var(--s2-active)_22%,transparent)]">
+                <div className="register-hero-pill mx-auto flex h-20 w-20 items-center justify-center rounded-full text-4xl">
                   ✓
                 </div>
                 <h2 className="mt-5 text-center text-2xl font-semibold">
                   สมัครสมาชิกสำเร็จ
                 </h2>
-                <p className="mt-2 text-center text-sm text-white/85">
+                <p className="register-hero-copy mt-2 text-center text-sm">
                   {isJuzmatchReferral
                     ? 'เราได้รับข้อมูลของคุณแล้ว กรุณารอการตรวจสอบ eKYC โดยปกติใช้เวลาประมาณ 1-3 วันทำการ หลังผ่านการยืนยันแล้ว JUZMATCH Pool จะแสดงในหน้าสมาชิก'
                     : 'เราได้รับข้อมูลของคุณแล้ว กรุณารอการตรวจสอบ eKYC โดยปกติใช้เวลาประมาณ 1-3 วันทำการ'}
                 </p>
-                <div className="mt-6 rounded-[24px] border border-white/20 bg-white/12 p-4">
+                <div className="register-hero-panel mt-6 rounded-[24px] p-4">
                   <div className="text-sm font-medium">สถานะล่าสุด</div>
-                  <div className="mt-2 text-xs text-white/80">
+                  <div className="register-hero-copy-soft mt-2 text-xs">
                     {isJuzmatchReferral
                       ? `รหัส ${formData.referralCode} ถูกผูกกับบัญชีแล้ว • สถานะยืนยันตัวตน: ${completedInvestor?.kyc_status || 'NOT_VERIFIED'}`
                       : `สถานะยืนยันตัวตน: ${completedInvestor?.kyc_status || 'NOT_VERIFIED'}`}
@@ -1767,7 +1777,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             )}
           </div>
 
-          {error && <div className="my-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+          {error && <div className="register-status-error my-4 rounded-2xl p-3 text-sm">{error}</div>}
 
           <div className={`${stepKey === 'welcome' ? 'mx-auto mt-[-96px] w-full max-w-md px-6 pb-10' : 'my-4'}`}>
             {stepKey !== 'success' && (
@@ -1792,8 +1802,8 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                 }
                 className={`flex w-full flex-col items-center justify-center rounded-full py-2 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
                   stepKey === 'welcome'
-                    ? 'bg-white text-[#0B3B82]'
-                    : 'bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] text-white'
+                    ? 'bg-background-white text-s2-active'
+                    : 'register-primary-btn text-white'
                 }`}
               >
                 <span className="text-base font-medium">
@@ -1807,7 +1817,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
               <button
                 type="button"
                 onClick={() => onRegistered(completedInvestor)}
-                className="flex w-full flex-col items-center justify-center rounded-full bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-2 text-white transition-all active:scale-[0.98]"
+                className="register-primary-btn flex w-full flex-col items-center justify-center rounded-full py-2 transition-all active:scale-[0.98]"
               >
                 <span className="text-base font-medium">เข้าสู่หน้าสมาชิก</span>
                 <span className="text-xs font-light opacity-90">Go to Member Page</span>
@@ -1815,7 +1825,7 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
             )}
 
             {currentStepIndex > 0 && stepKey !== 'success' && stepKey !== 'referral' && (
-              <button type="button" onClick={goBack} className="mt-2 flex w-full flex-col items-center justify-center rounded-full bg-[#E6EBF2] py-2 text-[#06367B] transition-colors active:scale-[0.98]">
+              <button type="button" onClick={goBack} className="register-secondary-btn mt-2 flex w-full flex-col items-center justify-center rounded-full py-2 transition-colors">
                 <span className="text-base font-medium">ย้อนกลับ</span>
                 <span className="text-xs font-light opacity-80">Back</span>
               </button>
