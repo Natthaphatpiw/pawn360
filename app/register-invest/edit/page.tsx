@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
-import { ChevronDown, ChevronLeft } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
 interface InvestorData {
   investor_id: string;
@@ -217,36 +217,36 @@ export default function InvestorEditProfile() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center page-investor">
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-background-white font-sans text-foreground">
       <div className="px-4 pt-6 flex justify-center">
         <div className="w-full max-w-md pb-10">
           {success && (
-            <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            <div className="register-status-success mb-4 rounded-lg p-4 text-sm">
               บันทึกข้อมูลเรียบร้อยแล้ว กำลังกลับไปหน้าโปรไฟล์...
             </div>
           )}
 
-          <div className="rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
-            <div className="mb-5 rounded-[24px] border border-white/80 bg-white/70 px-4 py-4">
-              <div className="inline-flex rounded-full border border-[#C8D6EC] bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[#5C76A6]">
+          <div className="register-shell rounded-xl p-4">
+            <div className="register-inner-card mb-5 rounded-lg px-4 py-4">
+              <div className="register-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
                 Investor Profile
               </div>
-              <div className="mt-3 bg-gradient-to-r from-[#0B3B82] via-[#1E4FA3] to-[#6D8FC8] bg-clip-text text-3xl font-semibold tracking-[0.08em] text-transparent">
+              <div className="register-title mt-3 text-3xl font-semibold tracking-[0.08em]">
                 แก้ไขข้อมูล
               </div>
-              <p className="mt-1 text-xs text-[#6F7E97]">อัปเดตข้อมูลส่วนตัวและบัญชีธนาคารให้เป็นปัจจุบัน</p>
+              <p className="register-subtle mt-1 text-xs">อัปเดตข้อมูลส่วนตัวและบัญชีธนาคารให้เป็นปัจจุบัน</p>
             </div>
 
             <div className="mb-2">
-              <h2 className="text-lg font-bold text-[#243B62]">Personal Information</h2>
-              <p className="text-xs text-[#6F7E97]">ข้อมูลส่วนตัว</p>
+              <h2 className="register-heading text-lg font-bold">Personal Information</h2>
+              <p className="register-subtle text-xs">ข้อมูลส่วนตัว</p>
             </div>
             <div className="space-y-1">
             <EditField
@@ -257,7 +257,6 @@ export default function InvestorEditProfile() {
               value={formData.firstname}
               onChange={handleInputChange}
               required
-              color="blue"
             />
             <EditField
               labelEn="Last name"
@@ -267,7 +266,6 @@ export default function InvestorEditProfile() {
               value={formData.lastname}
               onChange={handleInputChange}
               required
-              color="blue"
             />
             <EditField
               labelEn="Phone number"
@@ -278,7 +276,6 @@ export default function InvestorEditProfile() {
               value={formData.phoneNumber}
               onChange={handleInputChange}
               required
-              color="blue"
             />
             <EditField
               labelEn="ID"
@@ -287,7 +284,6 @@ export default function InvestorEditProfile() {
               name="nationalId"
               value={formData.nationalId}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Email"
@@ -297,15 +293,14 @@ export default function InvestorEditProfile() {
               type="email"
               value={formData.email}
               onChange={handleInputChange}
-              color="blue"
             />
           </div>
           </div>
           
-          <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+          <div className="register-shell mt-4 rounded-xl p-4">
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-[#243B62]">Address</h2>
-              <p className="text-xs text-[#6F7E97]">ที่อยู่</p>
+              <h2 className="register-heading text-lg font-bold">Address</h2>
+              <p className="register-subtle text-xs">ที่อยู่</p>
             </div>
             <div className="space-y-1">
             <EditField
@@ -315,7 +310,6 @@ export default function InvestorEditProfile() {
               name="addr_houseNo"
               value={formData.address.houseNo}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Village/Building (หมู่บ้าน/อาคาร)"
@@ -324,7 +318,6 @@ export default function InvestorEditProfile() {
               name="addr_village"
               value={formData.address.village}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Street (ตรอก/ซอย/ถนน)"
@@ -333,7 +326,6 @@ export default function InvestorEditProfile() {
               name="addr_street"
               value={formData.address.street}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Sub-district (แขวง/ตำบล)"
@@ -342,7 +334,6 @@ export default function InvestorEditProfile() {
               name="addr_subDistrict"
               value={formData.address.subDistrict}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="District (เขต/อำเภอ)"
@@ -351,7 +342,6 @@ export default function InvestorEditProfile() {
               name="addr_district"
               value={formData.address.district}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Province (จังหวัด)"
@@ -360,7 +350,6 @@ export default function InvestorEditProfile() {
               name="addr_province"
               value={formData.address.province}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Country (ประเทศ)"
@@ -369,7 +358,6 @@ export default function InvestorEditProfile() {
               name="addr_country"
               value={formData.address.country}
               onChange={handleInputChange}
-              color="blue"
             />
             <EditField
               labelEn="Postcode (รหัสไปรษณีย์)"
@@ -378,15 +366,14 @@ export default function InvestorEditProfile() {
               name="addr_postcode"
               value={formData.address.postcode}
               onChange={handleInputChange}
-              color="blue"
             />
           </div>
           </div>
           
-          <div className="mt-4 rounded-[28px] border border-[#D9E3F2] bg-gradient-to-br from-[#F4F8FD] via-[#EEF3FA] to-[#E3EBF8] p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
+          <div className="register-shell mt-4 rounded-xl p-4">
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-[#243B62]">Bank Account</h2>
-              <p className="text-xs text-[#6F7E97]">ข้อมูลบัญชีธนาคาร</p>
+              <h2 className="register-heading text-lg font-bold">Bank Account</h2>
+              <p className="register-subtle text-xs">ข้อมูลบัญชีธนาคาร</p>
             </div>
             <div className="space-y-1">
             <DropdownField
@@ -407,7 +394,6 @@ export default function InvestorEditProfile() {
               type="text"
               value={formData.bankInfo.accountNo}
               onChange={handleInputChange}
-              color="blue"
             />
             <DropdownField
               labelEn="Account Type"
@@ -426,13 +412,12 @@ export default function InvestorEditProfile() {
               name="bank_accountName"
               value={formData.bankInfo.accountName}
               onChange={handleInputChange}
-              color="blue"
             />
           </div>
           </div>
           
           {error && (
-            <div className="my-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            <div className="register-status-error my-4 rounded-lg p-3 text-sm">
               {error}
             </div>
           )}
@@ -441,7 +426,7 @@ export default function InvestorEditProfile() {
             <button
               onClick={handleSubmit}
               disabled={submitting || success}
-              className="flex w-full flex-col items-center justify-center rounded-full bg-gradient-to-r from-[#1E4FA3] to-[#0B3B82] py-2 text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 hover:from-[#18448F] hover:to-[#08306A]"
+              className="register-primary-btn flex w-full flex-col items-center justify-center rounded-full py-2 transition-all disabled:cursor-not-allowed disabled:opacity-50"
             >
               <span className="text-base font-medium">
                 {submitting ? 'กำลังบันทึก...' : success ? 'บันทึกเรียบร้อย' : 'บันทึก'}
@@ -454,7 +439,7 @@ export default function InvestorEditProfile() {
             <button
               onClick={() => router.back()}
               disabled={submitting}
-              className="w-full rounded-full bg-[#E6EBF2] py-2 text-[#06367B] flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50 hover:bg-[#B2C1D6]"
+              className="register-secondary-btn flex w-full flex-col items-center justify-center rounded-full border border-s2 py-2 transition-colors disabled:opacity-50"
             >
               <span className="text-base font-medium">ยกเลิก</span>
               <span className="text-xs font-light opacity-80">Cancel</span>
@@ -508,29 +493,29 @@ function DropdownField({
   return (
     <div className="mb-4" ref={containerRef}>
       <div className="mb-1">
-        <div className="text-sm font-medium text-gray-800 md:text-base">{labelEn}</div>
-        <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>
+        <div className="text-sm font-medium text-foreground md:text-base">{labelEn}</div>
+        <div className="register-subtle text-xs font-light">{labelTh}</div>
       </div>
       <div className="relative">
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-left text-base text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 focus:ring-[#06367B]"
+          className="register-select-trigger flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-base"
           aria-expanded={open}
         >
-          <span className={value ? 'text-gray-800' : 'text-gray-400'}>{value || placeholder}</span>
-          <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
+          <span className={value ? 'text-foreground' : 'register-select-placeholder'}>{value || placeholder}</span>
+          <ChevronDown className={`h-4 w-4 text-foreground-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
 
         {open && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+          <div className="register-select-menu absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-xl">
             <div className="max-h-60 overflow-y-auto py-1">
               {options.map((option) => (
                 <button
                   key={option}
                   type="button"
                   onClick={() => handleSelect(option)}
-                  className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option ? 'bg-[#E8F0FF] text-[#1E3A8A]' : 'text-gray-700 hover:bg-gray-50'}`}
+                  className={`block w-full px-3 py-2 text-left text-sm transition-colors ${value === option ? 'register-select-option-active' : 'text-foreground-muted hover:bg-background-subtle'}`}
                 >
                   {option}
                 </button>
@@ -552,8 +537,7 @@ const EditField = ({
   onChange,
   name,
   type = "text",
-  required = false,
-  color = "blue"
+  required = false
 }: {
   labelEn: string;
   labelTh: string;
@@ -563,17 +547,14 @@ const EditField = ({
   name: string;
   type?: string;
   required?: boolean;
-  color?: "orange" | "blue";
 }) => {
-  const ringColor = color === "blue" ? "focus:ring-[#06367B]" : "focus:ring-[#06367B]";
-  
   return (
     <div className="mb-4">
       <div className="mb-1">
-        <div className="text-sm font-medium text-gray-800 md:text-base">
-          {labelEn} {required && <span className="text-red-500">*</span>}
+        <div className="text-sm font-medium text-foreground md:text-base">
+          {labelEn} {required && <span className="text-error">*</span>}
         </div>
-        {labelTh && <div className="text-xs font-light text-[#6F7E97]">{labelTh}</div>}
+        {labelTh && <div className="register-subtle text-xs font-light">{labelTh}</div>}
       </div>
       <input
         type={type}
@@ -581,7 +562,7 @@ const EditField = ({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className={`w-full rounded-xl border border-[#CCD6E6] bg-white px-3 py-3 text-gray-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1 ${ringColor}`}
+        className="register-input w-full rounded-xl px-3 py-3"
       />
     </div>
   );

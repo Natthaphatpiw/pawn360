@@ -7,6 +7,7 @@ interface TransactionHeaderProps {
   subtitle: string;
   badge?: string;
   rightSlot?: React.ReactNode;
+  wrapperClassName?: string;
 }
 
 export default function TransactionHeader({
@@ -14,9 +15,10 @@ export default function TransactionHeader({
   subtitle,
   badge = 'Contract Transaction',
   rightSlot,
+  wrapperClassName,
 }: TransactionHeaderProps) {
   return (
-    <div className="sticky top-0 z-10 bg-background-white/10 backdrop-blur-md border-b border-background-white/50 px-4 py-3">
+    <div className={`sticky top-0 z-10 border-b border-background-white/50 px-4 py-3 ${wrapperClassName || 'bg-background-white/10 backdrop-blur-md'}`}>
       <div className="rounded-xl border border-primary-border bg-primary-soft/50 p-4 shadow-[0_14px_30px_rgba(11,59,130,0.08)]">
         <div className="rounded-lg border border-background-white/80 bg-background-white/90 px-4 py-4">
           <div className="flex items-start justify-between gap-3">

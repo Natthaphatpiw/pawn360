@@ -7,6 +7,8 @@ import axios from 'axios';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import { getMockContractById, getMockInvestorProfile, isInvestorPreviewMode, MOCK_CONTRACT_IDS } from '@/lib/mock-investment';
+import { CheckCircle } from 'lucide-react';
 
 const INVESTOR_TIER_THRESHOLDS = {
   GOLD: 400_000,
@@ -50,6 +52,7 @@ function OfferDetailContent() {
   const [acceptMessage, setAcceptMessage] = useState('');
 
   // Get contractId from either direct param or from liff.state
+  const previewMode = isInvestorPreviewMode();
   let contractId = searchParams.get('contractId');
 
   // If not found, try to extract from liff.state
@@ -63,11 +66,12 @@ function OfferDetailContent() {
       }
     }
   }
+  const effectiveContractId = contractId || (previewMode ? MOCK_CONTRACT_IDS.offer : null);
 
   useEffect(() => {
     if (liffLoading) return;
 
-    if (!contractId) {
+    if (!effectiveContractId) {
       setError('ไม่พบรายละเอียดข้อเสนอ');
       setLoading(false);
       return;
@@ -80,13 +84,18 @@ function OfferDetailContent() {
     }
 
     ensureInvestorKyc();
-  }, [contractId, profile?.userId, liffLoading]);
+  }, [effectiveContractId, profile?.userId, liffLoading]);
 
   const fetchContractDetails = async () => {
     try {
       setLoading(true);
-      console.log('Fetching contract details for:', contractId);
-      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&lineId=${profile?.userId}`);
+      console.log('Fetching contract details for:', effectiveContractId);
+      if (previewMode) {
+        setContract(getMockContractById(effectiveContractId));
+        setError(null);
+        return;
+      }
+      const response = await axios.get(`/api/contracts/${effectiveContractId}?viewer=investor&lineId=${profile?.userId}`);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);
@@ -103,6 +112,11 @@ function OfferDetailContent() {
 
   const ensureInvestorKyc = async () => {
     try {
+      if (previewMode) {
+        setInvestor(getMockInvestorProfile());
+        fetchContractDetails();
+        return;
+      }
       const response = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
       const status = response.data.investor?.kyc_status;
       setInvestor(response.data.investor);
@@ -137,7 +151,7 @@ function OfferDetailContent() {
       setActionLoading(true);
       const response = await axios.post('/api/contracts/investor-action', {
         action: 'accept',
-        contractId,
+        contractId: effectiveContractId,
         lineId: profile.userId,
         pinToken
       });
@@ -166,6 +180,12 @@ function OfferDetailContent() {
       return;
     }
 
+    if (previewMode) {
+      setAcceptMessage('รับข้อเสนอ mock สำเร็จ สามารถใช้หน้านี้ตรวจเลย์เอาต์และ flow ได้');
+      setAcceptSuccess(true);
+      return;
+    }
+
     pendingActionRef.current = async (token: string) => {
       await submitAccept(token);
     };
@@ -174,24 +194,21 @@ function OfferDetailContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     );
   }
 
   if (acceptSuccess) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-6">
-        <div className="w-full max-w-sm bg-white rounded-3xl p-8 text-center shadow-lg border border-gray-100">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-3xl">✓</span>
+      <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background-white flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-xl bg-background-white p-4 text-center">
+          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">รับข้อเสนอเรียบร้อย</h1>
-          <p className="text-gray-600 text-sm mb-6">
+          <h1 className="text-xl font-bold text-foreground mb-2">รับข้อเสนอเรียบร้อย</h1>
+          <p className="text-foreground-subtle text-sm mb-6">
             {acceptMessage || 'กรุณารอจุดรับฝากตรวจสอบและยืนยัน'}
           </p>
           <button
@@ -209,7 +226,7 @@ function OfferDetailContent() {
                 });
               }
             }}
-            className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-2xl py-4 font-bold transition-colors"
+            className="btn-transition btn-sheen w-full rounded-full bg-s2 py-4 font-medium text-s2-fg shadow-soft"
           >
             ปิด
           </button>
@@ -218,12 +235,12 @@ function OfferDetailContent() {
     );
   }
 
-  if (!contractId) {
+  if (!effectiveContractId) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="w-full max-w-md text-center">
-          <div className="text-red-600 mb-4">ไม่พบ Contract ID</div>
-          <div className="text-sm text-gray-500 mb-4">
+      <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-xl border border-s2-border bg-background-white p-8 text-center shadow-strong">
+          <div className="mb-4 text-error">ไม่พบ Contract ID</div>
+          <div className="mb-4 text-sm text-foreground-subtle">
             Debug: {JSON.stringify({
               directParam: searchParams.get('contractId'),
               liffState: searchParams.get('liff.state'),
@@ -238,7 +255,7 @@ function OfferDetailContent() {
               fallbackPath: '/investor-offers',
               statePath: '/investor-offers',
             })}
-            className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+            className="btn-transition inline-flex min-h-12 items-center justify-center rounded-full border border-s2 bg-s2 px-6 py-3 text-sm font-medium text-s2-fg"
           >
             กลับ
           </button>
@@ -249,10 +266,10 @@ function OfferDetailContent() {
 
   if (error || !contract) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="w-full max-w-md text-center">
-          <div className="text-red-600 mb-4">{error || 'ไม่พบข้อมูลข้อเสนอ'}</div>
-          <div className="text-sm text-gray-500 mb-4">Contract ID: {contractId}</div>
+      <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background-white flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center rounded-xl border border-s2-border bg-s2-soft px-6 py-8 shadow-soft">
+          <div className="text-error mb-4">{error || 'ไม่พบข้อมูลข้อเสนอ'}</div>
+          <div className="text-sm text-foreground-subtle mb-4">Contract ID: {effectiveContractId}</div>
           <button
             onClick={() => openLiffEntry({
               liffIdCandidates: [
@@ -261,7 +278,7 @@ function OfferDetailContent() {
               fallbackPath: '/investor-offers',
               statePath: '/investor-offers',
             })}
-            className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+            className="btn-transition inline-flex min-h-12 items-center justify-center rounded-full border border-s2 bg-background-white px-6 py-3 text-sm font-medium text-s2"
           >
             กลับ
           </button>
@@ -270,15 +287,15 @@ function OfferDetailContent() {
     );
   }
 
-  const InfoRow = ({ label, value, valueColor = 'text-gray-800', isBoldValue = false }: {
+  const InfoRow = ({ label, value, valueColor = 'text-foreground', isBoldValue = false }: {
     label: string;
     value: ReactNode;
     valueColor?: string;
     isBoldValue?: boolean;
   }) => (
     <div className="flex justify-between items-start py-1">
-      <div className="font-bold text-gray-700 text-sm w-1/3">{label}</div>
-      <div className={`text-right w-2/3 text-sm ${valueColor} ${isBoldValue ? 'font-bold' : 'font-medium'}`}>
+      <div className="w-1/3 text-sm font-bold text-foreground-muted">{label}</div>
+      <div className={`text-right w-2/3 text-sm ${valueColor} ${isBoldValue ? 'font-bold' : 'font-base'}`}>
         {value}
       </div>
     </div>
@@ -307,34 +324,33 @@ function OfferDetailContent() {
   const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
 
   return (
-    <div className="min-h-screen bg-white font-sans p-4 pb-10 flex flex-col items-center">
-
-      {/* Header */}
-      <div className="w-full max-w-sm text-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">รายละเอียดข้อเสนอ</h1>
-        <p className="text-sm text-gray-500">Offer Detail</p>
+    <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6 mb-12 flex flex-col items-center">
+      <div className="mb-5 w-full max-w-sm rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+        <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+          <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
+            Offer Detail
+          </div>
+          <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-s2">
+            รายละเอียดข้อเสนอ
+          </div>
+          <p className="mt-2 text-xs text-foreground-subtle">ตรวจสอบรายละเอียดสัญญาและผลตอบแทนก่อนตอบรับข้อเสนอ</p>
+        </div>
       </div>
 
-      {/* Main Content Card */}
-      <div className="w-full max-w-sm bg-[#F0F0F0] rounded-3xl p-5 mb-6">
-
-        {/* Title */}
-        <h1 className="text-lg font-bold text-gray-800 mb-4">รายละเอียดข้อเสนอ</h1>
-
-        {/* Product Image */}
-        <div className="w-full aspect-square bg-gray-200 rounded-xl overflow-hidden mb-6 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-s2-border bg-background-white p-4 mb-4 shadow-soft">
+        <div className="w-full aspect-square bg-s2-soft/45 rounded-lg overflow-hidden mb-6">
           <ImageCarousel
             images={contract.items?.image_urls}
             className="w-full h-full gap-0 no-scrollbar"
             itemClassName="w-full h-full flex-shrink-0"
             emptyLabel="No Image"
-            emptyClassName="w-full h-full flex items-center justify-center text-gray-400 text-sm"
+            emptyClassName="w-full h-full flex items-center justify-center text-sm text-foreground-subtle"
           />
         </div>
 
         {/* Details List */}
         <div className="space-y-1 mb-4">
-          <InfoRow label="ผู้ขอสินเชื่อ" value="ไม่เปิดเผย" valueColor="text-gray-500" />
+          <InfoRow label="ผู้ขอสินเชื่อ" value="ไม่เปิดเผย" valueColor="text-foreground-subtle" />
           <InfoRow label="สินค้า" value={`${contract.items?.brand} ${contract.items?.model}`} />
           <InfoRow label="ความจุ" value={contract.items?.capacity || 'ไม่ระบุ'} />
           <InfoRow label="สภาพ" value={`${contract.items?.item_condition}%`} />
@@ -345,10 +361,10 @@ function OfferDetailContent() {
             value={(
               <div className="text-right">
                 <div>{`${interestRatePercent.toFixed(1)}% | ${interestAmount.toLocaleString()}`}</div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-foreground-subtle">
                   นักลงทุน {investorRatePercent.toFixed(2)}% {investorInterest.toLocaleString()}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-foreground-subtle">
                   ค่าธรรมเนียมระบบ {feeRatePercent.toFixed(1)}% {platformFeeAmount.toLocaleString()}
                 </div>
               </div>
@@ -358,12 +374,12 @@ function OfferDetailContent() {
           <InfoRow label="วันที่เสนอ" value={new Date().toLocaleDateString('th-TH')} />
         </div>
 
-        <div className="h-px bg-white my-3 opacity-60"></div>
+        <div className="h-px bg-s2-border my-3 opacity-60"></div>
 
         {/* Remarks */}
-        <div className="mb-6">
-          <h3 className="font-bold text-gray-700 text-sm mb-1">หมายเหตุ</h3>
-          <p className="text-sm text-gray-500">{contract.items?.notes || 'ไม่มี'}</p>
+        <div className="mb-2">
+          <h3 className="font-bold text-foreground text-sm mb-1">หมายเหตุ</h3>
+          <p className="text-sm text-foreground-subtle">{contract.items?.notes || 'ไม่มี'}</p>
         </div>
 
       </div>
@@ -374,10 +390,10 @@ function OfferDetailContent() {
         <button
           onClick={handleAccept}
           disabled={actionLoading}
-          className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white rounded-2xl py-4 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
+          className="btn-transition btn-sheen w-full rounded-full bg-s2 py-2 flex flex-col items-center justify-center shadow-soft transition-colors disabled:opacity-50 text-s2-fg"
         >
-          <span className="text-base font-bold">ยอมรับ</span>
-          <span className="text-[10px] font-light opacity-90">Accept</span>
+          <span className="text-base font-medium">{actionLoading ? 'กำลังดำเนินการ...' : 'รับข้อเสนอ'}</span>
+          <span className="text-xs font-light opacity-90">Accept</span>
         </button>
       </div>
 
@@ -400,11 +416,8 @@ function OfferDetailContent() {
 export default function OfferDetailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+        <div className="dot-bricks" />
       </div>
     }>
       <OfferDetailContent />

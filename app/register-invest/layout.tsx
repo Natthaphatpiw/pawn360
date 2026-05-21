@@ -16,7 +16,7 @@ export default function RegisterInvestLayout({
     || '2008641671-O4zZnvW9';
   return (
     <LiffProvider liffId={liffId}>
-      <div className="theme-liff min-h-screen">{children}</div>
+      <div className="theme-liff theme-investor min-h-screen bg-background-white">{children}</div>
     </LiffProvider>
   );
 }
