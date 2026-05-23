@@ -167,15 +167,15 @@
 }
 
 .theme-investor {
-  --primary: var(--orange-600);
-  --primary-hover: var(--orange-500);
-  --primary-active: var(--orange-700);
-  --primary-soft: var(--orange-100);
-  --primary-border: color-mix(in srgb, var(--orange-200) 72%, white 28%);
+  --primary: var(--blue-600);
+  --primary-hover: var(--blue-500);
+  --primary-active: var(--blue-700);
+  --primary-soft: var(--blue-100);
+  --primary-border: color-mix(in srgb, var(--blue-200) 72%, white 28%);
   --primary-fg: var(--white);
-  --grad-primary-start: var(--orange-600);
-  --grad-primary-end: var(--orange-400);
-  --dot-fallback: var(--orange-600);
+  --grad-primary-start: var(--blue-600);
+  --grad-primary-end: var(--blue-400);
+  --dot-fallback: var(--blue-600);
 }
 
 .theme-droppoint {
@@ -712,6 +712,55 @@ body {
   --register-chart-4: color-mix(in srgb, var(--primary-hover) 58%, white 42%);
   --register-chart-5: color-mix(in srgb, var(--primary-border) 82%, white 18%);
   --register-chart-unallocated: color-mix(in srgb, var(--primary-border) 52%, white 48%);
+}
+
+:is(.theme-web, .theme-liff).theme-droppoint {
+  --register-surface: color-mix(in srgb, var(--background-white) 76%, var(--s3-soft) 24%);
+  --register-surface-strong: color-mix(in srgb, var(--background-white) 10%, var(--s3-soft) 90%);
+  --register-surface-muted: color-mix(in srgb, var(--background-white) 5%, var(--s3-soft) 95%);
+  --register-surface-hover: color-mix(in srgb, var(--background-white) 52%, var(--s3-soft) 48%);
+  --register-border: color-mix(in srgb, var(--s3-border) 68%, white 32%);
+  --register-border-strong: color-mix(in srgb, var(--s3-border) 84%, white 16%);
+  --register-shell-shadow: 0 14px 30px color-mix(in srgb, var(--s3-active) 12%, transparent);
+  --register-shell-shadow-strong: 0 22px 60px color-mix(in srgb, var(--s3-active) 16%, transparent);
+  --register-shell-gradient: linear-gradient(135deg, color-mix(in srgb, white 72%, var(--s3-soft) 28%) 0%, color-mix(in srgb, white 52%, var(--s3-soft) 48%) 52%, color-mix(in srgb, white 38%, var(--s3-soft) 62%) 100%);
+  --register-title-gradient: linear-gradient(90deg, var(--s3-active) 0%, var(--s3) 48%, color-mix(in srgb, var(--s3-hover) 76%, white 24%) 100%);
+  --register-hero-gradient: linear-gradient(135deg, color-mix(in srgb, var(--s3-active) 92%, black 8%) 0%, var(--s3) 48%, color-mix(in srgb, var(--s3-hover) 58%, white 42%) 100%);
+  --register-ring-track: color-mix(in srgb, var(--s3-border) 72%, white 28%);
+  --register-ring-fill: var(--s3-active);
+  --register-chip-neutral: color-mix(in srgb, var(--background-white) 32%, var(--s3-soft) 68%);
+  --register-chip-neutral-fg: color-mix(in srgb, var(--foreground-subtle) 70%, var(--s3) 30%);
+  --register-chart-1: var(--s3-active);
+  --register-chart-2: var(--s3);
+  --register-chart-3: color-mix(in srgb, var(--s3-hover) 82%, white 18%);
+  --register-chart-4: color-mix(in srgb, var(--s3-hover) 58%, white 42%);
+  --register-chart-5: color-mix(in srgb, var(--s3-border) 82%, white 18%);
+  --register-chart-unallocated: color-mix(in srgb, var(--s3-border) 52%, white 48%);
+}
+
+:is(.theme-web, .theme-liff).theme-investor,
+:is(.theme-web, .theme-liff) .page-investor {
+  --register-surface: color-mix(in srgb, var(--background-white) 76%, var(--s2-soft) 24%);
+  --register-surface-strong: color-mix(in srgb, var(--background-white) 10%, var(--s2-soft) 90%);
+  --register-surface-muted: color-mix(in srgb, var(--background-white) 5%, var(--s2-soft) 95%);
+  --register-surface-hover: color-mix(in srgb, var(--background-white) 52%, var(--s2-soft) 48%);
+  --register-border: color-mix(in srgb, var(--s2-border) 68%, white 32%);
+  --register-border-strong: color-mix(in srgb, var(--s2-border) 84%, white 16%);
+  --register-shell-shadow: 0 14px 30px color-mix(in srgb, var(--s2-active) 12%, transparent);
+  --register-shell-shadow-strong: 0 22px 60px color-mix(in srgb, var(--s2-active) 16%, transparent);
+  --register-shell-gradient: linear-gradient(135deg, color-mix(in srgb, white 72%, var(--s2-soft) 28%) 0%, color-mix(in srgb, white 52%, var(--s2-soft) 48%) 52%, color-mix(in srgb, white 38%, var(--s2-soft) 62%) 100%);
+  --register-title-gradient: linear-gradient(90deg, var(--s2-active) 0%, var(--s2) 48%, color-mix(in srgb, var(--s2-hover) 76%, white 24%) 100%);
+  --register-hero-gradient: linear-gradient(135deg, color-mix(in srgb, var(--s2-active) 92%, black 8%) 0%, var(--s2) 48%, color-mix(in srgb, var(--s2-hover) 58%, white 42%) 100%);
+  --register-ring-track: color-mix(in srgb, var(--s2-border) 72%, white 28%);
+  --register-ring-fill: var(--s2-active);
+  --register-chip-neutral: color-mix(in srgb, var(--background-white) 32%, var(--s2-soft) 68%);
+  --register-chip-neutral-fg: color-mix(in srgb, var(--foreground-subtle) 70%, var(--s2) 30%);
+  --register-chart-1: var(--s2-active);
+  --register-chart-2: var(--s2);
+  --register-chart-3: color-mix(in srgb, var(--s2-hover) 82%, white 18%);
+  --register-chart-4: color-mix(in srgb, var(--s2-hover) 58%, white 42%);
+  --register-chart-5: color-mix(in srgb, var(--s2-border) 82%, white 18%);
+  --register-chart-unallocated: color-mix(in srgb, var(--s2-border) 52%, white 48%);
 }
 
 :is(.theme-web, .theme-liff) .register-shell {
