@@ -11,6 +11,8 @@ type PinModalProps = {
   lineId: string;
   onClose: () => void;
   onVerified: (token: string, expiresAt: string) => void;
+  initialMode?: PinMode;
+  previewMode?: boolean;
 };
 
 type PinMode = 'verify' | 'setup' | 'reset';
@@ -24,18 +26,18 @@ const roleThemes: Record<PinRole, { primary: string; soft: string; border: strin
     overlay: 'color-mix(in srgb, var(--foreground) 38%, transparent)',
   },
   INVESTOR: {
-    primary: '#1E3A8A',
-    soft: '#EEF2FF',
-    border: '#BFCCF8',
-    shell: 'linear-gradient(135deg, #f7faff 0%, #ffffff 58%, #eef2ff 100%)',
-    overlay: 'rgba(11, 31, 66, 0.45)',
+    primary: 'var(--primary)',
+    soft: 'var(--primary-soft)',
+    border: 'var(--primary-border)',
+    shell: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-soft) 84%, white 16%) 0%, var(--background-white) 58%, color-mix(in srgb, var(--primary-soft) 78%, white 22%) 100%)',
+    overlay: 'color-mix(in srgb, var(--foreground) 38%, transparent)',
   },
   DROP_POINT: {
-    primary: '#365314',
-    soft: '#ECFCCB',
-    border: '#B9D38B',
-    shell: 'linear-gradient(135deg, #f6fbef 0%, #ffffff 58%, #ecfccb 100%)',
-    overlay: 'rgba(25, 43, 15, 0.42)',
+    primary: 'var(--primary)',
+    soft: 'var(--primary-soft)',
+    border: 'var(--primary-border)',
+    shell: 'linear-gradient(135deg, color-mix(in srgb, var(--primary-soft) 84%, white 16%) 0%, var(--background-white) 58%, color-mix(in srgb, var(--primary-soft) 78%, white 22%) 100%)',
+    overlay: 'color-mix(in srgb, var(--foreground) 38%, transparent)',
   },
 };
 
@@ -45,6 +47,8 @@ export default function PinModal({
   lineId,
   onClose,
   onVerified,
+  initialMode = 'verify',
+  previewMode = false,
 }: PinModalProps) {
   const theme = roleThemes[role];
   const modalVars = {
@@ -53,7 +57,7 @@ export default function PinModal({
     '--pin-border': theme.border,
   } as CSSProperties;
 
-  const [mode, setMode] = useState<PinMode>('verify');
+  const [mode, setMode] = useState<PinMode>(initialMode);
   const [loading, setLoading] = useState(false);
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
@@ -74,8 +78,10 @@ export default function PinModal({
     setPhoneNumber('');
     setNationalId('');
     setDropPointCode('');
+    setMode(initialMode);
+    if (previewMode) return;
     fetchStatus();
-  }, [open, role, lineId]);
+  }, [open, role, lineId, initialMode, previewMode]);
 
   useEffect(() => {
     if (!lockedUntil || remainingSeconds <= 0) return;
@@ -108,6 +114,7 @@ export default function PinModal({
   };
 
   const handleVerify = async () => {
+    if (previewMode) return;
     if (pin.length !== 6) {
       setError('กรุณากรอกรหัส PIN 6 หลัก');
       return;
@@ -136,6 +143,7 @@ export default function PinModal({
   };
 
   const handleSetup = async () => {
+    if (previewMode) return;
     if (pin.length !== 6) {
       setError('กรุณากรอกรหัส PIN 6 หลัก');
       return;
@@ -161,6 +169,7 @@ export default function PinModal({
   };
 
   const handleReset = async () => {
+    if (previewMode) return;
     if (pin.length !== 6) {
       setError('กรุณากรอกรหัส PIN 6 หลัก');
       return;
@@ -204,14 +213,14 @@ export default function PinModal({
       style={{ backgroundColor: theme.overlay }}
     >
       <div
-        className="modal-pop-in w-full max-w-sm rounded-[30px] border p-4 shadow-soft"
+        className="modal21-pop-in w-full max-w-sm rounded-xl border p-4 shadow-soft"
         style={{
           ...modalVars,
           borderColor: 'var(--pin-border)',
           backgroundImage: theme.shell,
         }}
       >
-        <div className="rounded-[24px] border border-background-white bg-background-white px-4 py-4 shadow-soft">
+        <div className="rounded-lg border border-background-white bg-background-white px-4 py-4 shadow-soft">
           <div
             className="inline-flex rounded-full border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]"
             style={{ borderColor: 'var(--pin-border)', color: 'var(--pin-primary)' }}
@@ -230,13 +239,13 @@ export default function PinModal({
 
         {lockedUntil && remainingSeconds > 0 ? (
           <div
-            className="mt-4 rounded-[24px] border bg-background-white p-4 text-sm"
+            className="mt-4 rounded-lg border bg-background-white p-4 text-sm"
             style={{ borderColor: 'var(--pin-border)', color: 'var(--pin-primary)' }}
           >
             บัญชีถูกล็อกชั่วคราว กรุณาลองใหม่อีกครั้งใน {remainingLabel}
           </div>
         ) : (
-          <div className="mt-4 rounded-[24px] border border-background-white bg-background-white p-4 shadow-soft">
+          <div className="mt-4 rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
             <div className="mb-4">
               <label className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground-muted">PIN 6 หลัก</label>
               <input
@@ -245,7 +254,7 @@ export default function PinModal({
                 maxLength={6}
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                className="mt-2 w-full rounded-2xl border border-line-soft bg-background-white px-4 py-3 text-center text-lg tracking-[0.5em] text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
+                className="mt-2 w-full rounded-full border border-primary-border bg-background-white px-4 py-3 text-center text-lg tracking-[0.5em] text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
                 style={{ ['--tw-ring-color' as string]: 'color-mix(in srgb, var(--pin-primary) 20%, transparent)' }}
                 placeholder="••••••"
               />
@@ -260,7 +269,7 @@ export default function PinModal({
                   maxLength={6}
                   value={pinConfirm}
                   onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ''))}
-                  className="mt-2 w-full rounded-2xl border border-line-soft bg-background-white px-4 py-3 text-center text-lg tracking-[0.5em] text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
+                  className="mt-2 w-full rounded-full border border-primary-border bg-background-white px-4 py-3 text-center text-lg tracking-[0.5em] text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
                   style={{ ['--tw-ring-color' as string]: 'color-mix(in srgb, var(--pin-primary) 20%, transparent)' }}
                   placeholder="••••••"
                 />
@@ -274,7 +283,7 @@ export default function PinModal({
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="เบอร์โทรศัพท์"
-                  className="w-full rounded-2xl border border-line-soft bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
+                  className="w-full rounded-full border border-primary-border bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
                   style={{ ['--tw-ring-color' as string]: 'color-mix(in srgb, var(--pin-primary) 20%, transparent)' }}
                 />
                 {(role === 'PAWNER' || role === 'INVESTOR') && (
@@ -283,7 +292,7 @@ export default function PinModal({
                     value={nationalId}
                     onChange={(e) => setNationalId(e.target.value)}
                     placeholder="เลขบัตรประชาชน"
-                    className="w-full rounded-2xl border border-line-soft bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
+                    className="w-full rounded-full border border-primary-border bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
                     style={{ ['--tw-ring-color' as string]: 'color-mix(in srgb, var(--pin-primary) 20%, transparent)' }}
                   />
                 )}
@@ -293,7 +302,7 @@ export default function PinModal({
                     value={dropPointCode}
                     onChange={(e) => setDropPointCode(e.target.value)}
                     placeholder="รหัสสาขา Drop Point"
-                    className="w-full rounded-2xl border border-line-soft bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
+                    className="w-full rounded-2xl border border-primary-border bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
                     style={{ ['--tw-ring-color' as string]: 'color-mix(in srgb, var(--pin-primary) 20%, transparent)' }}
                   />
                 )}
@@ -313,7 +322,7 @@ export default function PinModal({
             <button
               onClick={handleVerify}
               disabled={loading || !!lockedUntil}
-              className="btn-transition btn-sheen w-full rounded-2xl bg-[image:var(--background-image-grad-primary)] py-3 text-sm font-semibold text-primary-fg shadow-soft hover:brightness-95 disabled:opacity-60"
+              className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-fg shadow-soft hover:brightness-95 disabled:opacity-60"
             >
               {loading ? 'กำลังยืนยัน...' : 'ยืนยัน PIN'}
             </button>
@@ -323,7 +332,7 @@ export default function PinModal({
             <button
               onClick={handleSetup}
               disabled={loading || !!lockedUntil}
-              className="btn-transition btn-sheen w-full rounded-2xl bg-[image:var(--background-image-grad-primary)] py-3 text-sm font-semibold text-primary-fg shadow-soft hover:brightness-95 disabled:opacity-60"
+              className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-fg shadow-soft hover:brightness-95 disabled:opacity-60"
             >
               {loading ? 'กำลังตั้งค่า...' : 'ตั้งค่า PIN'}
             </button>
@@ -333,7 +342,7 @@ export default function PinModal({
             <button
               onClick={handleReset}
               disabled={loading || !!lockedUntil}
-              className="btn-transition btn-sheen w-full rounded-2xl bg-[image:var(--background-image-grad-primary)] py-3 text-sm font-semibold text-primary-fg shadow-soft hover:brightness-95 disabled:opacity-60"
+              className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-fg shadow-soft hover:brightness-95 disabled:opacity-60"
             >
               {loading ? 'กำลังรีเซ็ต...' : 'รีเซ็ต PIN'}
             </button>
@@ -343,7 +352,7 @@ export default function PinModal({
             <button
               type="button"
               onClick={() => setMode('reset')}
-              className="w-full rounded-2xl border border-primary-border bg-background-white py-3 text-sm font-medium text-primary"
+              className="w-full rounded-full border border-primary-border bg-background-white py-3 text-sm font-medium text-primary"
             >
               ลืม PIN
             </button>
@@ -353,7 +362,7 @@ export default function PinModal({
             <button
               type="button"
               onClick={() => setMode('verify')}
-              className="w-full rounded-2xl border border-primary-border bg-background-white py-3 text-sm font-medium text-primary"
+              className="w-full rounded-full border border-primary-border bg-background-white py-3 text-sm font-medium text-primary"
             >
               กลับไปยืนยัน PIN
             </button>
@@ -362,7 +371,7 @@ export default function PinModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full rounded-2xl border border-line-soft bg-background-white py-3 text-sm font-medium text-foreground-subtle"
+            className="w-full rounded-full border border-primary-border bg-background-white py-3 text-sm font-medium text-primary"
           >
             ยกเลิก
           </button>
