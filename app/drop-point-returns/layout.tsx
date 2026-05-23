@@ -15,5 +15,9 @@ export default function DropPointReturnsLayout({
   // Drop Point returns LIFF
   // Endpoint: https://pawnly.io/drop-point-returns
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
-  return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
+  return (
+    <LiffProvider liffId={liffId}>
+      <div className="theme-liff theme-droppoint page-droppoint min-h-screen bg-background-white">{children}</div>
+    </LiffProvider>
+  );
 }

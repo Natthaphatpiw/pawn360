@@ -1,10 +1,20 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
-import { Copy, Loader2, MapPin, Phone } from 'lucide-react';
+import { Copy, MapPin, Phone, Truck } from 'lucide-react';
+import { isDropPointMockEnabled, mockPickupData } from '@/lib/mock-drop-point';
+import {
+  DropPointCard,
+  DropPointHeroCard,
+  DropPointLoadingScreen,
+  DropPointMessageState,
+  DropPointPageShell,
+  DropPointStatusBadge,
+} from '@/components/drop-point/ui';
 
 interface DeliveryRequest {
   delivery_request_id: string;
@@ -22,9 +32,24 @@ interface ContractData {
   drop_point?: { drop_point_name?: string };
 }
 
+function statusLabel(status?: string) {
+  if (status === 'DRIVER_SEARCH' || status === 'PAYMENT_VERIFIED') return 'กำลังหาคนขับ';
+  if (status === 'ITEM_PICKED') return 'กำลังนำส่ง';
+  if (status === 'ARRIVED_AT_DROP_POINT') return 'รอตรวจสอบ';
+  return status || '-';
+}
+
+function statusTone(status?: string): 'success' | 'warning' | 'neutral' {
+  if (status === 'ITEM_PICKED') return 'warning';
+  if (status === 'ARRIVED_AT_DROP_POINT') return 'success';
+  return 'neutral';
+}
+
 function DropPointPickupPageContent() {
+  const router = useRouter();
   const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const searchParams = useSearchParams();
+  const previewMode = isDropPointMockEnabled(searchParams);
 
   const [deliveryRequestId, setDeliveryRequestId] = useState('');
   const [deliveryRequest, setDeliveryRequest] = useState<DeliveryRequest | null>(null);
@@ -45,37 +70,51 @@ function DropPointPickupPageContent() {
     if (id) setDeliveryRequestId(id);
   }, [searchParams]);
 
-  const fetchData = async () => {
-    if (!deliveryRequestId || !profile?.userId) return;
-    try {
-      setLoading(true);
-      const response = await axios.get('/api/pawn-delivery/drop-point', {
-        params: { deliveryRequestId, lineId: profile.userId }
-      });
-      setDeliveryRequest(response.data.deliveryRequest || null);
-      setContract(response.data.contract || null);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (liffLoading || !profile?.userId || !deliveryRequestId) return;
-    fetchData();
-  }, [liffLoading, profile?.userId, deliveryRequestId]);
+    const load = async () => {
+      if (previewMode) {
+        setDeliveryRequest(mockPickupData.deliveryRequest);
+        setContract(mockPickupData.contract);
+        setLoading(false);
+        return;
+      }
+
+      if (liffLoading || !profile?.userId || !deliveryRequestId) return;
+      try {
+        setLoading(true);
+        const response = await axios.get('/api/pawn-delivery/drop-point', {
+          params: { deliveryRequestId, lineId: profile.userId },
+        });
+        setDeliveryRequest(response.data.deliveryRequest || null);
+        setContract(response.data.contract || null);
+      } catch (err: any) {
+        setError(err.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [previewMode, liffLoading, profile?.userId, deliveryRequestId]);
 
   const handleCopy = async () => {
     if (!deliveryRequest?.address_full) return;
     try {
       await navigator.clipboard.writeText(deliveryRequest.address_full);
-    } catch (err) {
+    } catch {
       setError('ไม่สามารถคัดลอกที่อยู่ได้');
     }
   };
 
   const handleUpdateStatus = async (action: 'DRIVER_ASSIGNED' | 'ARRIVED') => {
+    if (previewMode) {
+      setDeliveryRequest((prev) => prev ? {
+        ...prev,
+        status: action === 'DRIVER_ASSIGNED' ? 'ITEM_PICKED' : 'ARRIVED_AT_DROP_POINT',
+      } : prev);
+      return;
+    }
+
     if (!deliveryRequest?.delivery_request_id || !profile?.userId) return;
     try {
       setUpdating(true);
@@ -84,7 +123,11 @@ function DropPointPickupPageContent() {
         lineId: profile.userId,
         action,
       });
-      await fetchData();
+      const response = await axios.get('/api/pawn-delivery/drop-point', {
+        params: { deliveryRequestId, lineId: profile.userId },
+      });
+      setDeliveryRequest(response.data.deliveryRequest || null);
+      setContract(response.data.contract || null);
     } catch (err: any) {
       setError(err.response?.data?.error || 'อัปเดตสถานะไม่สำเร็จ');
     } finally {
@@ -93,116 +136,87 @@ function DropPointPickupPageContent() {
   };
 
   const itemName = contract?.item ? `${contract.item.brand || ''} ${contract.item.model || ''}`.trim() : '-';
-
   const canAssignDriver = deliveryRequest?.status === 'DRIVER_SEARCH' || deliveryRequest?.status === 'PAYMENT_VERIFIED';
   const canMarkArrived = deliveryRequest?.status === 'ITEM_PICKED';
+  const canVerify = deliveryRequest?.status === 'ARRIVED_AT_DROP_POINT';
 
-  if (liffLoading || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA]">
-        <div className="text-center text-[#365314]">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-          <p className="mt-2 text-sm">กำลังโหลด...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (liffError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA] p-6">
-        <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
-          <p className="text-red-500">{liffError}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!deliveryRequest || !contract) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA]">
-        <p className="text-sm text-[#686360]">ไม่พบข้อมูลการรับสินค้า</p>
-      </div>
-    );
-  }
+  if ((liffLoading && !previewMode) || loading) return <DropPointLoadingScreen />;
+  if (liffError) return <DropPointMessageState title="เชื่อมต่อ LIFF ไม่สำเร็จ" description={liffError} />;
+  if (error) return <DropPointMessageState title="โหลดข้อมูลไม่สำเร็จ" description={error} />;
+  if (!deliveryRequest || !contract) return <DropPointMessageState title="ไม่พบข้อมูลการรับสินค้า" />;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] text-[#365314] px-4 py-6">
-      <div className="mx-auto w-full max-w-md">
-        {error && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs text-red-600">
-            {error}
-          </div>
-        )}
-
-        <div className="rounded-3xl bg-white p-5 shadow-sm mb-4">
-          <p className="text-xs text-[#9a9694]">สัญญา</p>
-          <h1 className="text-lg font-bold text-[#365314]">{contract.contract_number}</h1>
-          <p className="mt-1 text-sm text-[#6b7280]">สินค้า: {itemName}</p>
-          <p className="text-xs text-[#9a9694]">Drop Point: {contract.drop_point?.drop_point_name || '-'}</p>
+    <DropPointPageShell>
+      <DropPointHeroCard
+        eyebrow={previewMode ? 'Preview Mode' : 'Pickup'}
+        title={contract.contract_number}
+        subtitle={`สินค้า: ${itemName}`}
+      >
+        <div className="flex flex-wrap gap-2">
+          <DropPointStatusBadge tone={statusTone(deliveryRequest.status)}>{statusLabel(deliveryRequest.status)}</DropPointStatusBadge>
+          <DropPointStatusBadge tone="neutral">{contract.drop_point?.drop_point_name || '-'}</DropPointStatusBadge>
         </div>
+      </DropPointHeroCard>
 
-        <div className="rounded-3xl bg-white p-5 shadow-sm mb-4">
-          <h2 className="text-sm font-bold text-[#365314] mb-3">ที่อยู่รับสินค้า</h2>
-          <div className="flex items-start gap-2 text-sm text-[#4b5563]">
-            <MapPin className="h-4 w-4 mt-0.5" />
-            <p>{deliveryRequest.address_full || '-'}</p>
+      <div className="mt-4 space-y-4">
+        <DropPointCard>
+          <div className="register-heading mb-3 flex items-center gap-2 text-sm font-semibold">
+            <MapPin className="h-4 w-4 register-accent" />
+            ที่อยู่รับสินค้า
           </div>
-          <div className="flex items-center gap-2 text-sm text-[#4b5563] mt-2">
-            <Phone className="h-4 w-4" />
-            <span>{deliveryRequest.contact_phone || '-'}</span>
+          <div className="space-y-2 text-sm text-foreground-muted">
+            <div>{deliveryRequest.address_full || '-'}</div>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span>{deliveryRequest.contact_phone || '-'}</span>
+            </div>
           </div>
-          <button
-            onClick={handleCopy}
-            className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#365314] px-4 py-2 text-xs text-[#365314]"
-          >
+          <button onClick={handleCopy} className="register-outline-btn mt-4 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium">
             <Copy className="h-3.5 w-3.5" />
             คัดลอกที่อยู่
           </button>
-        </div>
+        </DropPointCard>
 
-        <div className="rounded-3xl bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-bold text-[#365314] mb-3">อัปเดตสถานะรับของ</h2>
-          <p className="text-xs text-[#6b7280] mb-4">สถานะปัจจุบัน: {deliveryRequest.status}</p>
+        <DropPointCard>
+          <div className="register-heading mb-3 flex items-center gap-2 text-sm font-semibold">
+            <Truck className="h-4 w-4 register-accent" />
+            อัปเดตสถานะรับของ
+          </div>
+          <p className="register-subtle mb-4 text-xs">สถานะปัจจุบัน: {statusLabel(deliveryRequest.status)}</p>
 
           <div className="space-y-3">
             <button
               onClick={() => handleUpdateStatus('DRIVER_ASSIGNED')}
               disabled={!canAssignDriver || updating}
-              className={`w-full rounded-2xl py-3 text-sm font-semibold text-white ${
-                canAssignDriver ? 'bg-[#365314]' : 'bg-gray-300'
-              }`}
+              className="register-primary-btn w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
             >
               มีรถมารับงานแล้ว
             </button>
             <button
               onClick={() => handleUpdateStatus('ARRIVED')}
               disabled={!canMarkArrived || updating}
-              className={`w-full rounded-2xl py-3 text-sm font-semibold text-white ${
-                canMarkArrived ? 'bg-[#C0562F]' : 'bg-gray-300'
-              }`}
+              className="register-secondary-btn w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
             >
               สินค้าถึง Drop Point แล้ว
             </button>
+            {canVerify ? (
+              <button
+                onClick={() => router.push(previewMode ? `/droppoint-verify?mock=1&contractId=${contract.contract_id}` : `/droppoint-verify?contractId=${contract.contract_id}`)}
+                className="register-primary-btn w-full rounded-2xl py-3 text-sm font-medium"
+              >
+                ตรวจสอบสินค้า
+              </button>
+            ) : null}
           </div>
-        </div>
+        </DropPointCard>
       </div>
-    </div>
+    </DropPointPageShell>
   );
 }
 
 export default function DropPointPickupPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA]">
-          <div className="text-center text-[#365314]">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-            <p className="mt-2 text-sm">กำลังโหลด...</p>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<DropPointLoadingScreen />}>
       <DropPointPickupPageContent />
     </Suspense>
   );
