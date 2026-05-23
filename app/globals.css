@@ -151,6 +151,9 @@
   --grad-investor-end: var(--blue-400);
   --grad-drop-start: var(--green-600);
   --grad-drop-end: var(--green-400);
+  --dot-primary: var(--primary);
+  --dot-secondary: var(--s2);
+  --dot-tertiary: var(--s3);
 }
 
 .theme-liff {
@@ -173,6 +176,43 @@
   --grad-primary-start: var(--orange-600);
   --grad-primary-end: var(--orange-400);
   --dot-fallback: var(--orange-600);
+}
+
+.theme-droppoint {
+  --primary: var(--green-600);
+  --primary-hover: var(--green-500);
+  --primary-active: var(--green-700);
+  --primary-soft: var(--green-100);
+  --primary-border: color-mix(in srgb, var(--green-200) 72%, white 28%);
+  --primary-fg: var(--white);
+  --grad-primary-start: var(--green-600);
+  --grad-primary-end: var(--green-400);
+  --dot-fallback: var(--green-600);
+  --dot-primary: var(--green-600);
+  --dot-secondary: var(--blue-600);
+  --dot-tertiary: var(--orange-600);
+
+  --register-surface: color-mix(in srgb, var(--background-white) 76%, var(--s3-soft) 24%);
+  --register-surface-strong: color-mix(in srgb, var(--background-white) 10%, var(--s3-soft) 90%);
+  --register-surface-muted: color-mix(in srgb, var(--background-white) 5%, var(--s3-soft) 95%);
+  --register-surface-hover: color-mix(in srgb, var(--background-white) 52%, var(--s3-soft) 48%);
+  --register-border: color-mix(in srgb, var(--s3-border) 68%, white 32%);
+  --register-border-strong: color-mix(in srgb, var(--s3-border) 84%, white 16%);
+  --register-shell-shadow: 0 14px 30px color-mix(in srgb, var(--s3-active) 12%, transparent);
+  --register-shell-shadow-strong: 0 22px 60px color-mix(in srgb, var(--s3-active) 16%, transparent);
+  --register-shell-gradient: linear-gradient(135deg, color-mix(in srgb, white 72%, var(--s3-soft) 28%) 0%, color-mix(in srgb, white 52%, var(--s3-soft) 48%) 52%, color-mix(in srgb, white 38%, var(--s3-soft) 62%) 100%);
+  --register-title-gradient: linear-gradient(90deg, var(--s3-active) 0%, var(--s3) 48%, color-mix(in srgb, var(--s3-hover) 76%, white 24%) 100%);
+  --register-hero-gradient: linear-gradient(135deg, color-mix(in srgb, var(--s3-active) 92%, black 8%) 0%, var(--s3) 48%, color-mix(in srgb, var(--s3-hover) 58%, white 42%) 100%);
+  --register-ring-track: color-mix(in srgb, var(--s3-border) 72%, white 28%);
+  --register-ring-fill: var(--s3-active);
+  --register-chip-neutral: color-mix(in srgb, var(--background-white) 32%, var(--s3-soft) 68%);
+  --register-chip-neutral-fg: color-mix(in srgb, var(--foreground-subtle) 70%, var(--s3) 30%);
+  --register-chart-1: var(--s3-active);
+  --register-chart-2: var(--s3);
+  --register-chart-3: color-mix(in srgb, var(--s3-hover) 82%, white 18%);
+  --register-chart-4: color-mix(in srgb, var(--s3-hover) 58%, white 42%);
+  --register-chart-5: color-mix(in srgb, var(--s3-border) 82%, white 18%);
+  --register-chart-unallocated: color-mix(in srgb, var(--s3-border) 52%, white 48%);
 }
 
 @theme inline {
@@ -631,28 +671,47 @@ body {
   background: transparent;
 }
 
+.theme-droppoint .volume-slider-track {
+  border: 1px solid color-mix(in srgb, var(--green-600) 18%, white 82%);
+  box-shadow: inset 0 -1px 2px color-mix(in srgb, var(--green-600) 12%, transparent);
+}
+
+.theme-droppoint .volume-slider::-webkit-slider-thumb {
+  background: linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, white 70%, var(--green-100) 30%) 100%);
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--green-600) 26%, transparent),
+    0 2px 6px rgba(32, 32, 32, 0.12);
+}
+
+.theme-droppoint .volume-slider::-moz-range-thumb {
+  background: linear-gradient(135deg, #ffffff 0%, color-mix(in srgb, white 70%, var(--green-100) 30%) 100%);
+  box-shadow:
+    0 10px 16px color-mix(in srgb, var(--green-600) 26%, transparent),
+    0 2px 6px rgba(32, 32, 32, 0.12);
+}
+
 :is(.theme-web, .theme-liff) {
-  --register-surface: color-mix(in srgb, var(--background-white) 76%, var(--s2-soft) 24%);
-  --register-surface-strong: color-mix(in srgb, var(--background-white) 10%, var(--s2-soft) 90%);
-  --register-surface-muted: color-mix(in srgb, var(--background-white) 5%, var(--s2-soft) 95%);
-  --register-surface-hover: color-mix(in srgb, var(--background-white) 52%, var(--s2-soft) 48%);
-  --register-border: color-mix(in srgb, var(--s2-border) 68%, white 32%);
-  --register-border-strong: color-mix(in srgb, var(--s2-border) 84%, white 16%);
-  --register-shell-shadow: 0 14px 30px color-mix(in srgb, var(--s2-active) 12%, transparent);
-  --register-shell-shadow-strong: 0 22px 60px color-mix(in srgb, var(--s2-active) 16%, transparent);
-  --register-shell-gradient: linear-gradient(135deg, color-mix(in srgb, white 72%, var(--s2-soft) 28%) 0%, color-mix(in srgb, white 52%, var(--s2-soft) 48%) 52%, color-mix(in srgb, white 38%, var(--s2-soft) 62%) 100%);
-  --register-title-gradient: linear-gradient(90deg, var(--s2-active) 0%, var(--s2) 48%, color-mix(in srgb, var(--s2-hover) 76%, white 24%) 100%);
-  --register-hero-gradient: linear-gradient(135deg, color-mix(in srgb, var(--s2-active) 92%, black 8%) 0%, var(--s2) 48%, color-mix(in srgb, var(--s2-hover) 58%, white 42%) 100%);
-  --register-ring-track: color-mix(in srgb, var(--s2-border) 72%, white 28%);
-  --register-ring-fill: var(--s2-active);
-  --register-chip-neutral: color-mix(in srgb, var(--background-white) 32%, var(--s2-soft) 68%);
-  --register-chip-neutral-fg: color-mix(in srgb, var(--foreground-subtle) 70%, var(--s2) 30%);
-  --register-chart-1: var(--s2-active);
-  --register-chart-2: var(--s2);
-  --register-chart-3: color-mix(in srgb, var(--s2-hover) 82%, white 18%);
-  --register-chart-4: color-mix(in srgb, var(--s2-hover) 58%, white 42%);
-  --register-chart-5: color-mix(in srgb, var(--s2-border) 82%, white 18%);
-  --register-chart-unallocated: color-mix(in srgb, var(--s2-border) 52%, white 48%);
+  --register-surface: color-mix(in srgb, var(--background-white) 90%, var(--primary-soft) 10%);
+  --register-surface-strong: color-mix(in srgb, var(--background-white) 10%, var(--primary-soft) 90%);
+  --register-surface-muted: color-mix(in srgb, var(--background-white) 5%, var(--primary-soft) 95%);
+  --register-surface-hover: color-mix(in srgb, var(--background-white) 52%, var(--primary-soft) 48%);
+  --register-border: color-mix(in srgb, var(--primary-border) 68%, white 32%);
+  --register-border-strong: color-mix(in srgb, var(--primary-border) 84%, white 16%);
+  --register-shell-shadow: 0 14px 30px color-mix(in srgb, var(--primary-active) 12%, transparent);
+  --register-shell-shadow-strong: 0 22px 60px color-mix(in srgb, var(--primary-active) 16%, transparent);
+  --register-shell-gradient: linear-gradient(135deg, color-mix(in srgb, white 72%, var(--primary-soft) 28%) 0%, color-mix(in srgb, white 52%, var(--primary-soft) 48%) 52%, color-mix(in srgb, white 38%, var(--primary-soft) 62%) 100%);
+  --register-title-gradient: linear-gradient(90deg, var(--primary-active) 0%, var(--primary) 48%, color-mix(in srgb, var(--primary-hover) 76%, white 24%) 100%);
+  --register-hero-gradient: linear-gradient(135deg, color-mix(in srgb, var(--primary-active) 92%, black 8%) 0%, var(--primary) 48%, color-mix(in srgb, var(--primary-hover) 58%, white 42%) 100%);
+  --register-ring-track: color-mix(in srgb, var(--primary-border) 72%, white 28%);
+  --register-ring-fill: var(--primary-active);
+  --register-chip-neutral: color-mix(in srgb, var(--background-white) 32%, var(--primary-soft) 68%);
+  --register-chip-neutral-fg: color-mix(in srgb, var(--foreground-subtle) 70%, var(--primary) 30%);
+  --register-chart-1: var(--primary-active);
+  --register-chart-2: var(--primary);
+  --register-chart-3: color-mix(in srgb, var(--primary-hover) 82%, white 18%);
+  --register-chart-4: color-mix(in srgb, var(--primary-hover) 58%, white 42%);
+  --register-chart-5: color-mix(in srgb, var(--primary-border) 82%, white 18%);
+  --register-chart-unallocated: color-mix(in srgb, var(--primary-border) 52%, white 48%);
 }
 
 :is(.theme-web, .theme-liff) .register-shell {
@@ -666,9 +725,9 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-inner-card {
-  border: 1px solid color-mix(in srgb, var(--background-white) 78%, var(--s2-border) 22%);
+  border: 1px solid color-mix(in srgb, var(--background-white) 78%, var(--primary-border) 22%);
   background: color-mix(in srgb, var(--background-white) 72%, transparent 28%);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--s2-active) 8%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary-active) 8%, transparent);
 }
 
 :is(.theme-web, .theme-liff) .register-surface {
@@ -685,30 +744,29 @@ body {
 
 :is(.theme-web, .theme-liff) .register-panel {
   border: 1px solid var(--register-border);
-  background: color-mix(in srgb, var(--background-white) 84%, transparent 16%);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--s2-active) 6%, transparent);
+  background: color-mix(in srgb, var(--primary-soft) 10%, transparent 90%);
 }
 
 :is(.theme-web, .theme-liff) .register-pill {
   border: 0px solid var(--register-border-strong);
-  background: var(--s2-soft);
-  color: color-mix(in srgb, var(--foreground-subtle) 56%, var(--s2) 44%);
+  background: var(--primary-soft);
+  color: color-mix(in srgb, var(--foreground-subtle) 56%, var(--primary) 44%);
 }
 
 :is(.theme-web, .theme-liff) .register-heading {
-  color: color-mix(in srgb, var(--foreground) 76%, var(--s2-active) 24%);
+  color: color-mix(in srgb, var(--foreground) 76%, var(--primary-active) 24%);
 }
 
 :is(.theme-web, .theme-liff) .register-subtle {
-  color: color-mix(in srgb, var(--foreground-subtle) 82%, var(--s2) 18%);
+  color: color-mix(in srgb, var(--foreground-subtle) 82%, var(--primary) 18%);
 }
 
 :is(.theme-web, .theme-liff) .register-accent {
-  color: var(--s2-active);
+  color: var(--primary-active);
 }
 
 :is(.theme-web, .theme-liff) .register-accent-soft {
-  color: color-mix(in srgb, var(--foreground-subtle) 60%, var(--s2) 40%);
+  color: color-mix(in srgb, var(--foreground-subtle) 60%, var(--primary) 40%);
 }
 
 :is(.theme-web, .theme-liff) .register-title {
@@ -723,18 +781,18 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-primary-btn {
-  background-image: linear-gradient(90deg, var(--s2) 0%, var(--s2-active) 100%);
-  color: var(--s2-fg);
-  box-shadow: 0 12px 24px color-mix(in srgb, var(--s2-active) 18%, transparent);
+  background-image: linear-gradient(90deg, var(--primary) 0%, var(--primary-active) 100%);
+  color: var(--primary-fg);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--primary-active) 18%, transparent);
 }
 
 :is(.theme-web, .theme-liff) .register-primary-btn:hover {
-  background-image: linear-gradient(90deg, var(--s2-hover) 0%, var(--s2-active) 100%);
+  background-image: linear-gradient(90deg, var(--primary-hover) 0%, var(--primary-active) 100%);
 }
 
 :is(.theme-web, .theme-liff) .register-secondary-btn {
   background: var(--register-surface-strong);
-  color: var(--s2-active);
+  color: var(--primary-active);
   border: 1px solid var(--register-border-strong);
 }
 
@@ -743,15 +801,15 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-outline-btn {
-  border: 1px solid color-mix(in srgb, var(--s2) 72%, white 28%);
+  border: 1px solid color-mix(in srgb, var(--primary) 72%, white 28%);
   background: var(--background-white);
-  color: var(--s2-active);
+  color: var(--primary-active);
 }
 
 :is(.theme-web, .theme-liff) .register-input,
 :is(.theme-web, .theme-liff) .register-select-trigger,
 :is(.theme-web, .theme-liff) .register-static-field {
-  border: 1px solid color-mix(in srgb, var(--s2-border) 72%, white 28%);
+  border: 1px solid color-mix(in srgb, var(--primary-border) 72%, white 28%);
   background: var(--background-white);
   color: var(--foreground);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--neutral-900) 4%, transparent);
@@ -765,11 +823,11 @@ body {
 :is(.theme-web, .theme-liff) .register-input:focus,
 :is(.theme-web, .theme-liff) .register-select-trigger:focus {
   outline: none;
-  box-shadow: 0 0 0 1px var(--s2-active);
+  box-shadow: 0 0 0 1px var(--primary-active);
 }
 
 :is(.theme-web, .theme-liff) .register-static-field {
-  background: color-mix(in srgb, var(--background-white) 54%, var(--s2-soft) 46%);
+  background: color-mix(in srgb, var(--background-white) 54%, var(--primary-soft) 46%);
   color: var(--foreground-muted);
 }
 
@@ -780,8 +838,8 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-select-option-active {
-  background: color-mix(in srgb, var(--background-white) 16%, var(--s2-soft) 84%);
-  color: var(--s2-active);
+  background: color-mix(in srgb, var(--background-white) 16%, var(--primary-soft) 84%);
+  color: var(--primary-active);
 }
 
 :is(.theme-web, .theme-liff) .register-status-success {
@@ -803,15 +861,15 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-chip-selected {
-  border-color: var(--s2-active);
-  background: linear-gradient(90deg, var(--s2) 0%, var(--s2-active) 100%);
-  color: var(--s2-fg);
+  border-color: var(--primary-active);
+  background: var(--primary-soft);
+  color: var(--primary-active);
 }
 
 :is(.theme-web, .theme-liff) .register-chip-unselected {
-  border-color: color-mix(in srgb, var(--s2-border) 72%, white 28%);
+  border-color: color-mix(in srgb, var(--primary-border) 72%, white 28%);
   background: var(--background-white);
-  color: color-mix(in srgb, var(--foreground-muted) 74%, var(--s2) 26%);
+  color: color-mix(in srgb, var(--foreground-muted) 74%, var(--primary) 26%);
 }
 
 :is(.theme-web, .theme-liff) .register-chip-soft {
@@ -824,11 +882,11 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-progress {
-  background-image: linear-gradient(90deg, var(--s2-active) 0%, var(--s2-hover) 100%);
+  background-image: linear-gradient(90deg, var(--primary-active) 0%, var(--primary-hover) 100%);
 }
 
 :is(.theme-web, .theme-liff) .register-divider {
-  border-color: color-mix(in srgb, var(--background-white) 62%, var(--s2-border) 38%);
+  border-color: color-mix(in srgb, var(--background-white) 62%, var(--primary-border) 38%);
 }
 
 :is(.theme-web, .theme-liff) .register-modal-backdrop {
@@ -836,13 +894,13 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-step-done {
-  border-color: var(--s2);
-  background: var(--s2);
+  border-color: var(--primary);
+  background: var(--primary);
 }
 
 :is(.theme-web, .theme-liff) .register-step-current {
-  border-color: var(--s2);
-  background: color-mix(in srgb, var(--s2) 50%, white 50%);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 50%, white 50%);
 }
 
 :is(.theme-web, .theme-liff) .register-step-idle {
@@ -851,11 +909,11 @@ body {
 }
 
 :is(.theme-web, .theme-liff) .register-blob-a { background: color-mix(in srgb, var(--background-white) 14%, transparent); }
-:is(.theme-web, .theme-liff) .register-blob-b { background: color-mix(in srgb, var(--s2-soft) 18%, transparent); }
+:is(.theme-web, .theme-liff) .register-blob-b { background: color-mix(in srgb, var(--primary-soft) 18%, transparent); }
 :is(.theme-web, .theme-liff) .register-blob-c { background: color-mix(in srgb, var(--background-white) 10%, transparent); }
 :is(.theme-web, .theme-liff) .register-star-a { background: color-mix(in srgb, var(--background-white) 70%, transparent); }
 :is(.theme-web, .theme-liff) .register-star-b { background: color-mix(in srgb, var(--background-white) 60%, transparent); }
-:is(.theme-web, .theme-liff) .register-star-c { background: color-mix(in srgb, var(--s2-soft) 80%, white 20%); }
+:is(.theme-web, .theme-liff) .register-star-c { background: color-mix(in srgb, var(--primary-soft) 80%, white 20%); }
 
 :is(.theme-web, .theme-liff) .register-hero-pill {
   border: 1px solid color-mix(in srgb, var(--background-white) 30%, transparent);
@@ -895,18 +953,18 @@ body {
   width: 12.5px;
   height: 12.5px;
   border-radius: 6.25px;
-  background-color: var(--primary);
-  color: var(--primary);
+  background-color: var(--dot-primary, var(--primary));
+  color: var(--dot-primary, var(--primary));
   box-shadow:
-    9999.8px -19.2px 0 0 var(--primary),
-    9989.4px 0 0 0 var(--s2),
-    10010.2px 0 0 0 var(--s3);
+    9999.8px -19.2px 0 0 var(--dot-primary, var(--primary)),
+    9989.4px 0 0 0 var(--dot-secondary, var(--s2)),
+    10010.2px 0 0 0 var(--dot-tertiary, var(--s3));
   animation: dot-bricks 2s infinite linear;
 }
 
 @keyframes dot-bricks {
-  0%      { box-shadow: 9999.8px -19.2px 0 0 var(--primary), 9989.4px 0 0 0 var(--s2), 10010.2px 0 0 0 var(--s3); }
-  33.333% { box-shadow: 10010.2px 0 0 0 var(--primary), 9999.8px -19.2px 0 0 var(--s2), 9989.4px 0 0 0 var(--s3); }
-  66.666% { box-shadow: 9989.4px 0 0 0 var(--primary), 10010.2px 0 0 0 var(--s2), 9999.8px -19.2px 0 0 var(--s3); }
-  100%    { box-shadow: 9999.8px -19.2px 0 0 var(--primary), 9989.4px 0 0 0 var(--s2), 10010.2px 0 0 0 var(--s3); }
+  0%      { box-shadow: 9999.8px -19.2px 0 0 var(--dot-primary, var(--primary)), 9989.4px 0 0 0 var(--dot-secondary, var(--s2)), 10010.2px 0 0 0 var(--dot-tertiary, var(--s3)); }
+  33.333% { box-shadow: 10010.2px 0 0 0 var(--dot-primary, var(--primary)), 9999.8px -19.2px 0 0 var(--dot-secondary, var(--s2)), 9989.4px 0 0 0 var(--dot-tertiary, var(--s3)); }
+  66.666% { box-shadow: 9989.4px 0 0 0 var(--dot-primary, var(--primary)), 10010.2px 0 0 0 var(--dot-secondary, var(--s2)), 9999.8px -19.2px 0 0 var(--dot-tertiary, var(--s3)); }
+  100%    { box-shadow: 9999.8px -19.2px 0 0 var(--dot-primary, var(--primary)), 9989.4px 0 0 0 var(--dot-secondary, var(--s2)), 10010.2px 0 0 0 var(--dot-tertiary, var(--s3)); }
 }

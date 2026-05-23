@@ -14,5 +14,9 @@ export default function DropPointVerifyLayout({
 }) {
   // Drop Point Verification LIFF ID
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q';
-  return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
+  return (
+    <LiffProvider liffId={liffId}>
+      <div className="theme-liff theme-droppoint page-droppoint min-h-screen bg-background-white">{children}</div>
+    </LiffProvider>
+  );
 }

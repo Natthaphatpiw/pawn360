@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 
 const INCOMING_STATUSES = ['PAWNER_CONFIRMED', 'IN_TRANSIT'];
 const ARRIVED_STATUSES = ['RECEIVED_AT_DROP_POINT', 'VERIFIED'];
+const WAITING_DRIVER_CONTRACT_STATUSES = ['PENDING'];
+const WAITING_DRIVER_REQUEST_STATUSES = ['DRIVER_SEARCH', 'PAYMENT_VERIFIED', 'AWAITING_PAYMENT', 'PAYMENT_REJECTED', 'SLIP_UPLOADED'];
 
 export async function GET(
   request: NextRequest,
@@ -56,7 +58,7 @@ export async function GET(
         )
       `)
       .eq('drop_point_id', dropPoint.drop_point_id)
-      .in('item_delivery_status', [...INCOMING_STATUSES, ...ARRIVED_STATUSES])
+      .in('item_delivery_status', [...WAITING_DRIVER_CONTRACT_STATUSES, ...INCOMING_STATUSES, ...ARRIVED_STATUSES])
       .order('updated_at', { ascending: false });
 
     if (contractsError) {
@@ -65,6 +67,7 @@ export async function GET(
 
     const contractIds = (contracts || []).map((contract) => contract.contract_id);
     let storageBoxByContractId: Record<string, string> = {};
+    let deliveryRequestByContractId: Record<string, { delivery_request_id: string; status: string; updated_at?: string | null }> = {};
 
     if (contractIds.length > 0) {
       const { data: storageBoxes, error: storageBoxesError } = await supabase
@@ -82,22 +85,51 @@ export async function GET(
         }
         return acc;
       }, {});
+
+      const { data: deliveryRequests, error: deliveryRequestsError } = await supabase
+        .from('pawn_delivery_requests')
+        .select('contract_id, delivery_request_id, status, updated_at')
+        .in('contract_id', contractIds)
+        .order('updated_at', { ascending: false });
+
+      if (deliveryRequestsError && deliveryRequestsError.code !== 'PGRST205') {
+        throw deliveryRequestsError;
+      }
+
+      deliveryRequestByContractId = (deliveryRequests || []).reduce<Record<string, { delivery_request_id: string; status: string; updated_at?: string | null }>>((acc, row) => {
+        if (row.contract_id && !acc[row.contract_id] && row.delivery_request_id) {
+          acc[row.contract_id] = {
+            delivery_request_id: row.delivery_request_id,
+            status: row.status,
+            updated_at: row.updated_at,
+          };
+        }
+        return acc;
+      }, {});
     }
 
     const formatted = (contracts || []).map((contract) => {
-      const statusGroup = INCOMING_STATUSES.includes(contract.item_delivery_status)
+      const deliveryRequest = deliveryRequestByContractId[contract.contract_id];
+      const statusGroup = WAITING_DRIVER_CONTRACT_STATUSES.includes(contract.item_delivery_status)
+        && deliveryRequest
+        && WAITING_DRIVER_REQUEST_STATUSES.includes(deliveryRequest.status)
+        ? 'WAITING_DRIVER'
+        : INCOMING_STATUSES.includes(contract.item_delivery_status)
         ? 'INCOMING'
         : ARRIVED_STATUSES.includes(contract.item_delivery_status)
           ? 'ARRIVED'
           : 'UNKNOWN';
 
-      const displayStatus = statusGroup === 'INCOMING'
+      const displayStatus = statusGroup === 'WAITING_DRIVER'
+        ? 'รอเรียกรถ'
+        : statusGroup === 'INCOMING'
         ? 'กำลังมา'
         : statusGroup === 'ARRIVED'
-          ? 'ถึงแล้ว'
+          ? 'รอตรวจสอบ'
           : 'ไม่ทราบสถานะ';
 
-      const displayDate = contract.item_received_at
+      const displayDate = deliveryRequest?.updated_at
+        || contract.item_received_at
         || contract.item_verified_at
         || contract.updated_at
         || contract.created_at;
@@ -107,6 +139,8 @@ export async function GET(
         statusGroup,
         displayStatus,
         displayDate,
+        delivery_request_id: deliveryRequest?.delivery_request_id || null,
+        delivery_request_status: deliveryRequest?.status || null,
         storage_box_code: storageBoxByContractId[contract.contract_id] || null,
       };
     });

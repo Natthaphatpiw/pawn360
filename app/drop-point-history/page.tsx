@@ -1,8 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
+import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
+import { isDropPointMockEnabled, mockHistoryEntries } from '@/lib/mock-drop-point';
+import {
+  DropPointCard,
+  DropPointHeroCard,
+  DropPointLoadingScreen,
+  DropPointMessageState,
+  DropPointPageShell,
+  DropPointStatusBadge,
+} from '@/components/drop-point/ui';
 
 type HistoryEntry = {
   id: string;
@@ -15,86 +25,86 @@ type HistoryEntry = {
 
 const FILTERS = [
   { key: 'ALL', label: 'ทั้งหมด' },
-  { key: 'ARRIVED', label: 'ถึงแล้ว' },
+  { key: 'ARRIVED', label: 'รับแล้ว' },
   { key: 'RETURNED', label: 'คืนแล้ว' },
   { key: 'CANCELLED', label: 'ยกเลิก' },
-];
+] as const;
+
+function getDisplayStatus(entry: Pick<HistoryEntry, 'status' | 'rawStatus'>) {
+  if (entry.rawStatus === 'RECEIVED_AT_DROP_POINT' || entry.rawStatus === 'VERIFIED' || entry.status === 'ถึงแล้ว') {
+    return 'รับแล้ว';
+  }
+  return entry.status;
+}
 
 function formatDate(dateString?: string) {
   if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('th-TH');
+  return new Date(dateString).toLocaleDateString('th-TH', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function DropPointHistoryContent() {
   const { profile, isLoading: liffLoading } = useLiff();
+  const searchParams = useSearchParams();
+  const previewMode = isDropPointMockEnabled(searchParams);
+
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('ALL');
 
   useEffect(() => {
-    if (liffLoading || !profile?.userId) return;
-    fetchHistory(profile.userId);
-  }, [liffLoading, profile?.userId]);
+    const load = async () => {
+      if (previewMode) {
+        setEntries(mockHistoryEntries);
+        setLoading(false);
+        return;
+      }
+      if (liffLoading || !profile?.userId) return;
+      try {
+        setLoading(true);
+        const response = await axios.get(`/api/drop-points/history/${profile.userId}`);
+        setEntries(response.data.entries || []);
+      } catch (fetchError: any) {
+        setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchHistory = async (lineId: string) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/drop-points/history/${lineId}`);
-      setEntries(response.data.entries || []);
-    } catch (fetchError: any) {
-      console.error('Error fetching history:', fetchError);
-      setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
-  };
+    load();
+  }, [previewMode, liffLoading, profile?.userId]);
 
   const filteredEntries = useMemo(() => {
     if (filter === 'ALL') return entries;
-    if (filter === 'ARRIVED') return entries.filter((entry) => entry.status === 'ถึงแล้ว');
-    if (filter === 'RETURNED') return entries.filter((entry) => entry.status === 'คืนแล้ว');
-    if (filter === 'CANCELLED') return entries.filter((entry) => entry.status === 'ยกเลิก');
+    if (filter === 'ARRIVED') return entries.filter((entry) => getDisplayStatus(entry) === 'รับแล้ว');
+    if (filter === 'RETURNED') return entries.filter((entry) => getDisplayStatus(entry) === 'คืนแล้ว');
+    if (filter === 'CANCELLED') return entries.filter((entry) => getDisplayStatus(entry) === 'ยกเลิก');
     return entries;
   }, [entries, filter]);
 
-  if (liffLoading || loading) {
-    return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#365314] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  if (liffLoading && !previewMode) return <DropPointLoadingScreen />;
+  if (loading) return <DropPointLoadingScreen />;
+  if (error) return <DropPointMessageState title="โหลดประวัติไม่สำเร็จ" description={error} />;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6">
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-gray-800">ประวัติรายการ</h1>
-        <p className="text-sm text-gray-500">รวมรายการทั้งหมดของ Drop Point</p>
-      </div>
+    <DropPointPageShell>
+      <DropPointHeroCard
+        eyebrow={previewMode ? 'Preview Mode' : 'Drop Point'}
+        title="ประวัติรายการ"
+        subtitle="รวมรายการรับเข้า ส่งคืน และสถานะย้อนหลังทั้งหมด"
+      />
 
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
+      <div className="mt-4 grid grid-cols-4 gap-2">
         {FILTERS.map((option) => (
           <button
             key={option.key}
             onClick={() => setFilter(option.key)}
-            className={`px-4 py-2 rounded-full text-xs font-semibold border ${
-              filter === option.key
-                ? 'bg-[#365314] text-white border-[#365314]'
-                : 'bg-white text-gray-600 border-gray-200'
+            className={`w-full rounded-full px-2 py-2 text-center text-xs font-semibold transition-colors ${
+              filter === option.key ? 'register-primary-btn' : 'register-secondary-btn'
             }`}
           >
             {option.label}
@@ -102,41 +112,44 @@ function DropPointHistoryContent() {
         ))}
       </div>
 
-      {filteredEntries.length === 0 ? (
-        <div className="bg-white rounded-2xl p-6 text-center text-sm text-gray-500">
-          ไม่มีรายการในสถานะนี้
-        </div>
-      ) : (
-        filteredEntries.map((entry) => (
-          <div key={`${entry.type}-${entry.id}`} className="bg-white rounded-2xl p-4 mb-3 shadow-sm">
-            <div className="flex justify-between items-start">
+      <div className="mt-4 space-y-3">
+        {filteredEntries.length === 0 ? (
+          <DropPointCard className="text-center text-sm text-foreground-subtle">ไม่มีรายการในสถานะนี้</DropPointCard>
+        ) : filteredEntries.map((entry) => (
+          <DropPointCard key={`${entry.type}-${entry.id}`}>
+            {(() => {
+              const displayStatus = getDisplayStatus(entry);
+              return (
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-base font-bold text-gray-800">{entry.title || '-'}</div>
-                <div className="text-xs text-gray-500">
+                <div className="register-heading text-base font-semibold">{entry.title || '-'}</div>
+                <div className="register-subtle mt-1 text-xs">
                   {entry.type === 'PAWN' ? 'รับเข้า' : 'ส่งคืน'} • {formatDate(entry.date)}
                 </div>
               </div>
-              <span className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                {entry.status}
-              </span>
+              <DropPointStatusBadge
+                tone={
+                  displayStatus === 'รับแล้ว' ? 'success'
+                  : displayStatus === 'คืนแล้ว' ? 'warning'
+                  : displayStatus === 'ยกเลิก' ? 'danger'
+                  : 'neutral'
+                }
+              >
+                {displayStatus}
+              </DropPointStatusBadge>
             </div>
-          </div>
-        ))
-      )}
-    </div>
+              );
+            })()}
+          </DropPointCard>
+        ))}
+      </div>
+    </DropPointPageShell>
   );
 }
 
 export default function DropPointHistoryPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#365314] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<DropPointLoadingScreen />}>
       <DropPointHistoryContent />
     </Suspense>
   );
