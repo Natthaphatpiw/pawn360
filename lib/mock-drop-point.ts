@@ -117,6 +117,40 @@ export type MockRedemptionDetail = {
   };
 };
 
+export type MockDropPointDashboardCategory = {
+  key: string;
+  label: string;
+  count: number;
+  color: string;
+};
+
+export type MockDropPointDashboard = {
+  dropPoint: MockDropPoint;
+  currentInventoryCount: number;
+  currentInventoryByType: MockDropPointDashboardCategory[];
+  cumulative: {
+    avgHoldingDays: number;
+    returnedItems: number;
+    verifiedItems: number;
+    totalRevenue: number;
+  };
+  allTimeItemsCount: number;
+  allTimeItemsByType: MockDropPointDashboardCategory[];
+  currentMonth: {
+    revenue: number;
+    pendingSaleItems: number;
+    receivedItems: number;
+    avgVerificationDays: number;
+  };
+  operations: {
+    waitingDriver: number;
+    incoming: number;
+    waitingVerification: number;
+    storageBoxesUsed: number;
+    storageBoxesTotal: number;
+  };
+};
+
 const mockImages = [
   'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=80',
   'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=900&q=80',
@@ -335,6 +369,45 @@ export const mockRedemptionDetails: Record<string, MockRedemptionDetail> = {
   },
 };
 
+export const mockDropPointDashboard: MockDropPointDashboard = {
+  dropPoint: mockDropPoint,
+  currentInventoryCount: 18,
+  currentInventoryByType: [
+    { key: 'phone', label: 'โทรศัพท์มือถือ', count: 8, color: 'var(--register-chart-1)' },
+    { key: 'apple', label: 'Apple', count: 4, color: 'var(--register-chart-2)' },
+    { key: 'camera', label: 'กล้อง', count: 3, color: 'var(--register-chart-3)' },
+    { key: 'notebook', label: 'โน้ตบุค', count: 2, color: 'var(--register-chart-4)' },
+    { key: 'accessory', label: 'อุปกรณ์เสริม', count: 1, color: 'var(--register-chart-5)' },
+  ],
+  cumulative: {
+    avgHoldingDays: 14.6,
+    returnedItems: 47,
+    verifiedItems: 326,
+    totalRevenue: 286450,
+  },
+  allTimeItemsCount: 326,
+  allTimeItemsByType: [
+    { key: 'phone', label: 'โทรศัพท์มือถือ', count: 142, color: 'var(--register-chart-1)' },
+    { key: 'apple', label: 'Apple', count: 79, color: 'var(--register-chart-2)' },
+    { key: 'camera', label: 'กล้อง', count: 43, color: 'var(--register-chart-3)' },
+    { key: 'notebook', label: 'โน้ตบุค', count: 38, color: 'var(--register-chart-4)' },
+    { key: 'accessory', label: 'อุปกรณ์เสริม', count: 24, color: 'var(--register-chart-5)' },
+  ],
+  currentMonth: {
+    revenue: 38450,
+    pendingSaleItems: 7,
+    receivedItems: 29,
+    avgVerificationDays: 1.8,
+  },
+  operations: {
+    waitingDriver: 3,
+    incoming: 5,
+    waitingVerification: 4,
+    storageBoxesUsed: 18,
+    storageBoxesTotal: 30,
+  },
+};
+
 export function getMockContractDetail(contractId?: string | null) {
   if (!contractId) return null;
   return mockContractDetails[contractId] || mockContractDetails.ct_mock_incoming_01;
@@ -343,6 +416,10 @@ export function getMockContractDetail(contractId?: string | null) {
 export function getMockRedemptionDetail(redemptionId?: string | null) {
   if (!redemptionId) return null;
   return mockRedemptionDetails[redemptionId] || mockRedemptionDetails.rd_mock_01;
+}
+
+export function getMockDropPointDashboard() {
+  return mockDropPointDashboard;
 }
 
 type SearchParamsLike = {
