@@ -1,24 +1,32 @@
 'use client';
 
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { ChevronLeft, Package, Clock } from 'lucide-react';
+import { Clock3, PackageCheck, PackageOpen, Phone } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import {
+  getMockContractDetail,
+  isDropPointMockEnabled,
+  mockContracts,
+  mockDropPoint,
+} from '@/lib/mock-drop-point';
+import {
+  DropPointCard,
+  DropPointHeroCard,
+  DropPointLoadingScreen,
+  DropPointMessageState,
+  DropPointPageShell,
+  DropPointStatusBadge,
+} from '@/components/drop-point/ui';
 
 type DropPoint = {
   drop_point_id: string;
   drop_point_name: string;
   drop_point_code?: string;
-};
-
-type ContractItem = {
-  brand?: string;
-  model?: string;
-  item_type?: string;
-  image_urls?: string[];
+  phone_number?: string;
 };
 
 type ContractListItem = {
@@ -28,57 +36,40 @@ type ContractListItem = {
   displayStatus: string;
   displayDate?: string;
   storage_box_code?: string | null;
-  statusGroup?: 'INCOMING' | 'ARRIVED' | 'UNKNOWN';
-  items?: ContractItem;
-};
-
-type ContractDetail = {
-  contract_id: string;
-  contract_number: string;
-  item_delivery_status: string;
-  item_received_at?: string;
-  item_verified_at?: string;
-  created_at?: string;
-  updated_at?: string;
-  storage_box_code?: string | null;
-  storage_box_assigned_at?: string | null;
+  delivery_request_id?: string | null;
+  delivery_request_status?: string | null;
+  statusGroup?: 'WAITING_DRIVER' | 'INCOMING' | 'ARRIVED' | 'UNKNOWN';
   items?: {
-    item_id?: string;
     brand?: string;
     model?: string;
-    capacity?: string | null;
+    item_type?: string;
     image_urls?: string[];
-    item_condition?: number;
-    notes?: string | null;
-    defects?: string | null;
-  };
-  pawners?: {
-    firstname?: string;
-    lastname?: string;
-    phone_number?: string;
-  };
-  drop_points?: {
-    drop_point_name?: string;
-    phone_number?: string;
   };
 };
+
+type ContractDetail = ReturnType<typeof getMockContractDetail>;
 
 function formatDate(dateString?: string) {
   if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('th-TH');
+  return new Date(dateString).toLocaleDateString('th-TH', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function DropPointContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
+  const previewMode = isDropPointMockEnabled(searchParams);
 
   const [loading, setLoading] = useState(true);
   const [dropPoint, setDropPoint] = useState<DropPoint | null>(null);
   const [contracts, setContracts] = useState<ContractListItem[]>([]);
-  const [contractDetail, setContractDetail] = useState<ContractDetail | null>(null);
+  const [contractDetail, setContractDetail] = useState<ContractDetail>(null);
   const [error, setError] = useState<string | null>(null);
-  const shouldShowRegisterButton = (error || '').toLowerCase().includes('drop point not found');
+  const [updatingArrival, setUpdatingArrival] = useState(false);
 
   let contractId = searchParams.get('contractId');
   if (!contractId) {
@@ -90,251 +81,429 @@ function DropPointContent() {
   }
 
   useEffect(() => {
-    if (liffLoading || !profile?.userId) return;
-    if (contractId) {
-      fetchContractDetail(profile.userId, contractId);
-    } else {
-      fetchContracts(profile.userId);
-    }
-  }, [liffLoading, profile?.userId, contractId]);
+    const load = async () => {
+      if (previewMode) {
+        setDropPoint(mockDropPoint);
+        setContracts(mockContracts);
+        setContractDetail(contractId ? getMockContractDetail(contractId) : null);
+        setLoading(false);
+        return;
+      }
 
-  const fetchContracts = async (lineId: string) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/drop-points/contracts/${lineId}`);
-      setDropPoint(response.data.dropPoint);
-      setContracts(response.data.contracts || []);
-    } catch (fetchError: any) {
-      console.error('Error fetching drop point contracts:', fetchError);
-      setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (liffLoading || !profile?.userId) return;
+      try {
+        setLoading(true);
+        setError(null);
+        if (contractId) {
+          const response = await axios.get(`/api/drop-points/contracts/detail/${contractId}?lineId=${profile.userId}`);
+          setContractDetail(response.data.contract);
+        } else {
+          const response = await axios.get(`/api/drop-points/contracts/${profile.userId}`);
+          setDropPoint(response.data.dropPoint);
+          setContracts(response.data.contracts || []);
+        }
+      } catch (fetchError: any) {
+        setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchContractDetail = async (lineId: string, targetContractId: string) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/drop-points/contracts/detail/${targetContractId}?lineId=${lineId}`);
-      setContractDetail(response.data.contract);
-    } catch (fetchError: any) {
-      console.error('Error fetching contract detail:', fetchError);
-      setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
-  };
+    load();
+  }, [previewMode, liffLoading, profile?.userId, contractId]);
 
   const incomingContracts = useMemo(
     () => contracts.filter((contract) => contract.statusGroup === 'INCOMING'),
     [contracts]
   );
 
-  if (liffLoading || loading) {
-    return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#365314] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    );
+  const waitingDriverContracts = useMemo(
+    () => contracts.filter((contract) => contract.statusGroup === 'WAITING_DRIVER'),
+    [contracts]
+  );
+
+  const arrivedContracts = useMemo(
+    () => contracts.filter((contract) => contract.statusGroup === 'ARRIVED'),
+    [contracts]
+  );
+
+  if (liffLoading && !previewMode) {
+    return <DropPointLoadingScreen />;
+  }
+
+  if (loading) {
+    return <DropPointLoadingScreen />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          {shouldShowRegisterButton && (
-            <button
-              onClick={() =>
-                openLiffEntry({
-                  liffIdCandidates: [
-                    process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT,
-                    process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_REGISTER,
-                  ],
-                  fallbackPath: '/register-droppoint',
-                })
-              }
-              className="bg-[#365314] text-white px-5 py-2 rounded-lg text-sm"
-            >
-              ไปหน้าลงทะเบียน Drop Point
-            </button>
-          )}
-        </div>
-      </div>
+      <DropPointMessageState
+        title="โหลดข้อมูลไม่สำเร็จ"
+        description={error}
+        action={(
+          <button
+            onClick={() =>
+              openLiffEntry({
+                liffIdCandidates: [
+                  process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT,
+                  process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_REGISTER,
+                ],
+                fallbackPath: '/register-droppoint',
+              })
+            }
+            className="register-primary-btn rounded-full px-5 py-3 text-sm font-medium"
+          >
+            ไปหน้าลงทะเบียน Drop Point
+          </button>
+        )}
+      />
     );
   }
 
   if (contractId && !contractDetail) {
-    return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">ไม่พบข้อมูลสัญญา</p>
-        </div>
-      </div>
-    );
+    return <DropPointMessageState title="ไม่พบข้อมูลสัญญา" description="ลองกลับไปหน้าเมนูหลักของ Drop Point อีกครั้ง" />;
   }
 
   if (contractId && contractDetail) {
-    const statusText = ['RECEIVED_AT_DROP_POINT', 'VERIFIED'].includes(contractDetail.item_delivery_status)
-      ? 'ถึงแล้ว'
+    const waitingDriverRequestStatuses = ['DRIVER_SEARCH', 'PAYMENT_VERIFIED', 'AWAITING_PAYMENT', 'PAYMENT_REJECTED', 'SLIP_UPLOADED'];
+    const isWaitingDriver = contractDetail.item_delivery_status === 'PENDING'
+      && waitingDriverRequestStatuses.includes(contractDetail.delivery_request_status || '');
+    const statusText = isWaitingDriver
+      ? 'รอเรียกรถ'
+      : contractDetail.item_delivery_status === 'VERIFIED'
+      ? 'ตรวจสอบแล้ว'
+      : contractDetail.item_delivery_status === 'RECEIVED_AT_DROP_POINT'
+      ? 'รอตรวจสอบ'
       : ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status)
-        ? 'กำลังมา'
-        : 'ไม่ทราบสถานะ';
+        ? 'กำลังจัดส่งมา'
+        : 'รอตรวจสอบ';
+    const canAssignDriver = isWaitingDriver && Boolean(contractDetail.delivery_request_id);
+    const canMarkArrived = ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status)
+      && Boolean(contractDetail.delivery_request_id);
+    const canVerify = contractDetail.item_delivery_status === 'RECEIVED_AT_DROP_POINT'
+      || (contractDetail.item_delivery_status === 'VERIFIED' && !contractDetail.item_verified_at);
+    const statusTone = isWaitingDriver
+      ? 'neutral'
+      : contractDetail.item_delivery_status === 'RECEIVED_AT_DROP_POINT'
+      ? 'success'
+      : ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status)
+        ? 'warning'
+        : 'success';
 
-    const verifyLiffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_VERIFY || '2008651088-m9yMlA7Q';
-    const verifyUrl = `https://liff.line.me/${verifyLiffId}?contractId=${encodeURIComponent(contractDetail.contract_id)}`;
-    const canVerify = contractDetail.item_delivery_status !== 'VERIFIED' || !contractDetail.item_verified_at;
+    const handleAssignDriver = async () => {
+      if (!contractDetail?.delivery_request_id) return;
+
+      if (previewMode) {
+        setUpdatingArrival(true);
+        setTimeout(() => {
+          setContractDetail((prev) => prev ? {
+            ...prev,
+            item_delivery_status: 'IN_TRANSIT',
+            delivery_request_status: 'DRIVER_ASSIGNED',
+            updated_at: new Date().toISOString(),
+          } : prev);
+          setUpdatingArrival(false);
+        }, 400);
+        return;
+      }
+
+      if (!profile?.userId) {
+        setError('ไม่พบผู้ใช้งาน LINE');
+        return;
+      }
+
+      try {
+        setUpdatingArrival(true);
+        setError(null);
+        await axios.post('/api/pawn-delivery/update-status', {
+          deliveryRequestId: contractDetail.delivery_request_id,
+          lineId: profile.userId,
+          action: 'DRIVER_ASSIGNED',
+        });
+
+        const response = await axios.get(`/api/drop-points/contracts/detail/${contractDetail.contract_id}?lineId=${profile.userId}`);
+        setContractDetail(response.data.contract);
+      } catch (assignError: any) {
+        setError(assignError.response?.data?.error || 'ไม่สามารถอัปเดตสถานะได้');
+      } finally {
+        setUpdatingArrival(false);
+      }
+    };
+
+    const handleMarkArrived = async () => {
+      if (!contractDetail?.delivery_request_id) return;
+
+      if (previewMode) {
+        setUpdatingArrival(true);
+        setTimeout(() => {
+          setContractDetail((prev) => prev ? {
+            ...prev,
+            item_delivery_status: 'RECEIVED_AT_DROP_POINT',
+            item_received_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } : prev);
+          setUpdatingArrival(false);
+        }, 400);
+        return;
+      }
+
+      if (!profile?.userId) {
+        setError('ไม่พบผู้ใช้งาน LINE');
+        return;
+      }
+
+      try {
+        setUpdatingArrival(true);
+        setError(null);
+        await axios.post('/api/pawn-delivery/update-status', {
+          deliveryRequestId: contractDetail.delivery_request_id,
+          lineId: profile.userId,
+          action: 'ARRIVED',
+        });
+
+        const response = await axios.get(`/api/drop-points/contracts/detail/${contractDetail.contract_id}?lineId=${profile.userId}`);
+        setContractDetail(response.data.contract);
+      } catch (arrivalError: any) {
+        setError(arrivalError.response?.data?.error || 'ไม่สามารถอัปเดตสถานะได้');
+      } finally {
+        setUpdatingArrival(false);
+      }
+    };
 
     return (
-      <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6">
-        <button
-          onClick={() => router.push('/drop-point')}
-          className="flex items-center text-[#365314] mb-4"
+      <DropPointPageShell>
+        <DropPointHeroCard
+          eyebrow={previewMode ? 'Preview Mode' : 'Drop Point'}
+          title={`${contractDetail.items.brand} ${contractDetail.items.model}`}
+          subtitle={`หมายเลขสัญญา ${contractDetail.contract_number}`}
         >
-          <ChevronLeft className="w-5 h-5" />
-          <span className="text-sm font-medium">กลับ</span>
-        </button>
-
-        <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-          <h1 className="text-lg font-bold text-gray-800 mb-2">
-            {contractDetail.items?.brand} {contractDetail.items?.model}
-          </h1>
-          <div className="text-sm text-gray-500">สถานะ: {statusText}</div>
-          <div className="text-sm text-gray-500">หมายเลขสัญญา: {contractDetail.contract_number}</div>
-          <div className="text-sm text-gray-500">
-            วันส่งมา: {formatDate(contractDetail.item_received_at || contractDetail.item_verified_at || contractDetail.updated_at || contractDetail.created_at)}
+          <div className="flex flex-wrap gap-2">
+            <DropPointStatusBadge
+              tone={statusTone}
+              className={isWaitingDriver ? 'border border-s3-border/70' : ''}
+            >
+              {statusText}
+            </DropPointStatusBadge>
+            {contractDetail.storage_box_code ? (
+              <DropPointStatusBadge tone="neutral">กล่อง {contractDetail.storage_box_code}</DropPointStatusBadge>
+            ) : null}
           </div>
-          {contractDetail.storage_box_code && (
-            <div className="text-sm text-gray-700 mt-2">
-              หมายเลขกล่องเก็บของ: <span className="font-bold">{contractDetail.storage_box_code}</span>
+        </DropPointHeroCard>
+
+        <div className="mt-4 space-y-4">
+          {error ? <DropPointCard className="register-status-error text-sm">{error}</DropPointCard> : null}
+          <DropPointCard>
+            <div className="grid gap-3 text-sm text-foreground-muted">
+              <div>วันส่งมา: {formatDate(contractDetail.item_received_at || contractDetail.updated_at || contractDetail.created_at)}</div>
+              <div>ความจุ: {contractDetail.items.capacity || '-'}</div>
+              <div>สภาพที่ลูกค้าระบุ: {contractDetail.items.item_condition || '-'}%</div>
+              <div>หมายเหตุ: {contractDetail.items.notes || '-'}</div>
             </div>
-          )}
-        </div>
+          </DropPointCard>
 
-        <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">ข้อมูลลูกค้า</h2>
-          <div className="text-sm text-gray-600">
-            {contractDetail.pawners?.firstname} {contractDetail.pawners?.lastname}
-          </div>
-          <div className="text-sm text-gray-600">{contractDetail.pawners?.phone_number || '-'}</div>
-        </div>
+          <DropPointCard>
+            <div className="mb-3 flex items-center gap-2">
+              <Phone className="h-4 w-4 register-accent" />
+              <div className="register-heading text-sm font-semibold">ข้อมูลลูกค้า</div>
+            </div>
+            <div className="space-y-1 text-sm text-foreground-muted">
+              <div>{contractDetail.pawners.firstname} {contractDetail.pawners.lastname}</div>
+              <div>{contractDetail.pawners.phone_number}</div>
+            </div>
+          </DropPointCard>
 
-        <div className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">รูปถ่ายสินค้า</h2>
-          <ImageCarousel
-            images={contractDetail.items?.image_urls}
-            className="no-scrollbar"
-            itemClassName="w-36 aspect-square rounded-2xl overflow-hidden bg-gray-100"
-            emptyLabel="No Image"
-            emptyClassName="w-full text-center text-gray-400 text-xs"
-          />
-        </div>
+          <DropPointCard>
+            <div className="register-heading mb-3 text-sm font-semibold">รูปถ่ายสินค้า</div>
+            <ImageCarousel
+              images={contractDetail.items.image_urls}
+              className="no-scrollbar"
+              itemClassName="w-36 aspect-square rounded-lg overflow-hidden bg-background-subtle"
+              emptyLabel="No Image"
+              emptyClassName="w-full text-center text-foreground-subtle text-xs"
+            />
+          </DropPointCard>
 
-        {canVerify && (
-          <button
-            onClick={() => {
-              window.location.href = verifyUrl;
-            }}
-            className="w-full bg-[#365314] hover:bg-[#2d4610] text-white rounded-2xl py-4 text-base font-bold shadow-sm transition-colors"
-          >
-            ตรวจสอบสินค้า
-          </button>
-        )}
-        {!canVerify && (
-          <div className="mt-2 text-center text-sm text-gray-500">
-            ตรวจสอบสินค้าเรียบร้อยแล้ว
-          </div>
-        )}
-      </div>
+          {canAssignDriver ? (
+            <button
+              onClick={handleAssignDriver}
+              disabled={updatingArrival}
+              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
+            >
+              {updatingArrival ? 'กำลังอัปเดต...' : 'มีรถรับงานแล้ว'}
+            </button>
+          ) : null}
+
+          {canMarkArrived ? (
+            <button
+              onClick={handleMarkArrived}
+              disabled={updatingArrival}
+              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
+            >
+              {updatingArrival ? 'กำลังอัปเดต...' : 'สินค้าถึง Drop Point แล้ว'}
+            </button>
+          ) : null}
+
+          {canVerify ? (
+            <button
+              onClick={() => router.push(previewMode ? `/droppoint-verify?mock=1&contractId=${contractDetail.contract_id}` : `/droppoint-verify?contractId=${contractDetail.contract_id}`)}
+              className="register-primary-btn w-full rounded-full py-3 text-base font-medium"
+            >
+              ตรวจสอบสินค้า
+            </button>
+          ) : contractDetail.item_delivery_status === 'VERIFIED' && contractDetail.item_verified_at ? (
+            <div className="register-panel rounded-lg p-4 text-center text-sm text-foreground-subtle">
+              ตรวจสอบสินค้าเรียบร้อยแล้ว
+            </div>
+          ) : null}
+        </div>
+      </DropPointPageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] font-sans px-4 py-6">
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-gray-800">รายการสินค้ารับฝาก</h1>
-        <p className="text-sm text-gray-500">{dropPoint?.drop_point_name || 'Drop Point'}</p>
-      </div>
+    <DropPointPageShell className="pb-28">
+      <DropPointHeroCard
+        eyebrow={previewMode ? 'Preview Mode' : 'Drop Point'}
+        title="รายการสินค้ารับฝาก"
+        subtitle={dropPoint?.drop_point_name || 'Drop Point'}
+      >
+        <div className="grid grid-cols-3 gap-3">
+          <DropPointCard className="register-surface-strong">
+            <div className="text-xs register-subtle">รอเรียกรถ</div>
+            <div className="register-accent mt-1 text-2xl font-semibold">{waitingDriverContracts.length}</div>
+          </DropPointCard>
+          <DropPointCard className="register-surface-strong">
+            <div className="text-xs register-subtle">กำลังมา</div>
+            <div className="register-accent mt-1 text-2xl font-semibold">{incomingContracts.length}</div>
+          </DropPointCard>
+          <DropPointCard className="register-surface-strong">
+            <div className="text-xs register-subtle">ถึงแล้ว</div>
+            <div className="register-accent mt-1 text-2xl font-semibold">{arrivedContracts.length}</div>
+          </DropPointCard>
+        </div>
+      </DropPointHeroCard>
 
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => {
-            const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
-            window.location.href = `https://liff.line.me/${liffId}`;
-          }}
-          className="flex-1 rounded-2xl bg-[#365314] py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#2d4610] transition-colors"
-        >
-          รายการส่งคืน
-        </button>
-        <button
-          onClick={() => {
-            const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_HISTORY || '2008651088-97dWJEQB';
-            window.location.href = `https://liff.line.me/${liffId}`;
-          }}
-          className="flex-1 rounded-2xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          ประวัติ
-        </button>
-      </div>
+      <div className="mt-5 space-y-4">
+        <section>
+          <div className="mb-2 flex items-center gap-2">
+            <Clock3 className="h-4 w-4 register-accent" />
+            <h2 className="text-sm font-semibold text-foreground">รอเรียกรถ</h2>
+          </div>
+          {waitingDriverContracts.length === 0 ? (
+            <DropPointCard className="text-center text-sm text-foreground-subtle">ไม่มีรายการรอเรียกรถ</DropPointCard>
+          ) : waitingDriverContracts.map((contract) => (
+            <button
+              key={contract.contract_id}
+              onClick={() => router.push(`/drop-point?contractId=${contract.contract_id}${previewMode ? '&mock=1' : ''}`)}
+              className="register-panel mb-3 w-full rounded-lg p-4 text-left"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="register-heading text-base font-semibold">
+                    {contract.items?.brand} {contract.items?.model}
+                  </div>
+                  <div className="register-subtle mt-1 text-xs">อัปเดตล่าสุด: {formatDate(contract.displayDate)}</div>
+                  <div className="register-subtle text-xs">สัญญา {contract.contract_number}</div>
+                </div>
+                <DropPointStatusBadge tone="neutral" className="border border-s3-border/70">รอเรียกรถ</DropPointStatusBadge>
+              </div>
+            </button>
+          ))}
+        </section>
 
-      <div className="space-y-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-[#F59E0B]" />
-            <h2 className="text-sm font-bold text-gray-700">กำลังมา</h2>
+        <section>
+          <div className="mb-2 flex items-center gap-2">
+            <Clock3 className="h-4 w-4 text-warning" />
+            <h2 className="text-sm font-semibold text-foreground">กำลังมา</h2>
           </div>
           {incomingContracts.length === 0 ? (
-            <div className="bg-white rounded-2xl p-4 text-sm text-gray-500 text-center">
-              ไม่มีรายการกำลังมา
-            </div>
-          ) : (
-            incomingContracts.map((contract) => (
-              <button
-                key={contract.contract_id}
-                onClick={() => router.push(`/drop-point?contractId=${contract.contract_id}`)}
-                className="w-full bg-white rounded-2xl p-4 mb-3 text-left shadow-sm"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="text-base font-bold text-gray-800">
-                      {contract.items?.brand} {contract.items?.model}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      วันที่ส่งมา: {formatDate(contract.displayDate)}
-                    </div>
-                    {contract.storage_box_code && (
-                      <div className="text-[11px] text-gray-600 mt-1">
-                        กล่อง: <span className="font-semibold">{contract.storage_box_code}</span>
-                      </div>
-                    )}
+            <DropPointCard className="text-center text-sm text-foreground-subtle">ไม่มีรายการกำลังมา</DropPointCard>
+          ) : incomingContracts.map((contract) => (
+            <button
+              key={contract.contract_id}
+              onClick={() => router.push(`/drop-point?contractId=${contract.contract_id}${previewMode ? '&mock=1' : ''}`)}
+              className="register-panel mb-3 w-full rounded-lg p-4 text-left"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="register-heading text-base font-semibold">
+                    {contract.items?.brand} {contract.items?.model}
                   </div>
-                  <span className="text-xs font-bold text-[#F59E0B] bg-[#FEF3C7] px-3 py-1 rounded-full">
-                    กำลังมา
-                  </span>
+                  <div className="register-subtle mt-1 text-xs">วันที่ส่งมา: {formatDate(contract.displayDate)}</div>
+                  <div className="register-subtle text-xs">สัญญา {contract.contract_number}</div>
                 </div>
-              </button>
-            ))
-          )}
-        </div>
+                <DropPointStatusBadge tone="warning">กำลังมา</DropPointStatusBadge>
+              </div>
+            </button>
+          ))}
+        </section>
 
+        <section>
+          <div className="mb-2 flex items-center gap-2">
+            <PackageCheck className="h-4 w-4 text-success" />
+            <h2 className="text-sm font-semibold text-foreground">ถึงแล้ว / รอตรวจสอบ</h2>
+          </div>
+          {arrivedContracts.length === 0 ? (
+            <DropPointCard className="text-center text-sm text-foreground-subtle">ยังไม่มีรายการถึงจุดรับฝาก</DropPointCard>
+          ) : arrivedContracts.map((contract) => (
+            <button
+              key={contract.contract_id}
+              onClick={() => router.push(`/drop-point?contractId=${contract.contract_id}${previewMode ? '&mock=1' : ''}`)}
+              className="register-panel mb-3 w-full rounded-lg p-4 text-left"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="register-heading text-base font-semibold">
+                    {contract.items?.brand} {contract.items?.model}
+                  </div>
+                  <div className="register-subtle mt-1 text-xs">อัปเดตล่าสุด: {formatDate(contract.displayDate)}</div>
+                  {contract.storage_box_code ? <div className="register-subtle text-xs">กล่อง {contract.storage_box_code}</div> : null}
+                </div>
+                <DropPointStatusBadge tone="success">รอตรวจสอบ</DropPointStatusBadge>
+              </div>
+            </button>
+          ))}
+        </section>
+
+        {previewMode ? (
+          <DropPointCard className="register-surface-muted">
+            <div className="mb-3 flex items-center gap-2">
+              <PackageOpen className="h-4 w-4 register-accent" />
+              <div className="register-heading text-sm font-semibold">หน้าที่เกี่ยวข้องสำหรับ Preview</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => router.push('/drop-point-pickup?mock=1&deliveryRequestId=dr_mock_01')} className="register-outline-btn rounded-lg px-3 py-2 text-sm">Pickup</button>
+              <button onClick={() => router.push('/drop-point-returns?mock=1&redemptionId=rd_mock_01')} className="register-outline-btn rounded-lg px-3 py-2 text-sm">Return Detail</button>
+              <button onClick={() => router.push('/droppoint-verify?mock=1&contractId=ct_mock_arrived_01')} className="register-outline-btn rounded-lg px-3 py-2 text-sm">Verify</button>
+              <button onClick={() => router.push('/drop-point-history?mock=1')} className="register-outline-btn rounded-lg px-3 py-2 text-sm">History</button>
+            </div>
+          </DropPointCard>
+        ) : null}
       </div>
-    </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 px-4 pb-[calc(var(--safe-bottom)+16px)] pt-3">
+        <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-3 rounded-[28px] border border-s3-border/60 bg-background-white/92 p-3 shadow-soft backdrop-blur">
+          <button
+            onClick={() => router.push(previewMode ? '/drop-point-history?mock=1' : '/drop-point-history')}
+            className="register-secondary-btn rounded-2xl py-3 text-sm font-medium"
+          >
+            ประวัติ
+          </button>
+          <button
+            onClick={() => router.push(previewMode ? '/drop-point-returns?mock=1' : '/drop-point-returns')}
+            className="register-primary-btn rounded-2xl py-3 text-sm font-medium"
+          >
+            ดูรายการส่งคืน
+          </button>
+        </div>
+      </div>
+    </DropPointPageShell>
   );
 }
 
 export default function DropPointPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#365314] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<DropPointLoadingScreen />}>
       <DropPointContent />
     </Suspense>
   );

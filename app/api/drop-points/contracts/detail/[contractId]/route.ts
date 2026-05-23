@@ -98,6 +98,26 @@ export async function GET(
       storageBox = storageBoxData;
     }
 
+    let deliveryRequestId: string | null = null;
+    let deliveryRequestStatus: string | null = null;
+    const { data: deliveryRequest, error: deliveryRequestError } = await supabase
+      .from('pawn_delivery_requests')
+      .select('delivery_request_id, status, updated_at')
+      .eq('contract_id', contractId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (deliveryRequestError && deliveryRequestError.code !== 'PGRST205') {
+      console.error('Error fetching delivery request:', deliveryRequestError);
+      throw deliveryRequestError;
+    }
+
+    if (deliveryRequest?.delivery_request_id) {
+      deliveryRequestId = deliveryRequest.delivery_request_id;
+      deliveryRequestStatus = deliveryRequest.status || null;
+    }
+
     let items = contract.items as any;
     if (Array.isArray(items)) {
       items = await Promise.all(
@@ -126,6 +146,8 @@ export async function GET(
       contract: {
         ...contract,
         items,
+        delivery_request_id: deliveryRequestId,
+        delivery_request_status: deliveryRequestStatus,
         storage_box_code: storageBox?.box_code || null,
         storage_box_assigned_at: storageBox?.occupied_at || storageBox?.last_updated_at || null
       }

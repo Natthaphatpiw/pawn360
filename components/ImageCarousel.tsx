@@ -30,7 +30,9 @@ export default function ImageCarousel({
   }
 
   return (
-    <div className={`flex gap-3 overflow-x-auto snap-x snap-mandatory ${className}`}>
+    <div
+      className={`flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+    >
       {images.map((url, index) => (
         <div
           key={`${url}-${index}`}
