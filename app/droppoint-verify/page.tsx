@@ -1,26 +1,35 @@
 'use client';
 
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { Camera, Check, QrCode, X } from 'lucide-react';
+import { Camera, Check, CheckCircle, QrCode, X } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
+import VolumeSlider from '@/components/VolumeSlider';
 import { getPinSession } from '@/lib/security/pin-session';
+import { getMockContractDetail, isDropPointMockEnabled } from '@/lib/mock-drop-point';
+import {
+  DropPointCard,
+  DropPointHeroCard,
+  DropPointLoadingScreen,
+  DropPointMessageState,
+  DropPointPageShell,
+} from '@/components/drop-point/ui';
 
 function DropPointVerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewMode = isDropPointMockEnabled(searchParams);
 
   const [contract, setContract] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get contractId from query params or liff.state
   let contractId = searchParams.get('contractId');
   if (!contractId) {
     const liffState = searchParams.get('liff.state');
@@ -30,7 +39,6 @@ function DropPointVerifyContent() {
     }
   }
 
-  // Verification state
   const [verificationData, setVerificationData] = useState({
     brand_correct: null as boolean | null,
     model_correct: null as boolean | null,
@@ -40,13 +48,14 @@ function DropPointVerifyContent() {
     mdm_lock_status: null as boolean | null,
     condition_score: 90,
     notes: '',
-    verification_photos: [] as string[]
+    verification_photos: [] as string[],
   });
 
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [storageBoxCode, setStorageBoxCode] = useState('');
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [successResult, setSuccessResult] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   const requiredCheckFields: Array<keyof typeof verificationData> = [
@@ -69,24 +78,35 @@ function DropPointVerifyContent() {
   const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!storageBoxCode.trim() && hasVerificationPhotos;
 
   useEffect(() => {
-    if (contractId && profile?.userId) {
-      fetchContractDetails();
-    }
-  }, [contractId, profile?.userId]);
+    const load = async () => {
+      if (previewMode) {
+        const mockContract = getMockContractDetail(contractId);
+        setContract(mockContract);
+        setVerificationData((prev) => ({
+          ...prev,
+          condition_score: Number(mockContract?.items?.item_condition || 90),
+        }));
+        setLoading(false);
+        return;
+      }
+      if (!profile?.userId || !contractId) return;
+      try {
+        setLoading(true);
+        const response = await axios.get(`/api/drop-points/contracts/detail/${contractId}?lineId=${profile.userId}`);
+        setContract(response.data.contract);
+        setVerificationData((prev) => ({
+          ...prev,
+          condition_score: Number(response.data.contract?.items?.item_condition || 90),
+        }));
+      } catch (fetchError: any) {
+        setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchContractDetails = async () => {
-    if (!profile?.userId || !contractId) return;
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/drop-points/contracts/detail/${contractId}?lineId=${profile.userId}`);
-      setContract(response.data.contract);
-    } catch (error: any) {
-      console.error('Error fetching contract:', error);
-      setError(error.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
-  };
+    load();
+  }, [previewMode, contractId, profile?.userId]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,82 +118,69 @@ function DropPointVerifyContent() {
       return;
     }
 
+    if (previewMode) {
+      setUploadingPhoto(true);
+      setTimeout(() => {
+        setVerificationData((prev) => ({
+          ...prev,
+          verification_photos: [...prev.verification_photos, URL.createObjectURL(file)],
+        }));
+        setUploadingPhoto(false);
+      }, 250);
+      e.target.value = '';
+      return;
+    }
+
     try {
       setUploadingPhoto(true);
-
-      // Create form data
       const formData = new FormData();
       formData.append('file', file);
       formData.append('folder', 'droppoint-verification');
-
       const response = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       if (response.data.url) {
-        setVerificationData(prev => ({
+        setVerificationData((prev) => ({
           ...prev,
-          verification_photos: [...prev.verification_photos, response.data.url]
+          verification_photos: [...prev.verification_photos, response.data.url],
         }));
       }
-    } catch (error) {
-      console.error('Error uploading photo:', error);
+    } catch {
       alert('ไม่สามารถอัปโหลดรูปภาพได้');
     } finally {
       setUploadingPhoto(false);
+      e.target.value = '';
     }
   };
 
-  const getPhotoLabel = (index: number) => {
-    if (index === 0) return 'front';
-    if (index === 1) return 'back';
-    return `photo ${index + 1}`;
-  };
-
   const removePhoto = (index: number) => {
-    setVerificationData(prev => ({
+    setVerificationData((prev) => ({
       ...prev,
-      verification_photos: prev.verification_photos.filter((_, i) => i !== index)
+      verification_photos: prev.verification_photos.filter((_, i) => i !== index),
     }));
   };
 
   const submitVerification = async (result: 'APPROVED' | 'REJECTED', pinToken: string) => {
-    if (!profile?.userId) {
-      alert('กรุณาเข้าสู่ระบบ LINE');
+    if (result === 'APPROVED' && !canApprove) {
+      alert('กรุณาตรวจสอบข้อมูลให้ครบก่อนยืนยัน');
       return;
     }
 
-    if (result === 'APPROVED' && mustReject) {
-      alert('พบข้อมูลไม่ตรงหรือสภาพต่ำกว่าที่กำหนด ต้องส่งคืนเท่านั้น');
-      return;
-    }
-
-    if (result === 'APPROVED' && hasIncompleteChecks) {
-      alert('กรุณาตรวจสอบข้อมูลให้ครบทุกข้อก่อนยืนยัน');
-      return;
-    }
-
-    if (result === 'APPROVED' && !isConfirmed) {
-      alert('กรุณายืนยันว่าได้ตรวจสอบข้อมูลทั้งหมดแล้ว');
-      return;
-    }
-
-    if (result === 'APPROVED' && !storageBoxCode.trim()) {
-      alert('กรุณากรอกหมายเลขกล่องเก็บของ');
-      return;
-    }
-
-    if (result === 'APPROVED' && !hasVerificationPhotos) {
-      alert('กรุณาถ่ายรูปสินค้าก่อนกดยืนยัน');
+    if (previewMode) {
+      setSubmitting(true);
+      setTimeout(() => {
+        setSubmitting(false);
+        setSuccessResult(result);
+      }, 500);
       return;
     }
 
     try {
       setSubmitting(true);
-
       const response = await axios.post('/api/drop-points/verify', {
         contractId,
-        lineId: profile.userId,
+        lineId: profile?.userId,
         verificationResult: result,
         storageBoxCode: storageBoxCode.trim().toUpperCase(),
         verificationData: {
@@ -181,109 +188,104 @@ function DropPointVerifyContent() {
           verification_result: result,
           storage_box_code: storageBoxCode.trim().toUpperCase(),
         },
-        pinToken
+        pinToken,
       });
-
       if (response.data.success) {
-        alert(result === 'APPROVED' ? 'ยืนยันสินค้าเรียบร้อยแล้ว' : 'ส่งคืนสินค้าเรียบร้อยแล้ว');
-        // Close LIFF or redirect
-        if (typeof window !== 'undefined' && window.liff) {
-          window.liff.closeWindow();
-        }
+        setSuccessResult(result);
       }
-    } catch (error: any) {
-      console.error('Error submitting verification:', error);
-      alert(error.response?.data?.error || 'เกิดข้อผิดพลาด');
+    } catch (submitError: any) {
+      alert(submitError.response?.data?.error || 'เกิดข้อผิดพลาด');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleVerificationSubmit = async (result: 'APPROVED' | 'REJECTED') => {
+    if (previewMode) {
+      await submitVerification(result, 'mock-token');
+      return;
+    }
     if (!profile?.userId) {
       alert('กรุณาเข้าสู่ระบบ LINE');
       return;
     }
-
     const session = getPinSession('DROP_POINT', profile.userId);
     if (session?.token) {
       await submitVerification(result, session.token);
       return;
     }
-
     pendingActionRef.current = async (token: string) => {
       await submitVerification(result, token);
     };
     setPinModalOpen(true);
   };
 
-  // Helper Component for verification toggle buttons
+  const handleCloseLiff = () => {
+    if (typeof window !== 'undefined' && window.liff?.closeWindow) {
+      window.liff.closeWindow();
+      return;
+    }
+
+    router.push(previewMode ? '/drop-point?mock=1' : '/drop-point');
+  };
+
   const VerificationToggle = ({
     label,
     fieldName,
     subLabel = '',
-    correctText = 'ถูกต้อง',
-    incorrectText = 'ไม่ถูกต้อง'
   }: {
     label: string;
     fieldName: keyof typeof verificationData;
     subLabel?: string;
-    correctText?: string;
-    incorrectText?: string;
   }) => (
-    <div className="mb-4">
-      <div className="flex justify-between items-end mb-2">
-        <label className="font-bold text-gray-700 text-sm">{label}</label>
-        {subLabel && <span className="text-gray-500 text-sm">{subLabel}</span>}
+    <div className="rounded-xl p-4 bg-s3-soft/50 border border-s3-border/50">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <label className="register-heading text-sm font-semibold">{label}</label>
+        {subLabel ? <span className="register-subtle text-xs">{subLabel}</span> : null}
       </div>
-      <div className="flex gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           onClick={() => setVerificationData({ ...verificationData, [fieldName]: true })}
-          className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
-            verificationData[fieldName] === true
-              ? 'bg-[#ECFCCB] border-[#4D7C0F] text-[#365314]'
-              : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+            verificationData[fieldName] === true ? 'register-chip-selected border-s3' : 'register-chip-unselected'
           }`}
         >
-          {correctText}
+          ถูกต้อง
         </button>
         <button
           type="button"
           onClick={() => setVerificationData({ ...verificationData, [fieldName]: false })}
-          className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
-            verificationData[fieldName] === false
-              ? 'bg-[#FEE2E2] border-[#EF4444] text-[#B91C1C]'
-              : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+          className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+            verificationData[fieldName] === false ? 'border-error register-status-error' : 'register-chip-unselected'
           }`}
         >
-          {incorrectText}
+          ไม่ถูกต้อง
         </button>
       </div>
     </div>
   );
 
-  if (liffLoading || loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#365314] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    );
-  }
+  if ((liffLoading && !previewMode) || loading) return <DropPointLoadingScreen />;
+  if (error || !contract) return <DropPointMessageState title="ไม่พบข้อมูลสัญญา" description={error || 'กรุณาลองใหม่อีกครั้ง'} />;
+  if (successResult) {
+    const isApproved = successResult === 'APPROVED';
 
-  if (error || !contract) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error || 'ไม่พบข้อมูลสัญญา'}</p>
+      <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-xl bg-background-white p-8 text-center">
+          <div className="mx-auto mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-green-100">
+            <CheckCircle className="h-24 w-24 text-green-500" />
+          </div>
+          <h1 className="mb-2 text-xl font-bold text-foreground">{isApproved ? 'รับของเข้าเรียบร้อย' : 'ทำการส่งคืนสินค้า'}</h1>
+          <p className="mb-6 text-sm text-foreground-subtle">
+            {isApproved ? 'ระบบบันทึกการรับสินค้าเรียบร้อยแล้ว' : 'ระบบบันทึกรายการส่งคืนสินค้าเรียบร้อยแล้ว'}
+          </p>
           <button
-            onClick={() => window.history.back()}
-            className="bg-[#365314] text-white px-6 py-3 rounded-lg"
+            onClick={handleCloseLiff}
+            className="w-full rounded-full bg-primary py-4 font-medium text-white"
           >
-            กลับ
+            ปิด LIFF
           </button>
         </div>
       </div>
@@ -291,266 +293,162 @@ function DropPointVerifyContent() {
   }
 
   return (
-    <div className="min-h-screen bg-white font-sans pb-10">
-
-      {/* Customer Info Card */}
-      <div className="bg-[#F2F2F2] p-4 pb-6">
-        <h2 className="font-bold text-gray-800 text-base mb-3">ข้อมูลลูกค้า</h2>
-        <div className="space-y-2 text-sm">
-          <div className="flex">
-            <span className="font-bold text-gray-700 w-24">ชื่อ</span>
-            <span className="text-gray-600">{contract.pawners?.firstname} {contract.pawners?.lastname}</span>
-          </div>
-          <div className="flex">
-            <span className="font-bold text-gray-700 w-24">เบอร์มือถือ</span>
-            <span className="text-gray-600">{contract.pawners?.phone_number || '-'}</span>
-          </div>
-          <div className="flex">
-            <span className="font-bold text-gray-700 w-24">หมายเลขสัญญา</span>
-            <span className="text-gray-600">{contract.contract_number}</span>
-          </div>
-          {contract.items?.device_passcode && (
-            <div className="flex">
-              <span className="font-bold text-gray-700 w-24">รหัสล็อกเครื่อง</span>
-              <span className="text-gray-600">{contract.items.device_passcode}</span>
-            </div>
-          )}
+    <DropPointPageShell className="pb-10">
+      <DropPointHeroCard
+        eyebrow={previewMode ? 'Preview Mode' : 'Verification'}
+        title="ตรวจสอบสินค้า"
+        subtitle={`สัญญา ${contract.contract_number}`}
+      >
+        <div className="register-subtle text-sm">
+          ลูกค้า: {contract.pawners?.firstname} {contract.pawners?.lastname} • {contract.pawners?.phone_number || '-'}
         </div>
-      </div>
+      </DropPointHeroCard>
 
-      <div className="p-4 -mt-4 bg-white rounded-t-3xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-
-        {/* Header Section */}
-        <div className="mb-4">
-          <h2 className="font-bold text-gray-800 text-base">ตรวจสินค้า</h2>
-          <p className="text-xs text-gray-500 font-light">ตรวจสอบความถูกต้องของสินค้าว่าตรงตามที่ลูกค้าระบุหรือไม่</p>
-        </div>
-
-        {/* Customer Photos */}
-        <div className="mb-6">
-          <label className="font-bold text-gray-700 text-sm mb-2 block">รูปถ่ายโดยลูกค้า</label>
+      <div className="mt-4 space-y-4">
+        <DropPointCard>
+          <div className="register-heading mb-3 text-sm font-semibold">รูปถ่ายโดยลูกค้า</div>
           <ImageCarousel
             images={contract.items?.image_urls}
             className="no-scrollbar"
-            itemClassName="w-32 aspect-square relative rounded-xl overflow-hidden bg-gray-100"
+            itemClassName="w-32 aspect-square relative rounded-md overflow-hidden bg-background-subtle"
             emptyLabel="No Image"
-            emptyClassName="w-full text-center text-gray-400 text-xs"
-            renderItem={(url, index) => (
-              <>
-                <img
-                  src={url}
-                  alt={`Photo ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute top-2 right-2 text-white text-[10px] drop-shadow-md text-right leading-tight">
-                  <span className="text-lg font-bold block">{getPhotoLabel(index)}</span>
-                  from pawner
-                </div>
-              </>
-            )}
+            emptyClassName="w-full text-center text-foreground-subtle text-xs"
           />
-        </div>
+        </DropPointCard>
 
-        {/* Verification Checklist */}
-        <div className="space-y-2">
-          <VerificationToggle
-            label="ยี่ห้อ"
-            subLabel={contract.items?.brand || '-'}
-            fieldName="brand_correct"
-          />
-          <VerificationToggle
-            label="รุ่น"
-            subLabel={contract.items?.model || '-'}
-            fieldName="model_correct"
-          />
-          <VerificationToggle
-            label="ความจุ"
-            subLabel={contract.items?.capacity || '-'}
-            fieldName="capacity_correct"
-          />
-        </div>
+        <VerificationToggle label="ยี่ห้อ" subLabel={contract.items?.brand || '-'} fieldName="brand_correct" />
+        <VerificationToggle label="รุ่น" subLabel={contract.items?.model || '-'} fieldName="model_correct" />
+        <VerificationToggle label="ความจุ" subLabel={contract.items?.capacity || '-'} fieldName="capacity_correct" />
+        <VerificationToggle label="สีตัวเครื่อง" subLabel={contract.items?.color || '-'} fieldName="color_match" />
+        <VerificationToggle label="การใช้งาน" subLabel="ใช้งานได้" fieldName="functionality_ok" />
+        <VerificationToggle label="การติดตั้ง MDM" subLabel="ไม่ได้ติดตั้ง" fieldName="mdm_lock_status" />
 
-        <div className="h-px bg-gray-100 my-4"></div>
-
-        {/* Condition Slider */}
-        <div className="mb-6">
-          <div className="flex justify-between items-end mb-4">
-            <label className="font-bold text-gray-700 text-sm">สภาพ</label>
-            <span className="text-gray-500 text-sm">{contract.items?.item_condition}%</span>
+        <DropPointCard>
+          <div className="mb-4 flex items-end justify-between">
+            <label className="register-heading text-sm font-semibold">สภาพสินค้า</label>
+            <span className="register-subtle text-xs">ลูกค้าระบุ {contract.items?.item_condition || 0}%</span>
           </div>
-
-          <div className="px-1">
-            <input
-              type="range"
-              min="0"
-              max="100"
+          <div className="mb-2 rounded-lg border border-s3/15 bg-background-white px-5 py-3">
+            <VolumeSlider
+              min={0}
+              max={100}
+              step={1}
               value={verificationData.condition_score}
-              onChange={(e) => setVerificationData({ ...verificationData, condition_score: parseInt(e.target.value) })}
-              className="w-full accent-[#365314]"
+              ariaLabel="Condition"
+              onChange={(condition_score) => setVerificationData({ ...verificationData, condition_score })}
             />
-            <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+            <div className="mt-3 flex justify-between text-xs font-semibold text-foreground-subtle">
               <span>0%</span>
               <span>100%</span>
             </div>
           </div>
-
-          <div className="flex justify-between items-center mt-2">
-            <span className="text-gray-500 text-sm font-medium">สภาพที่ตรวจ</span>
-            <span className="text-gray-800 text-sm font-bold">{verificationData.condition_score}%</span>
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <span className="register-subtle">สภาพที่ตรวจ</span>
+            <span className="register-heading font-semibold">{verificationData.condition_score}%</span>
           </div>
-          {isConditionGapTooHigh && (
-            <p className="text-[11px] text-red-600 mt-2">
-              สภาพต่ำกว่าที่ลูกค้าระบุเกิน 10% ต้องส่งคืนเท่านั้น
-            </p>
-          )}
-        </div>
+          {isConditionGapTooHigh ? <p className="mt-2 text-xs text-error">สภาพต่ำกว่าที่ลูกค้าระบุเกิน 10% ต้องส่งคืนเท่านั้น</p> : null}
+        </DropPointCard>
 
-        <div className="h-px bg-gray-100 my-4"></div>
-
-        {/* Additional Checks */}
-        <div className="space-y-2">
-          <VerificationToggle label="สีตัวเครื่องตรงกับในรูปด้านบน" fieldName="color_match" />
-          <VerificationToggle label="การใช้งาน" subLabel="ใช้งานได้" fieldName="functionality_ok" />
-          <VerificationToggle
-            label="การติดตั้ง MDM"
-            subLabel="ไม่ได้ติดตั้ง"
-            fieldName="mdm_lock_status"
-          />
-        </div>
-
-        <div className="h-px bg-gray-100 my-6"></div>
-
-        {/* Drop Point Photos */}
-        <div className="mb-6">
-          <label className="font-bold text-gray-700 text-sm mb-3 block">รูปถ่ายโดย Drop point</label>
+        <DropPointCard>
+          <div className="register-heading mb-3 text-sm font-semibold">รูปถ่ายโดย Drop Point</div>
           <div className="grid grid-cols-2 gap-3">
             {verificationData.verification_photos.map((url, index) => (
-              <div key={index} className="aspect-video bg-gray-800 rounded-xl relative overflow-hidden">
-                <img
-                  src={url}
-                  alt={`Drop point photo ${index + 1}`}
-                  className="w-full h-full object-cover opacity-80"
-                />
-                <button
-                  onClick={() => removePhoto(index)}
-                  className="absolute top-2 right-2 bg-black/50 p-1 rounded-full text-white"
-                >
-                  <X className="w-3 h-3" />
+              <div key={index} className="relative aspect-video overflow-hidden rounded-md bg-background-subtle">
+                <img src={url} alt={`Drop point photo ${index + 1}`} className="h-full w-full object-cover" />
+                <button onClick={() => removePhoto(index)} className="absolute right-2 top-2 rounded-full bg-background-dark/60 p-1 text-white">
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
-
-            {/* Add Photo Button */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPhoto || verificationData.verification_photos.length >= 5}
-              className="aspect-video bg-[#F2F2F2] rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:bg-gray-200 transition-colors disabled:opacity-50"
+              className={`register-surface flex aspect-video flex-col items-center justify-center rounded-md border-2 border-dashed border-s3-border text-center disabled:opacity-50 ${
+                verificationData.verification_photos.length === 0 ? 'col-span-2 w-full' : ''
+              }`}
             >
               {uploadingPhoto ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#365314]"></div>
+                <div className="dot-bricks scale-75" />
               ) : (
                 <>
-                  <Camera className="w-6 h-6 text-gray-500 mb-1" />
-                  <span className="text-xs font-bold text-[#365314]">เพิ่มรูป</span>
-                  <span className="text-[10px] text-gray-400">Add image</span>
+                  <Camera className="mb-2 h-6 w-6 register-accent" />
+                  <span className="register-heading text-sm font-semibold">เพิ่มรูป</span>
+                  <span className="register-subtle text-[10px]">สูงสุด 5 รูป</span>
                 </>
               )}
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoUpload}
-              className="hidden"
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
           </div>
-          <p className="text-[10px] text-gray-400 mt-2">ถ่ายรูปได้สูงสุด 5 รูป และต้องมีอย่างน้อย 1 รูปก่อนกดยืนยัน</p>
-        </div>
+        </DropPointCard>
 
-        {/* Storage Box */}
-        <div className="mb-6">
-          <label className="font-bold text-gray-700 text-sm mb-2 block">หมายเลขกล่องเก็บของ / สแกน QR code</label>
+        <DropPointCard>
+          <label className="register-heading mb-2 block text-sm font-semibold">หมายเลขกล่องเก็บของ / สแกน QR code</label>
           <div className="flex gap-2">
             <input
               type="text"
               placeholder="เช่น DP001123456"
               value={storageBoxCode}
-              inputMode="text"
               autoCapitalize="characters"
               onChange={(e) => setStorageBoxCode(e.target.value.toUpperCase())}
-              className="flex-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#365314] text-sm text-gray-600 bg-white"
+              className="register-input flex-1 rounded-xl px-4 py-3 text-sm"
             />
             <button
               type="button"
-              onClick={() => alert('ฟีเจอร์สแกน QR ผ่านกล้องกำลังเตรียมเปิดใช้งาน กรุณาพิมพ์รหัสหรือใช้เครื่องสแกนภายนอกก่อน')}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-semibold text-[#365314] bg-white"
+              onClick={() => alert('ฟีเจอร์สแกน QR ผ่านกล้องกำลังเตรียมเปิดใช้งาน')}
+              className="register-outline-btn inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium"
             >
-              <QrCode className="w-4 h-4" />
+              <QrCode className="h-4 w-4" />
               สแกน
             </button>
           </div>
-          <p className="text-[10px] text-gray-400 mt-2">พิมพ์รหัสกล่อง หรือสแกน QR code แล้วให้รหัสมาอยู่ในช่องนี้ก่อนยืนยัน</p>
-        </div>
+        </DropPointCard>
 
-        {/* Remarks */}
-        <div className="mb-6">
-          <label className="font-bold text-gray-700 text-sm mb-2 block">หมายเหตุ</label>
+        <DropPointCard>
+          <label className="register-heading mb-2 block text-sm font-semibold">หมายเหตุ</label>
           <input
             type="text"
-            placeholder="หมายเหตุ"
+            placeholder="หมายเหตุเพิ่มเติม"
             value={verificationData.notes}
             onChange={(e) => setVerificationData({ ...verificationData, notes: e.target.value })}
-            className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#365314] text-sm text-gray-600 bg-white"
+            className="register-input w-full rounded-xl px-4 py-3 text-sm"
           />
-        </div>
+        </DropPointCard>
 
-        {/* Confirmation & Actions */}
-        <div className="mb-6">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${isConfirmed ? 'bg-[#365314]' : 'bg-gray-200'}`}>
-              <Check className="w-3 h-3 text-white" />
-            </div>
-            <input
-              type="checkbox"
-              className="hidden"
-              checked={isConfirmed}
-              onChange={() => setIsConfirmed(!isConfirmed)}
-            />
-            <span className="text-sm text-gray-700 font-medium">ข้อมูลทั้งหมดถูกตรวจสอบเรียบร้อยแล้ว</span>
+        <DropPointCard>
+          <label className="flex items-center gap-3">
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full ${isConfirmed ? 'bg-s3-active text-white' : 'bg-background-subtle text-transparent'}`}>
+              <Check className="h-3 w-3" />
+            </span>
+            <input type="checkbox" className="hidden" checked={isConfirmed} onChange={() => setIsConfirmed(!isConfirmed)} />
+            <span className="text-sm text-foreground-muted">ข้อมูลทั้งหมดถูกตรวจสอบเรียบร้อยแล้ว</span>
           </label>
-          {hasIncompleteChecks && (
-            <p className="text-[11px] text-amber-600 mt-2">กรุณาเลือกผลตรวจสอบให้ครบทุกหัวข้อก่อนดำเนินการ</p>
-          )}
-          {!hasVerificationPhotos && !mustReject && (
-            <p className="text-[11px] text-amber-600 mt-2">กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูปก่อนกดยืนยัน</p>
-          )}
-          {mustReject && (
-            <p className="text-[11px] text-red-600 mt-2">พบข้อมูลไม่ตรง ต้องทำรายการส่งคืน</p>
-          )}
-        </div>
+          {hasIncompleteChecks ? <p className="mt-2 text-xs text-warning">กรุณาเลือกผลตรวจสอบให้ครบทุกหัวข้อ</p> : null}
+          {!hasVerificationPhotos && !mustReject ? <p className="mt-2 text-xs text-warning">กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูป</p> : null}
+          {mustReject ? <p className="mt-2 text-xs text-error">พบข้อมูลไม่ตรง ต้องทำรายการส่งคืน</p> : null}
+        </DropPointCard>
 
         <div className="space-y-3">
           {mustReject ? (
             <button
               onClick={() => handleVerificationSubmit('REJECTED')}
               disabled={submitting}
-              className="w-full bg-white border border-[#EF4444] hover:bg-red-50 text-[#EF4444] rounded-2xl py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="register-status-error w-full rounded-full py-3 text-sm font-medium disabled:opacity-50"
             >
-              <span className="text-base font-bold">{submitting ? 'กำลังดำเนินการ...' : 'ส่งคืน'}</span>
-              <span className="text-[10px] font-light opacity-80">Return</span>
+              {submitting ? 'กำลังดำเนินการ...' : 'ส่งคืน'}
             </button>
           ) : (
             <button
               onClick={() => handleVerificationSubmit('APPROVED')}
               disabled={submitting || !canApprove}
-              className="w-full bg-[#365314] hover:bg-[#2d4610] text-white rounded-2xl py-3 flex flex-col items-center justify-center shadow-sm transition-colors active:scale-[0.98] disabled:opacity-50"
+              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
-              <span className="text-base font-bold">{submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}</span>
-              <span className="text-[10px] font-light opacity-80">Confirm</span>
+              {submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
             </button>
           )}
         </div>
+      </div>
 
+      {!previewMode ? (
         <PinModal
           open={pinModalOpen}
           role="DROP_POINT"
@@ -562,22 +460,14 @@ function DropPointVerifyContent() {
             pendingActionRef.current = null;
           }}
         />
-
-      </div>
-    </div>
+      ) : null}
+    </DropPointPageShell>
   );
 }
 
 export default function DropPointVerifyPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#365314] mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<DropPointLoadingScreen />}>
       <DropPointVerifyContent />
     </Suspense>
   );

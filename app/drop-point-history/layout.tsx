@@ -15,5 +15,9 @@ export default function DropPointHistoryLayout({
   // Drop Point history LIFF
   // Endpoint: https://pawnly.io/drop-point-history
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_HISTORY || '2008651088-97dWJEQB';
-  return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
+  return (
+    <LiffProvider liffId={liffId}>
+      <div className="theme-liff theme-droppoint page-droppoint min-h-screen bg-background-white">{children}</div>
+    </LiffProvider>
+  );
 }
