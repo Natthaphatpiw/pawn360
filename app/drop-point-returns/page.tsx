@@ -78,6 +78,7 @@ function DropPointReturnsContent() {
     }
 
     setPinVerified(false);
+    setLoading(false);
     setPinModalOpen(true);
   }, [previewMode, profile?.userId]);
 
@@ -216,7 +217,6 @@ function DropPointReturnsContent() {
     }
   };
 
-  if ((liffLoading && !previewMode) || loading) return <DropPointLoadingScreen />;
   if (!previewMode && !pinVerified) {
     return (
       <DropPointPageShell className="flex items-center justify-center p-6">
@@ -247,6 +247,7 @@ function DropPointReturnsContent() {
       </DropPointPageShell>
     );
   }
+  if ((liffLoading && !previewMode) || loading) return <DropPointLoadingScreen />;
   if (error) return <DropPointMessageState title="โหลดข้อมูลไม่สำเร็จ" description={error} />;
 
   if (confirmed) {
