@@ -282,6 +282,7 @@ function DropPointDashboardContent() {
     }
 
     setPinVerified(false);
+    setLoading(false);
     setPinModalOpen(true);
   }, [previewMode, profile?.userId]);
 
@@ -362,7 +363,6 @@ function DropPointDashboardContent() {
       : 0;
   }, [dashboard]);
 
-  if ((liffLoading && !previewMode) || loading) return <DropPointLoadingScreen />;
   if (!previewMode && !pinVerified) {
     return (
       <DropPointPageShell className="flex items-center justify-center p-6">
@@ -393,6 +393,7 @@ function DropPointDashboardContent() {
       </DropPointPageShell>
     );
   }
+  if ((liffLoading && !previewMode) || loading) return <DropPointLoadingScreen />;
   if (!dashboard) return <DropPointMessageState title="ไม่พบข้อมูล Dashboard" description={error || 'กรุณาลองใหม่อีกครั้ง'} />;
 
   return (
