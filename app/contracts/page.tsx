@@ -287,11 +287,9 @@ export default function PawnerContractList() {
                       {getItemName(contract.items)}
                     </h3>
                     {/* Status Badge */}
-                    <div className="shrink-0 rounded-full px-2 py-1 bg-background-white">
-                      <span className={`${status.bg} ${status.textCol} whitespace-nowrap text-xs font-medium px-4 py-1.5 rounded-full`}>
-                        {status.text}
-                      </span>
-                    </div>
+                    <span className={`${status.bg} ${status.textCol} shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium border`}>
+                      {status.text}
+                    </span>
                   </div>
 
                   <div className="space-y-1 mb-1">
