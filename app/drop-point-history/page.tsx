@@ -4,6 +4,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 import { isDropPointMockEnabled, mockHistoryEntries } from '@/lib/mock-drop-point';
 import {
   DropPointCard,
@@ -52,9 +54,28 @@ function DropPointHistoryContent() {
   const previewMode = isDropPointMockEnabled(searchParams);
 
   const [loading, setLoading] = useState(true);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('ALL');
+
+  useEffect(() => {
+    if (previewMode) {
+      setPinVerified(true);
+      return;
+    }
+    if (!profile?.userId) return;
+
+    const session = getPinSession('DROP_POINT', profile.userId);
+    if (session?.token) {
+      setPinVerified(true);
+      return;
+    }
+
+    setPinVerified(false);
+    setPinModalOpen(true);
+  }, [previewMode, profile?.userId]);
 
   useEffect(() => {
     const load = async () => {
@@ -63,7 +84,7 @@ function DropPointHistoryContent() {
         setLoading(false);
         return;
       }
-      if (liffLoading || !profile?.userId) return;
+      if (liffLoading || !profile?.userId || !pinVerified) return;
       try {
         setLoading(true);
         const response = await axios.get(`/api/drop-points/history/${profile.userId}`);
@@ -76,7 +97,7 @@ function DropPointHistoryContent() {
     };
 
     load();
-  }, [previewMode, liffLoading, profile?.userId]);
+  }, [previewMode, liffLoading, profile?.userId, pinVerified]);
 
   const filteredEntries = useMemo(() => {
     if (filter === 'ALL') return entries;
@@ -87,6 +108,36 @@ function DropPointHistoryContent() {
   }, [entries, filter]);
 
   if (liffLoading && !previewMode) return <DropPointLoadingScreen />;
+  if (!previewMode && !pinVerified) {
+    return (
+      <DropPointPageShell className="flex items-center justify-center p-6">
+        <div className="register-shell-strong w-full max-w-md rounded-[30px] p-4">
+          <div className="register-inner-card rounded-lg px-5 py-6 text-center">
+            <h2 className="register-heading text-xl font-semibold">ยืนยัน PIN ก่อนเข้าดูประวัติ</h2>
+            <p className="register-subtle mt-2 text-sm">
+              เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูข้อมูลย้อนหลังของ Drop Point
+            </p>
+            <button
+              onClick={() => setPinModalOpen(true)}
+              className="register-primary-btn mt-5 w-full rounded-2xl py-3 text-sm font-medium"
+            >
+              ยืนยัน PIN
+            </button>
+          </div>
+        </div>
+        <PinModal
+          open={pinModalOpen}
+          role="DROP_POINT"
+          lineId={profile?.userId || ''}
+          onClose={() => setPinModalOpen(false)}
+          onVerified={() => {
+            setPinVerified(true);
+            setPinModalOpen(false);
+          }}
+        />
+      </DropPointPageShell>
+    );
+  }
   if (loading) return <DropPointLoadingScreen />;
   if (error) return <DropPointMessageState title="โหลดประวัติไม่สำเร็จ" description={error} />;
 
@@ -143,6 +194,19 @@ function DropPointHistoryContent() {
           </DropPointCard>
         ))}
       </div>
+
+      {!previewMode ? (
+        <PinModal
+          open={pinModalOpen}
+          role="DROP_POINT"
+          lineId={profile?.userId || ''}
+          onClose={() => setPinModalOpen(false)}
+          onVerified={() => {
+            setPinVerified(true);
+            setPinModalOpen(false);
+          }}
+        />
+      ) : null}
     </DropPointPageShell>
   );
 }
