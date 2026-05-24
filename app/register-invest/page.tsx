@@ -1137,10 +1137,38 @@ function CreditLimitDonutChart({ categories }: { categories: Array<{ key: string
 
 function JuzmatchPoolDonut({ transferredPercentDisplay, transferredPercent }: { transferredPercentDisplay: string; transferredPercent: number }) {
   const size = 112;
-  const strokeWidth = 16;
+  const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const segmentLength = Math.max(0, Math.min(circumference, (transferredPercent / 100) * circumference));
+  const normalizedTransferred = Math.max(0, Math.min(100, transferredPercent));
+  const categories = [
+    {
+      key: 'transferred',
+      amount: normalizedTransferred,
+      color: 'var(--register-ring-fill)',
+    },
+    {
+      key: 'remaining',
+      amount: Math.max(0, 100 - normalizedTransferred),
+      color: 'var(--register-chart-unallocated)',
+    },
+  ].filter((category) => category.amount > 0);
+  const total = categories.reduce((sum, category) => sum + category.amount, 0);
+  const gap = circumference * 0.018;
+  let cursor = 0;
+  const segments = categories.map((category) => {
+    const rawLength = total > 0 ? (category.amount / total) * circumference : 0;
+    const segmentLength = Math.max(rawLength - gap, 0);
+    const dashArray = `${segmentLength} ${circumference}`;
+    const dashOffset = -cursor;
+    cursor += rawLength;
+
+    return {
+      ...category,
+      dashArray,
+      dashOffset,
+    };
+  });
 
   return (
     <div className="relative h-28 w-28 shrink-0">
@@ -1153,18 +1181,20 @@ function JuzmatchPoolDonut({ transferredPercentDisplay, transferredPercent }: { 
           stroke="var(--register-ring-track)"
           strokeWidth={strokeWidth}
         />
-        {segmentLength > 0 && (
+        {[...segments].reverse().map((category) => (
           <circle
+            key={category.key}
             cx={size / 2}
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="var(--register-ring-fill)"
+            stroke={category.color}
             strokeWidth={strokeWidth}
-            strokeDasharray={`${segmentLength} ${circumference}`}
+            strokeDasharray={category.dashArray}
+            strokeDashoffset={category.dashOffset}
             strokeLinecap="round"
           />
-        )}
+        ))}
       </svg>
       <div className="register-surface-strong absolute inset-[10px] flex rounded-full items-center justify-center flex-col">
         <span className="register-accent text-xl font-medium">{transferredPercentDisplay}%</span>
