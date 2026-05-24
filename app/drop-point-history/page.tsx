@@ -185,6 +185,7 @@ function DropPointHistoryContent() {
                   : displayStatus === 'ยกเลิก' ? 'danger'
                   : 'neutral'
                 }
+                className="whitespace-nowrap"
               >
                 {displayStatus}
               </DropPointStatusBadge>

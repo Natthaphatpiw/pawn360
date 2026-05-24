@@ -270,11 +270,11 @@ export default function ActionStatusListPage() {
                   router.push(`/contracts/actions/${req.request_id}`);
                 }}
               >
-                <div className="flex items-center justify-between gap-3 flex-nowrap">
+                <div className="flex items-center justify-between gap-3 flex-nowrap mb-2">
                   <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
                     {actionTypeLabel[req.request_type] || req.request_type}
                   </h3>
-                  <div className="shrink-0 rounded-full bg-primary-soft px-3 py-1 text-center text-xs font-bold text-primary">
+                  <div className="shrink-0 rounded-full bg-background-white px-3 py-1 text-center text-xs font-medium text-primary">
                     {displayStatus}
                   </div>
                 </div>
