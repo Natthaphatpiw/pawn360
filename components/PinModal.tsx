@@ -302,7 +302,7 @@ export default function PinModal({
                     value={dropPointCode}
                     onChange={(e) => setDropPointCode(e.target.value)}
                     placeholder="รหัสสาขา Drop Point"
-                    className="w-full rounded-2xl border border-primary-border bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
+                    className="w-full rounded-full border border-primary-border bg-background-white px-4 py-3 text-sm text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus:outline-none focus:ring-1"
                     style={{ ['--tw-ring-color' as string]: 'color-mix(in srgb, var(--pin-primary) 20%, transparent)' }}
                   />
                 )}
