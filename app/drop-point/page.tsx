@@ -7,6 +7,8 @@ import axios from 'axios';
 import { Clock3, PackageCheck, PackageOpen, Phone } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import PinModal from '@/components/PinModal';
+import { getPinSession } from '@/lib/security/pin-session';
 import {
   getMockContractDetail,
   isDropPointMockEnabled,
@@ -65,6 +67,8 @@ function DropPointContent() {
   const previewMode = isDropPointMockEnabled(searchParams);
 
   const [loading, setLoading] = useState(true);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinModalOpen, setPinModalOpen] = useState(false);
   const [dropPoint, setDropPoint] = useState<DropPoint | null>(null);
   const [contracts, setContracts] = useState<ContractListItem[]>([]);
   const [contractDetail, setContractDetail] = useState<ContractDetail>(null);
@@ -81,6 +85,23 @@ function DropPointContent() {
   }
 
   useEffect(() => {
+    if (previewMode) {
+      setPinVerified(true);
+      return;
+    }
+    if (!profile?.userId) return;
+
+    const session = getPinSession('DROP_POINT', profile.userId);
+    if (session?.token) {
+      setPinVerified(true);
+      return;
+    }
+
+    setPinVerified(false);
+    setPinModalOpen(true);
+  }, [previewMode, profile?.userId]);
+
+  useEffect(() => {
     const load = async () => {
       if (previewMode) {
         setDropPoint(mockDropPoint);
@@ -90,7 +111,7 @@ function DropPointContent() {
         return;
       }
 
-      if (liffLoading || !profile?.userId) return;
+      if (liffLoading || !profile?.userId || !pinVerified) return;
       try {
         setLoading(true);
         setError(null);
@@ -110,7 +131,7 @@ function DropPointContent() {
     };
 
     load();
-  }, [previewMode, liffLoading, profile?.userId, contractId]);
+  }, [previewMode, liffLoading, profile?.userId, contractId, pinVerified]);
 
   const incomingContracts = useMemo(
     () => contracts.filter((contract) => contract.statusGroup === 'INCOMING'),
@@ -129,6 +150,37 @@ function DropPointContent() {
 
   if (liffLoading && !previewMode) {
     return <DropPointLoadingScreen />;
+  }
+
+  if (!previewMode && !pinVerified) {
+    return (
+      <DropPointPageShell className="flex items-center justify-center p-6">
+        <div className="register-shell-strong w-full max-w-md rounded-[30px] p-4">
+          <div className="register-inner-card rounded-lg px-5 py-6 text-center">
+            <h2 className="register-heading text-xl font-semibold">ยืนยัน PIN ก่อนเข้าดูรายการ</h2>
+            <p className="register-subtle mt-2 text-sm">
+              เพื่อความปลอดภัย กรุณายืนยัน PIN 6 หลักก่อนดูข้อมูล Drop Point
+            </p>
+            <button
+              onClick={() => setPinModalOpen(true)}
+              className="register-primary-btn mt-5 w-full rounded-2xl py-3 text-sm font-medium"
+            >
+              ยืนยัน PIN
+            </button>
+          </div>
+        </div>
+        <PinModal
+          open={pinModalOpen}
+          role="DROP_POINT"
+          lineId={profile?.userId || ''}
+          onClose={() => setPinModalOpen(false)}
+          onVerified={() => {
+            setPinVerified(true);
+            setPinModalOpen(false);
+          }}
+        />
+      </DropPointPageShell>
+    );
   }
 
   if (loading) {
@@ -504,6 +556,19 @@ function DropPointContent() {
           </button>
         </div>
       </div>
+
+      {!previewMode ? (
+        <PinModal
+          open={pinModalOpen}
+          role="DROP_POINT"
+          lineId={profile?.userId || ''}
+          onClose={() => setPinModalOpen(false)}
+          onVerified={() => {
+            setPinVerified(true);
+            setPinModalOpen(false);
+          }}
+        />
+      ) : null}
     </DropPointPageShell>
   );
 }
