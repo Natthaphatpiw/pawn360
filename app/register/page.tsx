@@ -284,6 +284,7 @@ export default function PawnerRegister() {
 
           <div className="space-y-2 pt-3">
             <button
+              type="button"
               onClick={() => router.push('/estimate')}
               className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 flex flex-col items-center justify-center text-primary-fg active:scale-[0.98]"
             >
@@ -291,6 +292,7 @@ export default function PawnerRegister() {
               <span className="text-xs font-light opacity-80">Pawn entry</span>
             </button>
             <button
+              type="button"
               onClick={() => router.push('/contracts')}
               className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 flex flex-col items-center justify-center text-primary"
             >
@@ -298,6 +300,7 @@ export default function PawnerRegister() {
               <span className="text-xs font-light opacity-80">Contract list</span>
             </button>
             <button
+              type="button"
               onClick={() => router.push('/register/edit')}
               className="btn-transition w-full rounded-full bg-primary-soft py-3 flex flex-col items-center justify-center text-primary"
             >
@@ -306,6 +309,7 @@ export default function PawnerRegister() {
             </button>
             {pawnerData.kyc_status !== 'VERIFIED' && (
               <button
+                type="button"
                 onClick={() => {
                   if (pawnerData.kyc_status === 'PENDING') {
                     router.push('/ekyc/waiting');
@@ -678,10 +682,11 @@ function RegisterForm({
 
         {/* Submit Button */}
         <div className="mt-6 mb-4">
-          <button 
+          <button
+            type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="btn-transition btn-sheen w-full min-h-12 rounded-full bg-primary py-4 text-primary-fg disabled:cursor-not-allowed disabled:opacity-50 flex flex-col items-center justify-center"
+            className="btn-transition btn-sheen w-full min-h-12 rounded-full bg-primary py-3 text-primary-fg disabled:cursor-not-allowed disabled:opacity-50 flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">
               {submitting ? 'กำลังบันทึก...' : 'ดำเนินการต่อ'}
