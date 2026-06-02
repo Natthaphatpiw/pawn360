@@ -285,7 +285,7 @@ export default function PawnerRegister() {
           <div className="space-y-2 pt-3">
             <button
               type="button"
-              onClick={() => router.push('/estimate')}
+              onClick={() => { window.location.href = '/estimate'; }}
               className="btn-transition btn-sheen w-full rounded-full bg-primary py-3 flex flex-col items-center justify-center text-primary-fg active:scale-[0.98]"
             >
               <span className="text-base font-medium">ขอสินเชื่อ</span>
@@ -293,7 +293,7 @@ export default function PawnerRegister() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/contracts')}
+              onClick={() => { window.location.href = '/contracts'; }}
               className="btn-transition w-full rounded-full border border-primary bg-background-white py-3 flex flex-col items-center justify-center text-primary"
             >
               <span className="text-base font-medium">รายการสัญญา</span>

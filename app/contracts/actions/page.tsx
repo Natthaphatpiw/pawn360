@@ -244,7 +244,7 @@ export default function ActionStatusListPage() {
       <div className="flex-1 space-y-3 pb-20 no-scrollbar">
         {pendingRequests.length === 0 ? (
           <div className="rounded-lg border border-primary-border bg-background p-8 text-center shadow-soft">
-            <p className="text-primary-soft">ไม่มีคำขอที่รอดำเนินการ</p>
+            <p className="text-primary/50">ไม่มีคำขอที่รอดำเนินการ</p>
           </div>
         ) : (
           pendingRequests.map((req) => {
