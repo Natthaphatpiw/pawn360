@@ -1531,7 +1531,7 @@ function EstimatePageInner() {
         {isProcessing && processingStatus && (
           <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
             <div className="absolute inset-0 bg-foreground/40" />
-            <div className="relative w-full max-w-sm rounded-2xl border border-primary-border/40 bg-background-white p-5 shadow-[var(--shadow-strong)]">
+            <div className="relative w-full max-w-sm rounded-xl border border-primary-border/40 bg-background-white p-5 shadow-[var(--shadow-strong)]">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full border-4 border-primary-border border-t-primary animate-spin" />
                 <div>
