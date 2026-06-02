@@ -271,7 +271,7 @@ export default function PawnerContractList() {
           </div>
           {visibleContracts.length === 0 ? (
             <div className="rounded-lg border border-primary-border bg-background p-8 text-center">
-              <p className="text-primary-soft">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
+              <p className="text-primary/50">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
             </div>
           ) : (
             visibleContracts.map((contract) => {
