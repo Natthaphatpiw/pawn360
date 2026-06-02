@@ -215,7 +215,7 @@ export default function PawnerContractList() {
             <button
               type="button"
               onClick={() => setPinModalOpen(true)}
-              className="btn-transition btn-sheen mt-5 w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-3 text-sm font-bold text-primary-fg shadow-soft"
+              className="btn-transition btn-sheen mt-5 w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-fg shadow-soft"
             >
               ยืนยัน PIN
             </button>
@@ -270,8 +270,8 @@ export default function PawnerContractList() {
               </div>
           </div>
           {visibleContracts.length === 0 ? (
-            <div className="rounded-xl border border-primary-border bg-background p-8 text-center">
-              <p className="text-foreground-subtle">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
+            <div className="rounded-lg border border-primary-border bg-background p-8 text-center">
+              <p className="text-primary-soft">ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ</p>
             </div>
           ) : (
             visibleContracts.map((contract) => {

@@ -440,7 +440,7 @@ export default function PawnerEditProfile() {
             <button
               onClick={handleSubmit}
               disabled={submitting || success}
-              className="btn-transition btn-sheen w-full min-h-12 rounded-full bg-primary py-4 text-primary-fg disabled:cursor-not-allowed disabled:opacity-50 flex flex-col items-center justify-center"
+              className="btn-transition btn-sheen w-full min-h-12 rounded-full bg-primary py-3 text-primary-fg disabled:cursor-not-allowed disabled:opacity-50 flex flex-col items-center justify-center"
             >
               <span className="text-base font-medium">
                 {submitting ? 'กำลังบันทึก...' : success ? 'บันทึกเรียบร้อย' : 'บันทึกข้อมูล'}
@@ -453,7 +453,7 @@ export default function PawnerEditProfile() {
             <button
               onClick={() => router.back()}
               disabled={submitting}
-              className="btn-transition w-full min-h-12 rounded-full border border-primary bg-background-white py-4 text-primary disabled:opacity-50 flex flex-col items-center justify-center"
+              className="btn-transition w-full min-h-12 rounded-full border border-primary bg-background-white py-3 text-primary disabled:opacity-50 flex flex-col items-center justify-center"
             >
               <span className="text-base font-medium">ยกเลิก</span>
               <span className="text-xs font-light opacity-80">Cancel</span>
