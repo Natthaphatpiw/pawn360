@@ -45,7 +45,7 @@ export default function InvestorPawnTicketPage() {
 
   if (loading) {
     return (
-      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />
       </div>
     );

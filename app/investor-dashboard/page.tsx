@@ -243,7 +243,7 @@ function InvestorDashboardContent() {
 
   if (liffLoading || loading) {
     return (
-      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+      <div className="page-investor min-h-dvh w-full bg-background flex items-center justify-center">
         <div className="dot-bricks" />
       </div>
     );
@@ -251,7 +251,7 @@ function InvestorDashboardContent() {
 
   if (!pinVerified) {
     return (
-      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center p-6">
+      <div className="theme-liff theme-investor min-h-dvh w-full bg-background flex items-center justify-center p-6">
         <div className="w-full max-w-md rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
           <div className="rounded-lg border border-background-white bg-background-white px-6 py-6 text-center shadow-soft">
             <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-s2">
@@ -289,7 +289,7 @@ function InvestorDashboardContent() {
   }
 
   return (
-    <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6">
+    <div className="theme-liff theme-investor min-h-dvh w-full bg-background px-4 py-6">
       <div className="mx-auto flex w-full max-w-md flex-col">
 
         <div className="mb-5 rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
@@ -376,7 +376,7 @@ function InvestorDashboardContent() {
 export default function InvestorDashboardPage() {
   return (
     <Suspense fallback={
-      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+      <div className="theme-liff theme-investor min-h-dvh w-full bg-background flex items-center justify-center">
         <div className="dot-bricks" />
       </div>
     }>
