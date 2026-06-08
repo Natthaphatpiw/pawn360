@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" style={{ colorScheme: "light" }}>
+    <html lang="en" className="theme-web" style={{ colorScheme: "light", backgroundColor: "var(--background)" }}>
       <body
         className={`${notoSansThai.variable} ${notoSansThai.className} theme-web antialiased`}
       >

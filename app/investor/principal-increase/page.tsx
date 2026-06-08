@@ -11,6 +11,7 @@ function InvestorPrincipalIncreaseEntryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [requestId, setRequestId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const resolvedRequestId = useMemo(() => {
     const direct = searchParams.get('requestId');
@@ -35,12 +36,15 @@ function InvestorPrincipalIncreaseEntryInner() {
     if (resolvedRequestId) {
       setRequestId(resolvedRequestId);
       router.replace(`/investor/principal-increase/${resolvedRequestId}`);
+      return;
     }
+
+    setLoading(false);
   }, [resolvedRequestId, router]);
 
-  if (requestId) {
+  if (loading) {
     return (
-      <div className="theme-liff theme-investor min-h-screen bg-background-white flex items-center justify-center">
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />
       </div>
     );

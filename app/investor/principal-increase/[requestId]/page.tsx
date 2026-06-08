@@ -2,11 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, TrendingUp, User, AlertTriangle, CheckCircle, X, Wallet } from 'lucide-react';
+import { TrendingUp, User, CheckCircle, X, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { openLiffEntry } from '@/lib/liff/navigation';
 import { getInvestorPrincipalIncreaseStatusMeta, getMockPrincipalIncreaseRequest, isInvestorPreviewMode } from '@/lib/mock-investment';
+
+function DetailRow({
+  label,
+  value,
+  valueClassName = 'text-foreground',
+}: {
+  label: string;
+  value: React.ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 text-sm">
+      <span className="text-foreground-subtle">{label}</span>
+      <span className={`text-right font-semibold ${valueClassName}`}>{value}</span>
+    </div>
+  );
+}
 
 export default function InvestorPrincipalIncreaseApprovalPage() {
   const router = useRouter();
@@ -104,19 +121,21 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-10 h-10 text-red-500" />
+      <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6 font-sans text-foreground">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center justify-center">
+          <div className="w-full rounded-[var(--radius-xl)] border border-error-border bg-error-soft/70 p-4 text-center shadow-soft">
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-background-white text-error shadow-soft">
+              <X className="h-10 w-10" />
+            </div>
+            <h1 className="mb-2 text-xl font-semibold text-foreground">เกิดข้อผิดพลาด</h1>
+            <p className="mb-6 text-sm text-foreground-subtle">{error}</p>
+            <button
+              onClick={goToInvestment}
+              className="btn-transition w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-4 font-semibold text-s2-fg shadow-soft"
+            >
+              กลับหน้าการลงทุน
+            </button>
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">เกิดข้อผิดพลาด</h1>
-          <p className="text-gray-500 text-sm mb-6">{error}</p>
-          <button
-            onClick={goToInvestment}
-            className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
-          >
-            กลับหน้าการลงทุน
-          </button>
         </div>
       </div>
     );
@@ -130,21 +149,23 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   // Show different states based on status
   if (status === 'COMPLETED' || status === 'INVESTOR_TRANSFERRED') {
     return (
-      <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+      <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6 font-sans text-foreground">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center justify-center">
+          <div className="w-full rounded-xl border border-s2-border bg-s2-soft/55 p-4 text-center shadow-soft">
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-success-soft text-success shadow-soft">
+              <CheckCircle className="h-10 w-10" />
+            </div>
+            <h1 className="mb-2 text-xl font-semibold text-foreground">ดำเนินการเรียบร้อย</h1>
+            <p className="mb-6 text-sm text-foreground-subtle">
+              คำขอเพิ่มเงินต้นนี้ได้รับการดำเนินการแล้ว
+            </p>
+            <button
+              onClick={goToInvestment}
+              className="btn-transition w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-4 font-semibold text-s2-fg shadow-soft"
+            >
+              กลับหน้าการลงทุน
+            </button>
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">ดำเนินการเรียบร้อย</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            คำขอเพิ่มเงินต้นนี้ได้รับการดำเนินการแล้ว
-          </p>
-          <button
-            onClick={goToInvestment}
-            className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
-          >
-            กลับหน้าการลงทุน
-          </button>
         </div>
       </div>
     );
@@ -152,21 +173,29 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
 
   if (status === 'INVESTOR_REJECTED') {
     return (
-      <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col items-center justify-center p-6">
-        <div className="bg-white rounded-3xl p-8 text-center shadow-lg max-w-sm w-full">
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-10 h-10 text-red-500" />
+      <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6 font-sans text-foreground">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center justify-center">
+          <div className="w-full rounded-xl p-4 text-center">
+            <div className="mx-auto mb-4 rounded-full w-40 h-40 bg-error-soft flex items-center justify-center text-error">
+              <svg xmlns="http://www.w3.org/2000/svg" width="128px" height="128px" viewBox="0 0 50 50">
+                <path d="M0 0h50v50H0z" fill="none" />
+                <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                  <path stroke="currentColor" d="m21.875 21.875l6.25 6.25m0-6.25l-6.25 6.25" />
+                  <path stroke="currentColor" d="M14.583 6.25H37.5a2.083 2.083 0 0 1 2.083 2.083v33.334A2.083 2.083 0 0 1 37.5 43.75h-25a2.083 2.083 0 0 1-2.083-2.083v-31.25zm-4.166 4.167h4.166V6.25z" />
+                </g>
+              </svg>
+            </div>
+            <h1 className="mb-2 text-xl font-semibold text-foreground">คำขอถูกปฏิเสธเรียบร้อย</h1>
+            <p className="mb-6 text-sm text-foreground-subtle">
+              คุณได้ปฏิเสธคำขอเพิ่มเงินต้นนี้แล้ว
+            </p>
+            <button
+              onClick={goToInvestment}
+              className="btn-transition w-full rounded-full bg-s2 py-4 font-semibold text-s2-fg shadow-soft"
+            >
+              กลับหน้าการลงทุน
+            </button>
           </div>
-          <h1 className="text-xl font-bold text-gray-800 mb-2">คำขอถูกปฏิเสธ</h1>
-          <p className="text-gray-500 text-sm mb-6">
-            คุณได้ปฏิเสธคำขอเพิ่มเงินต้นนี้แล้ว
-          </p>
-          <button
-            onClick={goToInvestment}
-            className="w-full bg-[#1E3A8A] hover:bg-[#1E40AF] text-white rounded-2xl py-4 font-bold transition-colors"
-          >
-            กลับหน้าการลงทุน
-          </button>
         </div>
       </div>
     );
@@ -183,35 +212,35 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F0F4F8] font-sans flex flex-col">
+    <div className="theme-liff theme-investor min-h-screen bg-background-white px-4 py-6 font-sans text-foreground">
       {/* Reject Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
-            <div className="p-4 border-b border-gray-200 bg-red-50">
-              <h3 className="text-lg font-bold text-center text-red-800">ปฏิเสธคำขอ</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background-darker/60 p-4 backdrop-blur-sm">
+          <div className="modal-pop-in w-full max-w-sm overflow-hidden rounded-xl bg-background-white shadow-strong">
+            <div className="border-b border-error bg-error px-4 py-4">
+              <h3 className="text-center text-lg font-semibold text-error-fg">ปฏิเสธคำขอ</h3>
             </div>
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-gray-600">
+            <div className="space-y-4 p-4">
+              <p className="text-sm text-foreground-subtle">
                 กรุณาระบุเหตุผลในการปฏิเสธคำขอเพิ่มเงินต้น
               </p>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="เหตุผลในการปฏิเสธ..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 h-24 resize-none"
+                className="w-full h-24 resize-none rounded-lg border border-error-border bg-background-white px-3 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none focus:ring-1 focus:ring-error autofill:bg-background-white autofill:text-foreground"
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowRejectModal(false)}
-                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                  className="btn-transition flex-1 rounded-full border border-error-border bg-background-white px-4 py-3 font-medium text-error hover:bg-background-subtle"
                 >
                   ยกเลิก
                 </button>
                 <button
                   onClick={handleReject}
                   disabled={!rejectReason.trim() || submitting}
-                  className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors font-medium disabled:opacity-50"
+                  className="btn-transition flex-1 rounded-full bg-error px-4 py-3 font-semibold text-primary-fg shadow-soft disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? 'กำลังดำเนินการ...' : 'ยืนยันปฏิเสธ'}
                 </button>
@@ -221,127 +250,179 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm sticky top-0 z-10">
-        <ChevronLeft
-          className="w-6 h-6 text-gray-800 cursor-pointer"
-          onClick={() => router.back()}
-        />
-        <div className="flex-1 text-center">
-          <h1 className="font-bold text-lg text-gray-800">คำขอเพิ่มเงินต้น</h1>
-          <p className="text-xs text-gray-400">Principal Increase Request</p>
-        </div>
-        <div className="w-6"></div>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center p-6 pb-32">
-        {/* Request Info */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-[#EFF6FF] rounded-full flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-[#1E3A8A]" />
+      <div className="mx-auto flex w-full max-w-md flex-col mb-24">
+        <div className="mb-5 rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
+          <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
+            <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
+              Investor Request
             </div>
-            <div>
-              <h2 className="font-bold text-gray-800">สัญญาเลขที่ {contract?.contract_number}</h2>
-              <p className="text-xs text-gray-500">{item?.brand} {item?.model}</p>
-            </div>
-          </div>
-
-          <div className="mb-4 rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-medium text-[#1D4ED8]">สถานะคำขอ</span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-[#1D4ED8]">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-s2">
+                  คำขอเพิ่มเงินต้น
+                </div>
+                <p className="mt-2 text-xs text-foreground-subtle">
+                  Principal Increase Request
+                </p>
+              </div>
+              <div className="text-right text-sm font-light text-foreground-subtle">
                 {statusMeta.label}
-              </span>
+              </div>
             </div>
-            <p className="mt-2 text-xs text-[#1E3A8A]">{statusMeta.description}</p>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-3 no-scrollbar">
+          <div className="rounded-xl border border-s2-border bg-s2-soft p-4 shadow-soft">
+            <div className="mb-3 flex items-center justify-between gap-3 flex-nowrap">
+              <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
+                {contract?.contract_number || 'รายละเอียดคำขอ'}
+              </h3>
+              <div className="shrink-0 rounded-full bg-background-white px-2 py-1">
+                <span className="whitespace-nowrap rounded-full bg-background-white px-4 py-1.5 text-xs font-medium text-s2">
+                  {statusMeta.label}
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-3 space-y-1">
+              <div className="text-sm text-foreground-subtle">
+                สินทรัพย์: <span className="text-foreground-muted">{item?.brand} {item?.model}</span>
+              </div>
+              <div className="text-sm text-foreground-subtle">
+                สถานะ: <span className="text-s2">{statusMeta.description}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 w-full rounded-full bg-s2/20 px-3 py-2 text-center text-xs font-light text-s2">
+              Investor request detail
+            </div>
           </div>
 
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">เงินต้นปัจจุบัน:</span>
-              <span className="font-bold">{(contract?.current_principal_amount || contract?.loan_principal_amount || contract?.original_principal_amount)?.toLocaleString()} บาท</span>
+          <div className="rounded-xl border border-s2-border bg-s2-soft p-4">
+            <div className="flex items-center justify-between gap-3 flex-nowrap">
+              <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-lg font-medium text-foreground">
+                สรุปจำนวนเงิน
+              </h3>
+              <div className="text-sm font-light text-foreground-subtle">
+                {requestDetails?.increase_amount?.toLocaleString()} บาท
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">จำนวนที่ขอเพิ่ม:</span>
-              <span className="font-bold text-green-600">+ {requestDetails?.increase_amount?.toLocaleString()} บาท</span>
-            </div>
-            <div className="flex justify-between pt-2 border-t">
-              <span className="font-bold text-gray-800">เงินต้นใหม่:</span>
-              <span className="font-bold text-[#1E3A8A] text-lg">{(requestDetails?.principal_after_increase || requestDetails?.new_principal_amount)?.toLocaleString()} บาท</span>
+
+            <div className="mt-4 space-y-3">
+              <div className="rounded-lg border border-background-white bg-background-white p-4">
+                <div className="space-y-3">
+                  <DetailRow
+                    label="เงินต้นปัจจุบัน"
+                    value={`${(contract?.current_principal_amount || contract?.loan_principal_amount || contract?.original_principal_amount)?.toLocaleString()} บาท`}
+                  />
+                  <DetailRow
+                    label="จำนวนที่ขอเพิ่ม"
+                    value={`+ ${requestDetails?.increase_amount?.toLocaleString()} บาท`}
+                    valueClassName="text-s2"
+                  />
+                  <div className="border-t border-s2-border pt-3">
+                    <DetailRow
+                      label="เงินต้นใหม่"
+                      value={`${(requestDetails?.principal_after_increase || requestDetails?.new_principal_amount)?.toLocaleString()} บาท`}
+                      valueClassName="text-base text-s2"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Pawner Info (Redacted) */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <User className="w-5 h-5 text-[#1E3A8A]" />
+        <div className="my-3 rounded-xl border border-s2-border bg-s2-soft p-4">
+          <h3 className="mb-3 flex items-center gap-2 text-base font-semibold text-foreground">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background-white text-s2">
+              <User className="h-5 w-5" />
+            </span>
             ข้อมูลผู้ขอสินเชื่อ
           </h3>
-          <div className="text-sm text-gray-600">
+          <div className="rounded-lg border border-s2-border bg-background-white/50 p-4 text-sm leading-7 text-foreground-subtle">
             ข้อมูลส่วนบุคคลของผู้ขอสินเชื่อถูกปกปิดตามนโยบายความเป็นส่วนตัว
           </div>
         </div>
 
         {/* Pawner Bank Account */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-[#1E3A8A]" />
-            บัญชีรับเงินของผู้ขอสินเชื่อ
-          </h3>
+        <div className="rounded-xl border border-s2-border bg-s2-soft p-4 shadow-soft">
+          <div className="mb-3 flex items-center justify-between gap-3 flex-nowrap">
+            <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
+              บัญชีรับเงินของผู้ขอสินเชื่อ
+            </h3>
+            <div className="shrink-0 rounded-full bg-background-white px-2 py-1">
+              <span className="whitespace-nowrap rounded-full bg-background-white px-4 py-1.5 text-xs font-medium text-s2">
+                Bank Account
+              </span>
+            </div>
+          </div>
 
-          <div className="bg-[#EFF6FF] rounded-xl p-3 border border-[#BFDBFE]">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">ธนาคาร:</span>
-                <span className="font-bold">{requestDetails?.pawner_bank_name || requestDetails?.contract?.pawners?.bank_name || ''}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">เลขบัญชี:</span>
-                <span className="font-bold text-[#1E3A8A]">{requestDetails?.pawner_bank_account_no || requestDetails?.contract?.pawners?.bank_account_no || ''}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">ชื่อบัญชี:</span>
-                <span className="font-bold">{requestDetails?.pawner_bank_account_name || requestDetails?.contract?.pawners?.bank_account_name || ''}</span>
-              </div>
+          <div className="rounded-lg border border-background-white bg-background-white p-4">
+            <div className="space-y-3">
+              <DetailRow
+                label="ธนาคาร"
+                value={requestDetails?.pawner_bank_name || requestDetails?.contract?.pawners?.bank_name || ''}
+              />
+              <DetailRow
+                label="เลขบัญชี"
+                value={requestDetails?.pawner_bank_account_no || requestDetails?.contract?.pawners?.bank_account_no || ''}
+                valueClassName="text-s2"
+              />
+              <DetailRow
+                label="ชื่อบัญชี"
+                value={requestDetails?.pawner_bank_account_name || requestDetails?.contract?.pawners?.bank_account_name || ''}
+              />
             </div>
           </div>
         </div>
 
-        {/* Interest Info */}
-        <div className="w-full max-w-sm bg-white rounded-2xl p-4 mb-4 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-3">ข้อมูลดอกเบี้ย</h3>
+        <div className="mt-3 rounded-xl border border-s2-border bg-s2-soft p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 flex-nowrap">
+            <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
+              ข้อมูลดอกเบี้ย
+            </h3>
+            <div className="shrink-0 rounded-full bg-background-white px-2 py-1">
+              <span className="whitespace-nowrap rounded-full bg-background-white px-4 py-1.5 text-xs font-medium text-s2">
+                Interest
+              </span>
+            </div>
+          </div>
 
-          <div className="bg-green-50 rounded-xl p-3">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">อัตราดอกเบี้ยสุทธิ (นักลงทุน):</span>
-                <span className="font-bold">{investorRatePercent.toFixed(2)}% / เดือน</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">ดอกเบี้ยใหม่/เดือน:</span>
-                <span className="font-bold text-green-700">
-                  {formatAmount(newMonthlyInterest)} บาท
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">เพิ่มขึ้น/เดือน:</span>
-                <span className="font-bold text-green-700">
-                  + {formatAmount(increaseMonthlyInterest)} บาท
-                </span>
-              </div>
+          <div className="rounded-lg border border-background-white bg-background-white p-4">
+            <div className="space-y-3">
+              <DetailRow
+                label="อัตราดอกเบี้ยสุทธิ (นักลงทุน)"
+                value={`${investorRatePercent.toFixed(2)}% / เดือน`}
+              />
+              <DetailRow
+                label="ดอกเบี้ยใหม่ / เดือน"
+                value={`${formatAmount(newMonthlyInterest)} บาท`}
+                valueClassName="text-s2"
+              />
+              <DetailRow
+                label="เพิ่มขึ้น / เดือน"
+                value={`+ ${formatAmount(increaseMonthlyInterest)} บาท`}
+                valueClassName="text-s2"
+              />
             </div>
           </div>
         </div>
 
-        {/* Warning */}
-        <div className="w-full max-w-sm bg-amber-50 rounded-2xl p-4 mb-4 border border-amber-200">
-          <h3 className="font-bold text-amber-800 mb-2 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            ข้อควรทราบ
-          </h3>
-          <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+        <div className="mt-3 rounded-xl border border-warning-border bg-warning-soft p-4 shadow-soft">
+          <div className="mb-2 flex items-center justify-between gap-3 flex-nowrap">
+            <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-warning">
+              ข้อควรทราบ
+            </h3>
+            <div className="shrink-0 rounded-full bg-background-white px-2 py-1">
+              <span className="whitespace-nowrap rounded-full bg-background-white px-4 py-1.5 text-xs font-medium text-warning">
+                Notice
+              </span>
+            </div>
+          </div>
+          <ul className="list-inside list-disc space-y-1 text-xs leading-6 text-warning">
             <li>หากอนุมัติ คุณต้องโอนเงิน {requestDetails?.increase_amount?.toLocaleString()} บาท ไปยังบัญชีผู้ขอสินเชื่อ</li>
             <li>หลังจากโอนเงิน กรุณาอัปโหลดสลิปเพื่อยืนยัน</li>
             <li>เงินต้นจะเพิ่มขึ้นหลังจากผู้ขอสินเชื่อยืนยันรับเงินแล้ว</li>
@@ -350,21 +431,21 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
       </div>
 
       {/* Fixed Bottom Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-[#F0F4F8]">
-        <div className="max-w-sm mx-auto flex gap-3">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-background-white/50 bg-background-white/25 p-4 backdrop-blur">
+        <div className="mx-auto flex max-w-md gap-3">
           <button
             onClick={() => setShowRejectModal(true)}
-            className="flex-1 py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] bg-white border-2 border-red-500 text-red-500 hover:bg-red-50"
+            className="btn-transition flex flex-1 flex-col items-center justify-center rounded-full border border-error py-3 text-error shadow-soft active:scale-[0.98] hover:bg-error-soft"
           >
-            <span className="text-base font-bold">ปฏิเสธ</span>
-            <span className="text-xs font-light opacity-80">Reject</span>
+            <span className="text-base font-semibold">ปฏิเสธ</span>
+            <span className="text-xs text-error/60">Reject</span>
           </button>
           <button
             onClick={handleApprove}
-            className="flex-1 py-4 rounded-2xl flex flex-col items-center justify-center shadow-lg transition-all active:scale-[0.98] bg-[#1E3A8A] hover:bg-[#1E40AF] text-white"
+            className="btn-transition btn-sheen flex flex-1 flex-col items-center justify-center rounded-full bg-s2 py-3 text-s2-fg shadow-soft active:scale-[0.98]"
           >
-            <span className="text-base font-bold">อนุมัติ</span>
-            <span className="text-xs font-light opacity-80">Approve</span>
+            <span className="text-base font-semibold">อนุมัติ</span>
+            <span className="text-xs text-s2-fg/80">Approve</span>
           </button>
         </div>
       </div>
