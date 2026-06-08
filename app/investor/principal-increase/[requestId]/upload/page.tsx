@@ -11,7 +11,7 @@ import TransactionHeader from '@/app/contracts/[contractId]/_components/Transact
 export default function InvestorPrincipalIncreaseUploadPage() {
   const params = useParams();
   const requestId = params.requestId as string;
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -137,9 +137,9 @@ export default function InvestorPrincipalIncreaseUploadPage() {
     }
   };
 
-  if (loading) {
+  if (liffLoading || loading) {
     return (
-      <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background-white flex items-center justify-center">
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />
       </div>
     );
@@ -162,20 +162,20 @@ export default function InvestorPrincipalIncreaseUploadPage() {
     return (
       <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background font-sans flex items-center justify-center p-6">
         <div className="w-full max-w-sm rounded-xl bg-background p-8 text-center">
-          <div className="w-32 h-32 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-24 h-24 text-red-500" />
+          <div className="w-32 h-32 bg-error-soft rounded-full flex items-center justify-center mx-auto mb-6">
+            <X className="w-24 h-24 text-error" />
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">การดำเนินการเป็นโมฆะ</h1>
           <p className="text-sm text-foreground-subtle mb-6">เนื่องจากโอนเงินไม่ตรงตามจำนวนถึง 2 ครั้ง</p>
-          <div className="bg-red-50 rounded-xl p-4 mb-6 text-left">
-            <p className="text-sm text-red-700">
+          <div className="bg-error-soft rounded-xl p-4 mb-6 text-left border border-error-border">
+            <p className="text-sm text-error">
               กรุณาติดต่อฝ่าย Support
             </p>
-            <p className="text-lg font-bold text-red-700 mt-1">โทร: 0626092941</p>
+            <p className="text-lg font-bold text-error mt-1">โทร: 0626092941</p>
           </div>
           <button
             onClick={handleGoToContracts}
-            className="w-full rounded-full bg-s2 py-4 font-medium text-white"
+            className="btn-transition w-full rounded-full bg-s2 py-4 font-medium text-s2-fg hover:bg-s2/90"
           >
             กลับหน้าการลงทุน
           </button>
@@ -189,14 +189,14 @@ export default function InvestorPrincipalIncreaseUploadPage() {
     return (
       <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background font-sans flex items-center justify-center p-6">
         <div className="w-full max-w-sm rounded-xl bg-background p-8 text-center">
-          <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-24 h-24 text-green-500" />
+          <div className="w-32 h-32 bg-success-soft rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-24 h-24 text-success" />
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">ส่งหลักฐานการโอนเงินแล้ว</h1>
           <p className="text-sm text-foreground-subtle mb-6">ระบบบันทึกการโอนเงินเพิ่มเงินต้นเรียบร้อยแล้ว กรุณารอการยืนยันขั้นตอนถัดไป</p>
           <button
             onClick={handleGoToContracts}
-            className="w-full rounded-full bg-s2 py-4 font-medium text-white"
+            className="btn-transition w-full rounded-full bg-s2 py-4 font-medium text-s2-fg hover:bg-s2/90"
           >
             กลับหน้าการลงทุน
           </button>
@@ -216,14 +216,14 @@ export default function InvestorPrincipalIncreaseUploadPage() {
     return (
       <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background font-sans flex items-center justify-center p-6">
         <div className="w-full max-w-sm rounded-xl bg-background p-8 text-center">
-          <div className="w-32 h-32 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-24 h-24 text-amber-500" />
+          <div className="w-32 h-32 bg-warning-soft rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-24 h-24 text-warning" />
           </div>
           <h1 className="text-xl font-bold text-foreground mb-2">ไม่สามารถส่งสลิปได้</h1>
           <p className="text-sm text-foreground-subtle mb-6">{statusMessage}</p>
           <button
             onClick={handleGoToContracts}
-            className="w-full rounded-full bg-s2 py-4 font-medium text-white"
+            className="btn-transition w-full rounded-full bg-s2 py-4 font-medium text-s2-fg hover:bg-s2/90"
           >
             กลับหน้าการลงทุน
           </button>
@@ -234,11 +234,11 @@ export default function InvestorPrincipalIncreaseUploadPage() {
 
   // Default: show slip upload form
   return (
-    <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background-white font-sans flex flex-col">
+    <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] font-sans flex flex-col">
 
       <div className="m-4 rounded-xl border border-s2-border bg-s2-soft/55 p-4 shadow-soft">
-        <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
-          <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
+        <div className="rounded-lg border border-background bg-background p-4 shadow-soft">
+          <div className="inline-flex rounded-full border border-s2-border bg-background px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
             Contract Transaction
           </div>
           <div className="flex items-end justify-between gap-4">
@@ -251,20 +251,20 @@ export default function InvestorPrincipalIncreaseUploadPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center p-4 pb-20 bg-background-white">
+      <div className="flex-1 flex flex-col items-center p-4 pb-20">
           {showRetry && verificationResult && (
-            <div className="w-full max-w-sm bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+            <div className="w-full max-w-sm bg-error-soft border border-error-border rounded-xl p-4 mb-4">
               <div className="flex gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-error flex-shrink-0" />
                 <div>
-                  <h3 className="font-bold text-red-700 text-sm mb-1">ยอดไม่ตรง</h3>
-                  <p className="text-xs text-red-600 mb-2">
+                  <h3 className="font-bold text-error text-sm mb-1">ยอดไม่ตรง</h3>
+                  <p className="text-xs text-error mb-2">
                     กรุณาโอนใหม่เต็มจำนวน {requiredAmount?.toLocaleString()} บาท
                   </p>
-                  <p className="text-xs text-red-600">
+                  <p className="text-xs text-error">
                     หากมีปัญหา กรุณาติดต่อฝ่าย Support โทร 0626092941
                   </p>
-                  <p className="text-xs text-red-500 mt-2">
+                  <p className="text-xs text-error mt-2">
                     เหลือโอกาสอีก {verificationResult.remainingAttempts} ครั้ง
                   </p>
                 </div>
@@ -273,7 +273,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
           )}
 
           {requestDetails && (
-            <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
+            <div className="w-full max-w-sm bg-background-white rounded-xl p-4 mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-foreground-subtle text-sm">สถานะคำขอ:</span>
                 <span className="font-medium text-s2">{statusMeta.label}</span>
@@ -292,7 +292,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
           )}
 
           {requestDetails && (
-            <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
+            <div className="w-full max-w-sm bg-background-white rounded-xl p-4 mb-4">
               <div className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
                 <Wallet className="w-4 h-4 text-s2" />
                 ข้อมูลบัญชีรับเงิน
@@ -361,14 +361,14 @@ export default function InvestorPrincipalIncreaseUploadPage() {
           </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background-white backdrop-blur-md border-t border-background-white/50">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background-white/25 backdrop-blur-md border-t border-background-white/50">
         <div className="max-w-sm mx-auto">
           <button
             onClick={handleSubmit}
             disabled={!slipImage || uploading}
             className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               slipImage && !uploading
-                ? 'bg-s2 hover:bg-s2/80 text-white'
+                ? 'bg-s2 hover:bg-s2/90 text-s2-fg'
                 : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >

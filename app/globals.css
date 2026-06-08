@@ -73,7 +73,7 @@
 .theme-web,
 .theme-liff {
   /* Light-only semantic tokens */
-  --background: var(--white);
+  --background: var(--neutral-50);
   --background-dark: var(--neutral-700);
   --background-darker: var(--neutral-850);
   --background-white: var(--white);
@@ -151,7 +151,7 @@
   --grad-investor-end: var(--blue-400);
   --grad-drop-start: var(--green-600);
   --grad-drop-end: var(--green-400);
-  --dot-primary: var(--primary);
+  --dot-primary: var(--orange-600);
   --dot-secondary: var(--s2);
   --dot-tertiary: var(--s3);
 }
@@ -188,9 +188,6 @@
   --grad-primary-start: var(--green-600);
   --grad-primary-end: var(--green-400);
   --dot-fallback: var(--green-600);
-  --dot-primary: var(--green-600);
-  --dot-secondary: var(--blue-600);
-  --dot-tertiary: var(--orange-600);
 
   --register-surface: color-mix(in srgb, var(--background-white) 76%, var(--s3-soft) 24%);
   --register-surface-strong: color-mix(in srgb, var(--background-white) 10%, var(--s3-soft) 90%);
@@ -501,12 +498,12 @@
 html,
 body {
   color-scheme: light;
-  background: var(--white);
+  background: var(--background);
 }
 
 body {
   min-height: 100%;
-  background: var(--white);
+  background: var(--background);
 }
 
 .theme-web,
@@ -1005,15 +1002,16 @@ body {
   background-color: var(--dot-primary, var(--primary));
   color: var(--dot-primary, var(--primary));
   box-shadow:
-    9999.8px -19.2px 0 0 var(--dot-primary, var(--primary)),
+    9999.8px -19.2px 0 0 var(--dot-primary, var(--orange-600)),
     9989.4px 0 0 0 var(--dot-secondary, var(--s2)),
     10010.2px 0 0 0 var(--dot-tertiary, var(--s3));
   animation: dot-bricks 2s infinite linear;
 }
 
 @keyframes dot-bricks {
-  0%      { box-shadow: 9999.8px -19.2px 0 0 var(--dot-primary, var(--primary)), 9989.4px 0 0 0 var(--dot-secondary, var(--s2)), 10010.2px 0 0 0 var(--dot-tertiary, var(--s3)); }
-  33.333% { box-shadow: 10010.2px 0 0 0 var(--dot-primary, var(--primary)), 9999.8px -19.2px 0 0 var(--dot-secondary, var(--s2)), 9989.4px 0 0 0 var(--dot-tertiary, var(--s3)); }
-  66.666% { box-shadow: 9989.4px 0 0 0 var(--dot-primary, var(--primary)), 10010.2px 0 0 0 var(--dot-secondary, var(--s2)), 9999.8px -19.2px 0 0 var(--dot-tertiary, var(--s3)); }
-  100%    { box-shadow: 9999.8px -19.2px 0 0 var(--dot-primary, var(--primary)), 9989.4px 0 0 0 var(--dot-secondary, var(--s2)), 10010.2px 0 0 0 var(--dot-tertiary, var(--s3)); }
+  0%      { box-shadow: 9999.8px -19.2px 0 0 var(--dot-primary, var(--orange-600)), 9989.4px 0 0 0 var(--dot-secondary, var(--s2)), 10010.2px 0 0 0 var(--dot-tertiary, var(--s3)); }
+  33.333% { box-shadow: 10010.2px 0 0 0 var(--dot-primary, var(--orange-600)), 9999.8px -19.2px 0 0 var(--dot-secondary, var(--s2)), 9989.4px 0 0 0 var(--dot-tertiary, var(--s3)); }
+  66.666% { box-shadow: 9989.4px 0 0 0 var(--dot-primary, var(--orange-600)), 10010.2px 0 0 0 var(--dot-secondary, var(--s2)), 9999.8px -19.2px 0 0 var(--dot-tertiary, var(--s3)); }
+  100%    { box-shadow: 9999.8px -19.2px 0 0 var(--dot-primary, var(--orange-600)), 9989.4px 0 0 0 var(--dot-secondary, var(--s2)), 10010.2px 0 0 0 var(--dot-tertiary, var(--s3)); }
 }
+/* ─── Dot Bricks Base ─────────────────────────────────────────────────────── */
