@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
+const MAX_OFFER_AGE_MS = 4 * 60 * 60 * 1000;
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ contractId: string }> }
@@ -159,11 +161,22 @@ export async function GET(
     const remainingInterest = Math.max(0, interestDue);
     const remainingAmount = Math.max(0, remainingPrincipal + remainingInterest);
     const itemNotes = splitItemNotesAndPasscode(contract.item?.notes);
+    const postedAtValue = contract.updated_at || contract.created_at;
+    const postedAt = postedAtValue ? new Date(postedAtValue) : null;
+    const postedAtMs = postedAt?.getTime();
+    const offerMetadata = postedAt && Number.isFinite(postedAtMs as number)
+      ? {
+          posted_at: postedAt.toISOString(),
+          expires_at: new Date((postedAtMs as number) + MAX_OFFER_AGE_MS).toISOString(),
+          hours_ago: Math.floor((Date.now() - (postedAtMs as number)) / (1000 * 60 * 60)),
+        }
+      : {};
 
     return NextResponse.json({
       success: true,
       contract: {
         ...contract,
+        ...offerMetadata,
         item: contract.item ? {
           ...contract.item,
           notes: itemNotes.publicNotes,
