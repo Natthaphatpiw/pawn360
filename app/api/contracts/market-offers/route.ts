@@ -45,14 +45,15 @@ export async function GET(request: NextRequest) {
 
     // Calculate additional info for each contract and hide expired offers
     const offersWithInfo = contracts?.flatMap((contract) => {
-      const createdAt = new Date(contract.created_at);
-      const createdAtMs = createdAt.getTime();
+      const postedAtValue = contract.updated_at || contract.created_at;
+      const postedAt = new Date(postedAtValue);
+      const postedAtMs = postedAt.getTime();
 
-      if (!Number.isFinite(createdAtMs)) {
+      if (!Number.isFinite(postedAtMs)) {
         return [];
       }
 
-      const ageMs = now - createdAtMs;
+      const ageMs = now - postedAtMs;
       if (ageMs > MAX_OFFER_AGE_MS) {
         return [];
       }
@@ -61,8 +62,9 @@ export async function GET(request: NextRequest) {
 
       return {
         ...contract,
+        posted_at: postedAt.toISOString(),
         hours_ago: hoursAgo,
-        expires_at: new Date(createdAtMs + MAX_OFFER_AGE_MS).toISOString(),
+        expires_at: new Date(postedAtMs + MAX_OFFER_AGE_MS).toISOString(),
         time_display: hoursAgo < 1 ? 'เมื่อสักครู่' :
                       hoursAgo < 24 ? `${hoursAgo} ชั่วโมงที่แล้ว` :
                       `${Math.floor(hoursAgo / 24)} วันที่แล้ว`

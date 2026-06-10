@@ -44,19 +44,46 @@ function InvestorOffersContent() {
   const [marketOffers, setMarketOffers] = useState<any[]>([]);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const formatItemName = (item?: { brand?: string | null; model?: string | null }) =>
     [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'รายการขอสินเชื่อ';
 
+  const formatPostedAt = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '-';
+    return date.toLocaleString('th-TH', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatRemainingTime = (value?: string | null, currentTime = Date.now()) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    const expiryMs = date.getTime();
+    if (!Number.isFinite(expiryMs)) return '-';
+
+    const remainingMs = expiryMs - currentTime;
+    if (remainingMs <= 0) return 'หมดเวลาแล้ว';
+
+    const remainingHours = Math.floor(remainingMs / (60 * 60 * 1000));
+    const remainingMinutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+    return `${remainingHours} ชั่วโมง : ${remainingMinutes.toString().padStart(2, '0')} นาที`;
+  };
+
   const isOfferWithinFourHours = (offer: any) => {
-    const createdAtValue = offer?.created_at || offer?.createdAt;
-    if (!createdAtValue) return false;
+    const postedAtValue = offer?.posted_at || offer?.updated_at || offer?.created_at || offer?.createdAt;
+    if (!postedAtValue) return false;
 
-    const createdAt = new Date(createdAtValue);
-    const createdAtMs = createdAt.getTime();
-    if (!Number.isFinite(createdAtMs)) return false;
+    const postedAt = new Date(postedAtValue);
+    const postedAtMs = postedAt.getTime();
+    if (!Number.isFinite(postedAtMs)) return false;
 
-    return Date.now() - createdAtMs <= MAX_OFFER_AGE_MS;
+    return Date.now() - postedAtMs <= MAX_OFFER_AGE_MS;
   };
 
   useEffect(() => {
@@ -64,6 +91,16 @@ function InvestorOffersContent() {
       fetchData();
     }
   }, [profile?.userId]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    setNow(Date.now());
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -155,6 +192,8 @@ function InvestorOffersContent() {
               const investorRate = INVESTOR_TIER_RATES[projectedTier];
               const investorRatePercent = investorRate * 100;
               const investorInterestAmount = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
+              const postedAtLabel = formatPostedAt(offer?.posted_at || offer?.updated_at || offer?.created_at);
+              const remainingTimeLabel = formatRemainingTime(offer?.expires_at, now);
 
               const handleViewOffer = () => {
                 if (isInvestorPreviewMode()) {
@@ -226,6 +265,18 @@ function InvestorOffersContent() {
                       <span className="font-medium text-foreground">
                         {projectedTier}
                       </span>
+                    </div>
+                    <div className="border-t border-s2-border pt-3 mt-3">
+                      <div className="flex items-center justify-between gap-3 text-[11px] text-foreground-subtle">
+                        <span>Posted at</span>
+                        <span className="font-medium text-foreground">{postedAtLabel}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-foreground-subtle">
+                        <span>Offer end in</span>
+                        <span className="font-medium text-s2">
+                          {remainingTimeLabel}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
