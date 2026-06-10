@@ -50,6 +50,7 @@ function OfferDetailContent() {
   const pendingActionRef = useRef<((token: string) => void) | null>(null);
   const [acceptSuccess, setAcceptSuccess] = useState(false);
   const [acceptMessage, setAcceptMessage] = useState('');
+  const [now, setNow] = useState(() => Date.now());
 
   // Get contractId from either direct param or from liff.state
   const previewMode = isInvestorPreviewMode();
@@ -68,6 +69,33 @@ function OfferDetailContent() {
   }
   const effectiveContractId = contractId || (previewMode ? MOCK_CONTRACT_IDS.offer : null);
 
+  const formatPostedAt = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '-';
+    return date.toLocaleString('th-TH', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatOfferEndIn = (value?: string | null, currentTime = Date.now()) => {
+    if (!value) return '-';
+    const expiryDate = new Date(value);
+    const expiryMs = expiryDate.getTime();
+    if (!Number.isFinite(expiryMs)) return '-';
+
+    const remainingMs = expiryMs - currentTime;
+    if (remainingMs <= 0) return 'หมดเวลาแล้ว';
+
+    const totalMinutes = Math.floor(remainingMs / (60 * 1000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${hours} ชั่วโมง : ${minutes.toString().padStart(2, '0')} นาที`;
+  };
+
   useEffect(() => {
     if (liffLoading) return;
 
@@ -85,6 +113,16 @@ function OfferDetailContent() {
 
     ensureInvestorKyc();
   }, [effectiveContractId, profile?.userId, liffLoading]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    setNow(Date.now());
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const fetchContractDetails = async () => {
     try {
@@ -311,6 +349,8 @@ function OfferDetailContent() {
   const feeRatePercent = platformFeeRate * 100;
   const principal = Number(contract.loan_principal_amount || 0);
   const durationDays = Number(contract.contract_duration_days || 0);
+  const offerPostedAt = contract?.posted_at || contract?.updated_at || contract?.created_at;
+  const offerExpiresAt = contract?.expires_at || (offerPostedAt ? new Date(new Date(offerPostedAt).getTime() + (4 * 60 * 60 * 1000)).toISOString() : null);
   const platformFeeRaw = Number(contract.platform_fee_amount);
   const platformFeeAmount = Number.isFinite(platformFeeRaw) && platformFeeRaw > 0
     ? platformFeeRaw
@@ -322,6 +362,7 @@ function OfferDetailContent() {
     : INVESTOR_TIER_RATES[projectedTier];
   const investorRatePercent = investorRate * 100;
   const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
+  const offerEndInLabel = formatOfferEndIn(offerExpiresAt, now);
 
   return (
     <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6 mb-12 flex flex-col items-center">
@@ -371,7 +412,13 @@ function OfferDetailContent() {
             )}
           />
           <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
-          <InfoRow label="วันที่เสนอ" value={new Date().toLocaleDateString('th-TH')} />
+        </div>
+
+        <div className="rounded-lg border border-s2-border bg-s2-soft/60 p-3 mb-4 shadow-soft">
+          <div className="space-y-1">
+            <InfoRow label="Posted at" value={formatPostedAt(offerPostedAt)} />
+            <InfoRow label="Offer end in" value={offerEndInLabel} isBoldValue />
+          </div>
         </div>
 
         <div className="h-px bg-s2-border my-3 opacity-60"></div>

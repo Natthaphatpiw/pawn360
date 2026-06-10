@@ -34,6 +34,7 @@ export function getMockInvestorContracts() {
       contract_id: MOCK_CONTRACT_IDS.offer,
       contract_number: 'INV-2026-0501',
       created_at: new Date(Date.now() - (60 * 60 * 1000)).toISOString(),
+      updated_at: new Date(Date.now() - (60 * 60 * 1000)).toISOString(),
       contract_status: 'PENDING',
       funding_status: 'PENDING',
       payment_status: 'PENDING',
