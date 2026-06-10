@@ -363,6 +363,8 @@ function OfferDetailContent() {
   const investorRatePercent = investorRate * 100;
   const investorInterest = Math.round(principal * investorRate * (durationDays / 30) * 100) / 100;
   const offerEndInLabel = formatOfferEndIn(offerExpiresAt, now);
+  const isOfferAccepted = Boolean(contract?.investor_id);
+  const isOfferUnavailable = isOfferAccepted || contract.funding_status !== 'PENDING' || !['PENDING', 'PENDING_SIGNATURE'].includes(contract.contract_status);
 
   return (
     <div className="theme-liff theme-investor min-h-screen bg-background px-4 py-6 mb-12 flex flex-col items-center">
@@ -436,11 +438,17 @@ function OfferDetailContent() {
         {/* Accept Button */}
         <button
           onClick={handleAccept}
-          disabled={actionLoading}
-          className="btn-transition btn-sheen w-full rounded-full bg-s2 py-2 flex flex-col items-center justify-center shadow-soft transition-colors disabled:opacity-50 text-s2-fg"
+          disabled={actionLoading || isOfferUnavailable}
+          className="btn-transition btn-sheen w-full rounded-full bg-s2 py-2 flex flex-col items-center justify-center shadow-soft transition-colors disabled:cursor-not-allowed disabled:opacity-50 text-s2-fg"
         >
-          <span className="text-base font-medium">{actionLoading ? 'กำลังดำเนินการ...' : 'รับข้อเสนอ'}</span>
-          <span className="text-xs font-light opacity-90">Accept</span>
+          <span className="text-base font-medium">
+            {isOfferAccepted
+              ? 'ข้อเสนอนี้ถูกรับไปแล้ว'
+              : actionLoading
+                ? 'กำลังดำเนินการ...'
+                : 'รับข้อเสนอ'}
+          </span>
+          {!isOfferAccepted && <span className="text-xs font-light opacity-90">Accept</span>}
         </button>
       </div>
 
