@@ -416,12 +416,14 @@ function OfferDetailContent() {
           <InfoRow label="ระยะเวลา" value={`${contract.contract_duration_days} วัน`} />
         </div>
 
-        <div className="rounded-lg border border-s2-border bg-s2-soft/60 p-3 mb-4 shadow-soft">
-          <div className="space-y-1">
-            <InfoRow label="Posted at" value={formatPostedAt(offerPostedAt)} />
-            <InfoRow label="Offer end in" value={offerEndInLabel} isBoldValue />
+        {!isOfferAccepted && (
+          <div className="rounded-lg border border-s2-border bg-s2-soft/60 p-3 mb-4 shadow-soft">
+            <div className="space-y-1">
+              <InfoRow label="Posted at" value={formatPostedAt(offerPostedAt)} />
+              <InfoRow label="Offer end in" value={offerEndInLabel} isBoldValue />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="h-px bg-s2-border my-3 opacity-60"></div>
 
@@ -448,7 +450,11 @@ function OfferDetailContent() {
                 ? 'กำลังดำเนินการ...'
                 : 'รับข้อเสนอ'}
           </span>
-          {!isOfferAccepted && <span className="text-xs font-light opacity-90">Accept</span>}
+          {isOfferAccepted ? (
+            <span className="text-xs font-light opacity-90">Offer unavailable</span>
+          ) : (
+            <span className="text-xs font-light opacity-90">Accept</span>
+          )}
         </button>
       </div>
 
