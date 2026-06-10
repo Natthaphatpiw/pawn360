@@ -51,6 +51,8 @@ type ContractListItem = {
 
 type ContractDetail = ReturnType<typeof getMockContractDetail>;
 
+const ARRIVED_AT_DROP_POINT_STATUSES = ['RECEIVED_AT_DROP_POINT', 'ARRIVED_AT_DROP_POINT'];
+
 function formatDate(dateString?: string) {
   if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('th-TH', {
@@ -218,27 +220,30 @@ function DropPointContent() {
 
   if (contractId && contractDetail) {
     const waitingDriverRequestStatuses = ['DRIVER_SEARCH', 'PAYMENT_VERIFIED', 'AWAITING_PAYMENT', 'PAYMENT_REJECTED', 'SLIP_UPLOADED'];
+    const isIncomingToDropPoint = ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status);
+    const isArrivedAtDropPoint = ARRIVED_AT_DROP_POINT_STATUSES.includes(contractDetail.item_delivery_status);
     const isWaitingDriver = contractDetail.item_delivery_status === 'PENDING'
       && waitingDriverRequestStatuses.includes(contractDetail.delivery_request_status || '');
     const statusText = isWaitingDriver
       ? 'รอเรียกรถ'
       : contractDetail.item_delivery_status === 'VERIFIED'
       ? 'ตรวจสอบแล้ว'
-      : contractDetail.item_delivery_status === 'RECEIVED_AT_DROP_POINT'
+      : isArrivedAtDropPoint
       ? 'รอตรวจสอบ'
-      : ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status)
+      : isIncomingToDropPoint
         ? 'กำลังจัดส่งมา'
         : 'รอตรวจสอบ';
     const canAssignDriver = isWaitingDriver && Boolean(contractDetail.delivery_request_id);
-    const canMarkArrived = ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status)
-      && Boolean(contractDetail.delivery_request_id);
-    const canVerify = contractDetail.item_delivery_status === 'RECEIVED_AT_DROP_POINT'
+    const canMarkArrived = (
+      isIncomingToDropPoint || contractDetail.delivery_request_status === 'ITEM_PICKED'
+    ) && !isArrivedAtDropPoint && Boolean(contractDetail.delivery_request_id);
+    const canVerify = isArrivedAtDropPoint
       || (contractDetail.item_delivery_status === 'VERIFIED' && !contractDetail.item_verified_at);
     const statusTone = isWaitingDriver
       ? 'neutral'
-      : contractDetail.item_delivery_status === 'RECEIVED_AT_DROP_POINT'
+      : isArrivedAtDropPoint
       ? 'success'
-      : ['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(contractDetail.item_delivery_status)
+      : isIncomingToDropPoint
         ? 'warning'
         : 'success';
 
