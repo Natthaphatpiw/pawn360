@@ -234,9 +234,12 @@ function DropPointContent() {
         ? 'กำลังจัดส่งมา'
         : 'รอตรวจสอบ';
     const canAssignDriver = isWaitingDriver && Boolean(contractDetail.delivery_request_id);
-    const canMarkArrived = (
-      isIncomingToDropPoint || contractDetail.delivery_request_status === 'ITEM_PICKED'
-    ) && !isArrivedAtDropPoint && Boolean(contractDetail.delivery_request_id);
+    const canMarkArrived = Boolean(contractDetail.delivery_request_id)
+      && !isArrivedAtDropPoint
+      && (
+        isIncomingToDropPoint
+        || ['ITEM_PICKED', 'DRIVER_ASSIGNED', 'ARRIVED'].includes(contractDetail.delivery_request_status || '')
+      );
     const canVerify = isArrivedAtDropPoint
       || (contractDetail.item_delivery_status === 'VERIFIED' && !contractDetail.item_verified_at);
     const statusTone = isWaitingDriver
@@ -328,7 +331,7 @@ function DropPointContent() {
     };
 
     return (
-      <DropPointPageShell>
+      <DropPointPageShell className="pb-28">
         <DropPointHeroCard
           eyebrow={previewMode ? 'Preview Mode' : 'Drop Point'}
           title={`${contractDetail.items.brand} ${contractDetail.items.model}`}
@@ -390,16 +393,6 @@ function DropPointContent() {
             </button>
           ) : null}
 
-          {canMarkArrived ? (
-            <button
-              onClick={handleMarkArrived}
-              disabled={updatingArrival}
-              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
-            >
-              {updatingArrival ? 'กำลังอัปเดต...' : 'สินค้าถึง Drop Point แล้ว'}
-            </button>
-          ) : null}
-
           {canVerify ? (
             <button
               onClick={() => router.push(previewMode ? `/droppoint-verify?mock=1&contractId=${contractDetail.contract_id}` : `/droppoint-verify?contractId=${contractDetail.contract_id}`)}
@@ -413,6 +406,20 @@ function DropPointContent() {
             </div>
           ) : null}
         </div>
+
+        {canMarkArrived ? (
+          <div className="fixed inset-x-0 bottom-0 z-30 px-4 pb-[calc(var(--safe-bottom)+16px)] pt-3">
+            <div className="mx-auto w-full max-w-md rounded-[28px] border border-s3-border/60 bg-background-white/96 p-3 shadow-soft backdrop-blur">
+              <button
+                onClick={handleMarkArrived}
+                disabled={updatingArrival}
+                className="register-primary-btn w-full rounded-2xl py-3 text-base font-medium disabled:opacity-50"
+              >
+                {updatingArrival ? 'กำลังอัปเดต...' : 'สินค้าถึง Drop Point แล้ว'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </DropPointPageShell>
     );
   }
