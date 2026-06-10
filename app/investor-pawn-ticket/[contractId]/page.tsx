@@ -97,8 +97,8 @@ export default function InvestorPawnTicketPage() {
           <div className="p-6">
             <div className="mb-6 flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-s2-border/30 bg-s2-soft text-xl font-bold text-s2">
-                  P
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-s2-border/30 bg-s2-soft text-xl font-bold text-s2">
+                  A
                 </div>
                 <div>
                   <div className="text-lg font-bold text-foreground">{ticketData.shopName}</div>
@@ -219,7 +219,7 @@ export default function InvestorPawnTicketPage() {
               <div className="text-center">
                 <div className="relative mb-2 flex h-16 items-end justify-center border-b border-dashed border-line-soft">
                   <div className="absolute right-2 top-1 flex h-12 w-12 rotate-[-15deg] items-center justify-center rounded-full border-2 border-s2/30 bg-s2/10">
-                    <span className="text-[8px] font-bold uppercase text-s2">Pawnly</span>
+                    <span className="text-[8px] font-bold uppercase text-s2">Astly</span>
                   </div>
                   <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ให้กู้</span>
                 </div>

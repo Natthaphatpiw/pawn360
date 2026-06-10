@@ -18,6 +18,8 @@ const INVESTOR_TIER_RATES = {
   PLATINUM: 0.016,
 };
 
+const MAX_OFFER_AGE_MS = 4 * 60 * 60 * 1000;
+
 const resolveInvestorTier = (total: number) => {
   if (total >= INVESTOR_TIER_THRESHOLDS.PLATINUM) return 'PLATINUM';
   if (total >= INVESTOR_TIER_THRESHOLDS.GOLD) return 'GOLD';
@@ -46,6 +48,17 @@ function InvestorOffersContent() {
   const formatItemName = (item?: { brand?: string | null; model?: string | null }) =>
     [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'รายการขอสินเชื่อ';
 
+  const isOfferWithinFourHours = (offer: any) => {
+    const createdAtValue = offer?.created_at || offer?.createdAt;
+    if (!createdAtValue) return false;
+
+    const createdAt = new Date(createdAtValue);
+    const createdAtMs = createdAt.getTime();
+    if (!Number.isFinite(createdAtMs)) return false;
+
+    return Date.now() - createdAtMs <= MAX_OFFER_AGE_MS;
+  };
+
   useEffect(() => {
     if (profile?.userId) {
       fetchData();
@@ -63,6 +76,7 @@ function InvestorOffersContent() {
         setMarketOffers(
           getMockInvestorContracts().filter((contract) =>
             ['PENDING', 'PENDING_SIGNATURE'].includes(String(contract.contract_status || ''))
+            && isOfferWithinFourHours(contract)
           )
         );
         return;
@@ -94,6 +108,7 @@ function InvestorOffersContent() {
     !offer?.investor_id
     && offer?.funding_status === 'PENDING'
     && ['PENDING', 'PENDING_SIGNATURE'].includes(String(offer?.contract_status || ''))
+    && isOfferWithinFourHours(offer)
   ));
 
   return (
@@ -193,7 +208,7 @@ function InvestorOffersContent() {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-s2-border bg-background-white p-4 shadow-soft">
+                  <div className="rounded-lg bg-background-white p-4 shadow-soft">
                     <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                       <span className="text-foreground-subtle">ดอกเบี้ย/เดือน</span>
                       <span className="font-medium text-foreground">
@@ -217,7 +232,7 @@ function InvestorOffersContent() {
                   <button
                     type="button"
                     onClick={handleViewOffer}
-                    className="btn-transition mt-3 w-full rounded-full border border-s2 bg-background-white py-3 text-sm font-medium text-s2"
+                    className="btn-transition mt-3 w-full rounded-full border border-s2 py-3 text-sm font-medium text-s2"
                   >
                     ดูรายละเอียด
                   </button>

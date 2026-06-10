@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
+const MAX_OFFER_AGE_HOURS = 4;
+const MAX_OFFER_AGE_MS = MAX_OFFER_AGE_HOURS * 60 * 60 * 1000;
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = supabaseAdmin();
@@ -38,15 +41,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calculate additional info for each contract
-    const offersWithInfo = contracts?.map(contract => {
+    const now = Date.now();
+
+    // Calculate additional info for each contract and hide expired offers
+    const offersWithInfo = contracts?.flatMap((contract) => {
       const createdAt = new Date(contract.created_at);
-      const now = new Date();
-      const hoursAgo = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60));
+      const createdAtMs = createdAt.getTime();
+
+      if (!Number.isFinite(createdAtMs)) {
+        return [];
+      }
+
+      const ageMs = now - createdAtMs;
+      if (ageMs > MAX_OFFER_AGE_MS) {
+        return [];
+      }
+
+      const hoursAgo = Math.floor(ageMs / (1000 * 60 * 60));
 
       return {
         ...contract,
         hours_ago: hoursAgo,
+        expires_at: new Date(createdAtMs + MAX_OFFER_AGE_MS).toISOString(),
         time_display: hoursAgo < 1 ? 'เมื่อสักครู่' :
                       hoursAgo < 24 ? `${hoursAgo} ชั่วโมงที่แล้ว` :
                       `${Math.floor(hoursAgo / 24)} วันที่แล้ว`

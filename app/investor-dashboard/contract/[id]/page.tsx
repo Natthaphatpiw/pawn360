@@ -419,7 +419,8 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
               <span className="text-xs opacity-70 font-light">See contract</span>
             </button>
 
-            <button
+            {/* Download PDF */}
+            {/* <button
               type="button"
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
@@ -429,7 +430,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
                 <span className="text-base font-medium">{downloadingPdf ? 'กำลังสร้าง PDF...' : 'ดาวน์โหลด PDF'}</span>
               </div>
               <span className="text-xs opacity-70 font-light">Download PDF</span>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>
