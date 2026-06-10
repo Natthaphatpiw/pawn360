@@ -24,7 +24,7 @@ const buildMockPawnTicketData = (contract: any) => {
     : 'รายการทรัพย์สิน';
 
   return {
-    shopName: 'Pawnly',
+    shopName: 'Astly',
     branch: contract.drop_point?.drop_point_name || 'สำนักงานใหญ่',
     ticketNo: contract.contract_number || contract.contract_id.substring(0, 6).toUpperCase(),
     bookNo: contract.contract_id.substring(0, 2).toUpperCase(),
@@ -155,8 +155,8 @@ export default function PawnTicketPage() {
           <div className="p-6">
             <div className="mb-6 flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary-border/30 bg-primary-soft text-xl font-bold text-primary">
-                  P
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-primary-border/30 bg-primary-soft text-xl font-bold text-primary">
+                  A
                 </div>
                 <div>
                   <div className="text-lg font-bold text-foreground">{ticketData.shopName}</div>
@@ -288,7 +288,7 @@ export default function PawnTicketPage() {
               <div className="text-center">
                 <div className="relative mb-2 flex h-16 items-end justify-center border-b border-dashed border-line-soft">
                   <div className="absolute right-2 top-1 flex h-12 w-12 rotate-[-15deg] items-center justify-center rounded-full border-2 border-primary/30 bg-primary/10">
-                    <span className="text-[8px] font-bold uppercase text-primary">Pawnly</span>
+                    <span className="text-[8px] font-bold uppercase text-primary">Astly</span>
                   </div>
                   <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ให้กู้</span>
                 </div>
