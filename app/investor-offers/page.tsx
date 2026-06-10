@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { Search, SearchX } from 'lucide-react';
@@ -27,6 +28,7 @@ const resolveInvestorTier = (total: number) => {
 };
 
 function InvestorOffersContent() {
+  const router = useRouter();
   const { profile, isLoading: liffLoading } = useLiff();
 
   const redirectToInvestorVerification = () => {
@@ -196,23 +198,11 @@ function InvestorOffersContent() {
               const remainingTimeLabel = formatRemainingTime(offer?.expires_at, now);
 
               const handleViewOffer = () => {
-                if (isInvestorPreviewMode()) {
-                  if (typeof window !== 'undefined') {
-                    window.location.assign(`/offer-detail?contractId=${offer.contract_id}`);
-                  }
-                  return;
-                }
                 if (kycStatus !== 'VERIFIED') {
                   redirectToInvestorVerification();
                   return;
                 }
-                openLiffEntry({
-                  liffIdCandidates: [
-                    process.env.NEXT_PUBLIC_LIFF_ID_INVEST_OFFER_DETAIL,
-                  ],
-                  fallbackPath: `/offer-detail?contractId=${offer.contract_id}`,
-                  statePath: `/offer-detail?contractId=${offer.contract_id}`,
-                });
+                router.push(`/offer-detail?contractId=${offer.contract_id}`);
               };
 
               return (
