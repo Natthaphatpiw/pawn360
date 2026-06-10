@@ -59,7 +59,7 @@ function InvestorPrincipalIncreaseEntryInner() {
         </div>
         <button
           onClick={() => router.back()}
-          className="bg-[#1E3A8A] text-white px-6 py-3 rounded-lg"
+          className="bg-s2 text-white px-6 py-3 rounded-lg"
         >
           กลับ
         </button>

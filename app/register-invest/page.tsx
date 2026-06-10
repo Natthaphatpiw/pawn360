@@ -803,7 +803,7 @@ export default function InvestorRegister() {
                 )}
               </div>
 
-            <div className="my-3 h-px bg-line-soft"></div>
+            <div className="my-3 h-px bg-s2-border"></div>
             
               <div className="mt-4 space-y-2 text-xs text-foreground-muted">
                 <div className="flex items-center justify-between">
