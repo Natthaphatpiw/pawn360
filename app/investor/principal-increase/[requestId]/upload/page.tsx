@@ -273,7 +273,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
           )}
 
           {requestDetails && (
-            <div className="w-full max-w-sm bg-background-white rounded-xl p-4 mb-4">
+            <div className="w-full max-w-sm bg-background-subtle rounded-xl p-4 mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-foreground-subtle text-sm">สถานะคำขอ:</span>
                 <span className="font-medium text-s2">{statusMeta.label}</span>
@@ -292,7 +292,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
           )}
 
           {requestDetails && (
-            <div className="w-full max-w-sm bg-background-white rounded-xl p-4 mb-4">
+            <div className="w-full max-w-sm bg-background-subtle rounded-xl p-4 mb-4">
               <div className="text-sm font-bold text-foreground mb-2 flex items-center gap-2">
                 <Wallet className="w-4 h-4 text-s2" />
                 ข้อมูลบัญชีรับเงิน
@@ -316,7 +316,7 @@ export default function InvestorPrincipalIncreaseUploadPage() {
 
             <div
               onClick={() => !slipImage && fileInputRef.current?.click()}
-              className={`bg-background rounded-xl h-72 mb-4 flex flex-col items-center justify-center border-2 border-dashed transition-all cursor-pointer ${
+              className={`bg-background-subtle rounded-xl h-72 mb-4 flex flex-col items-center justify-center border-2 border-dashed transition-all cursor-pointer ${
                 slipImage ? 'border-s2' : 'border-s2-border hover:border-s2'
               }`}
             >
