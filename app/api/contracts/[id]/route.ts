@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshImageUrls } from '@/lib/aws/s3';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
+const MAX_OFFER_AGE_MS = 4 * 60 * 60 * 1000;
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -88,6 +90,17 @@ export async function GET(
       };
     }
 
+    const postedAtValue = contract.updated_at || contract.created_at;
+    const postedAt = postedAtValue ? new Date(postedAtValue) : null;
+    const postedAtMs = postedAt?.getTime();
+    const offerMetadata = postedAt && Number.isFinite(postedAtMs as number)
+      ? {
+          posted_at: postedAt.toISOString(),
+          expires_at: new Date((postedAtMs as number) + MAX_OFFER_AGE_MS).toISOString(),
+          hours_ago: Math.floor((Date.now() - (postedAtMs as number)) / (1000 * 60 * 60)),
+        }
+      : {};
+
     let items = contract.items as any;
     if (Array.isArray(items)) {
       items = await Promise.all(
@@ -113,6 +126,7 @@ export async function GET(
       success: true,
       contract: {
         ...contract,
+        ...offerMetadata,
         items,
       }
     });
