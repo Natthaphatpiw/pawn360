@@ -651,7 +651,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   }
 
   return (
-    <div className="theme-liff min-h-screen bg-background-white pb-8 font-sans">
+    <div className="theme-liff min-h-screen bg-background-white font-sans">
 
       {/* 1. Header Section */}
       <div className="bg-primary-soft/50 rounded-lg p-4 flex justify-between items-center text-foreground text-sm border border-primary-border">
@@ -935,9 +935,9 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           <button
             onClick={handleSubmit}
             disabled={!isRegistered || isSubmitting || loanAmountNum < MIN_LOAN_AMOUNT}
-            className={`w-full min-h-12 rounded-full px-4 py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98] ${
+            className={`w-full min-h-12 rounded-full px-4 py-2 flex flex-col items-center justify-center transition-colors ${
               isRegistered && loanAmountNum >= MIN_LOAN_AMOUNT
-                ? 'bg-primary text-primary-fg hover:bg-primary-hover'
+                ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] text-primary-fg hover:bg-primary-hover'
                 : 'bg-grey-5 text-foreground-subtle cursor-not-allowed'
             }`}
           >
@@ -951,7 +951,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           {!isRegistered && (
             <button
               onClick={handleRegister}
-              className="w-full min-h-12 rounded-full bg-primary-soft px-4 py-3 flex flex-col items-center justify-center text-base font-medium text-primary transition-colors hover:bg-primary-border active:scale-[0.98]"
+              className="w-full min-h-12 rounded-full bg-primary-soft px-4 py-2 flex flex-col items-center justify-center text-base font-medium text-primary transition-colors hover:bg-primary-border active:scale-[0.98]"
             >
               <span className="text-base font-medium">
                 {kycStatus ? 'ยืนยันตัวตน' : 'ลงทะเบียน'}
@@ -965,7 +965,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           {/* Save Draft */}
           <button
             onClick={handleSaveDraft}
-            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-3 flex flex-col items-center justify-center text-base font-medium text-primary transition-colors hover:bg-background-subtle active:scale-[0.98]"
+            className="w-full min-h-12 rounded-full border border-primary px-4 py-2 flex flex-col items-center justify-center text-base font-medium text-primary transition-colors hover:bg-background-subtle active:scale-[0.98]"
           >
             <span className="text-base font-medium">บันทึกชั่วคราว</span>
             <span className="text-xs font-light opacity-80">Save draft</span>
@@ -974,7 +974,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           {/* Estimate Another */}
           <button
             onClick={onBack}
-            className="flex w-full min-h-12 flex-col items-center justify-center rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-line-soft active:scale-[0.98]"
+            className="flex w-full min-h-12 flex-col items-center justify-center rounded-full bg-primary/25 px-4 py-2 text-base font-medium text-primary transition-colors hover:bg-line-soft active:scale-[0.98]"
           >
             <span className="text-base font-medium">ประเมินสินค้าอื่น</span>
             <span className="text-xs font-light opacity-80 font-english">Estimate another item</span>

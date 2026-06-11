@@ -62,19 +62,19 @@ export default function SuccessConfirmation({ loanRequestId, itemId, onBackToHom
                 window.location.href = liffUrl;
               }
             }}
-            className="w-full min-h-12 rounded-full bg-primary px-4 py-3 text-base font-medium text-primary-fg transition-colors hover:bg-primary-hover active:scale-[0.98] flex flex-col items-center justify-center"
+            className="w-full min-h-12 rounded-full btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] px-4 py-2 text-base font-medium text-primary-fg transition-colors hover:bg-primary-hover active:scale-[0.98] flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">ดำเนินการต่อ</span>
-            <span className="text-[10px] font-light opacity-90">Continue</span>
+            <span className="text-xs font-light opacity-90">Continue</span>
           </button>
 
           {/* Back to Home Button */}
           <button
             onClick={onBackToHome}
-            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-3 text-base font-medium text-primary transition-colors hover:bg-background-subtle active:scale-[0.98] flex flex-col items-center justify-center"
+            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-2 text-base font-medium text-primary transition-colors hover:bg-background-subtle active:scale-[0.98] flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">กลับหน้าหลัก</span>
-            <span className="text-[10px] font-light opacity-90">Back to Home</span>
+            <span className="text-xs font-light opacity-90">Back to Home</span>
           </button>
         </div>
 

@@ -382,7 +382,9 @@ export default function InterestPaymentPage() {
           </button>
         }
       />
-      <ContractActionTabs contractId={contractId} activeTab="interest-payment" />
+
+      {/* Transaction tabs */}
+      {/* <ContractActionTabs contractId={contractId} activeTab="interest-payment" /> */}
 
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowInfoModal(false)}>
@@ -403,7 +405,7 @@ export default function InterestPaymentPage() {
         </div>
       )}
 
-      <div className="flex-1 p-4 pb-36 overflow-y-auto">
+      <div className="flex-1 px-4 pt-2 pb-12 overflow-y-auto">
         {error && (
           <div className="w-full max-w-sm bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
             <div className="flex gap-3">
@@ -541,7 +543,7 @@ export default function InterestPaymentPage() {
             disabled={!acceptedTerms || !signature || submitting}
             className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               acceptedTerms && !!signature && !submitting
-                ? 'bg-primary hover:bg-primary/80 text-white'
+                ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] hover:bg-primary/80 text-white'
                 : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >

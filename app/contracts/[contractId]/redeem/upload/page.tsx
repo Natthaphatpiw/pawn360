@@ -263,7 +263,7 @@ export default function RedemptionUploadPage() {
             disabled={!slipImage || uploading}
             className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               slipImage && !uploading
-                ? 'bg-primary hover:bg-primary/80 text-white'
+                ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] hover:bg-primary/80 text-white'
                 : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >
