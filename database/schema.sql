@@ -1000,6 +1000,51 @@ CREATE TABLE drop_point_bag_assignments (
 CREATE UNIQUE INDEX idx_drop_point_bag_assignments_contract_id ON drop_point_bag_assignments(contract_id);
 CREATE INDEX idx_drop_point_bag_assignments_drop_point_id ON drop_point_bag_assignments(drop_point_id);
 
+-- Table: pawn_delivery_requests (คำขอรับ-ส่งสินค้า)
+CREATE TABLE pawn_delivery_requests (
+  delivery_request_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  contract_id UUID NOT NULL REFERENCES contracts(contract_id) ON DELETE CASCADE,
+  loan_request_id UUID REFERENCES loan_requests(request_id),
+  customer_id UUID NOT NULL REFERENCES pawners(customer_id),
+  drop_point_id UUID REFERENCES drop_points(drop_point_id),
+  pawner_line_id VARCHAR(255) NOT NULL,
+  drop_point_line_id VARCHAR(255),
+  delivery_fee DECIMAL(8,2) DEFAULT 0,
+  status VARCHAR(50) DEFAULT 'DRIVER_SEARCH' CHECK (status IN (
+    'DRIVER_SEARCH', 'PAYMENT_VERIFIED', 'AWAITING_PAYMENT', 'PAYMENT_REJECTED',
+    'SLIP_UPLOADED', 'DRIVER_ASSIGNED', 'ITEM_PICKED', 'ARRIVED'
+  )),
+  address_house_no VARCHAR(100),
+  address_village VARCHAR(100),
+  address_street VARCHAR(100),
+  address_sub_district VARCHAR(100),
+  address_district VARCHAR(100),
+  address_province VARCHAR(100),
+  address_postcode VARCHAR(20),
+  address_full TEXT,
+  contact_phone VARCHAR(20),
+  notes TEXT,
+  payment_verified_at TIMESTAMP,
+  driver_assigned_at TIMESTAMP,
+  item_picked_at TIMESTAMP,
+  arrived_at TIMESTAMP,
+  slip_url TEXT,
+  slip_uploaded_at TIMESTAMP,
+  slip_amount_detected DECIMAL(12,2),
+  slip_verification_result VARCHAR(50) CHECK (slip_verification_result IN (
+    'MATCHED', 'UNDERPAID', 'OVERPAID', 'UNREADABLE', 'INVALID'
+  )),
+  slip_verification_details JSONB,
+  slip_attempt_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_pawn_delivery_requests_contract_id ON pawn_delivery_requests(contract_id);
+CREATE INDEX idx_pawn_delivery_requests_status ON pawn_delivery_requests(status);
+CREATE INDEX idx_pawn_delivery_requests_pawner_line_id ON pawn_delivery_requests(pawner_line_id);
+CREATE INDEX idx_pawn_delivery_requests_drop_point_line_id ON pawn_delivery_requests(drop_point_line_id);
+
 -- =====================================================
 -- 6. PAYMENTS & REPAYMENTS
 -- =====================================================
