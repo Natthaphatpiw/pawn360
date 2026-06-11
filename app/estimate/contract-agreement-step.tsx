@@ -158,7 +158,7 @@ export default function ContractAgreementStep({
               type="checkbox"
               checked={accepted}
               onChange={(e) => setAccepted(e.target.checked)}
-              className="mt-1 h-7 w-7 rounded border-primary/50 accent-primary focus:ring-primary"
+              className="mt-1 h-7 w-7 rounded-sm border-primary/50 accent-primary focus:ring-primary"
             />
             <div className="text-sm text-foreground-muted">
               <span className="font-base">ข้าพเจ้าได้อ่านและยอมรับใน</span>
@@ -170,7 +170,7 @@ export default function ContractAgreementStep({
 
         {/* Signature Section */}
         <div className="mb-6">
-          <h3 className="font-bold text-foreground mb-1">ลายเซ็นผู้ขอสินเชื่อ</h3>
+          <h3 className="font-semibold text-foreground mb-1">ลายเซ็นผู้ขอสินเชื่อ</h3>
           <p className="mb-3 text-xs text-foreground-subtle">เซ็นลายเซ็นในช่องด้านล่าง</p>
 
           <div className="rounded-lg border-1 border-primary/50 bg-background-white overflow-hidden">
@@ -187,7 +187,7 @@ export default function ContractAgreementStep({
 
           <button
             onClick={clearSignature}
-            className="w-full mt-2 inline-flex items-center justify-center rounded-full border border-primary bg-background-white px-3 py-2 text-xs font-medium text-primary transition-colors hover:bg-background-subtle"
+            className="w-full mt-2 inline-flex items-center justify-center rounded-full border border-primary bg-background-white px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-background-subtle"
           >
             ล้างลายเซ็น
           </button>
@@ -206,9 +206,9 @@ export default function ContractAgreementStep({
           <button
             onClick={handleSubmit}
             disabled={!accepted || isSubmitting}
-            className={`w-full min-h-12 rounded-full px-4 py-3 flex flex-col items-center justify-center transition-colors active:scale-[0.98] ${
+            className={`w-full min-h-12 rounded-full px-4 py-2 flex flex-col items-center justify-center transition-colors active:scale-[0.98] ${
               accepted
-                ? 'bg-primary text-primary-fg hover:bg-primary-hover'
+                ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] text-primary-fg hover:bg-primary-hover'
                 : 'bg-grey-5 text-foreground-subtle cursor-not-allowed'
             }`}
           >
@@ -224,7 +224,7 @@ export default function ContractAgreementStep({
           <button
             onClick={onBack}
             disabled={isSubmitting}
-            className="flex w-full min-h-12 flex-col items-center justify-center rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex w-full min-h-12 flex-col items-center justify-center rounded-full bg-background-subtle px-4 py-2 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="text-base font-medium">ย้อนกลับ</span>
             <span className="text-xs font-light opacity-70">Back</span>

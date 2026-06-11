@@ -642,7 +642,7 @@ export default function PawnContractDetail() {
           {contract.drop_point && contract.drop_point.google_map_url && (
             <button
               onClick={() => window.open(contract.drop_point!.google_map_url!, '_blank')}
-              className="btn-transition flex w-full min-h-12 items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary active:scale-[0.98]"
+              className="btn-transition flex w-full min-h-12 items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary"
             >
               <span className="text-sm font-medium">ที่ตั้ง Drop point</span>
             </button>
@@ -650,7 +650,7 @@ export default function PawnContractDetail() {
 
           <button
             onClick={() => router.push(`/pawn-ticket/${contractId}`)}
-            className="btn-transition flex w-full min-h-12 flex-col items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary active:scale-[0.98]"
+            className="btn-transition flex w-full min-h-12 flex-col items-center justify-center rounded-full bg-primary/25 px-4 py-4 text-primary"
           >
             <span className="text-sm font-medium">ดูสัญญาสินเชื่อ</span>
             {/* <span className="text-[10px] font-light opacity-80">Pawn ticket</span> */}
@@ -659,7 +659,7 @@ export default function PawnContractDetail() {
           {contract.contract_file_url && (
             <button
               onClick={() => window.open(contract.contract_file_url!, '_blank')}
-              className="btn-transition flex w-full min-h-12 flex-col items-center justify-center rounded-full border border-primary bg-background-white px-4 py-3 text-primary active:scale-[0.98]"
+              className="btn-transition flex w-full min-h-12 flex-col items-center justify-center rounded-full border border-primary bg-background-white px-4 py-4 text-primary active:scale-[0.98]"
             >
               <span className="text-sm font-medium">ดูสัญญา</span>
               {/* <span className="text-[10px] font-light opacity-80">See contract</span> */}

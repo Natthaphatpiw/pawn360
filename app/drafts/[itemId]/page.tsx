@@ -363,7 +363,7 @@ export default function DraftDetailPage() {
           <button
             onClick={handleContinueToContract}
             disabled={isCreatingContract}
-            className="flex w-full items-center justify-center rounded-full bg-primary px-4 py-3.5 font-medium text-primary-fg transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] flex w-full items-center justify-center rounded-full px-4 py-4 font-medium text-primary-fg transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isCreatingContract ? (
               <>
