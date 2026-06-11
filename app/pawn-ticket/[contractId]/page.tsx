@@ -308,7 +308,7 @@ export default function PawnTicketPage() {
         <div className="mt-6 w-full max-w-sm space-y-3">
           <button
             onClick={handleGoHome}
-            className="btn-transition flex w-full min-h-12 items-center justify-center gap-2 rounded-full border border-primary bg-background px-4 py-3 text-primary"
+            className="btn-transition flex w-full min-h-12 items-center justify-center gap-2 rounded-full border border-primary bg-background px-4 py-4 text-primary"
           >
             <Home className="h-5 w-5" />
             <span className="text-base font-medium">กลับหน้าหลัก</span>
