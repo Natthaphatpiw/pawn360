@@ -234,7 +234,8 @@ function DropPointContent() {
         ? 'กำลังจัดส่งมา'
         : 'รอตรวจสอบ';
     const canAssignDriver = isWaitingDriver && Boolean(contractDetail.delivery_request_id);
-    const canMarkArrived = !isArrivedAtDropPoint
+    const canMarkArrived = Boolean(contractDetail.delivery_request_id)
+      && !isArrivedAtDropPoint
       && (
         isIncomingToDropPoint
         || ['ITEM_PICKED', 'DRIVER_ASSIGNED', 'ARRIVED'].includes(contractDetail.delivery_request_status || '')
