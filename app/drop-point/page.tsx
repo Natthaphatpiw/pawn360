@@ -233,13 +233,15 @@ function DropPointContent() {
       : isIncomingToDropPoint
         ? 'กำลังจัดส่งมา'
         : 'รอตรวจสอบ';
-    const canAssignDriver = isWaitingDriver && Boolean(contractDetail.delivery_request_id);
-    const canMarkArrived = Boolean(contractDetail.delivery_request_id)
-      && !isArrivedAtDropPoint
+    const hasDeliveryRequest = Boolean(contractDetail.delivery_request_id);
+    const canAssignDriver = isWaitingDriver;
+    const canAssignDriverEnabled = isWaitingDriver && hasDeliveryRequest;
+    const canMarkArrived = !isArrivedAtDropPoint
       && (
         isIncomingToDropPoint
         || ['ITEM_PICKED', 'DRIVER_ASSIGNED', 'ARRIVED'].includes(contractDetail.delivery_request_status || '')
       );
+    const canMarkArrivedEnabled = canMarkArrived && hasDeliveryRequest;
     const canVerify = isArrivedAtDropPoint
       || (contractDetail.item_delivery_status === 'VERIFIED' && !contractDetail.item_verified_at);
     const statusTone = isWaitingDriver
@@ -386,7 +388,7 @@ function DropPointContent() {
           {canMarkArrived ? (
             <button
               onClick={handleMarkArrived}
-              disabled={updatingArrival}
+              disabled={!canMarkArrivedEnabled || updatingArrival}
               className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
               {updatingArrival ? 'กำลังอัปเดต...' : 'สินค้าถึง Drop Point แล้ว'}
@@ -396,7 +398,7 @@ function DropPointContent() {
           {canAssignDriver ? (
             <button
               onClick={handleAssignDriver}
-              disabled={updatingArrival}
+              disabled={!canAssignDriverEnabled || updatingArrival}
               className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
               {updatingArrival ? 'กำลังอัปเดต...' : 'มีรถรับงานแล้ว'}
