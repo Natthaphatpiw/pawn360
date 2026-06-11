@@ -211,7 +211,7 @@ export default function PrincipalIncreaseWaitingPage() {
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-primary text-primary-fg rounded-full py-4 font-medium transition-colors"
+            className="w-full btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] text-primary-fg rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>

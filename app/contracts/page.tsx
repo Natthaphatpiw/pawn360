@@ -240,7 +240,7 @@ export default function PawnerContractList() {
   }
 
   return (
-    <div className="min-h-screen bg-background-white px-4 py-6">
+    <div className="min-h-screen bg-background px-4 py-6">
       <div className="mx-auto flex w-full max-w-md flex-col">
 
         {/* Contract Header */}
@@ -310,10 +310,10 @@ export default function PawnerContractList() {
         </div>
 
         {/* Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 mx-auto flex w-full max-w-md flex-col gap-3 bg-transparent p-4">
+        <div className="fixed bottom-0 left-0 right-0 mx-auto flex w-full max-w-md flex-col gap-3 bg-background-white/25 backdrop-blur-sm border border-background-white/50 p-4 pb-10 shadow-soft">
           <button
             onClick={() => router.push('/contracts/actions')}
-            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-3 text-base font-medium text-primary transition-colors hover:bg-primary-soft active:scale-[0.98] flex flex-col items-center justify-center"
+            className="w-full min-h-12 rounded-full border border-primary bg-background-white px-4 py-2 text-base font-medium text-primary transition-colors flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">สถานะคำขอ</span>
             <span className="text-xs font-light opacity-90">Request status</span>
@@ -325,7 +325,7 @@ export default function PawnerContractList() {
               ],
               fallbackPath: '/estimate',
             })}
-            className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-3 text-primary-fg shadow-soft active:scale-[0.98]"
+            className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-2 text-primary-fg shadow-soft flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">ขอสินเชื่อ</span>
             <span className="text-xs font-light opacity-90">Pawn entry</span>

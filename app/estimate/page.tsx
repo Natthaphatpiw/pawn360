@@ -2124,7 +2124,7 @@ function EstimatePageInner() {
               <button
                 onClick={handleAnalyzeAndEstimate}
                 disabled={isProcessing}
-                className="w-full min-h-12 rounded-full px-4 py-3 text-base font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-4 text-primary-fg shadow-soft flex flex-col items-center justify-center"
                 style={{
                   backgroundColor: isProcessing ? 'var(--background-subtle)' : 'var(--primary)',
                   color: 'var(--primary-fg)',
@@ -2135,7 +2135,7 @@ function EstimatePageInner() {
 
               <button
                 onClick={() => router.push('/drafts')}
-                className="relative flex w-full min-h-12 items-center justify-center rounded-full bg-background-subtle px-4 py-3 text-base font-medium text-foreground-muted transition-colors hover:bg-line-soft"
+                className="relative flex w-full min-h-12 items-center justify-center rounded-full bg-background-subtle px-4 py-4 text-base font-medium text-foreground-muted transition-colors"
               >
                 <span className="text-center">ดูบันทึกชั่วคราว</span>
                 {draftCount > 0 && (

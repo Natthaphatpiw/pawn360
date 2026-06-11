@@ -81,7 +81,7 @@ export default function ContractSuccess({ contractId, onBackToHome }: ContractSu
         {/* Action Button */}
         <button
           onClick={onBackToHome}
-          className="w-full min-h-12 rounded-full bg-primary px-4 py-3 text-base font-medium text-primary-fg transition-colors hover:bg-primary-hover active:scale-[0.98] flex flex-col items-center justify-center"
+          className="w-full min-h-12 rounded-full btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] px-4 py-2 text-base font-medium text-primary-fg transition-colors hover:bg-primary-hover active:scale-[0.98] flex flex-col items-center justify-center"
         >
           <span className="text-base font-medium">เสร็จสิ้น</span>
           <span className="text-xs font-light opacity-90">Done</span>

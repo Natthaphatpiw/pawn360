@@ -193,10 +193,10 @@ export default function DraftsPage() {
                     <div className="w-20 h-20 flex-shrink-0">
                       <ImageCarousel
                         images={draft.image_urls}
-                        className="w-20 h-20 rounded-lg gap-2 no-scrollbar"
-                        itemClassName="w-20 h-20 overflow-hidden rounded-lg bg-background-subtle"
+                        className="w-20 h-20 rounded-md gap-2 no-scrollbar"
+                        itemClassName="w-20 h-20 overflow-hidden rounded-md bg-background-subtle"
                         emptyLabel="No Image"
-                        emptyClassName="flex h-20 w-20 items-center justify-center rounded-lg bg-background-subtle text-xs text-foreground-subtle"
+                        emptyClassName="flex h-20 w-20 items-center justify-center rounded-md bg-background-subtle text-xs text-foreground-subtle"
                       />
                     </div>
 

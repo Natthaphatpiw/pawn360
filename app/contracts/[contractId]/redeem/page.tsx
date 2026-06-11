@@ -354,7 +354,9 @@ export default function RedemptionPaymentPage() {
           </button>
         }
       />
-      <ContractActionTabs contractId={contractId} activeTab="redeem" />
+
+      {/* Transaction tabs */}
+      {/* <ContractActionTabs contractId={contractId} activeTab="redeem" /> */}
 
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowInfoModal(false)}>
@@ -375,7 +377,7 @@ export default function RedemptionPaymentPage() {
         </div>
       )}
 
-      <div className="flex-1 px-4 py-6 pb-36 overflow-y-auto">
+      <div className="flex-1 px-4 px-4 pt-2 pb-12 overflow-y-auto">
         {/* Contract Info */}
         <div className="bg-background rounded-xl p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
@@ -677,7 +679,7 @@ export default function RedemptionPaymentPage() {
             disabled={!acceptedTerms || submitting}
             className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
               acceptedTerms && !submitting
-                ? 'bg-primary hover:bg-primary/80 text-white'
+                ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] hover:bg-primary/80 text-white'
                 : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}
           >

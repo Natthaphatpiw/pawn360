@@ -374,7 +374,7 @@ export default function PrincipalReductionSignPage() {
 
           <button
             onClick={handleGoToContracts}
-            className="w-full bg-primary hover:bg-primary/80 text-white rounded-full py-4 font-medium transition-colors"
+            className="w-full btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] hover:bg-primary/80 text-white rounded-full py-4 font-medium transition-colors"
           >
             กลับหน้าสัญญา
           </button>
