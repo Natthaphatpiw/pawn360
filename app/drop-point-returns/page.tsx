@@ -261,7 +261,7 @@ function DropPointReturnsContent() {
               setConfirmed(false);
               router.push(previewMode ? '/drop-point-returns?mock=1' : '/drop-point-returns');
             }}
-            className="register-primary-btn w-full rounded-full py-3 text-sm font-medium"
+            className="w-full rounded-full register-primary-btn btn-sheen py-3 font-medium text-white"
           >
             กลับไปหน้ารายการ
           </button>
@@ -392,7 +392,7 @@ function DropPointReturnsContent() {
             <button
               onClick={handleConfirmReturn}
               disabled={confirming || uploadingIndex !== null || !returnBagNumber.trim() || !returnPhotos[0] || !returnPhotos[1]}
-              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
               {confirming ? 'กำลังยืนยัน...' : 'ยืนยันการส่งคืน'}
             </button>
@@ -454,13 +454,13 @@ function DropPointReturnsContent() {
         <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-3 rounded-[28px] border border-s3-border/60 bg-background-white/92 p-3 shadow-soft backdrop-blur">
           <button
             onClick={() => router.push(previewMode ? '/drop-point-history?mock=1' : '/drop-point-history')}
-            className="register-secondary-btn rounded-2xl py-3 text-sm font-medium"
+            className="register-secondary-btn rounded-lg py-3 text-sm font-medium"
           >
             ประวัติ
           </button>
           <button
             onClick={() => router.push(previewMode ? '/drop-point?mock=1' : '/drop-point')}
-            className="register-primary-btn rounded-2xl py-3 text-sm font-medium"
+            className="register-primary-btn rounded-lg py-3 text-sm font-medium"
           >
             ดูรายการรอรับ
           </button>
