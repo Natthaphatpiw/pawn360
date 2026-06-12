@@ -389,7 +389,7 @@ function DropPointContent() {
             <button
               onClick={handleMarkArrived}
               disabled={!canMarkArrivedEnabled || updatingArrival}
-              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
               {updatingArrival ? 'กำลังอัปเดต...' : 'สินค้าถึง Drop Point แล้ว'}
             </button>
@@ -399,7 +399,7 @@ function DropPointContent() {
             <button
               onClick={handleAssignDriver}
               disabled={!canAssignDriverEnabled || updatingArrival}
-              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
               {updatingArrival ? 'กำลังอัปเดต...' : 'มีรถรับงานแล้ว'}
             </button>
@@ -408,7 +408,7 @@ function DropPointContent() {
           {canVerify ? (
             <button
               onClick={() => router.push(previewMode ? `/droppoint-verify?mock=1&contractId=${contractDetail.contract_id}` : `/droppoint-verify?contractId=${contractDetail.contract_id}`)}
-              className="register-primary-btn w-full rounded-full py-3 text-base font-medium"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-base font-medium"
             >
               ตรวจสอบสินค้า
             </button>
@@ -466,7 +466,7 @@ function DropPointContent() {
                     {contract.items?.brand} {contract.items?.model}
                   </div>
                   <div className="register-subtle mt-1 text-xs">อัปเดตล่าสุด: {formatDate(contract.displayDate)}</div>
-                  <div className="register-subtle text-xs">สัญญา {contract.contract_number}</div>
+                  <div className="register-subtle text-xs mt-1">สัญญา {contract.contract_number}</div>
                 </div>
                 <DropPointStatusBadge tone="neutral" className="border border-s3-border/70">รอเรียกรถ</DropPointStatusBadge>
               </div>
@@ -493,7 +493,7 @@ function DropPointContent() {
                     {contract.items?.brand} {contract.items?.model}
                   </div>
                   <div className="register-subtle mt-1 text-xs">วันที่ส่งมา: {formatDate(contract.displayDate)}</div>
-                  <div className="register-subtle text-xs">สัญญา {contract.contract_number}</div>
+                  <div className="register-subtle text-xs mt-1">สัญญา {contract.contract_number}</div>
                 </div>
                 <DropPointStatusBadge tone="warning">กำลังมา</DropPointStatusBadge>
               </div>
@@ -520,7 +520,7 @@ function DropPointContent() {
                     {contract.items?.brand} {contract.items?.model}
                   </div>
                   <div className="register-subtle mt-1 text-xs">อัปเดตล่าสุด: {formatDate(contract.displayDate)}</div>
-                  {contract.storage_box_code ? <div className="register-subtle text-xs">กล่อง {contract.storage_box_code}</div> : null}
+                  {contract.storage_box_code ? <div className="register-subtle text-xs mt-1">กล่อง {contract.storage_box_code}</div> : null}
                 </div>
                 <DropPointStatusBadge tone="success">รอตรวจสอบ</DropPointStatusBadge>
               </div>

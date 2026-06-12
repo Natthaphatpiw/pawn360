@@ -188,21 +188,21 @@ function DropPointPickupPageContent() {
             <button
               onClick={() => handleUpdateStatus('DRIVER_ASSIGNED')}
               disabled={!canAssignDriver || updating}
-              className="register-primary-btn w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-sm font-medium disabled:opacity-50"
             >
               มีรถมารับงานแล้ว
             </button>
             <button
               onClick={() => handleUpdateStatus('ARRIVED')}
               disabled={!canMarkArrived || updating}
-              className="register-secondary-btn w-full rounded-2xl py-3 text-sm font-medium disabled:opacity-50"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-sm font-medium disabled:opacity-50"
             >
               สินค้าถึง Drop Point แล้ว
             </button>
             {canVerify ? (
               <button
                 onClick={() => router.push(previewMode ? `/droppoint-verify?mock=1&contractId=${contract.contract_id}` : `/droppoint-verify?contractId=${contract.contract_id}`)}
-                className="register-primary-btn w-full rounded-2xl py-3 text-sm font-medium"
+                className="register-primary-btn btn-sheen w-full rounded-full py-3 text-sm font-medium"
               >
                 ตรวจสอบสินค้า
               </button>
