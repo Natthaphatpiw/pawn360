@@ -117,7 +117,7 @@ export function DropPointStatusBadge({
     : 'register-chip-soft';
 
   return (
-    <span className={`${toneClassName} inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${className}`}>
+    <span className={`${toneClassName} inline-flex rounded-full px-3 py-1 text-[11px] font-semibold whitespace-nowrap ${className}`}>
       {children}
     </span>
   );

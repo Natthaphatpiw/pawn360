@@ -283,7 +283,7 @@ function DropPointVerifyContent() {
           </p>
           <button
             onClick={handleCloseLiff}
-            className="w-full rounded-full bg-primary py-4 font-medium text-white"
+            className="w-full rounded-full register-primary-btn btn-sheen py-3 font-medium text-white"
           >
             ปิด LIFF
           </button>
@@ -440,7 +440,7 @@ function DropPointVerifyContent() {
             <button
               onClick={() => handleVerificationSubmit('APPROVED')}
               disabled={submitting || !canApprove}
-              className="register-primary-btn w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
+              className="register-primary-btn btn-sheen w-full rounded-full py-3 text-base font-medium disabled:opacity-50"
             >
               {submitting ? 'กำลังดำเนินการ...' : 'ยืนยัน'}
             </button>
