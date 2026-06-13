@@ -14,9 +14,28 @@ const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
+const normalizeSignatureUrl = (...values: unknown[]) => {
+  const value = values
+    .find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  return /^(https?:\/\/|data:image\/|\/)/i.test(trimmed) ? trimmed : null;
+};
+
+const buildInitials = (...names: unknown[]) => {
+  const initials = names
+    .map((name) => typeof name === 'string' ? name.trim().charAt(0).toUpperCase() : '')
+    .filter(Boolean);
+
+  return initials.length ? `${initials.join('.')}.` : '';
+};
+
 const buildTicketPdfHtml = (ticketData: any) => {
   const items = Array.isArray(ticketData?.items) ? ticketData.items : [];
   const pawnerSignatureUrl = ticketData?.pawner?.signatureUrl ? escapeHtml(ticketData.pawner.signatureUrl) : '';
+  const investorSignatureUrl = ticketData?.investor?.signatureUrl ? escapeHtml(ticketData.investor.signatureUrl) : '';
+  const investorSignatureInitials = ticketData?.investor?.signatureInitials ? escapeHtml(ticketData.investor.signatureInitials) : '';
   const itemsHtml = items.length > 0
     ? items.map((item: any, index: number) => `
         <tr>
@@ -36,6 +55,11 @@ const buildTicketPdfHtml = (ticketData: any) => {
   const pawnerSignatureHtml = pawnerSignatureUrl
     ? `<img src="${pawnerSignatureUrl}" alt="Pawner signature" style="max-height: 64px; max-width: 100%; object-fit: contain;" />`
     : '';
+  const investorSignatureHtml = investorSignatureUrl
+    ? `<img src="${investorSignatureUrl}" alt="Investor signature" style="max-height: 64px; max-width: 100%; object-fit: contain;" />`
+    : investorSignatureInitials
+      ? `<span class="signature-initials">${investorSignatureInitials}</span>`
+      : '';
 
   return `<!DOCTYPE html>
 <html lang="th">
@@ -178,8 +202,38 @@ const buildTicketPdfHtml = (ticketData: any) => {
         gap: 24px;
       }
       .signature {
+        position: relative;
         height: 72px;
         border-bottom: 1px dashed #9ca3af;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+      }
+      .signature-stamp {
+        position: absolute;
+        right: 8px;
+        top: 4px;
+        width: 48px;
+        height: 48px;
+        border-radius: 999px;
+        border: 2px solid rgba(30, 58, 138, 0.3);
+        background: rgba(30, 58, 138, 0.08);
+        color: #1e3a8a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: rotate(-15deg);
+        font-size: 8px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .signature-initials {
+        color: #374151;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        line-height: 1;
         margin-bottom: 8px;
       }
       .signature-label {
@@ -285,7 +339,7 @@ const buildTicketPdfHtml = (ticketData: any) => {
             <div class="signature-label">ลงชื่อผู้ขอสินเชื่อ</div>
           </div>
           <div>
-            <div class="signature"></div>
+            <div class="signature"><div class="signature-stamp">Astly</div>${investorSignatureHtml}</div>
             <div class="signature-label">ลงชื่อผู้ลงทุน</div>
           </div>
         </div>
@@ -349,7 +403,8 @@ export async function GET(
           addr_postcode,
           bank_name,
           bank_account_no,
-          bank_account_name
+          bank_account_name,
+          investor_signature_id
         ),
         items (
           item_id,
@@ -498,13 +553,23 @@ export async function GET(
       return `${id[0]}-${id.substring(1, 5)}-${id.substring(5, 10)}-${id.substring(10, 12)}-${id[12]}`;
     };
 
+    const pawnerSignatureUrl = normalizeSignatureUrl(
+      contract.signed_contract_url,
+      contract.pawner?.signature_url
+    );
+    const investorSignatureUrl = normalizeSignatureUrl(contract.investor?.investor_signature_id);
+    const investorSignatureInitials = buildInitials(
+      contract.investor?.firstname,
+      contract.investor?.lastname
+    );
+
     // Prepare ticket data
     const pawnerFull = {
       name: `${contract.pawner?.firstname || ''} ${contract.pawner?.lastname || ''}`,
       idCard: formatNationalId(contract.pawner?.national_id || ''),
       address: formatAddress(contract.pawner || {}),
       phone: contract.pawner?.phone_number || '',
-      signatureUrl: contract.signed_contract_url || contract.pawner?.signature_url || null
+      signatureUrl: pawnerSignatureUrl
     };
 
     const investorFull = {
@@ -514,7 +579,9 @@ export async function GET(
       phone: contract.investor?.phone_number || '',
       bankName: contract.investor?.bank_name || '',
       bankAccountNo: contract.investor?.bank_account_no || '',
-      bankAccountName: contract.investor?.bank_account_name || ''
+      bankAccountName: contract.investor?.bank_account_name || '',
+      signatureUrl: investorSignatureUrl,
+      signatureInitials: investorSignatureInitials
     };
 
     const redactedPerson = {
@@ -522,11 +589,16 @@ export async function GET(
       idCard: '-',
       address: '-',
       phone: '',
-      signatureUrl: contract.signed_contract_url || contract.pawner?.signature_url || null
+      signatureUrl: pawnerSignatureUrl
     };
 
     const redactedInvestor = {
-      ...redactedPerson,
+      name: 'ไม่เปิดเผย',
+      idCard: '-',
+      address: '-',
+      phone: '',
+      signatureUrl: investorSignatureUrl,
+      signatureInitials: investorSignatureInitials,
       bankName: '',
       bankAccountNo: '',
       bankAccountName: ''

@@ -15,6 +15,11 @@ import {
   INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES,
   isInvestorPreviewMode,
 } from '@/lib/mock-investment';
+import {
+  getInvestorContractDisplayStatus,
+  getInvestorContractRemainingDays,
+  getInvestorContractStatusMeta,
+} from '@/lib/investor-contract-status';
 
 const resolveNetInvestorRate = (contract: {
   investor_rate?: number | null;
@@ -158,36 +163,6 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING_INVESTOR_APPROVAL':
-      case 'AWAITING_INVESTOR_APPROVAL':
-        return { text: 'รออนุมัติ', color: 'text-warning' };
-      case 'CONFIRMED':
-        return { text: 'กำลังดำเนินการ', color: 'text-s2' };
-      case 'PENDING':
-      case 'ACTIVE':
-      case 'EXTENDED':
-        return { text: 'ปกติ', color: 'text-success' };
-      case 'COMPLETED':
-        return { text: 'เสร็จสิ้น', color: 'text-foreground-subtle' };
-      case 'PENDING_SIGNATURE':
-        return { text: 'รอลงนาม', color: 'text-warning' };
-      case 'DEFAULTED':
-        return { text: 'เลยกำหนด', color: 'text-error' };
-      case 'TERMINATED':
-        return { text: 'ยกเลิก', color: 'text-foreground-subtle' };
-      default:
-        return { text: status, color: 'text-foreground-subtle' };
-    }
-  };
-
-  const getDaysRemaining = (endDate: string) => {
-    const end = new Date(endDate);
-    const now = new Date();
-    return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  };
-
   const InfoRow = ({ label, value, valueColor = 'text-foreground-muted' }: { label: string; value: ReactNode; valueColor?: string }) => (
     <div className="flex justify-between items-start mb-2">
       <div className="w-1/3 text-sm font-medium text-foreground">{label}</div>
@@ -277,11 +252,13 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
 
   const principalIncreaseStatus = principalIncreaseRequest?.request_status;
   const principalIncreaseStatusMeta = getInvestorPrincipalIncreaseStatusMeta(principalIncreaseStatus);
-  const displayContractStatus = INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES.has(principalIncreaseStatus)
-    ? principalIncreaseStatus
-    : contract.contract_status;
-  const badge = getStatusBadge(displayContractStatus);
-  const daysRemaining = getDaysRemaining(contract.contract_end_date);
+  const displayContractStatus = getInvestorContractDisplayStatus(
+    contract,
+    INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES.has(principalIncreaseStatus)
+  );
+  const badge = getInvestorContractStatusMeta(displayContractStatus);
+  const canViewContract = !['PENDING', 'TERMINATED'].includes(displayContractStatus);
+  const daysRemaining = getInvestorContractRemainingDays(contract, displayContractStatus);
   const interestAmount = Number(contract.interest_amount) || 0;
   const platformFeeRate = typeof contract.platform_fee_rate === 'number' ? contract.platform_fee_rate : 0.01;
   const interestRatePercent = typeof contract.interest_rate === 'number' ? contract.interest_rate * 100 : 0;
@@ -332,7 +309,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
             <div className="space-y-1 text-sm">
               <InfoRow label="หมายเลขสัญญา" value={contract.contract_number || '-'} />
               <InfoRow label="สินค้า" value={`${[contract.items?.brand, contract.items?.model].filter(Boolean).join(' ') || '-'}`} />
-              <InfoRow label="สถานะ" value={badge.text} valueColor={badge.color} />
+              <InfoRow label="สถานะ" value={badge.label} valueColor={badge.tone} />
               <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString() || 0} บาท`} />
               <InfoRow
                 label="ดอกเบี้ย"
@@ -395,29 +372,32 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
             </button>
           )}
 
-          {/* Remaining Days */}
-          <div className="relative mb-4 flex items-center justify-between overflow-hidden rounded-lg border border-s2-border bg-s2-soft p-4 text-s2 shadow-soft">
-            <div className="absolute inset-0 bg-[image:var(--background-image-grad-investor)] opacity-8"></div>
-            <div className="relative z-10">
-              <div className="font-bold text-xl mb-1 text-s2">ระยะเวลาคงเหลือ</div>
-              <div className="text-xs opacity-80 font-light text-s2">Remaining days</div>
+          {daysRemaining !== null ? (
+            <div className="relative mb-4 flex items-center justify-between overflow-hidden rounded-lg border border-s2-border bg-s2-soft p-4 text-s2 shadow-soft">
+              <div className="absolute inset-0 bg-[image:var(--background-image-grad-investor)] opacity-8"></div>
+              <div className="relative z-10">
+                <div className="font-bold text-xl mb-1 text-s2">ระยะเวลาคงเหลือ</div>
+                <div className="text-xs opacity-80 font-light text-s2">Remaining days</div>
+              </div>
+              <div className="relative z-10 text-right">
+                <div className="text-xs opacity-80 mb-1 text-s2">วัน</div>
+                <div className="text-5xl font-bold leading-none text-s2">{daysRemaining}</div>
+              </div>
             </div>
-            <div className="relative z-10 text-right">
-              <div className="text-xs opacity-80 mb-1 text-s2">วัน</div>
-              <div className="text-5xl font-bold leading-none text-s2">{daysRemaining > 0 ? daysRemaining : 0}</div>
-            </div>
-          </div>
+          ) : null}
 
           <div className="space-y-3">
-            <button
-              onClick={() => router.push(`/investor-pawn-ticket/${contractId}`)}
-              className="btn-transition w-full rounded-full border border-s2 bg-background py-2 text-s2"
-            >
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-base font-medium">ดูสัญญา</span>
-              </div>
-              <span className="text-xs opacity-70 font-light">See contract</span>
-            </button>
+            {canViewContract ? (
+              <button
+                onClick={() => router.push(`/investor-pawn-ticket/${contractId}`)}
+                className="btn-transition w-full rounded-full border border-s2 bg-background py-2 text-s2"
+              >
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-base font-medium">ดูสัญญา</span>
+                </div>
+                <span className="text-xs opacity-70 font-light">See contract</span>
+              </button>
+            ) : null}
 
             {/* Download PDF */}
             {/* <button
