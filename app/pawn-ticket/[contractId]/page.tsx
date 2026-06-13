@@ -6,6 +6,37 @@ import { Home, SearchX } from 'lucide-react';
 import axios from 'axios';
 import { getMockContractDetail, getMockContractsEnabled } from '@/lib/mock-contracts';
 
+const MOCK_PAWNER_SIGNATURE_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120' viewBox='0 0 300 120'%3E%3Crect width='300' height='120' fill='white' fill-opacity='0'/%3E%3Cpath d='M30 78 C55 35 78 102 102 62 S145 48 167 70 S210 92 232 56 S260 48 272 70' fill='none' stroke='%23111827' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E";
+const MOCK_INVESTOR_SIGNATURE_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120' viewBox='0 0 300 120'%3E%3Crect width='300' height='120' fill='white' fill-opacity='0'/%3E%3Cpath d='M24 72 C58 38 78 94 108 58 C132 30 156 94 184 60 C208 35 230 78 274 50' fill='none' stroke='%23111827' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E";
+
+const SignatureImage = ({ src, alt }: { src?: string | null; alt: string }) => {
+  if (!src) return null;
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="absolute bottom-2 max-h-12 max-w-full object-contain"
+    />
+  );
+};
+
+const getInvestorInitials = (investor?: any) => {
+  if (investor?.signatureInitials) return investor.signatureInitials;
+
+  const name = String(investor?.name || '').trim();
+  if (!name || name === 'ไม่เปิดเผย') return '';
+
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .filter(Boolean);
+
+  return initials.length ? `${initials.join('.')}.` : '';
+};
+
 const formatThaiDate = (dateString?: string) => {
   if (!dateString) return '-';
   const date = new Date(dateString);
@@ -41,7 +72,11 @@ const buildMockPawnTicketData = (contract: any) => {
         contract.drop_point?.addr_province,
         contract.drop_point?.addr_postcode,
       ].filter(Boolean).join(' ') || '-',
-      signatureUrl: null,
+      signatureUrl: contract.signed_contract_url || contract.customer?.signature_url || MOCK_PAWNER_SIGNATURE_URL,
+    },
+    investor: {
+      signatureUrl: contract.investor?.investor_signature_id || MOCK_INVESTOR_SIGNATURE_URL,
+      signatureInitials: 'A.I.',
     },
     items: contract.item ? [
       {
@@ -273,13 +308,8 @@ export default function PawnTicketPage() {
             <div className="mt-4 grid grid-cols-2 gap-8">
               <div className="text-center">
                 <div className="relative mb-2 flex h-16 items-end justify-center border-b border-dashed border-line-soft">
-                  {ticketData.pawner.signatureUrl ? (
-                    <img
-                      src={ticketData.pawner.signatureUrl}
-                      alt="Pawner Signature"
-                      className="absolute bottom-2 max-h-12 max-w-full object-contain"
-                    />
-                  ) : (
+                  <SignatureImage src={ticketData.pawner?.signatureUrl} alt="Pawner Signature" />
+                  {!ticketData.pawner?.signatureUrl && (
                     <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ขอสินเชื่อ</span>
                   )}
                 </div>
@@ -290,7 +320,12 @@ export default function PawnTicketPage() {
                   <div className="absolute right-2 top-1 flex h-12 w-12 rotate-[-15deg] items-center justify-center rounded-full border-2 border-primary/30 bg-primary/10">
                     <span className="text-[8px] font-bold uppercase text-primary">Astly</span>
                   </div>
-                  <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ให้กู้</span>
+                  <SignatureImage src={ticketData.investor?.signatureUrl} alt="Investor Signature" />
+                  {!ticketData.investor?.signatureUrl && (
+                    <span className="absolute bottom-2 text-lg font-semibold tracking-[0.18em] text-foreground-muted">
+                      {getInvestorInitials(ticketData.investor) || 'ลายเซ็นผู้ให้กู้'}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] text-foreground-subtle">ลงชื่อ ผู้ให้กู้</div>
               </div>
