@@ -8,12 +8,19 @@ import { Wallet } from 'lucide-react';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 import {
-  getMockInvestorContracts,
+  getMockInvestorPortfolioContracts,
   getMockInvestorProfile,
   getMockPrincipalIncreaseRequestForContract,
   INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES,
   isInvestorPreviewMode,
 } from '@/lib/mock-investment';
+import {
+  formatInvestorContractRemainingDays,
+  getInvestorContractDisplayStatus,
+  getInvestorContractRemainingDays,
+  getInvestorContractStatusMeta,
+  type InvestorContractDisplayStatus,
+} from '@/lib/investor-contract-status';
 
 const resolveNetInvestorRate = (contract: {
   investor_rate?: number | null;
@@ -51,7 +58,7 @@ function InvestorDashboardContent() {
     if (isInvestorPreviewMode()) {
       setPinVerified(true);
       setInvestor(getMockInvestorProfile());
-      setMyContracts(getMockInvestorContracts());
+      setMyContracts(getMockInvestorPortfolioContracts());
       setLoading(false);
       return;
     }
@@ -74,7 +81,7 @@ function InvestorDashboardContent() {
 
       if (isInvestorPreviewMode()) {
         setInvestor(getMockInvestorProfile());
-        setMyContracts(getMockInvestorContracts());
+        setMyContracts(getMockInvestorPortfolioContracts());
         return;
       }
 
@@ -97,61 +104,6 @@ function InvestorDashboardContent() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING_INVESTOR_APPROVAL':
-      case 'AWAITING_INVESTOR_APPROVAL':
-        return { label: 'รออนุมัติ', tone: 'text-warning' };
-      case 'CONFIRMED':
-        return { label: 'กำลังดำเนินการ', tone: 'text-s2' };
-      case 'PENDING':
-      case 'ACTIVE':
-      case 'EXTENDED':
-        return { label: 'ปกติ', tone: 'text-success' };
-      case 'PENDING_SIGNATURE':
-        return { label: 'รอลงนาม', tone: 'text-warning' };
-      case 'COMPLETED':
-        return { label: 'เสร็จสิ้น', tone: 'text-foreground-subtle' };
-      case 'DEFAULTED':
-        return { label: 'เลยกำหนด', tone: 'text-error' };
-      case 'TERMINATED':
-        return { label: 'ยกเลิก', tone: 'text-foreground-subtle' };
-      default:
-        return { label: status, tone: 'text-foreground-subtle' };
-    }
-  };
-
-  const getStatusGroup = (status?: string) => {
-    switch (status) {
-      case 'PENDING_INVESTOR_APPROVAL':
-      case 'AWAITING_INVESTOR_APPROVAL':
-        return { key: 'approval', label: 'รออนุมัติ' };
-      case 'CONFIRMED':
-        return { key: 'confirmed', label: 'กำลังดำเนินการ' };
-      case 'PENDING':
-      case 'ACTIVE':
-      case 'EXTENDED':
-        return { key: 'active', label: 'ปกติ' };
-      case 'PENDING_SIGNATURE':
-        return { key: 'pending-signature', label: 'รอลงนาม' };
-      case 'COMPLETED':
-        return { key: 'completed', label: 'เสร็จสิ้น' };
-      case 'DEFAULTED':
-        return { key: 'defaulted', label: 'เลยกำหนด' };
-      case 'TERMINATED':
-        return { key: 'terminated', label: 'ยกเลิก' };
-      default:
-        return { key: 'other', label: status || 'อื่นๆ' };
-    }
-  };
-
-  const getDaysRemaining = (endDate: string) => {
-    const end = new Date(endDate);
-    const now = new Date();
-    const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return diff;
-  };
-
   const getPrincipalIncreaseRequestForContract = (contract: any) => {
     if (isInvestorPreviewMode()) {
       return getMockPrincipalIncreaseRequestForContract(contract.contract_id);
@@ -167,11 +119,14 @@ function InvestorDashboardContent() {
 
   const getDashboardDisplayStatus = (contract: any) => {
     const requestStatus = getPrincipalIncreaseRequestForContract(contract)?.request_status;
-    if (INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES.has(requestStatus)) {
-      return requestStatus;
-    }
+    const hasPrincipalIncreaseApproval = INVESTOR_PRINCIPAL_INCREASE_APPROVAL_STATUSES.has(requestStatus);
 
-    return contract.contract_status;
+    return getInvestorContractDisplayStatus(contract, hasPrincipalIncreaseApproval);
+  };
+
+  const getStatusGroup = (status: InvestorContractDisplayStatus) => {
+    const meta = getInvestorContractStatusMeta(status);
+    return { key: meta.groupKey, label: meta.label };
   };
 
   const statusTabs = [
@@ -192,9 +147,12 @@ function InvestorDashboardContent() {
     : myContracts.filter((contract) => getStatusGroup(getDashboardDisplayStatus(contract)).key === activeTab);
 
   const renderContractCard = (contract: any) => {
+    const principalIncreaseRequest = getPrincipalIncreaseRequestForContract(contract);
+    const principalIncreaseRequestId = principalIncreaseRequest?.request_id || principalIncreaseRequest?.requestId || principalIncreaseRequest?.id;
     const displayStatus = getDashboardDisplayStatus(contract);
-    const badge = getStatusBadge(displayStatus);
-    const daysRemaining = getDaysRemaining(contract.contract_end_date);
+    const badge = getInvestorContractStatusMeta(displayStatus);
+    const daysRemaining = getInvestorContractRemainingDays(contract, displayStatus);
+    const daysRemainingLabel = formatInvestorContractRemainingDays(daysRemaining);
     const principal = Number(contract.loan_principal_amount || 0);
     const durationDays = Number(contract.contract_duration_days || 0);
     const investorRate = resolveNetInvestorRate(contract);
@@ -204,7 +162,11 @@ function InvestorDashboardContent() {
     return (
       <div
         key={contract.contract_id}
-        onClick={() => router.push(`/investor-dashboard/contract/${contract.contract_id}`)}
+        onClick={() => router.push(
+          principalIncreaseRequestId
+            ? `/investor-dashboard/contract/${contract.contract_id}?requestId=${principalIncreaseRequestId}`
+            : `/investor-dashboard/contract/${contract.contract_id}`
+        )}
         className="hover-card cursor-pointer rounded-xl border border-s2-border bg-s2-soft p-4 shadow-soft transition-colors hover:bg-s2-soft/80"
       >
         <div className="mb-1 flex items-center justify-between gap-3 flex-nowrap">
@@ -229,7 +191,7 @@ function InvestorDashboardContent() {
             วันครบกำหนด:{' '}
             <span className="text-foreground-muted">
               {new Date(contract.contract_end_date).toLocaleDateString('th-TH')}
-              {daysRemaining > 0 ? ` (อีก ${daysRemaining} วัน)` : daysRemaining === 0 ? ' (วันนี้)' : ` (เลย ${Math.abs(daysRemaining)} วัน)`}
+              {daysRemainingLabel ? ` (${daysRemainingLabel})` : ''}
             </span>
           </div>
         </div>

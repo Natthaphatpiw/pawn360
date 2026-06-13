@@ -6,6 +6,34 @@ import { Home, SearchX } from 'lucide-react';
 import axios from 'axios';
 import { getMockPawnTicket, isInvestorPreviewMode } from '@/lib/mock-investment';
 
+const SignatureImage = ({ src, alt }: { src?: string | null; alt: string }) => {
+  if (!src) return null;
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="absolute bottom-2 max-h-12 max-w-full object-contain"
+    />
+  );
+};
+
+const getInvestorInitials = (investor?: any) => {
+  if (investor?.signatureInitials) return investor.signatureInitials;
+
+  const name = String(investor?.name || '').trim();
+  if (!name || name === 'ไม่เปิดเผย') return '';
+
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .filter(Boolean);
+
+  return initials.length ? `${initials.join('.')}.` : '';
+};
+
 export default function InvestorPawnTicketPage() {
   const router = useRouter();
   const params = useParams();
@@ -212,7 +240,10 @@ export default function InvestorPawnTicketPage() {
             <div className="mt-4 grid grid-cols-2 gap-8">
               <div className="text-center">
                 <div className="relative mb-2 flex h-16 items-end justify-center border-b border-dashed border-line-soft">
-                  <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ขอสินเชื่อ</span>
+                  <SignatureImage src={ticketData.pawner?.signatureUrl} alt="Pawner Signature" />
+                  {!ticketData.pawner?.signatureUrl && (
+                    <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ขอสินเชื่อ</span>
+                  )}
                 </div>
                 <div className="text-[10px] text-foreground-subtle">ลงชื่อ ผู้ขอสินเชื่อ</div>
               </div>
@@ -221,7 +252,12 @@ export default function InvestorPawnTicketPage() {
                   <div className="absolute right-2 top-1 flex h-12 w-12 rotate-[-15deg] items-center justify-center rounded-full border-2 border-s2/30 bg-s2/10">
                     <span className="text-[8px] font-bold uppercase text-s2">Astly</span>
                   </div>
-                  <span className="absolute bottom-2 text-xs italic text-foreground-subtle opacity-50">ลายเซ็นผู้ให้กู้</span>
+                  <SignatureImage src={ticketData.investor?.signatureUrl} alt="Investor Signature" />
+                  {!ticketData.investor?.signatureUrl && (
+                    <span className="absolute bottom-2 text-lg font-semibold tracking-[0.18em] text-foreground-muted">
+                      {getInvestorInitials(ticketData.investor) || 'ลายเซ็นผู้ให้กู้'}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[10px] text-foreground-subtle">ลงชื่อ ผู้ให้กู้</div>
               </div>

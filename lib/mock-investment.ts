@@ -3,8 +3,14 @@ import { loadMockInvestor } from '@/lib/mock-investor';
 
 export const MOCK_CONTRACT_IDS = {
   offer: 'mock-contract-offer-001',
+  pending: 'mock-contract-pending-001',
   active: 'mock-contract-active-001',
+  extended: 'mock-contract-extended-001',
+  approval: 'mock-contract-approval-001',
+  overdue: 'mock-contract-overdue-001',
+  unredeemed: 'mock-contract-unredeemed-001',
   completed: 'mock-contract-completed-001',
+  terminated: 'mock-contract-terminated-001',
 };
 
 export const MOCK_ITEM_ID = 'mock-item-actions-001';
@@ -26,6 +32,9 @@ const isoFromNow = (offsetDays: number) => new Date(Date.now() + offsetDays * DA
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString('th-TH');
 
+const MOCK_PAWNER_SIGNATURE_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120' viewBox='0 0 300 120'%3E%3Crect width='300' height='120' fill='white' fill-opacity='0'/%3E%3Cpath d='M30 78 C55 35 78 102 102 62 S145 48 167 70 S210 92 232 56 S260 48 272 70' fill='none' stroke='%23111827' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E";
+const MOCK_INVESTOR_SIGNATURE_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120' viewBox='0 0 300 120'%3E%3Crect width='300' height='120' fill='white' fill-opacity='0'/%3E%3Cpath d='M24 72 C58 38 78 94 108 58 C132 30 156 94 184 60 C208 35 230 78 274 50' fill='none' stroke='%23111827' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E";
+
 export const isInvestorPreviewMode = () => process.env.NEXT_PUBLIC_LIFF_MOCK === 'true';
 
 export function getMockInvestorContracts() {
@@ -38,6 +47,7 @@ export function getMockInvestorContracts() {
       contract_status: 'PENDING',
       funding_status: 'PENDING',
       payment_status: 'PENDING',
+      item_delivery_status: 'PENDING',
       contract_start_date: isoFromNow(-1),
       contract_end_date: isoFromNow(29),
       contract_duration_days: 30,
@@ -66,11 +76,47 @@ export function getMockInvestorContracts() {
       },
     },
     {
+      contract_id: MOCK_CONTRACT_IDS.pending,
+      contract_number: 'INV-2026-0502',
+      contract_status: 'ACTIVE',
+      funding_status: 'FUNDED',
+      payment_status: 'PENDING',
+      item_delivery_status: 'PAWNER_CONFIRMED',
+      funded_at: isoFromNow(-1),
+      contract_start_date: isoFromNow(-1),
+      contract_end_date: isoFromNow(29),
+      contract_duration_days: 30,
+      loan_principal_amount: 36000,
+      interest_amount: 540,
+      interest_rate: 0.016,
+      platform_fee_rate: 0.001,
+      investor_rate: 0.015,
+      platform_fee_amount: 36,
+      investor_id: 'mock-investor-00000001',
+      payment_slip_url: null,
+      items: {
+        item_type: 'แท็บเล็ต',
+        brand: 'Apple',
+        model: 'iPad Air 5',
+        capacity: '256GB',
+        item_condition: 91,
+        defects: 'มีรอยเล็กน้อยบริเวณขอบ',
+        notes: 'รอผู้ขอสินเชื่อนำส่ง Drop Point',
+        image_urls: getMockImageUrls('Apple', 'iPad Air 5'),
+      },
+      pawners: {
+        bank_name: 'SCB',
+        bank_account_name: 'มณีรัตน์ ตัวอย่าง',
+        bank_account_no: '222-333-4444',
+      },
+    },
+    {
       contract_id: MOCK_CONTRACT_IDS.active,
       contract_number: 'INV-2026-0418',
       contract_status: 'ACTIVE',
       funding_status: 'DISBURSED',
       payment_status: 'COMPLETED',
+      item_delivery_status: 'VERIFIED',
       payment_confirmed_at: isoFromNow(-27),
       contract_start_date: isoFromNow(-28),
       contract_end_date: isoFromNow(12),
@@ -100,11 +146,152 @@ export function getMockInvestorContracts() {
       },
     },
     {
+      contract_id: MOCK_CONTRACT_IDS.extended,
+      contract_number: 'INV-2026-0407',
+      contract_status: 'EXTENDED',
+      funding_status: 'DISBURSED',
+      payment_status: 'COMPLETED',
+      item_delivery_status: 'VERIFIED',
+      payment_confirmed_at: isoFromNow(-34),
+      contract_start_date: isoFromNow(-35),
+      contract_end_date: isoFromNow(25),
+      contract_duration_days: 60,
+      loan_principal_amount: 56000,
+      interest_amount: 3360,
+      interest_rate: 0.018,
+      platform_fee_rate: 0.002,
+      investor_rate: 0.016,
+      platform_fee_amount: 112,
+      investor_id: 'mock-investor-00000001',
+      payment_slip_url: '/assets/astly_logo_primary.png',
+      items: {
+        item_type: 'นาฬิกา',
+        brand: 'Apple',
+        model: 'Watch Ultra 2',
+        capacity: 'Titanium',
+        item_condition: 92,
+        defects: 'สายมีรอยใช้งานเล็กน้อย',
+        notes: 'ต่อสัญญาแล้ว สถานะยังปกติ',
+        image_urls: getMockImageUrls('Apple', 'Watch Ultra 2'),
+      },
+      pawners: {
+        bank_name: 'KBank',
+        bank_account_name: 'ภควัต ตัวอย่าง',
+        bank_account_no: '333-444-5555',
+      },
+    },
+    {
+      contract_id: MOCK_CONTRACT_IDS.approval,
+      contract_number: 'INV-2026-0401',
+      contract_status: 'ACTIVE',
+      funding_status: 'DISBURSED',
+      payment_status: 'COMPLETED',
+      item_delivery_status: 'VERIFIED',
+      payment_confirmed_at: isoFromNow(-20),
+      contract_start_date: isoFromNow(-21),
+      contract_end_date: isoFromNow(9),
+      contract_duration_days: 30,
+      loan_principal_amount: 64000,
+      interest_amount: 3072,
+      interest_rate: 0.018,
+      platform_fee_rate: 0.002,
+      investor_rate: 0.016,
+      platform_fee_amount: 128,
+      investor_id: 'mock-investor-00000001',
+      payment_slip_url: '/assets/astly_logo_primary.png',
+      items: {
+        item_type: 'โน้ตบุค',
+        brand: 'Dell',
+        model: 'XPS 13 Plus',
+        capacity: '1TB',
+        item_condition: 88,
+        defects: 'มีรอยที่ฝาหลัง',
+        notes: 'มีคำขอเพิ่มเงินต้นรออนุมัติ',
+        image_urls: getMockImageUrls('Dell', 'XPS 13 Plus'),
+      },
+      pawners: {
+        bank_name: 'BBL',
+        bank_account_name: 'ศศิธร ตัวอย่าง',
+        bank_account_no: '444-555-6666',
+      },
+    },
+    {
+      contract_id: MOCK_CONTRACT_IDS.overdue,
+      contract_number: 'INV-2026-0325',
+      contract_status: 'ACTIVE',
+      funding_status: 'DISBURSED',
+      payment_status: 'COMPLETED',
+      item_delivery_status: 'VERIFIED',
+      payment_confirmed_at: isoFromNow(-35),
+      contract_start_date: isoFromNow(-35),
+      contract_end_date: isoFromNow(-2),
+      contract_duration_days: 33,
+      loan_principal_amount: 42000,
+      interest_amount: 2016,
+      interest_rate: 0.018,
+      platform_fee_rate: 0.002,
+      investor_rate: 0.016,
+      platform_fee_amount: 84,
+      investor_id: 'mock-investor-00000001',
+      payment_slip_url: '/assets/astly_logo_primary.png',
+      items: {
+        item_type: 'โทรศัพท์มือถือ',
+        brand: 'Samsung',
+        model: 'Galaxy S24 Ultra',
+        capacity: '512GB',
+        item_condition: 90,
+        defects: 'รอยใช้งานตามขอบเครื่อง',
+        notes: 'เลยกำหนดไม่เกิน 7 วัน',
+        image_urls: getMockImageUrls('Samsung', 'Galaxy S24 Ultra'),
+      },
+      pawners: {
+        bank_name: 'Krungthai',
+        bank_account_name: 'ธนกร ตัวอย่าง',
+        bank_account_no: '555-666-7777',
+      },
+    },
+    {
+      contract_id: MOCK_CONTRACT_IDS.unredeemed,
+      contract_number: 'INV-2026-0319',
+      contract_status: 'ACTIVE',
+      funding_status: 'DISBURSED',
+      payment_status: 'COMPLETED',
+      item_delivery_status: 'VERIFIED',
+      payment_confirmed_at: isoFromNow(-45),
+      contract_start_date: isoFromNow(-45),
+      contract_end_date: isoFromNow(-8),
+      contract_duration_days: 37,
+      loan_principal_amount: 81000,
+      interest_amount: 3888,
+      interest_rate: 0.018,
+      platform_fee_rate: 0.002,
+      investor_rate: 0.016,
+      platform_fee_amount: 162,
+      investor_id: 'mock-investor-00000001',
+      payment_slip_url: '/assets/astly_logo_primary.png',
+      items: {
+        item_type: 'กล้อง',
+        brand: 'Fujifilm',
+        model: 'X-T5',
+        capacity: 'Body',
+        item_condition: 87,
+        defects: 'มีรอยที่ฐานกล้อง',
+        notes: 'เลยกำหนดตั้งแต่ 7 วันขึ้นไป',
+        image_urls: getMockImageUrls('Fujifilm', 'X-T5'),
+      },
+      pawners: {
+        bank_name: 'TTB',
+        bank_account_name: 'กานต์ ตัวอย่าง',
+        bank_account_no: '666-777-8888',
+      },
+    },
+    {
       contract_id: MOCK_CONTRACT_IDS.completed,
       contract_number: 'INV-2026-0312',
       contract_status: 'COMPLETED',
       funding_status: 'DISBURSED',
       payment_status: 'COMPLETED',
+      item_delivery_status: 'VERIFIED',
       completed_at: isoFromNow(-8),
       payment_confirmed_at: isoFromNow(-38),
       contract_start_date: isoFromNow(-65),
@@ -134,7 +321,46 @@ export function getMockInvestorContracts() {
         bank_account_no: '456-123-7890',
       },
     },
+    {
+      contract_id: MOCK_CONTRACT_IDS.terminated,
+      contract_number: 'INV-2026-0304',
+      contract_status: 'TERMINATED',
+      funding_status: 'FUNDED',
+      payment_status: 'PENDING',
+      item_delivery_status: 'RETURNED',
+      terminated_at: isoFromNow(-6),
+      contract_start_date: isoFromNow(-12),
+      contract_end_date: isoFromNow(18),
+      contract_duration_days: 30,
+      loan_principal_amount: 39500,
+      interest_amount: 632,
+      interest_rate: 0.016,
+      platform_fee_rate: 0.001,
+      investor_rate: 0.015,
+      platform_fee_amount: 40,
+      investor_id: 'mock-investor-00000001',
+      payment_slip_url: null,
+      items: {
+        item_type: 'เครื่องเล่นเกม',
+        brand: 'Sony',
+        model: 'PlayStation 5',
+        capacity: 'Disc Edition',
+        item_condition: 72,
+        defects: 'Serial ไม่ตรงกับข้อมูลที่แจ้ง',
+        notes: 'Drop Point ปฏิเสธสินค้าและยกเลิกสัญญา',
+        image_urls: getMockImageUrls('Sony', 'PlayStation 5'),
+      },
+      pawners: {
+        bank_name: 'Krungsri',
+        bank_account_name: 'วรพล ตัวอย่าง',
+        bank_account_no: '777-888-9999',
+      },
+    },
   ];
+}
+
+export function getMockInvestorPortfolioContracts() {
+  return getMockInvestorContracts().filter((contract) => Boolean(contract.investor_id));
 }
 
 export function getMockContractById(contractId?: string | null) {
@@ -170,9 +396,11 @@ export function getMockPawnTicket(contractId?: string | null) {
       address: `${investor.addr_house_no || '123'} แขวงคลองตัน เขตวัฒนา กรุงเทพมหานคร ${investor.addr_postcode || '10110'}`,
       bankName: investor.bank_name || 'Bangkok Bank',
       bankAccountNo: investor.bank_account_no || '123-4-56789-0',
+      signatureUrl: MOCK_INVESTOR_SIGNATURE_URL,
+      signatureInitials: `${investor.firstname?.charAt(0) || 'A'}.${investor.lastname?.charAt(0) || 'I'}.`,
     },
     pawner: {
-      signatureUrl: null,
+      signatureUrl: MOCK_PAWNER_SIGNATURE_URL,
     },
     items: [
       {
@@ -226,7 +454,7 @@ export function getMockItemActionData() {
 }
 
 export function getMockPrincipalIncreaseRequest(requestId?: string | null) {
-  const contract = getMockContractById(MOCK_CONTRACT_IDS.active);
+  const contract = getMockContractById(MOCK_CONTRACT_IDS.approval);
   const investor = getMockInvestorProfile();
   if (!contract) return null;
 
@@ -258,7 +486,7 @@ export function getMockPrincipalIncreaseRequest(requestId?: string | null) {
 }
 
 export function getMockPrincipalIncreaseRequestForContract(contractId?: string | null) {
-  if (contractId !== MOCK_CONTRACT_IDS.active) {
+  if (contractId !== MOCK_CONTRACT_IDS.approval) {
     return null;
   }
 

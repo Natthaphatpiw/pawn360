@@ -12,7 +12,8 @@ export async function PUT(request: NextRequest) {
       nationalId,
       email,
       address,
-      bankInfo
+      bankInfo,
+      signatureUrl
     } = body;
 
     if (!lineId) {
@@ -76,6 +77,10 @@ export async function PUT(request: NextRequest) {
       if (bankInfo.accountNo) updateData.bank_account_no = bankInfo.accountNo;
       if (bankInfo.accountType) updateData.bank_account_type = bankInfo.accountType;
       if (bankInfo.accountName) updateData.bank_account_name = bankInfo.accountName;
+    }
+
+    if (typeof signatureUrl === 'string' && signatureUrl.trim()) {
+      updateData.investor_signature_id = signatureUrl.trim();
     }
 
     // Update investor data
