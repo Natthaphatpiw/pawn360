@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
+const INVESTOR_APPROVAL_REQUEST_STATUSES = [
+  'PENDING_INVESTOR_APPROVAL',
+  'AWAITING_INVESTOR_APPROVAL',
+];
+
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ lineId: string }> }
@@ -61,6 +66,39 @@ export async function GET(
       );
     }
 
+    const contractIds = (contracts || []).map((contract) => contract.contract_id);
+    let principalIncreaseRequestByContractId: Record<string, any> = {};
+
+    if (contractIds.length > 0) {
+      const { data: principalIncreaseRequests, error: requestsError } = await supabase
+        .from('contract_action_requests')
+        .select(`
+          request_id,
+          contract_id,
+          request_type,
+          request_status,
+          increase_amount,
+          principal_after_increase,
+          created_at,
+          updated_at
+        `)
+        .in('contract_id', contractIds)
+        .eq('request_type', 'PRINCIPAL_INCREASE')
+        .in('request_status', INVESTOR_APPROVAL_REQUEST_STATUSES)
+        .order('created_at', { ascending: false });
+
+      if (requestsError) {
+        console.error('Error fetching principal increase requests:', requestsError);
+      }
+
+      principalIncreaseRequestByContractId = (principalIncreaseRequests || []).reduce<Record<string, any>>((acc, request) => {
+        if (request.contract_id && !acc[request.contract_id]) {
+          acc[request.contract_id] = request;
+        }
+        return acc;
+      }, {});
+    }
+
     // Calculate additional info for each contract
     const contractsWithInfo = contracts?.map(contract => {
       const endDate = new Date(contract.contract_end_date);
@@ -69,6 +107,7 @@ export async function GET(
 
       return {
         ...contract,
+        pending_principal_increase_request: principalIncreaseRequestByContractId[contract.contract_id] || null,
         remaining_days: remainingDays,
         is_overdue: remainingDays < 0
       };
