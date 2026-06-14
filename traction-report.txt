@@ -1,0 +1,96 @@
+================ DATASET ================
+Contracts: 54 | GMV (loan disbursed): 485,300 THB
+Window: 08/05/2026 → 15/05/2026 = 8 days
+Run-rate: 6.75 contracts/day | 60,663 THB/day
+
+================ LOAN SIZE ================
+mean 8,987 | median 8,400 | min 3,000 | max 23,000 | sd 4,830
+p25 5,000 | p75 11,750
+buckets:
+  0-5,000: 16 (29.6%)
+  5,001-8,000: 11 (20.4%)
+  8,001-12,000: 18 (33.3%)
+  12,001-20,000: 7 (13.0%)
+  20,001-+: 2 (3.7%)
+
+================ CUSTOMERS ================
+Unique customers (by national ID): 51
+Repeat customers (≥2 contracts, by ID): 3
+  นาย ศุภชัย ทะสุใจ: 2 contracts, 14,000 THB
+  น.ส. กมลลักษณ์ รุ่งโรจน์วงศ์ศรี: 2 contracts, 15,000 THB
+  นาย วิโรจน์ เสาหิน: 2 contracts, 33,000 THB
+Repeat by NAME (catches ID typos): 4
+  นาย ศุภชัย ทะสุใจ: 2 | ids=3510300129131
+  นาย อภิชาติ ตรีพยัคฆา: 2 | ids=1101401490236,2101401490236
+  น.ส. กมลลักษณ์ รุ่งโรจน์วงศ์ศรี: 2 | ids=8571584052636
+  นาย วิโรจน์ เสาหิน: 2 | ids=3560300421362
+Contracts per unique customer: 1.06
+
+================ PRODUCT MIX ================
+  iPhone       n=39 (72.2%) | GMV  358,300 (73.8%) | avg 9,187 | redeemed 11/39
+  iPad         n= 7 (13.0%) | GMV   58,000 (12.0%) | avg 8,286 | redeemed 1/7
+  MacBook      n= 4 (7.4%) | GMV   55,000 (11.3%) | avg 13,750 | redeemed 0/4
+  Apple Watch  n= 4 (7.4%) | GMV   14,000 (2.9%) | avg 3,500 | redeemed 2/4
+top models by GMV:
+  iPhone 17 Pro Max 256GB            n=3 GMV 52,500
+  iPhone 16 Pro 256GB                n=3 GMV 36,000
+  iPhone 17 Pro 256GB                n=2 GMV 30,000
+  iPhone 14 Pro 128GB                n=2 GMV 30,000
+  iPad Pro 11" M4 256GB WiFi         n=3 GMV 29,000
+  MacBook Air 15" M3 8GB/256GB       n=2 GMV 25,000
+  iPhone 16 Plus 128GB               n=3 GMV 23,000
+  iPhone 15 Pro Max 256GB            n=2 GMV 22,000
+Type concentration HHI: 0.573
+
+================ REDEMPTION (repayment) ================
+Redeemed so far: 14/54 = 25.9% | redeemed GMV 151,500 (31.2%)
+(all contracts are 14-21 days into a 30-day term → these are EARLY redemptions)
+  iPhone       redeemed 11/39 = 28.2%
+  iPad         redeemed 1/7 = 14.3%
+  Apple Watch  redeemed 2/4 = 50.0%
+  MacBook      redeemed 0/4 = 0.0%
+Active (open) loans: 40 | Active principal outstanding: 333,800 THB
+
+================ GEOGRAPHY ================
+Provinces represented: 13
+Chiang Mai: 24/54 contracts (44.4%) | 40.2% of GMV  → out-of-province 55.6%
+  จ.เชียงใหม่        n=24 GMV 195,300
+  จ.ลำพูน            n=6 GMV 49,000
+  จ.พะเยา            n=5 GMV 73,000
+  จ.น่าน             n=4 GMV 52,000
+  จ.เชียงราย         n=4 GMV 21,500
+  จ.ชลบุรี           n=3 GMV 25,000
+  จ.แม่ฮ่องสอน       n=2 GMV 12,000
+  กรุงเทพมหานคร      n=1 GMV 22,500
+  จ.เพชรบูรณ์        n=1 GMV 6,500
+  จ.ราชบุรี          n=1 GMV 12,000
+  จ.มหาสารคาม        n=1 GMV 9,000
+  จ.พัทลุง           n=1 GMV 3,500
+  จ.สุราษฎร์ธานี     n=1 GMV 4,000
+
+================ ASSET QUALITY (vs our pricing engine) ================
+Sum of system market estimate: 1,198,901 THB
+Implied LTV on market (actual loan / market): 40.5%
+Collateral cushion (market / loan): 2.47x
+Actual loan vs our 60%-cap system price: 68.5% (headroom 31.5%)
+
+================ INTEREST / REVENUE (rate model: 3%/mo = 2% interest + 1% fee) ================
+Active book accrued interest to date (40 loans, to 29/05/2026): 5,715 THB
+Full one-cycle gross interest if all held 30d (GMV×3%): 14,559 THB
+  → platform fee portion (×1%): 4,853 | investor interest (×1.5%): 7,280
+
+================ RUN-RATE FORECAST (per this 1 store) ================
+Monthly origination (run-rate ×30): 1,819,875 THB
+Annualized origination (×365): 22,141,813 THB
+Steady-state active book (origination/day × 30d): 1,819,875 THB
+Monthly gross interest at steady state (book×3%): 54,596 THB
+Monthly platform fee at steady state (book×1%): 18,199 THB
+Annual gross interest at steady state: 655,155 THB
+
+================ SCALE SCENARIOS (store expansion, per-store run-rate held constant) ================
+stores | annual GMV | annual gross interest(3%) | annual platform fee(1%)
+    1   |   22,141,813 |      655,155 |      218,385
+    5   |  110,709,063 |    3,275,775 |    1,091,925
+   10   |  221,418,125 |    6,551,550 |    2,183,850
+   25   |  553,545,313 |   16,378,875 |    5,459,625
+   50   | 1,107,090,625 |   32,757,750 |   10,919,250

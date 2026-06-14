@@ -241,7 +241,7 @@ function DropPointContent() {
         isIncomingToDropPoint
         || ['ITEM_PICKED', 'DRIVER_ASSIGNED', 'ARRIVED'].includes(contractDetail.delivery_request_status || '')
       );
-    const canMarkArrivedEnabled = canMarkArrived && hasDeliveryRequest;
+    const canMarkArrivedEnabled = canMarkArrived;
     const canVerify = isArrivedAtDropPoint
       || (contractDetail.item_delivery_status === 'VERIFIED' && !contractDetail.item_verified_at);
     const statusTone = isWaitingDriver
@@ -293,7 +293,7 @@ function DropPointContent() {
     };
 
     const handleMarkArrived = async () => {
-      if (!contractDetail?.delivery_request_id) return;
+      if (!contractDetail?.contract_id) return;
 
       if (previewMode) {
         setUpdatingArrival(true);
@@ -318,7 +318,8 @@ function DropPointContent() {
         setUpdatingArrival(true);
         setError(null);
         await axios.post('/api/pawn-delivery/update-status', {
-          deliveryRequestId: contractDetail.delivery_request_id,
+          deliveryRequestId: contractDetail.delivery_request_id || undefined,
+          contractId: contractDetail.contract_id,
           lineId: profile.userId,
           action: 'ARRIVED',
         });
