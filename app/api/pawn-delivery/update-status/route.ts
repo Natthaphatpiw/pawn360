@@ -26,10 +26,11 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const deliveryRequestId = typeof body?.deliveryRequestId === 'string' ? body.deliveryRequestId.trim() : '';
+    const contractIdFromBody = typeof body?.contractId === 'string' ? body.contractId.trim() : '';
     const lineId = typeof body?.lineId === 'string' ? body.lineId.trim() : '';
     const action = typeof body?.action === 'string' ? body.action.trim() : '';
 
-    if (!deliveryRequestId || !lineId || !action) {
+    if ((!deliveryRequestId && !contractIdFromBody) || !lineId || !action) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -38,18 +39,47 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseAdmin();
 
-    const { data: deliveryRequest, error: requestError } = await supabase
-      .from('pawn_delivery_requests')
-      .select('*')
-      .eq('delivery_request_id', deliveryRequestId)
-      .single();
+    let deliveryRequest: any = null;
 
-    if (requestError || !deliveryRequest) {
+    if (deliveryRequestId) {
+      const { data, error } = await supabase
+        .from('pawn_delivery_requests')
+        .select('*')
+        .eq('delivery_request_id', deliveryRequestId)
+        .maybeSingle();
+
+      if (error || !data) {
+        return NextResponse.json(
+          { error: 'Delivery request not found' },
+          { status: 404 }
+        );
+      }
+
+      deliveryRequest = data;
+    } else if (contractIdFromBody) {
+      const { data, error } = await supabase
+        .from('pawn_delivery_requests')
+        .select('*')
+        .eq('contract_id', contractIdFromBody)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST205') {
+        throw error;
+      }
+
+      deliveryRequest = data || null;
+    }
+
+    if (!deliveryRequest && action !== 'ARRIVED') {
       return NextResponse.json(
         { error: 'Delivery request not found' },
         { status: 404 }
       );
     }
+
+    const contractId = deliveryRequest?.contract_id || contractIdFromBody;
 
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
@@ -57,11 +87,12 @@ export async function POST(request: NextRequest) {
         contract_id,
         contract_number,
         item_delivery_status,
+        item_received_at,
         items:item_id (brand, model),
         pawners:customer_id (line_id),
         drop_points:drop_point_id (line_id, drop_point_name)
       `)
-      .eq('contract_id', deliveryRequest.contract_id)
+      .eq('contract_id', contractId)
       .single();
 
     if (contractError || !contract) {
@@ -84,8 +115,15 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const updatePayload: any = { updated_at: now };
     const contractPayload: any = { updated_at: now };
+    let shouldUpdateDeliveryRequest = Boolean(deliveryRequest);
 
     if (action === 'DRIVER_ASSIGNED') {
+      if (!deliveryRequest) {
+        return NextResponse.json(
+          { error: 'Delivery request not found' },
+          { status: 404 }
+        );
+      }
       if (!isDropPoint) {
         return NextResponse.json(
           { error: 'Unauthorized' },
@@ -102,6 +140,12 @@ export async function POST(request: NextRequest) {
       updatePayload.driver_assigned_at = now;
       contractPayload.item_delivery_status = 'IN_TRANSIT';
     } else if (action === 'PAWNER_CONFIRMED') {
+      if (!deliveryRequest) {
+        return NextResponse.json(
+          { error: 'Delivery request not found' },
+          { status: 404 }
+        );
+      }
       if (!isPawner) {
         return NextResponse.json(
           { error: 'Unauthorized' },
@@ -124,16 +168,28 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
-      if (deliveryRequest.status !== 'ITEM_PICKED') {
+
+      const deliveryRequestCanArrive = deliveryRequest
+        ? ['DRIVER_ASSIGNED', 'ITEM_PICKED', 'ARRIVED'].includes(deliveryRequest.status)
+        : false;
+      const contractCanArrive = ['PAWNER_CONFIRMED', 'IN_TRANSIT', 'RECEIVED_AT_DROP_POINT'].includes(contract.item_delivery_status);
+
+      if (!deliveryRequestCanArrive && !contractCanArrive) {
         return NextResponse.json(
-          { error: 'ต้องรอให้ผู้ขอสินเชื่อยืนยันรับของก่อน' },
+          { error: 'สถานะปัจจุบันยังไม่สามารถเปลี่ยนเป็นสินค้าถึง Drop Point ได้' },
           { status: 400 }
         );
       }
-      updatePayload.status = 'ARRIVED';
-      updatePayload.arrived_at = now;
+
+      if (deliveryRequest) {
+        updatePayload.status = 'ARRIVED';
+        updatePayload.arrived_at = deliveryRequest.arrived_at || now;
+      } else {
+        shouldUpdateDeliveryRequest = false;
+      }
+
       contractPayload.item_delivery_status = 'RECEIVED_AT_DROP_POINT';
-      contractPayload.item_received_at = now;
+      contractPayload.item_received_at = contract.item_received_at || now;
     } else {
       return NextResponse.json(
         { error: 'Invalid action' },
@@ -141,17 +197,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await supabase
-      .from('pawn_delivery_requests')
-      .update(updatePayload)
-      .eq('delivery_request_id', deliveryRequestId);
+    if (shouldUpdateDeliveryRequest && deliveryRequest?.delivery_request_id) {
+      const { error: deliveryUpdateError } = await supabase
+        .from('pawn_delivery_requests')
+        .update(updatePayload)
+        .eq('delivery_request_id', deliveryRequest.delivery_request_id);
 
-    await supabase
+      if (deliveryUpdateError) {
+        throw deliveryUpdateError;
+      }
+    }
+
+    const { error: contractUpdateError } = await supabase
       .from('contracts')
       .update(contractPayload)
-      .eq('contract_id', deliveryRequest.contract_id);
+      .eq('contract_id', contract.contract_id);
 
-    if (action === 'ARRIVED' && pawner?.line_id && pawnerLineClient) {
+    if (contractUpdateError) {
+      throw contractUpdateError;
+    }
+
+    if (action === 'ARRIVED' && contract.item_delivery_status !== 'RECEIVED_AT_DROP_POINT' && pawner?.line_id && pawnerLineClient) {
       const statusUrl = getPawnerStatusUrl(contract.contract_id);
       try {
         await pawnerLineClient.pushMessage(pawner.line_id, {
@@ -165,7 +231,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      status: updatePayload.status,
+      status: updatePayload.status || (action === 'ARRIVED' ? 'ARRIVED' : undefined),
+      itemDeliveryStatus: contractPayload.item_delivery_status,
     });
   } catch (error: any) {
     console.error('Error updating delivery status:', error);
