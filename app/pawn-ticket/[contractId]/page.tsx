@@ -177,7 +177,7 @@ export default function PawnTicketPage() {
             <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
               Pawn Ticket
             </div>
-            <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-primary">
+            <div className="mt-3 text-2xl font-semibold tracking-[0.08em] text-primary">
               สัญญาสินเชื่ออิเล็กทรอนิกส์
             </div>
             <p className="mt-2 text-xs text-foreground-subtle">แสดงรายละเอียดสัญญา ทรัพย์สินค้ำประกัน และยอดเงินตามข้อมูลในระบบ</p>
