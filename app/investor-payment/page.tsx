@@ -245,10 +245,10 @@ function InvestorPaymentContent() {
             <div className="inline-flex rounded-full border border-s2-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-s2/70">
               Investor Payment
             </div>
-            <div className="mt-3 text-3xl font-semibold tracking-[0.08em] text-s2">
+            <div className="mt-3 text-2xl font-semibold tracking-[0.08em] text-s2">
               ส่งหลักฐานการชำระเงิน
             </div>
-            <p className="mt-2 text-xs text-foreground-subtle">อัปโหลดสลิปการโอนเงินสำหรับรายการลงทุนนี้</p>
+            <p className="mt-2 text-xs text-foreground-subtle">Upload Payment Slip</p>
           </div>
         </div>
 
@@ -259,8 +259,8 @@ function InvestorPaymentContent() {
         )}
 
         <div className="space-y-4 pb-4">
-          <div className="rounded-xl border border-s2-border bg-background-white p-4 shadow-soft">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">Contract Detail</h3>
+          <div className="w-full max-w-md bg-background-white rounded-xl p-4 mb-4">
+            <h3 className="text-sm font-bold text-foreground mb-2">Contract Detail</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between gap-3">
                 <span className="text-foreground-subtle">หมายเลขสัญญา</span>
@@ -277,8 +277,8 @@ function InvestorPaymentContent() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-s2-border bg-s2-soft/45 p-4 shadow-soft">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">Receiver Account</h3>
+          <div className="w-full max-w-md bg-background-white rounded-xl p-4 mb-4">
+            <h3 className="text-sm font-bold text-foreground mb-2">Receiver Account</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between gap-3">
                 <span className="text-foreground-subtle">ธนาคาร</span>
@@ -306,23 +306,23 @@ function InvestorPaymentContent() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-s2-border bg-background-white p-4 shadow-soft">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-semibold uppercase tracking-[0.18em] text-s2/70">Transfer Amount</label>
+          <div className="w-full max-w-md bg-background-white rounded-xl p-4 mb-4">
+            <div className="mb-2 flex flex-row items-center justify-between mb-3">
+              <label className="text-sm font-bold text-foreground">Transfer Amount</label>
               <span className="text-sm text-foreground-subtle">บาท</span>
             </div>
             <input
               type="text"
               value={amount}
               readOnly
-              className="w-full rounded-xl border border-s2-border bg-s2-soft/30 px-4 py-4 text-xl font-semibold text-s2 outline-none"
+              className="w-full rounded-full border border-s2-border bg-s2-soft/30 px-4 py-4 text-xl font-semibold text-s2 outline-none text-center"
             />
-            <p className="mt-2 text-xs text-foreground-subtle">ยอดนี้ล็อกตามวงเงินที่ลูกค้าขอ ไม่สามารถแก้ไขได้</p>
+            <p className="mt-2 text-xs text-foreground-subtle text-center">ยอดนี้ล็อกตามวงเงินที่ลูกค้าขอ ไม่สามารถแก้ไขได้</p>
           </div>
 
           <div
             onClick={() => !slipImage && fileInputRef.current?.click()}
-            className={`rounded-xl border-2 bg-background-white p-4 h-56 shadow-soft flex flex-col items-center justify-center transition-colors relative overflow-hidden ${
+            className={`rounded-xl border-2 border-s2-border border-dashed bg-background-white px-4 py-0 h-56 shadow-soft flex flex-col items-center justify-center transition-colors relative overflow-hidden ${
               slipImage ? 'border-s2-border' : 'border-dashed border-s2-border cursor-pointer hover:bg-s2-soft/20'
             }`}
           >
@@ -358,30 +358,30 @@ function InvestorPaymentContent() {
           {slipImage && (
             <button
               onClick={handleRemoveImage}
-              className="btn-transition w-full rounded-full border border-s2 bg-background-white py-3 text-sm font-medium text-s2"
+              className="btn-transition w-full rounded-full border border-s2 bg-transparent py-3 text-sm font-medium text-s2"
             >
               ลบรูปสลิป
             </button>
           )}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 mx-auto flex w-full max-w-md flex-col gap-3 bg-transparent p-4">
+        <div className="fixed bottom-0 left-0 right-0 mx-auto flex w-full max-w-md flex-col gap-2 bg-background-white/25 backdrop-blur-sm border-t border-background-white/50 p-4 pb-10">
           <button
             onClick={handleSubmit}
             disabled={submitting || !slipImage}
-            className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-3 text-s2-fg shadow-soft disabled:opacity-50"
+            className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-investor)] py-2 text-s2-fg shadow-soft disabled:opacity-50 flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">{submitting ? 'กำลังส่ง...' : 'ส่งหลักฐานการชำระเงิน'}</span>
             <span className="text-xs font-light opacity-90">Submit payment proof</span>
           </button>
-          <button
+          {/* <button
             onClick={() => {
               router.push('/investment');
             }}
             className="btn-transition w-full rounded-full border border-s2 bg-background-white py-3 text-sm font-medium text-s2"
           >
             กลับพอร์ตการลงทุน
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
