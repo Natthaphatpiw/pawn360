@@ -5,6 +5,7 @@ import PinModal from '@/components/PinModal';
 import type { PinRole } from '@/lib/security/pin';
 
 type PreviewMode = 'verify' | 'setup' | 'reset';
+type PreviewStartStep = 'pin' | 'confirm' | 'details';
 
 const GROUPS: Array<{
   role: PinRole;
@@ -37,11 +38,19 @@ function PinModalPreviewCard({
   label,
   subtitle,
   wrapperClassName,
+  previewStartStep,
+  previewPrefill,
 }: {
   role: PinRole;
   label: string;
   subtitle: string;
   wrapperClassName: string;
+  previewStartStep?: PreviewStartStep;
+  previewPrefill?: {
+    phoneNumber?: string;
+    nationalId?: string;
+    dropPointCode?: string;
+  };
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<PreviewMode>('verify');
@@ -58,7 +67,7 @@ function PinModalPreviewCard({
           <div className="register-pill inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
             {label}
           </div>
-          <h2 className="register-heading mt-3 text-xl font-semibold">PIN Modal Preview</h2>
+          <h2 className="register-heading mt-3 text-xl font-semibold">PIN Page Preview</h2>
           <p className="register-subtle mt-1 text-sm">{subtitle}</p>
 
           <div className="mt-4 grid grid-cols-1 gap-2">
@@ -95,6 +104,8 @@ function PinModalPreviewCard({
         onVerified={() => setOpen(false)}
         initialMode={mode}
         previewMode
+        previewStartStep={mode === 'reset' ? previewStartStep : undefined}
+        previewPrefill={previewPrefill}
       />
     </div>
   );
@@ -106,9 +117,9 @@ export default function PinModalPreviewPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 rounded-[28px] border border-line-soft bg-background-white p-5 shadow-soft">
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-foreground-subtle">Component Preview</div>
-          <h1 className="mt-3 text-3xl font-semibold text-foreground">PIN Modal by User Group</h1>
+          <h1 className="mt-3 text-3xl font-semibold text-foreground">PIN Page by User Group</h1>
           <p className="mt-2 text-sm text-foreground-subtle">
-            ใช้หน้านี้สำหรับดู PIN modal UI เดียวกันภายใต้สีของแต่ละกลุ่มผู้ใช้งาน
+            ใช้หน้านี้สำหรับดู PIN page UI เดียวกันภายใต้สีของแต่ละกลุ่มผู้ใช้งาน
           </p>
         </div>
 
@@ -120,6 +131,15 @@ export default function PinModalPreviewPage() {
               label={group.label}
               subtitle={group.subtitle}
               wrapperClassName={group.wrapperClassName}
+              previewStartStep={group.role === 'PAWNER' ? 'details' : undefined}
+              previewPrefill={
+                group.role === 'PAWNER'
+                  ? {
+                      phoneNumber: '0802879789',
+                      nationalId: '1229900682544',
+                    }
+                  : undefined
+              }
             />
           ))}
         </div>
