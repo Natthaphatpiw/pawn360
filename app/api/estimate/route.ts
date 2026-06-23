@@ -3,6 +3,13 @@ import OpenAI from 'openai';
 import crypto from 'crypto';
 import { Redis } from '@upstash/redis';
 import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
+import {
+  hasAnthropicKeys,
+  getAnthropicModel,
+  callAnthropicMessages,
+  getAnthropicResponseText,
+  anthropicStructured,
+} from '@/lib/services/anthropic-llm';
 
 const collectEnvKeys = (values: Array<string | undefined>) => (
   values
@@ -57,8 +64,7 @@ async function runWithOpenAIFallback<T>(task: (client: OpenAI) => Promise<T>): P
   throw lastError;
 }
 
-const MODEL = 'gpt-4.1-mini';
-const PRICE_SEARCH_MODEL = 'gpt-4.1';
+const PRICE_SEARCH_MODEL = 'gpt-4.1'; // default model only for the optional PRICE_SEARCH_PROVIDER=openai web-search path
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
 const MIN_ESTIMATE_PRICE = 100;
 const WEB_SEARCH_MIN_ITEMS = 4;
@@ -69,6 +75,47 @@ const SERPAPI_FILTER_MAX_OUTPUT_TOKENS = 600;
 const USE_TH_WEIGHTS = false;
 const TH_WEIGHT = 2;
 const NON_TH_WEIGHT = 1;
+
+// ---- Web-search price provider (OpenAI vs Anthropic/Claude) ----
+// The "ราคากลาง" (market reference price) step searches the live web for used-market
+// listings. The provider used for THAT step is configurable via env; everything else
+// (input normalization, SerpAPI filtering) stays on OpenAI.
+type PriceSearchProvider = 'openai' | 'anthropic';
+
+const DEFAULT_OPENAI_PRICE_SEARCH_MODEL = PRICE_SEARCH_MODEL; // 'gpt-4.1'
+
+// PRICE_SEARCH_PROVIDER: 'openai' (default) | 'anthropic'
+function getPriceSearchProvider(): PriceSearchProvider {
+  const value = (process.env.PRICE_SEARCH_PROVIDER || 'openai').trim().toLowerCase();
+  return value === 'anthropic' ? 'anthropic' : 'openai';
+}
+
+// Model id for the active web-search provider. Override with PRICE_SEARCH_MODEL,
+// otherwise fall back to the provider default (gpt-4.1 / claude-sonnet-4-6).
+function getPriceSearchModel(provider: PriceSearchProvider): string {
+  const configured = process.env.PRICE_SEARCH_MODEL?.trim();
+  if (configured) return configured;
+  return provider === 'anthropic'
+    ? getAnthropicModel()
+    : DEFAULT_OPENAI_PRICE_SEARCH_MODEL;
+}
+
+// Whether to enable the Anthropic web_fetch tool alongside web_search. Default: on.
+function isWebFetchEnabledForPriceSearch(): boolean {
+  const value = process.env.PRICE_SEARCH_ENABLE_WEB_FETCH;
+  if (value === undefined) return true;
+  return ['true', '1', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
+// ---- Anthropic web-search tool constants (generic client lives in lib/services/anthropic-llm) ----
+const ANTHROPIC_WEB_SEARCH_TOOL = 'web_search_20250305';
+const ANTHROPIC_WEB_FETCH_TOOL = 'web_fetch_20250910';
+const ANTHROPIC_PRICE_SEARCH_MAX_TOKENS = 4096;
+const ANTHROPIC_WEB_SEARCH_MAX_USES = 5;
+const ANTHROPIC_WEB_FETCH_MAX_USES = 5;
+const ANTHROPIC_WEB_FETCH_MAX_CONTENT_TOKENS = 4000;
+const ANTHROPIC_MAX_PAUSE_CONTINUATIONS = 4;
+
 const ESTIMATE_CACHE_VERSION = 'v1';
 const resolvePositiveInt = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
@@ -418,7 +465,7 @@ function usdToThb(usd: number, exchangeRate: number): number {
   return Math.round(usd * exchangeRate * 100) / 100;
 }
 
-async function fetchWebSearchPrices(productName: string): Promise<WebSearchResult | null> {
+async function fetchWebSearchPricesOpenAI(productName: string): Promise<WebSearchResult | null> {
   if (!hasOpenAIKeys()) {
     return null;
   }
@@ -440,7 +487,7 @@ Rules:
 - Use canonical product URLs and remove tracking parameters when possible.`;
 
   const runSearch = (maxTokens: number) => runWithOpenAIFallback((client) => client.responses.create({
-    model: PRICE_SEARCH_MODEL,
+    model: getPriceSearchModel('openai'),
     input: prompt,
     max_output_tokens: maxTokens,
     temperature: 0,
@@ -509,6 +556,124 @@ Rules:
     query,
     items,
   };
+}
+
+// Routes the market-price web search to the provider configured by PRICE_SEARCH_PROVIDER.
+async function fetchWebSearchPrices(productName: string): Promise<WebSearchResult | null> {
+  const provider = getPriceSearchProvider();
+  if (provider === 'anthropic') {
+    return fetchWebSearchPricesAnthropic(productName);
+  }
+  return fetchWebSearchPricesOpenAI(productName);
+}
+
+// Anthropic/Claude variant of the web-search price lookup. Uses the Messages API
+// with the web_search (and optional web_fetch) server tools, then parses a JSON
+// array of Thai used-market listings out of Claude's final text response.
+async function fetchWebSearchPricesAnthropic(productName: string): Promise<WebSearchResult | null> {
+  if (!hasAnthropicKeys()) {
+    console.warn('⚠️ PRICE_SEARCH_PROVIDER=anthropic but ANTHROPIC_API_KEY is not configured; skipping web search.');
+    return null;
+  }
+
+  const query = buildWebSearchQuery(productName);
+  const exchangeRate = getExchangeRate();
+  const model = getPriceSearchModel('anthropic');
+
+  const system =
+    'You are a pricing analyst for the Thai second-hand (used) electronics market. ' +
+    'Use the web_search tool (and web_fetch to read a listing page when helpful) to find real, current resale prices. ' +
+    'Respond with valid JSON only.';
+
+  const prompt = `Find ${WEB_SEARCH_MIN_ITEMS}-${WEB_SEARCH_MAX_ITEMS} real second-hand (used) market listings for this exact product in Thailand: "${productName}".
+Use the web_search tool, for example with the query: "${query}".
+
+Rules:
+- Only include listings that match the exact model and capacity/spec.
+- Every price must be in Thai Baht (THB). If a listing is in another currency, convert using 1 USD = ${exchangeRate} THB.
+- Prefer real marketplace/retailer listings; use canonical product URLs without tracking parameters.
+- Keep between ${WEB_SEARCH_MIN_ITEMS} and ${WEB_SEARCH_MAX_ITEMS} items.
+
+Respond with ONLY a JSON object (no prose, no markdown code fences) in exactly this shape:
+{
+  "query": "${query}",
+  "items": [
+    { "title": "string", "price_thb": number, "source": "string", "url": "string" }
+  ]
+}`;
+
+  // Note: Anthropic's web_search localization rejects country code "TH"
+  // (unlike OpenAI), so we steer toward the Thai market via the query/prompt
+  // (Thai-language query + "in Thailand" + THB) rather than user_location.
+  const tools: any[] = [
+    {
+      type: ANTHROPIC_WEB_SEARCH_TOOL,
+      name: 'web_search',
+      max_uses: ANTHROPIC_WEB_SEARCH_MAX_USES,
+    },
+  ];
+
+  if (isWebFetchEnabledForPriceSearch()) {
+    tools.push({
+      type: ANTHROPIC_WEB_FETCH_TOOL,
+      name: 'web_fetch',
+      max_uses: ANTHROPIC_WEB_FETCH_MAX_USES,
+      max_content_tokens: ANTHROPIC_WEB_FETCH_MAX_CONTENT_TOKENS,
+      citations: { enabled: false },
+    });
+  }
+
+  const messages: any[] = [{ role: 'user', content: prompt }];
+
+  try {
+    let data: any = null;
+
+    // Server tools can pause a long turn (stop_reason: "pause_turn"); feed the
+    // partial assistant turn back so Claude can continue until the turn ends.
+    for (let attempt = 0; attempt <= ANTHROPIC_MAX_PAUSE_CONTINUATIONS; attempt++) {
+      data = await callAnthropicMessages({
+        model,
+        max_tokens: ANTHROPIC_PRICE_SEARCH_MAX_TOKENS,
+        system,
+        messages,
+        tools,
+      });
+
+      if (data?.stop_reason !== 'pause_turn' || !Array.isArray(data?.content)) {
+        break;
+      }
+      messages.push({ role: 'assistant', content: data.content });
+    }
+
+    const text = getAnthropicResponseText(data?.content);
+    const parsed = parseJsonFromText<WebSearchResult>(text);
+
+    if (!parsed || !Array.isArray(parsed.items)) {
+      console.warn('⚠️ Failed to parse Anthropic web_search prices');
+      return null;
+    }
+
+    const items: WebSearchItem[] = parsed.items
+      .map((item: any) => {
+        const priceRaw = item?.price_thb;
+        const price = typeof priceRaw === 'number'
+          ? priceRaw
+          : Number(String(priceRaw ?? '').replace(/[^\d.]/g, ''));
+        return {
+          title: typeof item?.title === 'string' ? item.title : '',
+          price_thb: price,
+          source: typeof item?.source === 'string' ? item.source : '',
+          url: typeof item?.url === 'string' ? item.url : '',
+        };
+      })
+      .filter((item) => item.title && Number.isFinite(item.price_thb) && item.price_thb > 0)
+      .slice(0, WEB_SEARCH_MAX_ITEMS);
+
+    return { query, items };
+  } catch (error) {
+    console.warn('⚠️ Anthropic web search failed:', error);
+    return null;
+  }
 }
 
 async function fetchSerpapiShoppingResults(
@@ -615,36 +780,26 @@ Return JSON only with:
   "keep_item_ids": ["item_1", "item_7"]
 }`;
 
-    const llmResponse = await runWithOpenAIFallback((client) => client.responses.create({
-      model: PRICE_SEARCH_MODEL,
-      input: prompt,
-      max_output_tokens: SERPAPI_FILTER_MAX_OUTPUT_TOKENS,
-      temperature: 0,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'serpapi_cleaned_prices',
-          strict: true,
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              query: { type: 'string' },
-              exchange_rate_thb_per_usd: { type: 'number' },
-              fetched_at: { type: 'string' },
-              keep_item_ids: {
-                type: 'array',
-                items: { type: 'string' },
-              },
-            },
-            required: ['query', 'exchange_rate_thb_per_usd', 'fetched_at', 'keep_item_ids'],
+    const parsed = await anthropicStructured<{ keep_item_ids: string[] }>({
+      userText: prompt,
+      toolName: 'serpapi_cleaned_prices',
+      toolDescription: 'Return the IDs of the SerpAPI items to keep.',
+      maxTokens: 1024,
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          query: { type: 'string' },
+          exchange_rate_thb_per_usd: { type: 'number' },
+          fetched_at: { type: 'string' },
+          keep_item_ids: {
+            type: 'array',
+            items: { type: 'string' },
           },
         },
+        required: ['query', 'exchange_rate_thb_per_usd', 'fetched_at', 'keep_item_ids'],
       },
-    }));
-
-    const content = getResponseText(llmResponse);
-    const parsed = parseJsonFromText<{ keep_item_ids: string[] }>(content);
+    });
 
     if (!parsed || !Array.isArray(parsed.keep_item_ids)) {
       console.warn('⚠️ Failed to parse SerpAPI LLM filter response');
@@ -675,7 +830,7 @@ Return JSON only with:
 
 // Agent 1: Normalize input data only
 async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
-  if (!hasOpenAIKeys()) {
+  if (!hasAnthropicKeys()) {
     return {
       productName: `${input.brand} ${input.model}`.trim(),
     };
@@ -720,30 +875,21 @@ ${extraLines ? `\nข้อมูลเพิ่มเติม:\n${extraLines}`
   "productName": "ชื่อสินค้า"
 }`;
 
-  const response = await runWithOpenAIFallback((client) => client.responses.create({
-    model: MODEL,
-    input: prompt,
-    max_output_tokens: 300,
-    temperature: 0,
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'normalized_item',
-        strict: true,
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            productName: { type: 'string' },
-          },
-          required: ['productName'],
-        },
+  const parsed = await anthropicStructured<NormalizedData>({
+    userText: prompt,
+    toolName: 'normalized_item',
+    toolDescription: 'Return the normalized product name.',
+    maxTokens: 512,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        productName: { type: 'string' },
       },
+      required: ['productName'],
     },
-  }));
+  });
 
-  const content = getResponseText(response);
-  const parsed = parseJsonFromText<NormalizedData>(content);
   const fallbackName = `${input.brand} ${input.model}`.trim();
 
   let productName = parsed?.productName?.trim() || fallbackName;
@@ -803,7 +949,7 @@ async function getRepresentativeMarketPrice(
 ): Promise<RepresentativeMarketResult> {
   const fallbackPrice = MIN_ESTIMATE_PRICE;
 
-  if (!hasOpenAIKeys()) {
+  if (!hasAnthropicKeys()) {
     return {
       marketPrice: fallbackPrice,
       analysis: null,
@@ -890,9 +1036,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<EstimateR
       }
     }
 
-    if (!hasOpenAIKeys()) {
+    if (!hasAnthropicKeys()) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'Anthropic API key not configured' },
         { status: 500 }
       );
     }
