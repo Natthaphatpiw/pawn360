@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { anthropicStructured, hasAnthropicKeys, getAnthropicVisionModel } from '@/lib/services/anthropic-llm';
 
 const collectEnvKeys = (values: Array<string | undefined>) => (
   values
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value))
 );
-
-const OPENAI_KEYS = collectEnvKeys([
-  process.env.OPENAI_API_KEY,
-  process.env.OPENAI_API_KEY_2,
-  process.env.OPENAI_API_KEY_3,
-  process.env.OPENAI_API_KEY_4,
-]);
 
 const GEMINI_KEYS = collectEnvKeys([
   process.env.GEMINI_API_KEY,
@@ -22,32 +15,14 @@ const GEMINI_KEYS = collectEnvKeys([
   process.env.GEMINI_API_KEY_4,
 ]);
 
-const openaiClients = OPENAI_KEYS.map((apiKey) => new OpenAI({ apiKey }));
 const geminiClients = GEMINI_KEYS.map((apiKey) => new GoogleGenerativeAI(apiKey));
 
-const PRECHECK_MODEL = 'gpt-4.1-mini';
 const GEMINI_MODEL = 'gemini-3-flash-preview';
 const MAX_IMAGE_COUNT = 6;
 const MAX_TOTAL_IMAGE_MB = 10;
 const MIN_AI_CONDITION_SCORE = 0.3;
 
-const hasOpenAIKeys = () => openaiClients.length > 0;
 const hasGeminiKeys = () => geminiClients.length > 0;
-
-const isOpenAIRateLimitError = (error: any): boolean => {
-  const status = error?.status ?? error?.response?.status;
-  if (status === 429) return true;
-  const code = `${error?.code || error?.error?.code || ''}`.toLowerCase();
-  const message = `${error?.message || ''} ${error?.error?.message || ''}`.toLowerCase();
-  return (
-    code.includes('rate_limit') ||
-    code.includes('insufficient_quota') ||
-    message.includes('rate limit') ||
-    message.includes('insufficient quota') ||
-    message.includes('quota') ||
-    message.includes('429')
-  );
-};
 
 const isGeminiRateLimitError = (error: any): boolean => {
   const status = error?.status ?? error?.response?.status;
@@ -60,27 +35,6 @@ const isGeminiRateLimitError = (error: any): boolean => {
     message.includes('429')
   );
 };
-
-async function runWithOpenAIFallback<T>(task: (client: OpenAI) => Promise<T>): Promise<T> {
-  if (!hasOpenAIKeys()) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
-  let lastError: any;
-  for (let i = 0; i < openaiClients.length; i++) {
-    const client = openaiClients[i];
-    try {
-      return await task(client);
-    } catch (error) {
-      lastError = error;
-      if (isOpenAIRateLimitError(error) && i < openaiClients.length - 1) {
-        console.warn(`⚠️ OpenAI rate limit hit. Switching to fallback key ${i + 2}.`);
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw lastError;
-}
 
 async function runWithGeminiFallback<T>(task: (client: GoogleGenerativeAI) => Promise<T>): Promise<T> {
   if (!hasGeminiKeys()) {
@@ -101,23 +55,6 @@ async function runWithGeminiFallback<T>(task: (client: GoogleGenerativeAI) => Pr
     }
   }
   throw lastError;
-}
-
-function getResponseText(response: any): string {
-  if (typeof response?.output_text === 'string') {
-    return response.output_text;
-  }
-
-  if (!Array.isArray(response?.output)) {
-    return '';
-  }
-
-  return response.output
-    .filter((item: any) => item?.type === 'message')
-    .flatMap((item: any) => item?.content || [])
-    .filter((part: any) => part?.type === 'output_text' && typeof part?.text === 'string')
-    .map((part: any) => part.text)
-    .join('\n');
 }
 
 function parseJsonFromText<T>(text: string): T | null {
@@ -305,7 +242,7 @@ function buildExpectedTypeLabel(itemType: string, appleCategory?: string) {
   return labelMap[normalized] || normalized;
 }
 
-// Agent 1: Image precheck with OpenAI (type match + consistency)
+// Agent 1: Image precheck with Claude (type match + consistency)
 async function precheckImages(options: {
   images: string[];
   itemType: string;
@@ -313,8 +250,8 @@ async function precheckImages(options: {
   model?: string;
   appleCategory?: string;
 }): Promise<ImagePrecheckResult> {
-  if (!hasOpenAIKeys()) {
-    throw new Error('OPENAI_API_KEY is not configured');
+  if (!hasAnthropicKeys()) {
+    throw new Error('ANTHROPIC_API_KEY is not configured');
   }
 
   const expectedType = buildExpectedTypeLabel(options.itemType, options.appleCategory);
@@ -347,66 +284,40 @@ expectedType: ${expectedType}
   "recommendation": "คำแนะนำให้ผู้ใช้ถ่ายภาพใหม่หรือเพิ่มเติม"
 }`;
 
-  const input: any[] = [
-    {
-      role: 'user',
-      content: [
-        { type: 'input_text', text: prompt },
-      ],
-    },
-  ];
-
-  const maxImages = Math.min(options.images.length, MAX_IMAGE_COUNT);
-  for (let i = 0; i < maxImages; i++) {
-    input[0].content.push({
-      type: 'input_image',
-      image_url: options.images[i],
-      detail: 'low',
-    });
-  }
-
-  const response = await runWithOpenAIFallback((client) => client.responses.create({
-    model: PRECHECK_MODEL,
-    input,
-    max_output_tokens: 400,
-    temperature: 0,
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'image_precheck',
-        strict: true,
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            pass: { type: 'boolean' },
-            reason: { type: 'string' },
-            expectedType: { type: 'string' },
-            consistentItem: { type: 'boolean' },
-            imageChecks: {
-              type: 'array',
-              items: {
-                type: 'object',
-                additionalProperties: false,
-                properties: {
-                  index: { type: 'number' },
-                  detectedType: { type: 'string' },
-                  matchesExpected: { type: 'boolean' },
-                  note: { type: 'string' },
-                },
-                required: ['index', 'detectedType', 'matchesExpected', 'note'],
-              },
+  const parsed = await anthropicStructured<ImagePrecheckResult>({
+    userText: prompt,
+    images: options.images.slice(0, MAX_IMAGE_COUNT),
+    model: getAnthropicVisionModel(),
+    toolName: 'image_precheck',
+    toolDescription: 'Return the image precheck result.',
+    maxTokens: 1024,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        pass: { type: 'boolean' },
+        reason: { type: 'string' },
+        expectedType: { type: 'string' },
+        consistentItem: { type: 'boolean' },
+        imageChecks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              index: { type: 'number' },
+              detectedType: { type: 'string' },
+              matchesExpected: { type: 'boolean' },
+              note: { type: 'string' },
             },
-            recommendation: { type: 'string' },
+            required: ['index', 'detectedType', 'matchesExpected', 'note'],
           },
-          required: ['pass', 'reason', 'expectedType', 'consistentItem', 'imageChecks', 'recommendation'],
         },
+        recommendation: { type: 'string' },
       },
+      required: ['pass', 'reason', 'expectedType', 'consistentItem', 'imageChecks', 'recommendation'],
     },
-  }));
-
-  const content = getResponseText(response);
-  const parsed = parseJsonFromText<ImagePrecheckResult>(content);
+  });
 
   if (!parsed) {
     return {
@@ -574,9 +485,9 @@ export const dynamic = 'force-dynamic'; // Always run dynamically
 
 export async function POST(request: NextRequest) {
   try {
-    if (!hasOpenAIKeys()) {
+    if (!hasAnthropicKeys()) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'Anthropic API key not configured' },
         { status: 500 }
       );
     }
@@ -597,7 +508,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'กรุณาเลือกประเภทสินค้าให้ถูกต้อง' }, { status: 400 });
     }
 
-    // Normalize image payloads for OpenAI/Gemini (data URL or https)
+    // Normalize image payloads for Claude/Gemini (data URL or https)
     const normalizedImages = images.map((img: string) => normalizeImageInput(img)).filter(Boolean);
 
     // Check total payload size to avoid invalid/truncated images
@@ -617,7 +528,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Processed size: ${originalSizeMB.toFixed(2)}MB`);
 
-    console.log('🔍 Prechecking images with OpenAI...');
+    console.log('🔍 Prechecking images with Claude...');
     const precheck = await precheckImages({
       images: processedImages,
       itemType,

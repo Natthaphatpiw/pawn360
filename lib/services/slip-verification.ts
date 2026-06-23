@@ -1,30 +1,10 @@
-import OpenAI from 'openai';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { anthropicStructured, hasAnthropicKeys, getAnthropicVisionModel } from '@/lib/services/anthropic-llm';
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null;
-
-const LEGACY_MODEL = 'gpt-4.1-mini';
+// Internal label for the non-SlipOK (Claude vision) verification path, stored in rawResponse.
+const LEGACY_MODEL = 'anthropic-vision';
 const SLIPOK_PROVIDER = 'slipok';
 const SLIPOK_BASE_URL = 'https://api.slipok.com/api/line/apikey';
-
-function getResponseText(response: any): string {
-  if (typeof response?.output_text === 'string') {
-    return response.output_text;
-  }
-
-  if (!Array.isArray(response?.output)) {
-    return '';
-  }
-
-  return response.output
-    .filter((item: any) => item?.type === 'message')
-    .flatMap((item: any) => item?.content || [])
-    .filter((part: any) => part?.type === 'output_text' && typeof part?.text === 'string')
-    .map((part: any) => part.text)
-    .join('\n');
-}
 
 export interface SlipVerificationResult {
   success: boolean;
@@ -499,7 +479,7 @@ async function verifyWithLegacyVision(
   tolerance: number,
 ): Promise<SlipVerificationResult> {
   try {
-    if (!openai) {
+    if (!hasAnthropicKeys()) {
       return {
         success: false,
         result: 'UNREADABLE',
@@ -507,8 +487,8 @@ async function verifyWithLegacyVision(
         expectedAmount,
         difference: null,
         confidenceScore: 0,
-        message: 'OpenAI API key not configured',
-        rawResponse: { error: 'OPENAI_API_KEY not set' },
+        message: 'Anthropic API key not configured',
+        rawResponse: { error: 'ANTHROPIC_API_KEY not set' },
       };
     }
 
@@ -534,92 +514,58 @@ Return ONLY a JSON object with this exact structure:
   "notes": "<any relevant notes>"
 }`;
 
-    const response = await openai.responses.create({
-      model: LEGACY_MODEL,
-      input: [
-        {
-          role: 'system',
-          content: [
-            { type: 'input_text', text: systemPrompt },
-          ],
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: `Please analyze this bank transfer slip and extract the transfer amount. Expected amount is ${expectedAmount.toLocaleString()} THB.`,
-            },
-            {
-              type: 'input_image',
-              image_url: slipUrl,
-              detail: 'high',
-            },
-          ],
-        },
-      ],
-      max_output_tokens: 500,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'slip_verification',
-          strict: true,
-          schema: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              detected_amount: {
-                anyOf: [
-                  { type: 'number' },
-                  { type: 'null' },
-                ],
-              },
-              confidence: { type: 'number' },
-              is_valid_slip: { type: 'boolean' },
-              bank_name: {
-                anyOf: [
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-              transaction_date: {
-                anyOf: [
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-              notes: {
-                anyOf: [
-                  { type: 'string' },
-                  { type: 'null' },
-                ],
-              },
-            },
-            required: [
-              'detected_amount',
-              'confidence',
-              'is_valid_slip',
-              'bank_name',
-              'transaction_date',
-              'notes',
+    const parsed: any = await anthropicStructured<any>({
+      system: systemPrompt,
+      userText: `Please analyze this bank transfer slip and extract the transfer amount. Expected amount is ${expectedAmount.toLocaleString()} THB.`,
+      images: [slipUrl],
+      model: getAnthropicVisionModel(),
+      toolName: 'slip_verification',
+      toolDescription: 'Return the extracted bank-slip details.',
+      maxTokens: 700,
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          detected_amount: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'null' },
+            ],
+          },
+          confidence: { type: 'number' },
+          is_valid_slip: { type: 'boolean' },
+          bank_name: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'null' },
+            ],
+          },
+          transaction_date: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'null' },
+            ],
+          },
+          notes: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'null' },
             ],
           },
         },
+        required: [
+          'detected_amount',
+          'confidence',
+          'is_valid_slip',
+          'bank_name',
+          'transaction_date',
+          'notes',
+        ],
       },
     });
 
-    const content = getResponseText(response);
-
-    let parsed: any;
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
-      }
-    } catch {
-      console.error('Failed to parse AI response:', content);
+    if (!parsed) {
+      console.error('Failed to parse AI slip response');
       return {
         success: false,
         result: 'UNREADABLE',
@@ -630,7 +576,7 @@ Return ONLY a JSON object with this exact structure:
         message: 'ไม่สามารถอ่านข้อมูลจากสลิปได้ กรุณาถ่ายรูปใหม่ให้ชัดเจน',
         rawResponse: {
           provider: LEGACY_MODEL,
-          content,
+          content: null,
         },
       };
     }
