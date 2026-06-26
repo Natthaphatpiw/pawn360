@@ -232,16 +232,35 @@ export async function POST(request: NextRequest) {
       item_status: 'PENDING',
     };
 
-    const { data: item, error: itemError } = await supabase
-      .from('items')
-      .insert(itemRecord)
-      .select()
-      .single();
+    const insertItemRecord = async (record: Record<string, unknown>) => (
+      supabase
+        .from('items')
+        .insert(record)
+        .select()
+        .single()
+    );
+
+    let { data: item, error: itemError } = await insertItemRecord(itemRecord);
+
+    if (itemError && `${itemError.message || ''}`.toLowerCase().includes('condition_checklist')) {
+      const fallbackRecord = { ...itemRecord };
+      delete (fallbackRecord as Record<string, unknown>).condition_checklist;
+      ({ data: item, error: itemError } = await insertItemRecord(fallbackRecord));
+    }
+
+    if (itemError && `${itemError.message || ''}`.toLowerCase().includes('item_status')) {
+      const fallbackRecord = { ...itemRecord, item_status: 'DRAFT' };
+      delete (fallbackRecord as Record<string, unknown>).condition_checklist;
+      ({ data: item, error: itemError } = await insertItemRecord(fallbackRecord));
+    }
 
     if (itemError || !item) {
       console.error('Error creating item:', itemError);
       return NextResponse.json(
-        { error: 'Failed to create item record' },
+        {
+          error: 'Failed to create item record',
+          details: itemError?.message || null,
+        },
         { status: 500 }
       );
     }
