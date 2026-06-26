@@ -308,14 +308,17 @@ const runReminders = async (supabase: any, today: Date) => {
       }
 
       const daysOverdue = calculateOverdueDays(contract.contract_end_date, todayStart);
-      const penaltyAmount = daysOverdue * 100;
+      const penaltyAmount = Number(requirement.penaltyAmount || 0);
+      const overdueInterestAmount = Number(requirement.overdueInterestAmount || 0);
+      const totalLateChargeAmount = Number(requirement.totalLateChargeAmount || penaltyAmount + overdueInterestAmount);
       const penaltyLink = buildPenaltyLiffUrl(contract.contract_id);
 
       const title = 'แจ้งเตือนค่าปรับค้างชำระ';
       const message = [
         `คุณมีสัญญาที่เริ่มต้นวันที่ ${formatThaiDate(contract.contract_start_date)} และสิ้นสุดวันที่ ${formatThaiDate(contract.contract_end_date)}`,
         `วันนี้วันที่ ${formatThaiDate(todayStart)} ซึ่งเกินกำหนดมาแล้ว ${daysOverdue} วัน`,
-        `ค่าปรับวันละ 100 บาท รวมเป็น ${penaltyAmount.toLocaleString()} บาท`,
+        `ค่าปรับเดือนละ 50 บาท ${overdueInterestAmount > 0 ? `และดอกเบี้ยเลท ${overdueInterestAmount.toLocaleString()} บาท` : ''}`.trim(),
+        `ยอดรวมค่าปรับและดอกเบี้ยเลท ${totalLateChargeAmount.toLocaleString()} บาท`,
         `กรุณาเข้าลิงค์นี้เพื่อทำรายการจ่ายเงินค่าปรับ ${penaltyLink}`,
       ].join('\n');
 

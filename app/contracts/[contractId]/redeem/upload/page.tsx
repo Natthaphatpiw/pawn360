@@ -15,6 +15,7 @@ export default function RedemptionUploadPage() {
   const contractId = params.contractId as string;
   const redemptionId = searchParams.get('redemptionId');
   const previewMode = isPreviewMode(searchParams);
+  const previewDeliveryMethod = searchParams.get('deliveryMethod');
 
   const { profile } = useLiff();
 
@@ -30,17 +31,22 @@ export default function RedemptionUploadPage() {
     promptpay_number: '0626092941',
   };
   const penaltyAmount = Number(redemptionDetails?.penalty_amount || redemptionDetails?.payment_breakdown?.penaltyAmount || 0);
+  const overdueInterestAmount = Number(redemptionDetails?.overdue_interest_amount || redemptionDetails?.payment_breakdown?.overdueInterestAmount || 0);
   const baseAmount = Number(redemptionDetails?.base_amount || redemptionDetails?.payment_breakdown?.baseAmount || 0);
+  const receiptRedemptionId = redemptionId || `preview-redeem-${contractId}`;
+  const returnReceiptPath = previewMode
+    ? `${withPreview(`/contracts/${contractId}/return-receipt`, 'redemptionId', receiptRedemptionId)}${redemptionDetails?.delivery_method ? `&deliveryMethod=${encodeURIComponent(String(redemptionDetails.delivery_method))}` : ''}`
+    : `/contracts/${contractId}/return-receipt?redemptionId=${encodeURIComponent(receiptRedemptionId)}`;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (previewMode) {
-      setRedemptionDetails(getMockRedemption(redemptionId || `preview-redeem-${contractId}`, contractId));
+      setRedemptionDetails(getMockRedemption(redemptionId || `preview-redeem-${contractId}`, contractId, previewDeliveryMethod || undefined));
     } else if (redemptionId) {
       fetchRedemptionDetails();
     }
-  }, [redemptionId, previewMode, contractId]);
+  }, [redemptionId, previewMode, contractId, previewDeliveryMethod]);
 
   const fetchRedemptionDetails = async () => {
     try {
@@ -135,14 +141,10 @@ export default function RedemptionUploadPage() {
           <h1 className="text-xl font-bold text-foreground mb-2">ส่งหลักฐานการชำระเงินแล้ว</h1>
           <p className="text-sm text-foreground-subtle mb-6">ระบบบันทึกคำขอไถ่ถอนเรียบร้อยแล้ว กรุณารอจุดรับฝากดำเนินการส่งคืนสินค้า</p>
           <button
-            onClick={() => (
-              previewMode
-                ? router.replace(withPreview(`/contracts/${contractId}/redeem/receipt`, 'redemptionId', redemptionId || `preview-redeem-${contractId}`))
-                : router.replace('/contracts')
-            )}
+            onClick={() => router.replace(returnReceiptPath)}
             className="w-full rounded-full bg-primary py-4 font-medium text-white"
           >
-            {previewMode ? 'ดูขั้นตอนถัดไป' : 'กลับไปหน้าสัญญา'}
+            ดูใบรับของ
           </button>
         </div>
       </div>
@@ -171,6 +173,14 @@ export default function RedemptionUploadPage() {
                 <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
                 <span className="font-medium text-primary">
                   {penaltyAmount.toLocaleString()} บาท
+                </span>
+              </div>
+            )}
+            {overdueInterestAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-foreground-subtle text-sm">ดอกเบี้ยเลท (3%/เดือน):</span>
+                <span className="font-medium text-primary">
+                  {overdueInterestAmount.toLocaleString()} บาท
                 </span>
               </div>
             )}

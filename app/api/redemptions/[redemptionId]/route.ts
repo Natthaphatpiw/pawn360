@@ -79,12 +79,15 @@ export async function GET(
         + Number(redemption.interest_amount || 0)
         + Number(redemption.delivery_fee || 0);
       const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+      const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
       redemption.base_amount = baseAmount;
       redemption.penalty_amount = penaltyAmount;
-      redemption.total_amount = roundCurrency(baseAmount + penaltyAmount);
+      redemption.overdue_interest_amount = overdueInterestAmount;
+      redemption.total_amount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
       redemption.payment_breakdown = {
         baseAmount,
         penaltyAmount,
+        overdueInterestAmount,
         totalAmount: redemption.total_amount,
       };
     }

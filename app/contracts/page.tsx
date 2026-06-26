@@ -36,6 +36,7 @@ interface Contract {
   total_amount: number;
   amount_paid: number;
   contract_status: string;
+  redemption_status?: string | null;
   funding_status: string;
   items: ContractItem;
   remainingDays: number;
@@ -163,6 +164,10 @@ export default function PawnerContractList() {
         return { text: 'เลยกำหนด', bg: 'bg-error-soft', textCol: 'text-error' };
       case 'ส่งคืน':
         return { text: 'ส่งคืน', bg: 'bg-background-subtle', textCol: 'text-foreground-subtle' };
+      case 'รอรับของคืน':
+        return { text: 'รอรับของคืน', bg: 'bg-primary-soft', textCol: 'text-primary' };
+      case 'ไถ่ถอน':
+        return { text: 'ไถ่ถอน', bg: 'bg-success-soft', textCol: 'text-success' };
       default:
         return { text: status, bg: 'bg-background-subtle', textCol: 'text-foreground-subtle' };
     }
@@ -174,6 +179,13 @@ export default function PawnerContractList() {
   };
 
   const visibleContracts = contracts.filter((contract) => {
+    if (contract.displayStatus === 'รอรับของคืน') {
+      return true;
+    }
+    if (contract.displayStatus === 'ไถ่ถอน') {
+      return true;
+    }
+
     if (ENDED_CONTRACT_STATUSES.has(contract.contract_status)) {
       return false;
     }
@@ -325,7 +337,7 @@ export default function PawnerContractList() {
               ],
               fallbackPath: '/estimate',
             })}
-            className="btn-transition btn-sheen w-full rounded-full bg-[image:var(--background-image-grad-primary)] py-2 text-primary-fg shadow-soft flex flex-col items-center justify-center"
+            className="btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] w-full rounded-full py-2 text-primary-fg shadow-soft flex flex-col items-center justify-center"
           >
             <span className="text-base font-medium">ขอสินเชื่อ</span>
             <span className="text-xs font-light opacity-90">Pawn entry</span>

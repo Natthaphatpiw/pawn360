@@ -28,9 +28,14 @@ CREATE TABLE IF NOT EXISTS redemption_requests (
 
   -- Delivery Options
   delivery_method VARCHAR(50) CHECK (delivery_method IN (
-    'SELF_PICKUP',          -- รับของเอง
-    'SELF_ARRANGE',         -- เรียกขนส่งเอง
-    'PLATFORM_ARRANGE'      -- ให้ Platform เรียกขนส่งให้
+    'SELF_PICKUP',                 -- รับของเอง (legacy)
+    'SELF_ARRANGE',                -- เรียกขนส่งเอง (legacy)
+    'PLATFORM_ARRANGE',            -- ให้ Platform เรียกขนส่งให้ (legacy)
+    'DROPPOINT_SELF_PICKUP',        -- รับเองที่ Drop Point ภายใน 15 วัน
+    'DROPPOINT_SELF_RIDER',         -- เรียกไรเดอร์เองไปรับที่ Drop Point
+    'CENTRAL_SCHEDULE_7D',          -- Astly ส่งกลับ Drop Point เดิมภายใน 7 วันเพื่อให้ลูกค้ามารับเอง
+    'CENTRAL_SELF_PICKUP_TODAY',    -- รับเองที่คลังกลาง Astly ภายในวัน
+    'DROPPOINT_NEXT_DAY_PICKUP'     -- ส่งกลับ Drop Point เพื่อรับวันถัดไป
   )),
 
   -- Delivery Address (for SELF_ARRANGE or PLATFORM_ARRANGE)

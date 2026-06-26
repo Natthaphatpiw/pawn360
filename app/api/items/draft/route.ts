@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
       imageUrls,
       conditionResult,
       estimateResult,
+      conditionChecklist,
       // Laptop specific
       cpu,
       ram,
@@ -198,6 +199,7 @@ export async function POST(request: NextRequest) {
         item_condition: totalScore,
         ai_condition_score: aiScore,
         ai_condition_reason: conditionResult?.reason || null,
+        condition_checklist: conditionChecklist || null,
         estimated_value: estimatedValue,
         ai_confidence: aiConfidence,
         item_status: 'DRAFT',
