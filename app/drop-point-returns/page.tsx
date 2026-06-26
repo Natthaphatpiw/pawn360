@@ -274,13 +274,16 @@ function DropPointReturnsContent() {
 
   if (redemptionId && detail) {
     const isReturnCompleted = detail.request_status === 'COMPLETED' || Boolean(detail.item_return_confirmed_at);
-    const deliveryMethodText = detail.delivery_method === 'SELF_PICKUP'
-      ? 'ดำเนินการด้วยตัวเอง'
-      : detail.delivery_method === 'SELF_ARRANGE'
-        ? 'เรียกขนส่งเอง'
-        : detail.delivery_method === 'PLATFORM_ARRANGE'
-          ? 'Pawnly จัดส่งให้'
-          : detail.delivery_method || '-';
+    const deliveryMethodText = {
+      SELF_PICKUP: 'ดำเนินการด้วยตัวเอง',
+      SELF_ARRANGE: 'เรียกขนส่งเอง',
+      PLATFORM_ARRANGE: 'Pawnly จัดส่งให้',
+      DROPPOINT_SELF_PICKUP: 'รับเองที่ Drop Point',
+      DROPPOINT_SELF_RIDER: 'เรียกไรเดอร์เอง',
+      CENTRAL_SCHEDULE_7D: 'นัดรับที่ Drop Point ภายใน 7 วัน',
+      CENTRAL_SELF_PICKUP_TODAY: 'รับเองที่คลังกลาง Astly วันนี้',
+      DROPPOINT_NEXT_DAY_PICKUP: 'รับวันถัดไปที่ Drop Point',
+    }[detail.delivery_method as string] || detail.delivery_method || '-';
 
     return (
       <DropPointPageShell className="pb-28">

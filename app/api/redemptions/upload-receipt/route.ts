@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
       .update({
         contract_status: 'COMPLETED',
         redemption_status: 'COMPLETED',
+        item_delivery_status: 'RETURNED',
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

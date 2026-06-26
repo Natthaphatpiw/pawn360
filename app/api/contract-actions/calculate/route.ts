@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
     const penalty = serializePenaltyRequirement(contract, penaltyRequirement);
     const penaltyAmount = penaltyRequirement.required ? penaltyRequirement.penaltyAmount : 0;
+    const overdueInterestAmount = penaltyRequirement.required ? penaltyRequirement.overdueInterestAmount : 0;
+    const lateChargeAmount = penaltyRequirement.required ? penaltyRequirement.totalLateChargeAmount : 0;
 
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const msPerDay = 1000 * 60 * 60 * 24;
@@ -70,10 +72,10 @@ export async function POST(request: NextRequest) {
     const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
     const daysRemaining = Math.max(0, daysInContract - daysElapsed);
 
-    // Rates: interest (2%) and platform fee (1%) are separate
+    // Rates: interest (1.5%) and platform fee (1.5%) are separate
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const feeRate = Number(contract.platform_fee_rate ?? 0.015);
     const dailyInterestRate = monthlyInterestRate / 30;
 
     // Current principal
@@ -102,6 +104,8 @@ export async function POST(request: NextRequest) {
       penaltyRequired: penaltyRequirement.required,
       penalty,
       penaltyAmount,
+      overdueInterestAmount,
+      lateChargeAmount,
     };
 
     switch (actionType) {
@@ -117,7 +121,7 @@ export async function POST(request: NextRequest) {
           ...calculation,
           interestToPay,
           baseTotalToPay: interestToPay,
-          totalToPay: round2(interestToPay + penaltyAmount),
+          totalToPay: round2(interestToPay + lateChargeAmount),
           newStartDate: renewedWindow.contractStartDate.toISOString().split('T')[0],
           newEndDate: renewedWindow.contractEndDate.toISOString().split('T')[0],
           extensionDays: daysInContract,
@@ -159,7 +163,7 @@ export async function POST(request: NextRequest) {
           interestRemaining: newInterestForRemaining,
           interestTotalIfPayLater,
           baseTotalToPay: totalToPayNow,
-          totalToPay: round2(totalToPayNow + penaltyAmount),
+          totalToPay: round2(totalToPayNow + lateChargeAmount),
           totalToPayNow,
           principalAfterReduction,
           newInterestForRemaining,
@@ -220,7 +224,7 @@ export async function POST(request: NextRequest) {
           interestIncrease,
           maxIncrease,
           baseTotalToPay: interestForPeriod,
-          totalToPay: round2(interestForPeriod + penaltyAmount),
+          totalToPay: round2(interestForPeriod + lateChargeAmount),
           amountToReceive: increaseAmountValue, // จำนวนที่ pawner จะได้รับจาก investor
           description: `เพิ่มเงินต้น ${increaseAmountValue.toLocaleString()} บาท\nดอกเบี้ยช่วงแรก ${interestForPeriod.toLocaleString()} บาท\nดอกเบี้ยช่วงที่เหลือ ${newInterestForRemaining.toLocaleString()} บาท`,
         };

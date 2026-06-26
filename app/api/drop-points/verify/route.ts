@@ -5,6 +5,41 @@ import { requirePinToken } from '@/lib/security/pin';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
+const CONDITION_CHECK_KEYS = [
+  'screenCrack',
+  'screenLineDeadPixel',
+  'touchIssue',
+  'batteryIssue',
+  'bodyDamage',
+  'cameraIssue',
+  'portButtonIssue',
+  'waterIssue',
+] as const;
+
+type ConditionCheckKey = (typeof CONDITION_CHECK_KEYS)[number];
+
+const hasStoredConditionChecklist = (checklist: unknown): checklist is Record<ConditionCheckKey, boolean> => {
+  if (!checklist || typeof checklist !== 'object') return false;
+  return CONDITION_CHECK_KEYS.every((key) => typeof (checklist as Record<string, unknown>)[key] === 'boolean');
+};
+
+const isConditionChecklistMatch = (
+  pawnerChecklist: unknown,
+  dropPointChecklist: unknown
+) => {
+  if (!hasStoredConditionChecklist(pawnerChecklist)) {
+    return true;
+  }
+
+  if (!hasStoredConditionChecklist(dropPointChecklist)) {
+    return false;
+  }
+
+  return CONDITION_CHECK_KEYS.every(
+    (key) => pawnerChecklist[key] === dropPointChecklist[key]
+  );
+};
+
 // Investor LINE OA client
 const investorLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
@@ -111,11 +146,14 @@ export async function POST(request: NextRequest) {
     const hasAnyMismatch = requiredBooleanFields.some((field) => verificationData?.[field] === false);
     const expectedConditionScore = Number(contract.items?.item_condition || 0);
     const actualConditionScore = Number(verificationData?.condition_score || 0);
+    const pawnerConditionChecklist = contract.items?.condition_checklist;
+    const dropPointConditionChecklist = verificationData?.condition_checklist;
+    const hasChecklistMismatch = !isConditionChecklistMatch(pawnerConditionChecklist, dropPointConditionChecklist);
     const isConditionGapTooHigh = Number.isFinite(expectedConditionScore)
       ? actualConditionScore < (expectedConditionScore - 10)
       : false;
 
-    if (verificationResult === 'APPROVED' && (hasIncompleteChecks || hasAnyMismatch || isConditionGapTooHigh)) {
+    if (verificationResult === 'APPROVED' && (hasIncompleteChecks || hasAnyMismatch || isConditionGapTooHigh || hasChecklistMismatch)) {
       return NextResponse.json(
         {
           error: 'พบข้อมูลไม่ตรงหรือสภาพต่ำกว่าที่กำหนด ต้องส่งคืนเท่านั้น',
@@ -123,6 +161,7 @@ export async function POST(request: NextRequest) {
           hasIncompleteChecks,
           hasAnyMismatch,
           isConditionGapTooHigh,
+          hasChecklistMismatch,
         },
         { status: 400 }
       );
@@ -149,6 +188,7 @@ export async function POST(request: NextRequest) {
         functionality_ok: verificationData.functionality_ok,
         mdm_lock_status: verificationData.mdm_lock_status,
         condition_score: verificationData.condition_score,
+        condition_checklist: verificationData.condition_checklist,
         verification_photos: verificationData.verification_photos,
         notes: verificationData.notes,
         verification_result: verificationResult,

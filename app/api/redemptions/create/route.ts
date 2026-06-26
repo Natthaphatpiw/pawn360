@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
     const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
     if (penaltyRequirement.required) {
       await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
     }
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const feeRate = Number(contract.platform_fee_rate ?? 0.015);
     const dailyInterestRate = monthlyInterestRate / 30;
 
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     const basePrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
     const deliveryFeeAmount = deliveryFee || 0;
-    const totalAmount = basePrincipal + interestDue + deliveryFeeAmount + penaltyAmount;
+    const totalAmount = basePrincipal + interestDue + deliveryFeeAmount + penaltyAmount + overdueInterestAmount;
 
     // Create redemption request
     const { data: redemption, error: redemptionError } = await supabase
@@ -177,6 +178,7 @@ export async function POST(request: NextRequest) {
       redemptionId: redemption.redemption_id,
       penaltyRequired: penaltyRequirement.required,
       penaltyAmount,
+      overdueInterestAmount,
       message: 'Redemption request created successfully',
     });
 

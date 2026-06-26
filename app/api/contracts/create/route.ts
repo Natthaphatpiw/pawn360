@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
     const contractEndDate = new Date(contractStartDate);
     contractEndDate.setUTCDate(contractEndDate.getUTCDate() + requestedDurationDays);
 
-    const monthlyInterestRate = 0.02; // 2% per month (pawner interest)
-    const platformFeeRate = 0.01; // 1% per month (fixed fee for full term)
+    const monthlyInterestRate = 0.015; // 1.5% per month (pawner interest)
+    const platformFeeRate = 0.015; // 1.5% per month (fixed fee for full term)
     const interestAmount = loanRequest.requested_amount * monthlyInterestRate * (requestedDurationDays / 30);
     const platformFeeAmount = loanRequest.requested_amount * platformFeeRate * (requestedDurationDays / 30);
     const totalAmount = loanRequest.requested_amount + interestAmount + platformFeeAmount;
@@ -111,10 +111,10 @@ export async function POST(request: NextRequest) {
       contract_end_date: contractEndDate.toISOString(),
       contract_duration_days: requestedDurationDays,
       loan_principal_amount: loanRequest.requested_amount,
-      interest_rate: monthlyInterestRate, // Pawner interest rate (2%)
-      interest_amount: interestAmount, // Interest amount for full term (2%)
+      interest_rate: monthlyInterestRate, // Pawner interest rate (1.5%)
+      interest_amount: interestAmount, // Interest amount for full term (1.5%)
       total_amount: totalAmount, // principal + interest + fee
-      platform_fee_rate: platformFeeRate, // Platform fee rate (1%)
+      platform_fee_rate: platformFeeRate, // Platform fee rate (1.5%)
       platform_fee_amount: platformFeeAmount,
       contract_status: 'PENDING_SIGNATURE',
       funding_status: 'PENDING',
