@@ -12,7 +12,6 @@ import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
-import VolumeSlider from '@/components/VolumeSlider';
 import {
   buildMockEstimate,
   createMockPawnRequest,
@@ -453,6 +452,102 @@ interface Customer {
 
 type Step = 'form' | 'estimate_result' | 'pawn_summary' | 'pawn_setup' | 'qr_display' | 'contract_agreement' | 'contract_success';
 
+type ConditionCheckKey =
+  | 'screenCrack'
+  | 'screenLineDeadPixel'
+  | 'touchIssue'
+  | 'batteryIssue'
+  | 'bodyDamage'
+  | 'cameraIssue'
+  | 'portButtonIssue'
+  | 'waterIssue';
+
+const CONDITION_CHECKLIST: Array<{
+  key: ConditionCheckKey;
+  label: string;
+  detail: string;
+  deduction: number;
+}> = [
+  {
+    key: 'screenCrack',
+    label: 'จอแตก / ร้าว',
+    detail: 'มีรอยร้าว แตกบางส่วน หรือแตกหนัก',
+    deduction: 32,
+  },
+  {
+    key: 'screenLineDeadPixel',
+    label: 'จอเป็นเส้น / เดดพิกเซล',
+    detail: 'มีเส้นขึ้น หน้าจอกระพริบ หรือมี dead pixel',
+    deduction: 24,
+  },
+  {
+    key: 'touchIssue',
+    label: 'ทัชสกรีนผิดปกติ',
+    detail: 'แตะไม่ติด สะดุด หรือบางจุดไม่ตอบสนอง',
+    deduction: 18,
+  },
+  {
+    key: 'batteryIssue',
+    label: 'สภาพแบตเตอรี่ไม่ดี',
+    detail: 'แบตเสื่อม บวม หมดไว หรือแจ้งเตือนสุขภาพแบตต่ำ',
+    deduction: 14,
+  },
+  {
+    key: 'bodyDamage',
+    label: 'ตัวเครื่องบุบ / แตก',
+    detail: 'มีรอยตกกระแทก บิ่น งอ หรือฝาหลังเสียหาย',
+    deduction: 12,
+  },
+  {
+    key: 'cameraIssue',
+    label: 'กล้อง / แฟลชเสีย',
+    detail: 'ถ่ายไม่ได้ เบลอ มีฝ้า หรือแฟลชไม่ทำงาน',
+    deduction: 8,
+  },
+  {
+    key: 'portButtonIssue',
+    label: 'พอร์ต / ปุ่มกดมีปัญหา',
+    detail: 'ชาร์จไม่เข้า ปุ่มค้าง ปุ่มกดเสีย หรือพอร์ตหลวม',
+    deduction: 6,
+  },
+  {
+    key: 'waterIssue',
+    label: 'มีร่องรอยน้ำเข้า / เปิดไม่ติด',
+    detail: 'มีคราบน้ำ สนิม หรือเปิดไม่ติดเป็นปกติ',
+    deduction: 34,
+  },
+];
+
+type ConditionCheckState = Record<ConditionCheckKey, boolean | null>;
+
+const createInitialConditionChecks = (): ConditionCheckState => ({
+  screenCrack: null,
+  screenLineDeadPixel: null,
+  touchIssue: null,
+  batteryIssue: null,
+  bodyDamage: null,
+  cameraIssue: null,
+  portButtonIssue: null,
+  waterIssue: null,
+});
+
+const calculateConditionScore = (checks: ConditionCheckState) => {
+  const deduction = CONDITION_CHECKLIST.reduce((total, item) => (
+    checks[item.key] ? total + item.deduction : total
+  ), 0);
+
+  return Math.max(0, Math.min(100, 100 - deduction));
+};
+
+const safeParseJson = <T,>(raw: string, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 const createInitialFormData = (): FormData => ({
   itemType: '',
   brand: '',
@@ -466,7 +561,7 @@ const createInitialFormData = (): FormData => ({
   watchConnectivity: '',
   connectivity: '',
   accessories: '',
-  condition: 50,
+  condition: 0,
   defects: '',
   note: '',
   lenses: ['', ''],
@@ -508,6 +603,8 @@ function EstimatePageInner() {
   // Estimation and AI results
   const [estimateResult, setEstimateResult] = useState<EstimateResult | null>(null);
   const [conditionResult, setConditionResult] = useState<{ score: number; reason: string } | null>(null);
+  const [conditionChecks, setConditionChecks] = useState<ConditionCheckState>(createInitialConditionChecks);
+  const [conditionChecklistTouched, setConditionChecklistTouched] = useState(false);
 
   // Pawn setup
   const [stores, setStores] = useState<Store[]>([]);
@@ -539,6 +636,9 @@ function EstimatePageInner() {
   const manualPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const appleModels = formData.appleCategory ? (APPLE_MODELS_BY_CATEGORY[formData.appleCategory] || []) : [];
+  const derivedConditionScore = conditionChecklistTouched
+    ? calculateConditionScore(conditionChecks)
+    : 0;
 
   // Success confirmation data
   const [loanRequestId, setLoanRequestId] = useState<string>('');
@@ -547,6 +647,8 @@ function EstimatePageInner() {
 
   const resetEstimateForm = () => {
     setFormData(createInitialFormData());
+    setConditionChecks(createInitialConditionChecks());
+    setConditionChecklistTouched(false);
     setImages([]);
     setImageUrls([]);
     setUploadedImageUrls([]);
@@ -677,9 +779,12 @@ function EstimatePageInner() {
         return;
       }
       try {
-        const response = await axios.get('/api/manual-estimate/config');
+        const response = await axios.get('/api/manual-estimate/config', {
+          responseType: 'text',
+        });
+        const payload = safeParseJson<{ enabled?: boolean }>(String(response.data || ''), {});
         if (mounted) {
-          setManualEstimateEnabled(Boolean(response.data?.enabled));
+          setManualEstimateEnabled(Boolean(payload.enabled));
         }
       } catch (configError) {
         console.warn('Manual estimate config fetch failed:', configError);
@@ -703,10 +808,13 @@ function EstimatePageInner() {
 
     const loadDraft = async () => {
       try {
-        const res = await axios.get(`/api/items/draft?lineId=${profile.userId}&itemId=${effectiveDraftId}`);
-        if (!res.data?.success || !res.data?.item) return;
+        const res = await axios.get(`/api/items/draft?lineId=${profile.userId}&itemId=${effectiveDraftId}`, {
+          responseType: 'text',
+        });
+        const payload = safeParseJson<{ success?: boolean; item?: any }>(String(res.data || ''), {});
+        if (!payload.success || !payload.item) return;
 
-        const d = res.data.item;
+        const d = payload.item;
         const notesPayload = splitItemNotesAndPasscode(d.notes);
         const accessoriesTokens = (d.accessories || '')
           .split(',')
@@ -741,6 +849,18 @@ function EstimatePageInner() {
           },
         }));
 
+        if (d.condition_checklist && typeof d.condition_checklist === 'object') {
+          const nextChecks = {
+            ...createInitialConditionChecks(),
+            ...d.condition_checklist,
+          } as ConditionCheckState;
+          setConditionChecks(nextChecks);
+          setConditionChecklistTouched(true);
+        } else {
+          setConditionChecks(createInitialConditionChecks());
+          setConditionChecklistTouched(false);
+        }
+
         setUploadedImageUrls(d.image_urls || []);
         setEstimateResult({
           estimatedPrice: d.estimated_value || 0,
@@ -771,9 +891,12 @@ function EstimatePageInner() {
       return;
     }
     try {
-      const response = await axios.get(`/api/items/draft?lineId=${profile.userId}`);
-      if (response.data.success) {
-        setDraftCount(response.data.items.length);
+      const response = await axios.get(`/api/items/draft?lineId=${profile.userId}`, {
+        responseType: 'text',
+      });
+      const payload = safeParseJson<{ success?: boolean; items?: unknown[] }>(String(response.data || ''), {});
+      if (payload.success) {
+        setDraftCount(payload.items?.length || 0);
       }
     } catch (error) {
       console.error('Error fetching draft count:', error);
@@ -787,9 +910,12 @@ function EstimatePageInner() {
       return;
     }
     try {
-      const response = await axios.get('/api/stores');
-      if (response.data.success) {
-        setStores(response.data.stores);
+      const response = await axios.get('/api/stores', {
+        responseType: 'text',
+      });
+      const payload = safeParseJson<{ success?: boolean; stores?: Store[] }>(String(response.data || ''), {});
+      if (payload.success) {
+        setStores(payload.stores || []);
       }
     } catch (error) {
       console.error('Error fetching stores:', error);
@@ -834,6 +960,7 @@ function EstimatePageInner() {
             ...prev,
             condition: conditionScore,
           }));
+          setConditionChecklistTouched(false);
 
           setManualRequestId(null);
           clearManualPolling();
@@ -925,6 +1052,8 @@ function EstimatePageInner() {
 
     // Reset fields when item type changes
     if (name === 'itemType') {
+      setConditionChecks(createInitialConditionChecks());
+      setConditionChecklistTouched(false);
       setFormData(prev => ({
         ...prev,
         brand: '',
@@ -945,6 +1074,7 @@ function EstimatePageInner() {
         gpu: '',
         appleCategory: '',
         appleSpecs: '',
+        condition: 0,
       }));
     }
   };
@@ -1038,6 +1168,22 @@ function EstimatePageInner() {
         [accessory]: !prev.appleAccessories![accessory]
       }
     }));
+  };
+
+  const handleConditionCheckChange = (key: ConditionCheckKey, value: boolean) => {
+    setConditionChecklistTouched(true);
+    setConditionChecks((prev) => {
+      const nextChecks = {
+        ...prev,
+        [key]: value,
+      };
+      const nextScore = calculateConditionScore(nextChecks);
+      setFormData((formPrev) => ({
+        ...formPrev,
+        condition: nextScore,
+      }));
+      return nextChecks;
+    });
   };
 
   // Validation
@@ -1179,7 +1325,7 @@ function EstimatePageInner() {
           itemType: formData.itemType,
           brand: formData.brand,
           model: formData.model,
-          condition: formData.condition,
+          condition: derivedConditionScore,
           appleCategory: formData.appleCategory,
         });
 
@@ -1194,6 +1340,7 @@ function EstimatePageInner() {
           ...prev,
           condition: Math.round(mockConditionResult.score * 100),
         }));
+        setConditionChecklistTouched(false);
 
         updateProcessingStatus(100, 'พร้อมแสดงผล', 'กำลังเปิดหน้า Pawn Summary');
         await waitMock(250);
@@ -1281,7 +1428,7 @@ function EstimatePageInner() {
           watchConnectivity: formData.watchConnectivity,
           accessories: accessoriesValue,
           appleAccessories,
-          pawnerCondition: formData.condition,
+          pawnerCondition: derivedConditionScore,
           defects: formData.defects,
           note: formData.note,
           appleCategory: formData.appleCategory,
@@ -1347,9 +1494,7 @@ function EstimatePageInner() {
       ensureNotCanceled(signal);
       updateProcessingStatus(80, 'ประเมินราคา', 'กำลังคำนวณราคาประเมิน');
 
-      const pawnerConditionPercent = Number.isFinite(formData.condition)
-        ? Math.min(100, Math.max(0, formData.condition))
-        : 0;
+      const pawnerConditionPercent = Math.min(100, Math.max(0, derivedConditionScore));
       const aiConditionPercent = Number.isFinite(conditionResponse.data.score)
         ? Math.min(100, Math.max(0, conditionResponse.data.score <= 1 ? conditionResponse.data.score * 100 : conditionResponse.data.score))
         : 0;
@@ -1409,6 +1554,7 @@ function EstimatePageInner() {
         ...prev,
         condition: finalConditionPercent
       }));
+      setConditionChecklistTouched(false);
 
       // Move to pawn summary step
       console.log('🎯 Moving to pawn summary step');
@@ -1469,7 +1615,7 @@ function EstimatePageInner() {
         model: formData.model,
         type: formData.itemType,
         serialNo: formData.serialNo,
-        condition: formData.condition,
+        condition: derivedConditionScore,
         defects: formData.defects,
         note: formData.note,
         accessories: formData.itemType === 'Apple'
@@ -1724,7 +1870,7 @@ function EstimatePageInner() {
                           className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                         />
                         <datalist id="apple-capacity-options">
-                          <option value="32GB" />
+                          {/* <option value="32GB" /> */}
                           <option value="64GB" />
                           <option value="128GB" />
                           <option value="256GB" />
@@ -1976,42 +2122,88 @@ function EstimatePageInner() {
                   </div>
                 )}
 
-                {/* Condition Slider */}
-                <div className="mb-4 mt-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <FormLabel thai="สภาพ" eng="Condition" required />
-                    <span className="text-primary font-bold">{formData.condition}%</span>
+                {/* Condition Checklist */}
+                <div className="mb-6 mt-6">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground text-sm md:text-base">
+                        สภาพและตำหนิ <span className="text-error">*</span>
+                      </span>
+                      <span className="rounded-md bg-background-white/80 px-2 py-0.5 text-xs font-normal text-foreground-subtle">
+                        Condition checklist
+                      </span>
+                    </div>
+                    <span className="rounded-full border border-primary-border bg-primary-soft px-3 py-1 text-xs font-semibold text-primary">
+                      {derivedConditionScore}%
+                    </span>
                   </div>
 
-                  <div className="mb-2 rounded-lg border border-primary/15 bg-background-white px-5 py-3">
-                    <VolumeSlider
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={formData.condition}
-                      ariaLabel="Condition"
-                      onChange={(condition) => setFormData(prev => ({ ...prev, condition }))}
-                    />
+                  <div className="space-y-4 p-0">
 
-                    <div className="mt-3 flex justify-between text-xs font-semibold text-foreground-subtle">
-                      <span>0%</span>
-                      <span>100%</span>
+                    <div className="grid gap-2">
+                      {CONDITION_CHECKLIST.map((item) => {
+                        const checked = conditionChecks[item.key];
+                        return (
+                          <div key={item.key} className="rounded-lg bg-background-white p-3">
+                            <div className="mb-3">
+                              <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                              <div className="mt-1 text-xs leading-relaxed text-foreground-subtle">{item.detail}</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleConditionCheckChange(item.key, true)}
+                                aria-pressed={checked === true}
+                                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                                  checked === true
+                                    ? 'border-error bg-error text-primary-fg'
+                                    : 'border-error-border bg-background-white text-error/55 hover:bg-background-subtle'
+                                }`}
+                              >
+                                ใช่
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleConditionCheckChange(item.key, false)}
+                                aria-pressed={checked === false}
+                                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                                  checked === false
+                                    ? 'border-success bg-success text-success-fg'
+                                    : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+                                }`}
+                              >
+                                ไม่ใช่
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="rounded-lg border border-primary-border bg-background-white px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-medium text-foreground">สภาพโดยประมาณ</span>
+                        <span className="text-lg font-bold text-primary">{derivedConditionScore}%</span>
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-foreground-subtle">
+                        คะแนนจะลดลงตามความรุนแรงของตำหนิ โดยจอแตก / น้ำเข้า / เปิดไม่ติดจะกระทบราคามากที่สุด
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Condition Instructions Box */}
-                <div className="bg-background-white rounded-lg px-4 py-3 mb-6 border border-primary-border">
+                {/* Condition Guidance Box */}
+                {/* <div className="bg-background-white rounded-lg px-4 py-3 mb-6 border border-primary-border">
                   <div
                     className="flex justify-between items-center cursor-pointer"
                     onClick={() => setIsConditionExpanded(!isConditionExpanded)}
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-foreground text-sm md:text-base">
-                        {formData.itemType === 'Apple' ? 'วิธีประเมินสภาพ' : 'วิธีดูสภาพ'}
+                        ตัวอย่างอาการที่ควรเลือก
                       </span>
                       <span className="bg-background-subtle text-foreground-subtle text-xs px-2 py-0.5 rounded-md">
-                        {formData.itemType === 'Apple' ? 'Guide' : 'Instructions'}
+                        Guide
                       </span>
                     </div>
                     {isConditionExpanded ? <ChevronUp className="w-5 h-5 text-foreground-subtle" /> : <ChevronDown className="w-5 h-5 text-foreground-subtle" />}
@@ -2025,52 +2217,25 @@ function EstimatePageInner() {
                     }`}
                   >
                     <div className="space-y-3">
-                      {formData.itemType === 'Apple' ? (
-                        <>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-foreground-muted">95 - 100%</span>
-                            <span>Perfect: ไม่มีรอย เครื่องสวยกริ๊บ แบตเตอรี่สุขภาพดี</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-foreground-muted">80 - 94%</span>
-                            <span>Good: มีรอยขนแมวเล็กน้อยตามขอบ ไม่กระทบหน้าจอ</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-foreground-muted">60 - 79%</span>
-                            <span>Fair: มีรอยชัดเจน รอยบุบ หรือหน้าจอลอก แต่ใช้งานปกติ</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[80px] text-foreground-muted">ต่ำกว่า 60%</span>
-                            <span>Poor: จอแตก เปิดไม่ติด หรือมีฟังก์ชันเสียหาย (เช่น FaceID เสีย)</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-foreground-muted">90 - 100%</span>
-                            <span>เหมือนใหม่ ไม่มีรอยขีดข่วนหรือตำหนิใดๆ ใช้งานได้ 100%</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-foreground-muted">70 - 89%</span>
-                            <span>ใช้งานได้ หน้าจอไม่มีรอยตำหนิลึก อาจมีรอยขนแมวตามขอบหรือด้านหลังเล็กน้อย</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-foreground-muted">50 - 69%</span>
-                            <span>ใช้งานได้ <span className="font-bold text-foreground">แต่</span> หน้าจอมีรอยขีดข่วนชัดเจน ตัวเครื่องมีรอยบุบ/ถลอกจากการใช้งาน</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-foreground-muted">25 - 49%</span>
-                            <span>ใช้งานได้แต่มีตำหนิใหญ่ หน้าจอมีรอยร้าว หรือตัวเครื่องมีรอยบุบอย่างเห็นได้ชัด</span>
-                          </div>
-                          <div className="flex gap-3">
-                            <span className="font-bold min-w-[70px] text-foreground-muted">0 - 24%</span>
-                            <span>ใช้งานไม่ได้ เครื่องเปิดไม่ติด, หน้าจอแตก, ปุ่มหลักเสีย, หรือมีความเสียหายจากน้ำ</span>
-                          </div>
-                        </>
-                      )}
+                      <div className="flex gap-3">
+                        <span className="font-bold min-w-[80px] text-foreground-muted">หน้าจอ</span>
+                        <span>จอแตก, จอเป็นเส้น, dead pixel, ทัชสกรีนไม่ตอบสนอง</span>
+                      </div>
+                      <div className="flex gap-3">
+                        <span className="font-bold min-w-[80px] text-foreground-muted">แบตเตอรี่</span>
+                        <span>แบตเสื่อม, แบตบวม, ชาร์จเต็มไวแต่หมดไว หรือสุขภาพแบตต่ำ</span>
+                      </div>
+                      <div className="flex gap-3">
+                        <span className="font-bold min-w-[80px] text-foreground-muted">ตัวเครื่อง</span>
+                        <span>บุบ แตก งอ ฝาหลังร้าว หรือมีร่องรอยตกกระแทก</span>
+                      </div>
+                      <div className="flex gap-3">
+                        <span className="font-bold min-w-[80px] text-foreground-muted">การทำงาน</span>
+                        <span>กล้องเสีย ปุ่มกดเสีย พอร์ตชาร์จมีปัญหา หรือเปิดไม่ติด</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </div> */}
 
                 {/* Defects */}
                 <div className="mb-4">
@@ -2171,6 +2336,7 @@ function EstimatePageInner() {
               serialNo: formData.serialNo,
               devicePasscode: formData.devicePasscode,
               condition: formData.condition,
+              conditionChecklist: conditionChecks,
               aiConditionScore: conditionResult?.score,
               aiConditionReason: conditionResult?.reason,
               images: uploadedImageUrls,
@@ -2402,7 +2568,7 @@ function EstimatePageInner() {
                   <DropdownField
                     value={pawnDuration}
                     placeholder="เลือกจำนวนวัน"
-                    options={['7', '14', '30', '60', '90'].map((day) => ({ value: day, label: `${day} วัน` }))}
+                    options={['15', '30'].map((day) => ({ value: day, label: `${day} วัน` }))}
                     onChange={setPawnDuration}
                   />
                 </div>

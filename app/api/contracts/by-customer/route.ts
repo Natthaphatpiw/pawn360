@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         interest_paid,
         principal_paid,
         contract_status,
+        redemption_status,
         funding_status,
         payment_status,
         item_delivery_status,
@@ -91,9 +92,15 @@ export async function GET(request: NextRequest) {
 
     const getDisplayStatus = (contract: any, remainingDays: number) => {
       const status = contract.contract_status;
+      const redemptionStatus = contract.redemption_status;
       const fundingStatus = contract.funding_status;
       const paymentStatus = contract.payment_status;
       const itemStatus = contract.item_delivery_status;
+
+      if (['PENDING', 'IN_PROGRESS'].includes(String(redemptionStatus || '')) && itemStatus !== 'RETURNED') {
+        return 'รอรับของคืน';
+      }
+      if (redemptionStatus === 'COMPLETED') return 'ไถ่ถอน';
 
       if (status === 'TERMINATED') return 'ยกเลิก';
       if (status === 'COMPLETED') return 'เสร็จสิ้น';

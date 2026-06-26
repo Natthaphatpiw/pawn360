@@ -321,6 +321,7 @@ CREATE TABLE items (
   item_condition INTEGER CHECK (item_condition >= 0 AND item_condition <= 100),
   ai_condition_score DECIMAL(5,2), -- From AI analysis
   ai_condition_reason TEXT,
+  condition_checklist JSONB,
 
   estimated_value DECIMAL(12,2) NOT NULL,
   ai_confidence DECIMAL(5,4),
@@ -695,9 +696,14 @@ CREATE TABLE redemption_requests (
 
   -- Delivery Options
   delivery_method VARCHAR(50) CHECK (delivery_method IN (
-    'SELF_PICKUP',          -- รับของเอง
-    'SELF_ARRANGE',         -- เรียกขนส่งเอง
-    'PLATFORM_ARRANGE'      -- ให้ Platform เรียกขนส่งให้
+    'SELF_PICKUP',                 -- รับของเอง (legacy)
+    'SELF_ARRANGE',                -- เรียกขนส่งเอง (legacy)
+    'PLATFORM_ARRANGE',            -- ให้ Platform เรียกขนส่งให้ (legacy)
+    'DROPPOINT_SELF_PICKUP',        -- รับเองที่ Drop Point ภายใน 15 วัน
+    'DROPPOINT_SELF_RIDER',         -- เรียกไรเดอร์เองไปรับที่ Drop Point
+    'CENTRAL_SCHEDULE_7D',          -- Astly ส่งกลับ Drop Point เดิมภายใน 7 วันเพื่อให้ลูกค้ามารับเอง
+    'CENTRAL_SELF_PICKUP_TODAY',    -- รับเองที่คลังกลาง Astly ภายในวัน
+    'DROPPOINT_NEXT_DAY_PICKUP'     -- ส่งกลับ Drop Point เพื่อรับวันถัดไป
   )),
 
   -- Delivery Address (for SELF_ARRANGE or PLATFORM_ARRANGE)
@@ -963,6 +969,7 @@ CREATE TABLE drop_point_verifications (
 
   -- Condition assessment
   condition_score INTEGER CHECK (condition_score >= 0 AND condition_score <= 100),
+  condition_checklist JSONB,
 
   -- Photos taken by drop point
   verification_photos TEXT[],

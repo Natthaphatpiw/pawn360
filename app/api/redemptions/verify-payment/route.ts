@@ -85,10 +85,16 @@ export async function POST(request: NextRequest) {
           .join(' ')
           .trim() || 'สินค้า';
 
-        if (redemption.delivery_method === 'SELF_PICKUP') {
+        if (['SELF_PICKUP', 'DROPPOINT_SELF_PICKUP'].includes(redemption.delivery_method)) {
           message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nกรุณามารับสินค้าที่ ${dropPointName} พร้อมแสดงหลักฐานการโอนเงิน\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        } else if (redemption.delivery_method === 'SELF_ARRANGE') {
+        } else if (['SELF_ARRANGE', 'DROPPOINT_SELF_RIDER'].includes(redemption.delivery_method)) {
           message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nกรุณานัดหมายกับ ${dropPointName} เพื่อมารับสินค้า\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
+        } else if (redemption.delivery_method === 'CENTRAL_SCHEDULE_7D') {
+          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nAstly จะส่งสินค้ากลับไปยัง ${dropPointName} ภายใน 7 วัน เพื่อให้คุณมารับด้วยตัวเอง\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
+        } else if (redemption.delivery_method === 'CENTRAL_SELF_PICKUP_TODAY') {
+          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nกรุณาเปิดใบรับของและแสดง QR เมื่อต้องรับสินค้าที่คลังกลาง Astly วันนี้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
+        } else if (redemption.delivery_method === 'DROPPOINT_NEXT_DAY_PICKUP') {
+          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nAstly จะส่งสินค้ากลับไปยัง ${dropPointName} เพื่อให้รับในวันถัดไป\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
         } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
           message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nทาง ${dropPointName} จะเตรียมสินค้าไว้ให้ พร้อมให้บริการขนส่งตามที่อยู่ที่คุณระบุ\n\nเมื่อได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
         }

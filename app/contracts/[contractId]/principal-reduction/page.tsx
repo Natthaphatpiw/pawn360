@@ -193,9 +193,13 @@ interface Calculation {
   description: string;
   penaltyRequired?: boolean;
   penaltyAmount?: number;
+  overdueInterestAmount?: number;
+  lateChargeAmount?: number;
   penalty?: {
     daysOverdue: number;
     penaltyAmount: number;
+    overdueInterestAmount?: number;
+    totalLateChargeAmount?: number;
   };
 }
 
@@ -533,8 +537,9 @@ export default function PrincipalReductionPage() {
             {penaltyAmount > 0 && (
               <>
                 <DetailRow label="ค่าปรับเกินกำหนด" value={`${penaltyAmount.toLocaleString()} บาท`} highlight />
+                <DetailRow label="ดอกเบี้ยเลท (3%/เดือน)" value={`${Number(calculation.overdueInterestAmount || calculation.penalty?.overdueInterestAmount || 0).toLocaleString()} บาท`} />
                 <p className="text-xs text-primary mt-1">
-                  เกินกำหนดแล้ว {calculation.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                  เกินกำหนดแล้ว {calculation.penalty?.daysOverdue || 0} วัน คิดค่าปรับเดือนละ 50 บาท และดอกเบี้ยเลท 3%/เดือน
                 </p>
               </>
             )}

@@ -179,6 +179,7 @@ export default function InterestPaymentUploadPage() {
   };
 
   const penaltyAmount = Number(requestDetails?.penalty_amount || requestDetails?.payment_breakdown?.penaltyAmount || 0);
+  const overdueInterestAmount = Number(requestDetails?.overdue_interest_amount || requestDetails?.payment_breakdown?.overdueInterestAmount || 0);
   const baseAmount = Number(requestDetails?.base_amount || requestDetails?.payment_breakdown?.baseAmount || requestDetails?.interest_to_pay || 0);
 
   // Show voided state
@@ -241,6 +242,12 @@ export default function InterestPaymentUploadPage() {
               <div className="flex justify-between items-center mb-2">
                 <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
                 <span className="font-medium text-primary">{penaltyAmount.toLocaleString()} บาท</span>
+              </div>
+            )}
+            {overdueInterestAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-foreground-subtle text-sm">ดอกเบี้ยเลท (3%/เดือน):</span>
+                <span className="font-medium text-primary">{overdueInterestAmount.toLocaleString()} บาท</span>
               </div>
             )}
             <div className="flex justify-between items-center">

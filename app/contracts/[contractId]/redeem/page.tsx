@@ -2,17 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { AlertTriangle, Truck, MapPin, Phone, Info } from 'lucide-react';
+import { AlertTriangle, CalendarDays, MapPin, Truck, Warehouse, Info } from 'lucide-react';
 import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { useLiff } from '@/lib/liff/liff-provider';
 import ContractActionTabs from '../_components/ContractActionTabs';
 import TransactionHeader from '../_components/TransactionHeader';
-import { withPreview } from '../_lib/preview';
+import {
+  getMockNearDueCentralRedemptionContract,
+  getMockPost15RedemptionContract,
+  isPreviewMode,
+  withPreview,
+} from '../_lib/preview';
 
 interface ContractDetail {
   contract_id: string;
   contract_number: string;
+  contract_start_date?: string | null;
   loan_principal_amount: number;
   original_principal_amount?: number | null;
   interest_rate: number;
@@ -55,13 +61,29 @@ interface ContractDetail {
   } | null;
 }
 
-type DeliveryMethod = 'SELF_PICKUP' | 'SELF_ARRANGE' | 'PLATFORM_ARRANGE';
+type DeliveryMethod =
+  | ''
+  | 'DROPPOINT_SELF_PICKUP'
+  | 'DROPPOINT_SELF_RIDER'
+  | 'CENTRAL_SCHEDULE_7D'
+  | 'CENTRAL_SELF_PICKUP_TODAY'
+  | 'DROPPOINT_NEXT_DAY_PICKUP';
+
+interface ReturnOption {
+  value: Exclude<DeliveryMethod, ''>;
+  title: string;
+  caption: string;
+  fee: number;
+  icon: React.ElementType;
+}
 
 interface PenaltyInfo {
   penaltyRequired: boolean;
   penalty?: {
     daysOverdue: number;
     penaltyAmount: number;
+    overdueInterestAmount?: number;
+    totalLateChargeAmount?: number;
   } | null;
 }
 
@@ -71,6 +93,13 @@ export default function RedemptionPaymentPage() {
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const requestType = searchParams.get('type') || 'FULL_REDEMPTION';
+  const previewMode = isPreviewMode(searchParams);
+  const previewReturnStage = searchParams.get('returnStage');
+  const usePost15Preview = previewMode && (
+    previewReturnStage === 'central'
+    || previewReturnStage === 'post15'
+    || contractId === 'mock-post15'
+  ) || contractId === 'mock-contract-001';
 
   const { profile } = useLiff();
 
@@ -80,59 +109,35 @@ export default function RedemptionPaymentPage() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [penaltyInfo, setPenaltyInfo] = useState<PenaltyInfo | null>(null);
 
-  // Delivery Options
-  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('SELF_PICKUP');
-  const [addressMode, setAddressMode] = useState<'registered' | 'other'>('registered');
-
-  // Address fields (for SELF_ARRANGE or PLATFORM_ARRANGE)
-  const [addressHouseNo, setAddressHouseNo] = useState('');
-  const [addressVillage, setAddressVillage] = useState('');
-  const [addressStreet, setAddressStreet] = useState('');
-  const [addressSubDistrict, setAddressSubDistrict] = useState('');
-  const [addressDistrict, setAddressDistrict] = useState('');
-  const [addressProvince, setAddressProvince] = useState('');
-  const [addressPostcode, setAddressPostcode] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [deliveryNotes, setDeliveryNotes] = useState('');
+  // Return Options
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('');
 
   // Terms acceptance
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  // Delivery fee
-  const DELIVERY_FEE = 40;
+  const DROPPOINT_HOLD_DAYS = 15;
+  const DROPPOINT_NEXT_DAY_FEE = 100;
 
   useEffect(() => {
     if (contractId) {
       fetchContractDetail();
     }
-  }, [contractId]);
-
-  useEffect(() => {
-    if (!contract?.customer) return;
-    const hasRegisteredAddress = Boolean(
-      contract.customer.addr_house_no ||
-      contract.customer.addr_street ||
-      contract.customer.addr_district ||
-      contract.customer.addr_province ||
-      contract.customer.addr_postcode
-    );
-    if (hasRegisteredAddress) {
-      setAddressMode('registered');
-      setAddressHouseNo(contract.customer.addr_house_no || '');
-      setAddressVillage(contract.customer.addr_village || '');
-      setAddressStreet(contract.customer.addr_street || '');
-      setAddressSubDistrict(contract.customer.addr_sub_district || '');
-      setAddressDistrict(contract.customer.addr_district || '');
-      setAddressProvince(contract.customer.addr_province || '');
-      setAddressPostcode(contract.customer.addr_postcode || '');
-      setContactPhone(contract.customer.phone_number || '');
-    } else {
-      setAddressMode('other');
-    }
-  }, [contract?.customer]);
+  }, [contractId, usePost15Preview]);
 
   const fetchContractDetail = async () => {
     try {
+      if (contractId === 'mock-contract-001') {
+        setContract(getMockNearDueCentralRedemptionContract(contractId));
+        setPenaltyInfo({ penaltyRequired: false, penalty: null });
+        return;
+      }
+
+      if (usePost15Preview) {
+        setContract(getMockPost15RedemptionContract(contractId));
+        setPenaltyInfo({ penaltyRequired: false, penalty: null });
+        return;
+      }
+
       const response = await axios.get(`/api/contracts/detail/${contractId}`);
       if (response.data.success) {
         setContract(response.data.contract);
@@ -158,6 +163,7 @@ export default function RedemptionPaymentPage() {
       setContract({
         contract_id: contractId,
         contract_number: `CT-${contractId}-MOCK`,
+        contract_start_date: new Date().toISOString(),
         loan_principal_amount: 10000,
         original_principal_amount: 10000,
         interest_rate: 0.03,
@@ -208,16 +214,81 @@ export default function RedemptionPaymentPage() {
   const getTotalAmount = () => {
     if (!contract) return 0;
     let total = contract.remainingAmount;
-    if (deliveryMethod === 'PLATFORM_ARRANGE') {
-      total += DELIVERY_FEE;
-    }
+    total += getReturnFee();
     if (penaltyInfo?.penaltyRequired) {
-      total += Number(penaltyInfo.penalty?.penaltyAmount || 0);
+      total += Number(penaltyInfo.penalty?.totalLateChargeAmount
+        ?? Number(penaltyInfo.penalty?.penaltyAmount || 0) + Number(penaltyInfo.penalty?.overdueInterestAmount || 0));
     }
     return total;
   };
 
-  const feeRate = 0.01;
+  const getContractDay = () => {
+    if (!contract?.contract_start_date) return 1;
+    const startDate = new Date(contract.contract_start_date);
+    const today = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return Math.max(1, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  };
+
+  const isCentralStorageStage = getContractDay() > DROPPOINT_HOLD_DAYS;
+
+  const returnOptions: ReturnOption[] = isCentralStorageStage
+    ? [
+        {
+          value: 'CENTRAL_SCHEDULE_7D',
+          title: 'นัดรับที่ Drop Point ภายใน 7 วัน',
+          caption: 'Astly จะส่งสินค้ากลับไปยัง Drop Point เดิม แล้วคุณมารับเอง ไม่มีค่าใช้จ่าย',
+          fee: 0,
+          icon: CalendarDays,
+        },
+        {
+          value: 'CENTRAL_SELF_PICKUP_TODAY',
+          title: 'รับวันนี้ที่คลังกลาง Astly',
+          caption: 'ไปรับด้วยตัวเองที่คลังกลาง พร้อมแสดง QR ใบรับของ',
+          fee: 0,
+          icon: Warehouse,
+        },
+        {
+          value: 'DROPPOINT_NEXT_DAY_PICKUP',
+          title: 'รับวันถัดไปที่ Drop Point',
+          caption: 'Astly ส่งของกลับไปยัง Drop Point สำหรับรับในวันถัดไป',
+          fee: DROPPOINT_NEXT_DAY_FEE,
+          icon: MapPin,
+        },
+      ]
+    : [
+        {
+          value: 'DROPPOINT_SELF_PICKUP',
+          title: 'รับเองที่ Drop Point',
+          caption: 'ไปรับสินค้าด้วยตัวเองที่ Drop Point ไม่มีค่าใช้จ่าย',
+          fee: 0,
+          icon: MapPin,
+        },
+        {
+          value: 'DROPPOINT_SELF_RIDER',
+          title: 'เรียกไรเดอร์เอง',
+          caption: 'เรียกไรเดอร์หรือขนส่งของคุณไปรับที่ Drop Point ไม่มีค่าใช้จ่าย',
+          fee: 0,
+          icon: Truck,
+        },
+      ];
+
+  const getReturnFee = () => {
+    return returnOptions.find((option) => option.value === deliveryMethod)?.fee || 0;
+  };
+
+  const getReturnNotes = () => {
+    const selectedOption = returnOptions.find((option) => option.value === deliveryMethod);
+    const storageStage = isCentralStorageStage ? 'CENTRAL_STORAGE_AFTER_15_DAYS' : 'DROPPOINT_WITHIN_15_DAYS';
+    return [
+      `Return option: ${selectedOption?.title || deliveryMethod}`,
+      `Storage stage: ${storageStage}`,
+      'Astly central notification: pending implementation',
+    ].join(' | ');
+  };
+
+  const feeRate = 0.015;
   const durationMonths = contract ? (contract.contract_duration_days || 0) / 30 : 0;
   const feeBase = contract?.original_principal_amount || contract?.loan_principal_amount || 0;
   const feeAmount = Math.round(feeBase * feeRate * durationMonths * 100) / 100;
@@ -229,23 +300,8 @@ export default function RedemptionPaymentPage() {
       return;
     }
 
-    const useRegisteredAddress = deliveryMethod === 'PLATFORM_ARRANGE' && addressMode === 'registered';
-    const deliveryAddress = deliveryMethod === 'PLATFORM_ARRANGE'
-      ? {
-        houseNo: useRegisteredAddress ? (contract?.customer?.addr_house_no || '') : addressHouseNo,
-        village: useRegisteredAddress ? (contract?.customer?.addr_village || '') : addressVillage,
-        street: useRegisteredAddress ? (contract?.customer?.addr_street || '') : addressStreet,
-        subDistrict: useRegisteredAddress ? (contract?.customer?.addr_sub_district || '') : addressSubDistrict,
-        district: useRegisteredAddress ? (contract?.customer?.addr_district || '') : addressDistrict,
-        province: useRegisteredAddress ? (contract?.customer?.addr_province || '') : addressProvince,
-        postcode: useRegisteredAddress ? (contract?.customer?.addr_postcode || '') : addressPostcode,
-        contactPhone: useRegisteredAddress ? (contract?.customer?.phone_number || '') : contactPhone,
-        notes: deliveryNotes,
-      }
-      : null;
-
-    if (deliveryMethod === 'PLATFORM_ARRANGE' && !deliveryAddress?.houseNo) {
-      alert('กรุณากรอกที่อยู่จัดส่ง');
+    if (!deliveryMethod) {
+      alert('กรุณาเลือกวิธีรับสินค้าคืน');
       return;
     }
 
@@ -257,10 +313,13 @@ export default function RedemptionPaymentPage() {
         contractId,
         requestType,
         deliveryMethod,
-        deliveryAddress,
+        deliveryAddress: {
+          contactPhone: contract?.customer?.phone_number || null,
+          notes: getReturnNotes(),
+        },
         principalAmount: contract?.remainingPrincipal || 0,
         interestAmount: contract?.remainingInterest || 0,
-        deliveryFee: deliveryMethod === 'PLATFORM_ARRANGE' ? DELIVERY_FEE : 0,
+        deliveryFee: getReturnFee(),
         totalAmount: getTotalAmount(),
         pawnerLineId: profile?.userId,
       });
@@ -283,7 +342,7 @@ export default function RedemptionPaymentPage() {
     } catch (error: any) {
       console.error('Error creating redemption:', error);
       const previewRedemptionId = `preview-redeem-${contractId}`;
-      router.push(withPreview(`/contracts/${contractId}/redeem/upload`, 'redemptionId', previewRedemptionId));
+      router.push(`${withPreview(`/contracts/${contractId}/redeem/upload`, 'redemptionId', previewRedemptionId)}&deliveryMethod=${encodeURIComponent(deliveryMethod)}`);
     } finally {
       setSubmitting(false);
     }
@@ -304,20 +363,6 @@ export default function RedemptionPaymentPage() {
       </div>
     </div>
   );
-
-  const formatRegisteredAddress = () => {
-    if (!contract?.customer) return '-';
-    const parts = [
-      contract.customer.addr_house_no,
-      contract.customer.addr_village,
-      contract.customer.addr_street,
-      contract.customer.addr_sub_district,
-      contract.customer.addr_district,
-      contract.customer.addr_province,
-      contract.customer.addr_postcode,
-    ].filter(Boolean);
-    return parts.length > 0 ? parts.join(' ') : '-';
-  };
 
   if (loading) {
     return (
@@ -394,18 +439,19 @@ export default function RedemptionPaymentPage() {
           <h2 className="font-bold text-foreground text-sm mb-3">รายการที่ต้องชำระ</h2>
           <div className="bg-primary-soft rounded-lg p-4 mb-3">
             <DetailRow label="เงินต้น" value={`${contract.remainingPrincipal.toLocaleString()} บาท`} />
-            <DetailRow label="ดอกเบี้ย (2%)" value={`${interestOnly.toLocaleString()} บาท`} />
-            <DetailRow label="ค่าธรรมเนียม (1%)" value={`${feeAmount.toLocaleString()} บาท`} />
+            <DetailRow label="ดอกเบี้ย (1.5%)" value={`${interestOnly.toLocaleString()} บาท`} />
+            <DetailRow label="ค่าธรรมเนียม (1.5%)" value={`${feeAmount.toLocaleString()} บาท`} />
             {penaltyInfo?.penaltyRequired && (
               <>
                 <DetailRow label="ค่าปรับเกินกำหนด" value={`${Number(penaltyInfo.penalty?.penaltyAmount || 0).toLocaleString()} บาท`} highlight />
+                <DetailRow label="ดอกเบี้ยเลท (3%/เดือน)" value={`${Number(penaltyInfo.penalty?.overdueInterestAmount || 0).toLocaleString()} บาท`} />
                 <p className="text-xs text-primary mt-1">
-                  เกินกำหนดแล้ว {penaltyInfo.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                  เกินกำหนดแล้ว {penaltyInfo.penalty?.daysOverdue || 0} วัน คิดค่าปรับเดือนละ 50 บาท และดอกเบี้ยเลท 3%/เดือน
                 </p>
               </>
             )}
-            {deliveryMethod === 'PLATFORM_ARRANGE' && (
-              <DetailRow label="ค่าจัดส่ง" value={`${DELIVERY_FEE.toLocaleString()} บาท`} />
+            {getReturnFee() > 0 && (
+              <DetailRow label="ค่าบริการรับที่ Drop Point" value={`${getReturnFee().toLocaleString()} บาท`} />
             )}
           </div>
           <div className="bg-primary rounded-lg p-4 text-white">
@@ -416,197 +462,67 @@ export default function RedemptionPaymentPage() {
           </div>
         </div>
 
-        {/* Delivery Options */}
+        {/* Return Options */}
         <div className="bg-background rounded-xl p-4 mb-4">
-          <h2 className="text-base font-bold text-foreground mb-4">วิธีการรับสินค้า</h2>
-
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-foreground">วิธีการรับสินค้า</h2>
+              <p className="mt-1 text-xs text-foreground-subtle">Return method</p>
+            </div>
+            <span className="rounded-full bg-primary-soft px-3 py-1 text-[10px] font-bold text-primary">
+              วันที่ {getContractDay()} ของสัญญา
+            </span>
+          </div>
+          <div className="mb-4 rounded-lg border border-primary-border bg-background-white p-3 text-xs leading-relaxed text-foreground-subtle">
+            {isCentralStorageStage
+              ? 'ครบ 15 วันแล้ว สินค้าถูกย้ายไปยังคลังกลาง Astly กรุณาเลือกวิธีรับคืนด้านล่าง'
+              : 'สินค้ายังอยู่ที่ Drop Point ภายในช่วง 15 วันแรก สามารถรับเองหรือเรียกไรเดอร์ไปรับได้ฟรี'}
+          </div>
           <div className="space-y-3">
-            {/* Option 1: Self Pickup */}
-            <label className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${deliveryMethod === 'SELF_PICKUP' ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'}`}>
-              <input
-                type="radio"
-                name="deliveryMethod"
-                value="SELF_PICKUP"
-                checked={deliveryMethod === 'SELF_PICKUP'}
-                onChange={() => setDeliveryMethod('SELF_PICKUP')}
-                className="mt-1 accent-primary"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-primary" />
-                  <span className="font-bold text-foreground">รับของด้วยตัวเอง</span>
-                </div>
-                <p className="text-xs text-foreground-subtle mt-1">ไปรับสินค้าที่ Drop Point ด้วยตนเอง</p>
-                {contract.drop_point && (
-                  <p className="text-xs text-primary mt-2">
-                    {contract.drop_point.drop_point_name} - {contract.drop_point.phone_number}
-                  </p>
-                )}
-              </div>
-            </label>
-
-            {/* Option 2: Self Arrange Delivery */}
-            <label className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${deliveryMethod === 'SELF_ARRANGE' ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'}`}>
-              <input
-                type="radio"
-                name="deliveryMethod"
-                value="SELF_ARRANGE"
-                checked={deliveryMethod === 'SELF_ARRANGE'}
-                onChange={() => setDeliveryMethod('SELF_ARRANGE')}
-                className="mt-1 accent-primary"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-primary" />
-                  <span className="font-bold text-foreground">เรียกขนส่งเอง</span>
-                </div>
-                <p className="text-xs text-foreground-subtle mt-1">เรียกบริการขนส่งไปรับของที่ Drop Point ด้วยตนเอง</p>
-              </div>
-            </label>
-
-            {/* Option 3: Platform Arrange Delivery */}
-            <label className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${deliveryMethod === 'PLATFORM_ARRANGE' ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'}`}>
-              <input
-                type="radio"
-                name="deliveryMethod"
-                value="PLATFORM_ARRANGE"
-                checked={deliveryMethod === 'PLATFORM_ARRANGE'}
-                onChange={() => setDeliveryMethod('PLATFORM_ARRANGE')}
-                className="mt-1 accent-primary"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-primary" />
-                  <span className="font-bold text-foreground">ให้ Pawnly เรียกขนส่งให้</span>
-                  <span className="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full">+{DELIVERY_FEE} บาท</span>
-                </div>
-                <p className="text-xs text-foreground-subtle mt-1">เราจะเรียกบริการขนส่งไปส่งให้ถึงที่</p>
-              </div>
-            </label>
+            {returnOptions.map((option) => {
+              const Icon = option.icon;
+              const selected = deliveryMethod === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    selected ? 'border-primary bg-primary-soft' : 'border-primary-border bg-background-white'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deliveryMethod"
+                    value={option.value}
+                    checked={selected}
+                    onChange={() => setDeliveryMethod(option.value)}
+                    className="mt-1 accent-primary"
+                  />
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Icon className="w-4 h-4 text-primary" />
+                      <span className="font-bold text-foreground">{option.title}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        option.fee > 0 ? 'bg-primary text-white' : 'bg-success-soft text-success'
+                      }`}>
+                        {option.fee > 0 ? `+${option.fee.toLocaleString()} บาท` : 'ฟรี'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground-subtle mt-1">{option.caption}</p>
+                    {option.value.includes('DROPPOINT') && contract.drop_point && (
+                      <p className="text-xs text-primary mt-2">
+                        {contract.drop_point.drop_point_name} - {contract.drop_point.phone_number}
+                      </p>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
 
-          {contract.drop_point?.map_embed && (
+          {contract.drop_point?.map_embed && deliveryMethod.includes('DROPPOINT') && (
             <div className="mt-4 bg-background-white border border-primary-border rounded-xl p-3">
               <div className="text-sm font-bold text-foreground-muted mb-2">แผนที่สาขา</div>
               <MapEmbed embedHtml={contract.drop_point.map_embed} className="h-40" />
-            </div>
-          )}
-
-          {/* Address Form (only for Pawnly arrange delivery) */}
-          {deliveryMethod === 'PLATFORM_ARRANGE' && (
-            <div className="mt-6 space-y-4">
-              <h3 className="font-bold text-foreground text-sm">ที่อยู่จัดส่ง</h3>
-
-              <div className="space-y-2">
-                <label className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${addressMode === 'registered' ? 'border-primary bg-primary-soft' : 'border-primary-border'}`}>
-                  <input
-                    type="radio"
-                    name="addressMode"
-                    value="registered"
-                    checked={addressMode === 'registered'}
-                    onChange={() => setAddressMode('registered')}
-                    className="mt-1 accent-primary"
-                  />
-                  <div>
-                    <p className="font-semibold text-foreground">ใช้ที่อยู่ที่ลงทะเบียนไว้</p>
-                    <p className="text-xs text-foreground-subtle mt-1">{formatRegisteredAddress()}</p>
-                  </div>
-                </label>
-
-                <label className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${addressMode === 'other' ? 'border-primary bg-primary-soft' : 'border-primary-border'}`}>
-                  <input
-                    type="radio"
-                    name="addressMode"
-                    value="other"
-                    checked={addressMode === 'other'}
-                    onChange={() => setAddressMode('other')}
-                    className="mt-1 accent-primary"
-                  />
-                  <div>
-                    <p className="font-semibold text-foreground">ใส่ที่อยู่อื่น</p>
-                    <p className="text-xs text-foreground-subtle mt-1">กรอกที่อยู่สำหรับรับสินค้าคืน</p>
-                  </div>
-                </label>
-              </div>
-
-              {addressMode === 'other' && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder="บ้านเลขที่ *"
-                      value={addressHouseNo}
-                      onChange={(e) => setAddressHouseNo(e.target.value)}
-                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                    />
-                    <input
-                      type="text"
-                      placeholder="หมู่บ้าน/คอนโด"
-                      value={addressVillage}
-                      onChange={(e) => setAddressVillage(e.target.value)}
-                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="ถนน/ซอย"
-                    value={addressStreet}
-                    onChange={(e) => setAddressStreet(e.target.value)}
-                    className="w-full p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                  />
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder="ตำบล/แขวง *"
-                      value={addressSubDistrict}
-                      onChange={(e) => setAddressSubDistrict(e.target.value)}
-                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                    />
-                    <input
-                      type="text"
-                      placeholder="อำเภอ/เขต *"
-                      value={addressDistrict}
-                      onChange={(e) => setAddressDistrict(e.target.value)}
-                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder="จังหวัด *"
-                      value={addressProvince}
-                      onChange={(e) => setAddressProvince(e.target.value)}
-                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                    />
-                    <input
-                      type="text"
-                      placeholder="รหัสไปรษณีย์ *"
-                      value={addressPostcode}
-                      onChange={(e) => setAddressPostcode(e.target.value)}
-                      className="p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                    />
-                  </div>
-
-                  <input
-                    type="tel"
-                    placeholder="เบอร์โทรติดต่อ *"
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    className="w-full p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary"
-                  />
-
-                  <textarea
-                    placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
-                    value={deliveryNotes}
-                    onChange={(e) => setDeliveryNotes(e.target.value)}
-                    rows={2}
-                    className="w-full p-3 border border-primary-border rounded-xl text-sm focus:outline-none focus:border-primary resize-none"
-                  />
-                </>
-              )}
             </div>
           )}
         </div>
@@ -676,9 +592,9 @@ export default function RedemptionPaymentPage() {
         <div className="max-w-md mx-auto">
           <button
             onClick={handleProceedToUpload}
-            disabled={!acceptedTerms || submitting}
+            disabled={!acceptedTerms || !deliveryMethod || submitting}
             className={`w-full py-2 rounded-full flex flex-col items-center justify-center transition-all ${
-              acceptedTerms && !submitting
+              acceptedTerms && deliveryMethod && !submitting
                 ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] hover:bg-primary/80 text-white'
                 : 'bg-background-subtle text-foreground-subtle cursor-not-allowed'
             }`}

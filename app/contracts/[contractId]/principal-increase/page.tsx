@@ -275,8 +275,8 @@ export default function PrincipalIncreasePage() {
           interestFirstPart: 400,
           feeAmount: 100,
           interestAccrued: 300,
-          interestRemaining: Math.round(newPrincipal * 0.02),
-          newInterestForRemaining: Math.round(newPrincipal * 0.02),
+          interestRemaining: Math.round(newPrincipal * 0.015),
+          newInterestForRemaining: Math.round(newPrincipal * 0.015),
           increaseAmount: amount,
           newPrincipal,
           totalToPay: 400,
@@ -392,9 +392,12 @@ export default function PrincipalIncreasePage() {
   const penaltyAmount = calculation?.penaltyRequired
     ? Number(calculation?.penaltyAmount || calculation?.penalty?.penaltyAmount || 0)
     : 0;
+  const overdueInterestAmount = calculation?.penaltyRequired
+    ? Number(calculation?.overdueInterestAmount || calculation?.penalty?.overdueInterestAmount || 0)
+    : 0;
   const rawRate = Number(contract?.interest_rate || 0);
   const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
-  const feeRate = 0.01;
+  const feeRate = 0.015;
   const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
 
   return (
@@ -567,8 +570,12 @@ export default function PrincipalIncreasePage() {
                       <span className="text-blue-700">ค่าปรับเกินกำหนด:</span>
                       <span className="font-bold text-primary">{penaltyAmount.toLocaleString()} บาท</span>
                     </div>
+                    <div className="flex justify-between mt-2">
+                      <span className="text-blue-700">ดอกเบี้ยเลท (3%/เดือน):</span>
+                      <span className="font-bold text-blue-800">{overdueInterestAmount.toLocaleString()} บาท</span>
+                    </div>
                     <p className="text-[11px] text-primary mt-1">
-                      เกินกำหนดแล้ว {calculation?.penalty?.daysOverdue || 0} วัน คิดวันละ 100 บาท
+                      เกินกำหนดแล้ว {calculation?.penalty?.daysOverdue || 0} วัน คิดค่าปรับเดือนละ 50 บาท และดอกเบี้ยเลท 3%/เดือน
                     </p>
                   </>
                 )}

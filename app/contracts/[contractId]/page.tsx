@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
-import { SearchX } from 'lucide-react';
+import { ReceiptText, SearchX } from 'lucide-react';
 import MapEmbed from '@/components/MapEmbed';
 import { getMockContractDetail, getMockContractsEnabled } from '@/lib/mock-contracts';
 
@@ -70,6 +70,7 @@ interface ContractDetail {
   interest_paid: number;
   principal_paid: number;
   contract_status: string;
+  redemption_status?: string | null;
   funding_status: string;
   payment_status?: string | null;
   item_delivery_status?: string | null;
@@ -165,6 +166,8 @@ export default function PawnContractDetail() {
       case 'ยกเลิก':
       case 'เสร็จสิ้น':
         return 'text-foreground-subtle';
+      case 'รอรับของคืน':
+        return 'text-primary';
       default:
         return 'text-s3';
     }
@@ -250,9 +253,14 @@ export default function PawnContractDetail() {
   const getActionBlockedReason = () => {
     const status = contract.contract_status;
     const itemStatus = contract.item_delivery_status || '';
+    const redemptionStatus = contract.redemption_status || '';
 
     if (['COMPLETED', 'TERMINATED', 'LIQUIDATED', 'DEFAULTED'].includes(status)) {
       return 'สัญญานี้สิ้นสุดแล้ว ไม่สามารถทำรายการเพิ่มเติมได้';
+    }
+
+    if (['PENDING', 'IN_PROGRESS'].includes(redemptionStatus)) {
+      return 'สัญญานี้อยู่ระหว่างการไถ่ถอน กรุณาใช้ใบรับของเพื่อรับสินค้าคืน';
     }
 
     if (!['CONFIRMED', 'EXTENDED'].includes(status)) {
@@ -268,10 +276,15 @@ export default function PawnContractDetail() {
 
   const actionBlockedReason = getActionBlockedReason();
   const actionsEnabled = !actionBlockedReason;
+  const isRedeemedContract = contract.contract_status === 'COMPLETED'
+    || contract.redemption_status === 'COMPLETED'
+    || contract.redemption_status === 'IN_PROGRESS'
+    || contract.displayStatus === 'ไถ่ถอน'
+    || contract.displayStatus === 'รอรับของคืน';
 
   const rawRate = Number(contract.interest_rate || 0);
   const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
-  const feeRate = 0.01;
+  const feeRate = 0.015;
   const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
   const durationMonths = (contract.contract_duration_days || 0) / 30;
   const feeBase = contract.original_principal_amount || contract.loan_principal_amount;
@@ -573,6 +586,20 @@ export default function PawnContractDetail() {
           <div className="mb-3 rounded-2xl border border-warning-border bg-warning-soft p-4 text-xs text-warning">
             {actionBlockedReason}
           </div>
+        )}
+
+        {isRedeemedContract && (
+          <button
+            type="button"
+            onClick={() => router.push(`/contracts/${contractId}/return-receipt`)}
+            className="btn-transition mb-3 flex w-full min-h-14 items-center justify-center gap-3 rounded-2xl bg-success px-4 py-3 text-white shadow-soft active:scale-[0.98]"
+          >
+            <ReceiptText className="h-5 w-5" />
+            <span className="flex flex-col text-left">
+              <span className="text-sm font-medium">ใบรับของ</span>
+              <span className="text-xs font-light opacity-90">Return receipt</span>
+            </span>
+          </button>
         )}
 
         {/* 5. Action Buttons Grid */}

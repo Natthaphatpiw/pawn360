@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
     const baseAmount = getBaseAmountForActionRequest(actionRequest);
     const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const expectedAmount = roundCurrency(baseAmount + penaltyAmount);
+    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+    const expectedAmount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
 
     if (expectedAmount !== Number(actionRequest.total_amount || 0)) {
       await supabase
