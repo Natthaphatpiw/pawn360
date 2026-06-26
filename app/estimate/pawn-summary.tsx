@@ -501,7 +501,13 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
     } catch (error) {
       console.error('Error submitting loan request:', error);
       if (axios.isAxiosError(error)) {
-        alert(error.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');
+        const responseError = error.response?.data?.error;
+        const responseDetails = error.response?.data?.details;
+        alert(
+          responseError
+            ? `${responseError}${responseDetails ? `\n${responseDetails}` : ''}`
+            : 'เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง'
+        );
       } else {
         alert('เกิดข้อผิดพลาดในการส่งคำขอ กรุณาลองใหม่อีกครั้ง');
       }

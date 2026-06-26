@@ -63,16 +63,29 @@ export async function POST(request: NextRequest) {
       drop_point_id: branchId || null,
     };
 
-    const { data: item, error: itemError } = await supabase
-      .from('items')
-      .insert(itemRecord)
-      .select()
-      .single();
+    const insertItemRecord = async (record: Record<string, unknown>) => (
+      supabase
+        .from('items')
+        .insert(record)
+        .select()
+        .single()
+    );
+
+    let { data: item, error: itemError } = await insertItemRecord(itemRecord);
+
+    if (itemError && `${itemError.message || ''}`.toLowerCase().includes('condition_checklist')) {
+      const fallbackRecord = { ...itemRecord };
+      delete (fallbackRecord as Record<string, unknown>).condition_checklist;
+      ({ data: item, error: itemError } = await insertItemRecord(fallbackRecord));
+    }
 
     if (itemError || !item) {
       console.error('Error creating item draft:', itemError);
       return NextResponse.json(
-        { error: 'Failed to save draft' },
+        {
+          error: 'Failed to save draft',
+          details: itemError?.message || null,
+        },
         { status: 500 }
       );
     }
