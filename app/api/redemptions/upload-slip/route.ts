@@ -100,7 +100,8 @@ export async function POST(request: NextRequest) {
       + Number(redemption.interest_amount || 0)
       + Number(redemption.delivery_fee || 0);
     const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const expectedAmount = roundCurrency(baseAmount + penaltyAmount);
+    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+    const expectedAmount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
 
     if (expectedAmount !== Number(redemption.total_amount || 0)) {
       await supabase
@@ -288,6 +289,11 @@ function createDropPointRedemptionCard(redemption: any, returnUrl: string): Flex
     'SELF_PICKUP': 'ลูกค้ามารับเอง',
     'SELF_ARRANGE': 'ลูกค้าเรียกขนส่งเอง',
     'PLATFORM_ARRANGE': 'ให้ Pawnly เรียกขนส่ง',
+    'DROPPOINT_SELF_PICKUP': 'ลูกค้ารับเองที่ Drop Point',
+    'DROPPOINT_SELF_RIDER': 'ลูกค้าเรียกไรเดอร์เอง',
+    'CENTRAL_SCHEDULE_7D': 'นัดรับที่ Drop Point ภายใน 7 วัน',
+    'CENTRAL_SELF_PICKUP_TODAY': 'ลูกค้ารับเองที่คลังกลาง Astly วันนี้',
+    'DROPPOINT_NEXT_DAY_PICKUP': 'รับวันถัดไปที่ Drop Point',
   }[redemption.delivery_method as string] || redemption.delivery_method;
 
   return {

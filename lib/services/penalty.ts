@@ -1,12 +1,16 @@
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const DAYS_PER_PENALTY_MONTH = 30;
+const OVERDUE_INTEREST_PER_MONTH = 0.03;
 
-export const PENALTY_PER_DAY = 100;
+export const PENALTY_PER_MONTH = 50;
 export const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 export interface PenaltyRequirement {
   required: boolean;
   daysOverdue: number;
   penaltyAmount: number;
+  overdueInterestAmount: number;
+  totalLateChargeAmount: number;
   today: Date;
   contractStartDate: Date;
   contractEndDate: Date;
@@ -31,8 +35,39 @@ export const calculateOverdueDays = (contractEndDate: Date | string, today: Date
 };
 
 export const calculatePenaltyAmount = (daysOverdue: number) => (
-  Math.max(0, daysOverdue) * PENALTY_PER_DAY
+  Math.max(0, Math.ceil(daysOverdue / DAYS_PER_PENALTY_MONTH)) * PENALTY_PER_MONTH
 );
+
+export const calculatePenaltyMonths = (daysOverdue: number) => (
+  Math.max(0, Math.ceil(Math.max(0, daysOverdue) / DAYS_PER_PENALTY_MONTH))
+);
+
+export const calculateOverdueInterestAmount = (
+  principalAmount: number,
+  contractEndDate: Date | string,
+  today: Date = new Date(),
+) => {
+  const principal = Math.max(0, Number(principalAmount || 0));
+  if (principal <= 0) return 0;
+
+  const overdueStart = normalizeDate(contractEndDate);
+  overdueStart.setDate(overdueStart.getDate() + 1);
+
+  const currentDate = normalizeDate(today);
+  if (currentDate.getTime() < overdueStart.getTime()) {
+    return 0;
+  }
+
+  let total = 0;
+  const cursor = new Date(overdueStart);
+  while (cursor.getTime() <= currentDate.getTime()) {
+    const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+    total += (principal * OVERDUE_INTEREST_PER_MONTH) / daysInMonth;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return roundCurrency(total);
+};
 
 export const buildPenaltyLiffUrl = (contractId?: string) => {
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_PENALTY_PAYMENT || '2008216710-Z54fuL3s';
@@ -51,6 +86,8 @@ export const serializePenaltyRequirement = (contract: any, requirement: PenaltyR
   today: requirement.today.toISOString(),
   daysOverdue: requirement.daysOverdue,
   penaltyAmount: requirement.penaltyAmount,
+  overdueInterestAmount: requirement.overdueInterestAmount,
+  totalLateChargeAmount: requirement.totalLateChargeAmount,
   paidThroughDate: requirement.paidThroughDate?.toISOString() ?? null,
 });
 
@@ -59,13 +96,18 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
   const contractStartDate = normalizeDate(contract.contract_start_date);
   const contractEndDate = normalizeDate(contract.contract_end_date);
   const daysOverdue = calculateOverdueDays(contractEndDate, today);
+  const currentPrincipal = Number(contract.current_principal_amount || contract.loan_principal_amount || 0);
   const penaltyAmount = calculatePenaltyAmount(daysOverdue);
+  const overdueInterestAmount = calculateOverdueInterestAmount(currentPrincipal, contractEndDate, today);
+  const totalLateChargeAmount = roundCurrency(penaltyAmount + overdueInterestAmount);
 
   if (daysOverdue <= 0) {
     return {
       required: false,
       daysOverdue,
       penaltyAmount,
+      overdueInterestAmount,
+      totalLateChargeAmount,
       today,
       contractStartDate,
       contractEndDate,
@@ -98,6 +140,8 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
     required: !isPaid,
     daysOverdue,
     penaltyAmount,
+    overdueInterestAmount,
+    totalLateChargeAmount,
     today,
     contractStartDate,
     contractEndDate,

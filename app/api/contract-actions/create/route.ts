@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
     const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
     if (penaltyRequirement.required) {
       await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
     }
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
 
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const feeRate = Number(contract.platform_fee_rate ?? 0.015);
     const dailyInterestRate = monthlyInterestRate / 30;
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
     const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;
@@ -213,7 +214,8 @@ export async function POST(request: NextRequest) {
         requestData = {
           ...requestData,
           interest_to_pay: interestToPay,
-          total_amount: round2(interestToPay + penaltyAmount),
+          overdue_interest_amount: overdueInterestAmount,
+          total_amount: round2(interestToPay + penaltyAmount + overdueInterestAmount),
           new_end_date: renewedWindow.contractEndDate.toISOString().split('T')[0],
           pawner_signature_url: pawnerSignatureUrl,
         };
@@ -247,7 +249,8 @@ export async function POST(request: NextRequest) {
           reduction_amount: reductionAmt,
           interest_for_period: interestForPeriod,
           total_to_pay_reduction: totalToPay,
-          total_amount: round2(totalToPay + penaltyAmount),
+          overdue_interest_amount: overdueInterestAmount,
+          total_amount: round2(totalToPay + penaltyAmount + overdueInterestAmount),
           principal_after_reduction: principalAfterReduction,
           new_interest_for_remaining: newInterestForRemaining,
           pawner_signature_url: pawnerSignatureUrl,
@@ -312,7 +315,8 @@ export async function POST(request: NextRequest) {
           interest_for_period: interestForPeriod,
           principal_after_increase: principalAfterIncrease,
           new_interest_for_remaining_increase: newInterestForRemaining,
-          total_amount: round2(totalToPayNow + penaltyAmount),
+          overdue_interest_amount: overdueInterestAmount,
+          total_amount: round2(totalToPayNow + penaltyAmount + overdueInterestAmount),
           pawner_signature_url: pawnerSignatureUrl,
           pawner_bank_name: pawnerBankAccount.bank_name,
           pawner_bank_account_no: pawnerBankAccount.bank_account_no,

@@ -27,6 +27,7 @@ export type MockContractListItem = {
   total_amount: number;
   amount_paid: number;
   contract_status: string;
+  redemption_status?: string | null;
   funding_status: string;
   items: MockContractItem;
   remainingDays: number;
@@ -66,6 +67,7 @@ export type MockContractDetail = {
   interest_paid: number;
   principal_paid: number;
   contract_status: string;
+  redemption_status?: string | null;
   funding_status: string;
   payment_status?: string | null;
   item_delivery_status?: string | null;
@@ -167,6 +169,37 @@ const mockContractList: MockContractListItem[] = [
     },
     remainingDays: 13,
     displayStatus: 'ปกติ',
+  },
+  {
+    contract_id: 'mock-contract-redeemed',
+    contract_number: 'PW-2026-000221',
+    contract_start_date: '2026-05-24T00:00:00.000Z',
+    contract_end_date: '2026-06-23T00:00:00.000Z',
+    contract_duration_days: 30,
+    loan_principal_amount: 21000,
+    interest_rate: 0.03,
+    interest_amount: 945,
+    total_amount: 21945,
+    amount_paid: 21945,
+    contract_status: 'CONFIRMED',
+    redemption_status: 'IN_PROGRESS',
+    funding_status: 'FUNDED',
+    items: {
+      item_id: 'mock-item-redeemed-ipad',
+      item_type: 'แท็บเล็ต',
+      brand: 'Apple',
+      model: 'iPad Pro 12.9',
+      capacity: '256GB',
+      estimated_value: 28500,
+      item_condition: 91,
+      image_urls: getMockImageUrls('แท็บเล็ต', 'iPad Pro 12.9'),
+      accessories: 'Apple Pencil, ที่ชาร์จ',
+      defects: 'รอยเล็กน้อยที่มุมเครื่อง',
+      notes: 'ไถ่ถอนแล้ว รอรับของคืน',
+      serial_number: 'APL-IPAD-PRO-RETURN-003',
+    },
+    remainingDays: 0,
+    displayStatus: 'รอรับของคืน',
   },
 ];
 
@@ -287,6 +320,49 @@ const mockContractDetails: Record<string, MockContractDetail> = {
     remainingAmount: 18312,
     remainingPrincipal: 16800,
     remainingInterest: 1512,
+  },
+  'mock-contract-redeemed': {
+    ...mockContractList[2],
+    original_principal_amount: 21000,
+    current_principal_amount: 21000,
+    interest_paid: 945,
+    principal_paid: 21000,
+    payment_status: 'COMPLETED',
+    item_delivery_status: 'VERIFIED',
+    contract_file_url: null,
+    customer: {
+      customer_id: 'mock-customer-returned',
+      firstname: 'สมชาย',
+      lastname: 'รับของคืน',
+      phone_number: '0865557788',
+      national_id: '1101700203999',
+    },
+    investor: {
+      investor_id: 'mock-investor-returned',
+      firstname: 'อนันต์',
+      lastname: 'ปิดสัญญา',
+      phone_number: '0801239876',
+    },
+    item: mockContractList[2].items,
+    drop_point: {
+      drop_point_id: 'mock-drop-001',
+      drop_point_name: 'Pawnly Siam Square',
+      drop_point_code: 'SQ01',
+      phone_number: '02-123-4567',
+      addr_house_no: '432',
+      addr_street: 'Rama I Rd',
+      addr_sub_district: 'Wang Mai',
+      addr_district: 'Pathum Wan',
+      addr_province: 'Bangkok',
+      addr_postcode: '10330',
+      google_map_url: 'https://maps.google.com/?q=13.7466,100.5327',
+      map_embed: null,
+      latitude: 13.7466,
+      longitude: 100.5327,
+    },
+    remainingAmount: 0,
+    remainingPrincipal: 0,
+    remainingInterest: 0,
   },
 };
 

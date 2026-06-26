@@ -26,6 +26,15 @@ const isSerialRequiredForType = (itemType?: string) => {
   return !SERIAL_OPTIONAL_TYPES.has(itemType);
 };
 
+const safeParseJson = <T,>(raw: string, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 interface Branch {
   branch_id: string;
   branch_name: string;
@@ -53,6 +62,7 @@ interface PawnSummaryProps {
     watchConnectivity?: string;
     serialNo?: string;
     condition: number;
+    conditionChecklist?: Record<string, boolean | null>;
     aiConditionScore?: number;
     aiConditionReason?: string;
     images: string[];
@@ -154,10 +164,10 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   const [loanAmount, setLoanAmount] = useState<string>('');
   const [serialNo, setSerialNo] = useState<string>(itemData.serialNo || '');
   const [devicePasscode, setDevicePasscode] = useState<string>(itemData.devicePasscode || '');
-  const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('pickup');
+  const [deliveryMethod, setDeliveryMethod] = useState<'rider' | 'pickup' | ''>('');
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [defaultBranchId, setDefaultBranchId] = useState<string | null>(null);
-  const [duration, setDuration] = useState<string>('30');
+  const [duration, setDuration] = useState<string>('');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
@@ -179,16 +189,26 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   const maxLoanAmount = itemData.estimatedPrice;
   const MIN_LOAN_AMOUNT = 1000;
   const loanAmountNum = parseFloat(loanAmount.replace(/,/g, '')) || 0;
-  const deliveryFee = deliveryMethod === 'delivery' ? 40 : 0;
+  const deliveryFee = 0;
   const MAX_DELIVERY_DISTANCE_KM = 10;
   const interestRateTotal = 0.03; // total 3% per month
-  const interestRatePawner = 0.02; // interest portion 2%
-  const feeRate = 0.01; // fee portion 1%
-  const durationMonths = parseInt(duration) / 30;
+  const interestRatePawner = 0.015; // interest portion 1.5%
+  const feeRate = 0.015; // platform fee portion 1.5%
+  const durationMonths = duration ? parseInt(duration) / 30 : 0;
   const interestAmount = loanAmountNum * interestRatePawner * durationMonths;
   const feeAmount = loanAmountNum * feeRate * durationMonths;
   const totalInterest = interestAmount + feeAmount;
   const totalRepayment = loanAmountNum + totalInterest + deliveryFee;
+  const normalizedSerial = serialNo.trim();
+  const isSerialRequired = isSerialRequiredForType(itemData.itemType);
+  const canContinue =
+    isRegistered &&
+    !isSubmitting &&
+    loanAmountNum >= MIN_LOAN_AMOUNT &&
+    Boolean(deliveryMethod) &&
+    Boolean(duration) &&
+    Boolean(selectedBranchId) &&
+    (!isSerialRequired || Boolean(normalizedSerial));
 
   const currentBranch = branches.find(b => b.branch_id === selectedBranchId);
 
@@ -222,32 +242,10 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   }, [branches, defaultBranchId, selectedBranchId]);
 
   useEffect(() => {
-    if (deliveryMethod !== 'delivery') {
-      setDeliveryError(null);
-      setDeliveryDistanceKm(null);
-      setDeliveryEligible(null);
-      return;
-    }
-
-    if (!deliveryLocationRequested && !userLocation) {
-      setDeliveryLocationRequested(true);
-      handleUseLocation({ setDefault: false, context: 'delivery' });
-      return;
-    }
-
-    if (userLocation && currentBranch) {
-      const distanceKm = getBranchDistanceKm(userLocation, currentBranch);
-      setDeliveryDistanceKm(distanceKm);
-      if (distanceKm != null) {
-        setDeliveryEligible(distanceKm <= MAX_DELIVERY_DISTANCE_KM);
-        if (distanceKm > MAX_DELIVERY_DISTANCE_KM) {
-          setDeliveryError('ตำแหน่งของคุณอยู่นอกระยะบริการจัดส่ง (เกิน 10 กม.)');
-        } else {
-          setDeliveryError(null);
-        }
-      }
-    }
-  }, [deliveryMethod, userLocation, currentBranch, deliveryLocationRequested]);
+    setDeliveryError(null);
+    setDeliveryDistanceKm(null);
+    setDeliveryEligible(null);
+  }, [deliveryMethod]);
 
   const checkRegistration = async () => {
     if (mockMode) {
@@ -262,13 +260,16 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
     }
     try {
       setIsLoading(true);
-      const response = await axios.get(`/api/pawners/check?lineId=${lineId}`);
+      const response = await axios.get(`/api/pawners/check?lineId=${lineId}`, {
+        responseType: 'text',
+      });
+      const payload = safeParseJson<{ exists?: boolean; pawner?: { kyc_status?: string; default_drop_point_id?: string | null } }>(String(response.data || ''), {});
 
-      if (response.data.exists) {
-        const status = response.data.pawner.kyc_status;
+      if (payload.exists) {
+        const status = payload.pawner?.kyc_status || null;
         setKycStatus(status);
         setIsRegistered(status === 'VERIFIED');
-        setDefaultBranchId(response.data.pawner.default_drop_point_id || null);
+        setDefaultBranchId(payload.pawner?.default_drop_point_id || null);
       } else {
         setIsRegistered(false);
         setKycStatus(null);
@@ -288,8 +289,11 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
       return;
     }
     try {
-      const response = await axios.get('/api/drop-points');
-      setBranches(response.data.branches || []);
+      const response = await axios.get('/api/drop-points', {
+        responseType: 'text',
+      });
+      const payload = safeParseJson<{ branches?: Branch[] }>(String(response.data || ''), {});
+      setBranches(payload.branches || []);
     } catch (error) {
       console.error('Error fetching branches:', error);
     }
@@ -427,36 +431,21 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
   const handleSubmit = async () => {
     console.log('🚀 handleSubmit called in pawn-summary');
-    const normalizedSerial = serialNo.trim();
-    const isSerialRequired = isSerialRequiredForType(itemData.itemType);
     if (isSerialRequired && !normalizedSerial) {
       alert('กรุณาระบุหมายเลขเครื่อง/Serial ก่อนดำเนินการ');
+      return;
+    }
+    if (!deliveryMethod) {
+      alert('กรุณาเลือกวิธีการรับฝาก/ส่ง');
+      return;
+    }
+    if (!duration) {
+      alert('กรุณาเลือกระยะเวลา');
       return;
     }
     if (!selectedBranchId) {
       alert('กรุณาเลือกสาขาที่สะดวก');
       return;
-    }
-    if (deliveryMethod === 'delivery') {
-      if (!userLocation) {
-        setDeliveryError('กรุณาอนุญาตตำแหน่งของคุณก่อนใช้บริการจัดส่ง');
-        alert('กรุณาอนุญาตตำแหน่งของคุณก่อนใช้บริการจัดส่ง');
-        return;
-      }
-      const distanceKm = getBranchDistanceKm(userLocation, currentBranch);
-      if (distanceKm == null) {
-        const message = 'สาขาที่เลือกไม่มีพิกัดสำหรับตรวจสอบระยะทาง กรุณาเลือกสาขาอื่นหรือเลือก Walk-in';
-        setDeliveryError(message);
-        alert(message);
-        return;
-      }
-      if (distanceKm > MAX_DELIVERY_DISTANCE_KM) {
-        const message = 'คุณอยู่ไกลจาก Drop Point เกินกว่าที่กำหนด ขออภัยกรุณาเลือก "ดำเนินการด้วยตัวเอง (Walk-in)" เพื่อนำมาส่งให้ Drop Point ด้วยตัวเอง ขออภัยในความสะดวก ขอบคุณครับ';
-        setDeliveryError(message);
-        alert(message);
-        setDeliveryMethod('pickup');
-        return;
-      }
     }
     if (!isRegistered || loanAmountNum === 0) {
       console.log('❌ Validation failed:', { isRegistered, loanAmountNum });
@@ -489,7 +478,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
         deliveryMethod,
         deliveryFee,
         branchId: selectedBranchId,
-        userLocation: deliveryMethod === 'delivery' ? userLocation : null,
+        userLocation: null,
         duration: parseInt(duration),
         interestRate: interestRateTotal,
         totalInterest,
@@ -551,6 +540,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
         notes: itemData.notes,
         devicePasscode: devicePasscode.trim() || undefined,
         imageUrls: itemData.images,
+        conditionChecklist: itemData.conditionChecklist,
         conditionResult: {
           score: itemData.aiConditionScore,
           reason: itemData.aiConditionReason,
@@ -590,6 +580,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
     notes: itemData.notes,
     devicePasscode: devicePasscode.trim() || undefined,
     imageUrls: itemData.images,
+    conditionChecklist: itemData.conditionChecklist,
     conditionResult: {
       score: itemData.aiConditionScore,
       reason: itemData.aiConditionReason,
@@ -757,31 +748,41 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
         <div className="h-px bg-primary my-6"></div>
 
         {/* 5. Delivery Section */}
-        <div className="mb-4">
-          <label className="block font-bold text-foreground mb-2">
-            การจัดส่ง*
-          </label>
-          <DropdownField
-            value={deliveryMethod}
-            placeholder="เลือกวิธีการจัดส่ง"
-            options={[
-              { value: 'delivery', label: 'บริการจัดส่ง (+40บาท)' },
-              { value: 'pickup', label: 'ดำเนินการด้วยตัวเอง (Walk-in)' },
-            ]}
-            onChange={(value) => setDeliveryMethod(value as 'delivery' | 'pickup')}
-            className="rounded-2xl px-4 py-4 text-gray-800"
-          />
+        <div className="mb-8">
+          <div className="mb-2 flex items-center gap-2">
+            <label className="whitespace-nowrap font-bold text-foreground">
+              การรับฝาก/ส่ง*
+            </label>
+            <span className="rounded-full bg-background-subtle px-2 py-0.5 text-[10px] text-foreground-subtle">Delivery</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setDeliveryMethod('rider')}
+              className={`flex items-center justify-center rounded-full border px-4 py-3 text-center transition-colors ${
+                deliveryMethod === 'rider'
+                  ? 'border-primary bg-primary text-primary-fg'
+                  : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+              }`}
+            >
+              <span className="font-medium">เรียกไรเดอร์ด้วยตัวเอง</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeliveryMethod('pickup')}
+              className={`flex items-center justify-center rounded-full border px-4 py-3 text-center transition-colors ${
+                deliveryMethod === 'pickup'
+                  ? 'border-primary bg-primary text-primary-fg'
+                  : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+              }`}
+            >
+              <span className="font-medium">ส่งที่สาขาด้วยตัวเอง</span>
+            </button>
+          </div>
 
-          <p className="text-[10px] text-grey-4 mt-2 leading-tight">
-            *ถ้าอยู่นอกพื้นที่การจัดส่งสามารถเลือก &quot;ดำเนินการด้วยตัวเอง&quot;<br/>
-            แล้วเรียกบริการส่งของด้วยตัวเองได้ หรือติดต่อ &quot;ช่วยเหลือ/Support&quot;
-          </p>
-          {deliveryMethod === 'delivery' && deliveryDistanceKm != null && (
-            <p className={`text-[11px] mt-2 ${deliveryEligible ? 'text-green-600' : 'text-red-500'}`}>
-              ระยะทางจากตำแหน่งของคุณถึงสาขา ~{deliveryDistanceKm.toFixed(1)} กม.
-              {deliveryEligible === false ? ' (เกิน 10 กม. ไม่สามารถใช้บริการจัดส่งได้)' : ''}
-            </p>
-          )}
+          {/* <p className="text-[10px] text-grey-4 mt-2 leading-tight">
+            *เลือก &quot;เรียกไรเดอร์ด้วยตัวเอง&quot; สำหรับนำส่งฟรี หรือเลือก &quot;ดำเนินการด้วยตัวเอง&quot; แบบ Walk-in
+          </p> */}
           {deliveryError && (
             <p className="text-[11px] text-red-500 mt-2">{deliveryError}</p>
           )}
@@ -878,17 +879,30 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           <span className="rounded-full bg-background-subtle px-2 py-0.5 text-[10px] text-foreground-subtle">Duration</span>
           <span className="ml-auto text-xs text-foreground-subtle">วัน</span>
         </div>
-        <DropdownField
-          value={duration}
-          placeholder="เลือกระยะเวลา"
-          options={[
-            { value: '15', label: '15 วัน' },
-            { value: '30', label: '30 วัน' },
-            { value: '60', label: '60 วัน' },
-          ]}
-          onChange={setDuration}
-          className="mb-4 rounded-2xl px-4 py-4 text-foreground"
-        />
+        <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => setDuration('15')}
+            className={`flex items-center justify-center rounded-full border px-4 py-3 text-center transition-colors ${
+              duration === '15'
+                ? 'border-primary bg-primary text-primary-fg'
+                : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+            }`}
+          >
+            <span className="font-medium">15 วัน</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDuration('30')}
+            className={`flex items-center justify-center rounded-full border px-4 py-3 text-center transition-colors ${
+              duration === '30'
+                ? 'border-primary bg-primary text-primary-fg'
+                : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+            }`}
+          >
+            <span className="font-medium">30 วัน</span>
+          </button>
+        </div>
 
         {/* 7. Interest & Fee */}
         <div className="mb-2 flex items-center gap-2">
@@ -907,7 +921,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           />
         </div>
         <p className="mb-4 text-[11px] text-foreground-subtle">
-          ดอกเบี้ย 2% ของมูลค่าสัญญา (คิดตามระยะเวลาที่เลือก)
+          ดอกเบี้ย 1.5% ของมูลค่าสัญญา และค่าธรรมเนียมแพลตฟอร์ม 1.5% (คิดตามระยะเวลาที่เลือก)
         </p>
 
         <div className="mb-2 flex items-center gap-2">
@@ -926,17 +940,27 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
           />
         </div>
         <p className="mb-8 text-[11px] text-foreground-subtle">
-          ค่าธรรมเนียมคำนวณจากมูลค่าสัญญา (คงที่ตามวงเงินเริ่มต้น)
+          ค่าธรรมเนียมแพลตฟอร์ม 1.5% ของมูลค่าสัญญา (คงที่ตามวงเงินเริ่มต้น)
         </p>
 
         {/* 8. Action Buttons */}
         <div className="space-y-3">
+          <div className="rounded-lg border border-warning/55 bg-warning/10 px-4 py-3 text-sm text-foreground-subtle">
+            <div className="mb-1 font-semibold text-warning">หมายเหตุ</div>
+            <p className="leading-relaxed">
+              ของจะถูกเก็บไว้ที่จุดรับฝากแค่ 15 วัน หลังจากนั้นจะถูกส่งไปเก็บที่ส่วนกลาง
+              หากต้องการไถ่ถอนแบบไม่เสียค่าใช้จ่ายเพิ่มให้วางแผนล่วงหน้า 7 วัน หรือไปรับเองที่ส่วนกลาง
+              หรือหากต้องการรับของภายในวันถัดไปที่จุดรับฝากเดิมจะมีค่าดำเนินการเพิ่ม 100 บาท
+              และหากครบกำหนดสัญญาแล้วจะมีค่าปรับเดือนละ 50 บาท
+            </p>
+          </div>
+
           {/* Continue */}
           <button
             onClick={handleSubmit}
-            disabled={!isRegistered || isSubmitting || loanAmountNum < MIN_LOAN_AMOUNT}
+            disabled={!canContinue}
             className={`w-full min-h-12 rounded-full px-4 py-2 flex flex-col items-center justify-center transition-colors ${
-              isRegistered && loanAmountNum >= MIN_LOAN_AMOUNT
+              canContinue
                 ? 'btn-transition btn-sheen bg-[image:var(--background-image-grad-primary)] text-primary-fg hover:bg-primary-hover'
                 : 'bg-grey-5 text-foreground-subtle cursor-not-allowed'
             }`}

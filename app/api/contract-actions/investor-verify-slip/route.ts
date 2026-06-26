@@ -37,7 +37,7 @@ const buildRenewedContractRecord = (params: {
   durationDays: number;
   signedContractUrl?: string | null;
 }) => {
-  const platformFeeRate = params.contract.platform_fee_rate ?? 0.01;
+  const platformFeeRate = params.contract.platform_fee_rate ?? 0.015;
   const platformFeeAmount = round2(params.principalAmount * platformFeeRate * (params.durationDays / 30));
   const originalContractId = params.contract.original_contract_id || params.contract.contract_id;
 

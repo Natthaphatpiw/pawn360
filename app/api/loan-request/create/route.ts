@@ -201,6 +201,7 @@ export async function POST(request: NextRequest) {
     const estimatedValue = normalizeNumber(itemData?.estimatedPrice);
     const aiConditionScore = normalizeNumber(itemData?.aiConditionScore);
     const aiConfidence = normalizeNumber(itemData?.aiConfidence);
+    const conditionChecklist = itemData?.conditionChecklist || null;
 
     // Create item record
     const itemRecord = {
@@ -223,6 +224,7 @@ export async function POST(request: NextRequest) {
       ai_condition_reason: itemData.aiConditionReason || null,
       estimated_value: estimatedValue,
       ai_confidence: aiConfidence,
+      condition_checklist: conditionChecklist,
       accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
       defects: itemData.defects || null,
       notes: buildItemNotesWithPasscode(itemData.notes, itemData.devicePasscode),

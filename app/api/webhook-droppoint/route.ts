@@ -572,7 +572,25 @@ function createPawnerItemReadyCard(redemption: any): FlexMessage {
     'SELF_PICKUP': 'รับของด้วยตัวเอง',
     'SELF_ARRANGE': 'เรียกขนส่งเอง',
     'PLATFORM_ARRANGE': 'Pawnly จัดส่งให้',
+    'DROPPOINT_SELF_PICKUP': 'รับเองที่ Drop Point',
+    'DROPPOINT_SELF_RIDER': 'เรียกไรเดอร์เอง',
+    'CENTRAL_SCHEDULE_7D': 'นัดรับที่ Drop Point ภายใน 7 วัน',
+    'CENTRAL_SELF_PICKUP_TODAY': 'รับเองที่คลังกลาง Astly วันนี้',
+    'DROPPOINT_NEXT_DAY_PICKUP': 'รับวันถัดไปที่ Drop Point',
   }[redemption.delivery_method as string] || redemption.delivery_method;
+  const dropPointReturnMethods = new Set([
+    'SELF_PICKUP',
+    'SELF_ARRANGE',
+    'DROPPOINT_SELF_PICKUP',
+    'DROPPOINT_SELF_RIDER',
+    'CENTRAL_SCHEDULE_7D',
+    'DROPPOINT_NEXT_DAY_PICKUP',
+  ]);
+  const centralReturnMethods = new Set([
+    'CENTRAL_SELF_PICKUP_TODAY',
+  ]);
+  const isDropPointReturn = dropPointReturnMethods.has(String(redemption.delivery_method || ''));
+  const isCentralReturn = centralReturnMethods.has(String(redemption.delivery_method || ''));
 
   return {
     type: 'flex',
@@ -623,7 +641,7 @@ function createPawnerItemReadyCard(redemption: any): FlexMessage {
               { type: 'text', text: deliveryMethodText, color: '#B85C38', size: 'sm', flex: 5, weight: 'bold' }
             ]
           },
-          ...(redemption.delivery_method === 'SELF_PICKUP' ? [{
+          ...(isDropPointReturn ? [{
             type: 'box' as const,
             layout: 'vertical' as const,
             margin: 'lg' as const,
@@ -633,7 +651,17 @@ function createPawnerItemReadyCard(redemption: any): FlexMessage {
               { type: 'text' as const, text: `โทร: ${dropPoint?.phone_number || ''}`, color: '#666666', size: 'xs' as const, margin: 'sm' as const }
             ]
           }] : []),
-          ...(redemption.delivery_method !== 'SELF_PICKUP' ? [{
+          ...(isCentralReturn ? [{
+            type: 'box' as const,
+            layout: 'vertical' as const,
+            margin: 'lg' as const,
+            contents: [
+              { type: 'text' as const, text: 'สถานที่รับ:', color: '#666666', size: 'xs' as const },
+              { type: 'text' as const, text: 'คลังกลาง Astly', color: '#333333', size: 'sm' as const, weight: 'bold' as const, margin: 'sm' as const },
+              { type: 'text' as const, text: 'เจ้าหน้าที่จะแจ้งรายละเอียดนัดหมาย', color: '#666666', size: 'xs' as const, margin: 'sm' as const }
+            ]
+          }] : []),
+          ...(redemption.delivery_method === 'PLATFORM_ARRANGE' ? [{
             type: 'box' as const,
             layout: 'vertical' as const,
             margin: 'lg' as const,

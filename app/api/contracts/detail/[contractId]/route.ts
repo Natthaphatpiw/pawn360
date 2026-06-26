@@ -90,9 +90,15 @@ export async function GET(
 
     const getDisplayStatus = (data: any, remainingDays: number) => {
       const status = data.contract_status;
+      const redemptionStatus = data.redemption_status;
       const fundingStatus = data.funding_status;
       const paymentStatus = data.payment_status;
       const itemStatus = data.item_delivery_status;
+
+      if (['PENDING', 'IN_PROGRESS'].includes(String(redemptionStatus || '')) && itemStatus !== 'RETURNED') {
+        return 'รอรับของคืน';
+      }
+      if (redemptionStatus === 'COMPLETED') return 'ไถ่ถอน';
 
       if (status === 'TERMINATED') return 'ยกเลิก';
       if (status === 'COMPLETED') return 'เสร็จสิ้น';
@@ -147,7 +153,7 @@ export async function GET(
 
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
-    const feeRate = Number(contract.platform_fee_rate ?? 0.01);
+    const feeRate = Number(contract.platform_fee_rate ?? 0.015);
     const dailyInterestRate = monthlyInterestRate / 30;
 
     const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;

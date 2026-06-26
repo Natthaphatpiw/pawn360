@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
         today: requirement.today.toISOString(),
         daysOverdue: requirement.daysOverdue,
         penaltyAmount: requirement.penaltyAmount,
+        overdueInterestAmount: requirement.overdueInterestAmount,
+        totalLateChargeAmount: requirement.totalLateChargeAmount,
       },
       payment: payment ? {
         paymentId: payment.penalty_id,

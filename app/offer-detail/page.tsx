@@ -240,8 +240,8 @@ function OfferDetailContent() {
 
   if (acceptSuccess) {
     return (
-      <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background-white flex items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-xl bg-background-white p-4 text-center">
+      <div className="theme-liff theme-investor h-[100dvh] min-h-[100dvh] bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-xl bg-background p-4 text-center">
           <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-24 h-24 text-green-500" />
           </div>
@@ -342,7 +342,7 @@ function OfferDetailContent() {
   const interestAmount = Number(contract.interest_amount) || 0;
   const platformFeeRate = typeof contract.platform_fee_rate === 'number'
     ? contract.platform_fee_rate
-    : 0.01;
+    : 0.015;
   const interestRatePercent = typeof contract.interest_rate === 'number'
     ? contract.interest_rate * 100
     : 0;

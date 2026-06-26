@@ -58,12 +58,15 @@ export async function GET(
       const penaltyRequirement = await getPenaltyRequirement(supabase, actionRequest.contract);
       const baseAmount = getBaseAmountForActionRequest(actionRequest);
       const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+      const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
       actionRequest.base_amount = baseAmount;
       actionRequest.penalty_amount = penaltyAmount;
-      actionRequest.total_amount = roundCurrency(baseAmount + penaltyAmount);
+      actionRequest.overdue_interest_amount = overdueInterestAmount;
+      actionRequest.total_amount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
       actionRequest.payment_breakdown = {
         baseAmount,
         penaltyAmount,
+        overdueInterestAmount,
         totalAmount: actionRequest.total_amount,
       };
     }

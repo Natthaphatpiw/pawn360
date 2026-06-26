@@ -7,7 +7,6 @@ import axios from 'axios';
 import { Camera, Check, CheckCircle, QrCode, X } from 'lucide-react';
 import ImageCarousel from '@/components/ImageCarousel';
 import PinModal from '@/components/PinModal';
-import VolumeSlider from '@/components/VolumeSlider';
 import { getPinSession } from '@/lib/security/pin-session';
 import { getMockContractDetail, isDropPointMockEnabled } from '@/lib/mock-drop-point';
 import {
@@ -17,6 +16,117 @@ import {
   DropPointMessageState,
   DropPointPageShell,
 } from '@/components/drop-point/ui';
+
+type ConditionCheckKey =
+  | 'screenCrack'
+  | 'screenLineDeadPixel'
+  | 'touchIssue'
+  | 'batteryIssue'
+  | 'bodyDamage'
+  | 'cameraIssue'
+  | 'portButtonIssue'
+  | 'waterIssue';
+
+const CONDITION_CHECKLIST: Array<{
+  key: ConditionCheckKey;
+  label: string;
+  detail: string;
+  deduction: number;
+}> = [
+  {
+    key: 'screenCrack',
+    label: 'จอแตก / ร้าว',
+    detail: 'มีรอยร้าว แตกบางส่วน หรือแตกหนัก',
+    deduction: 32,
+  },
+  {
+    key: 'screenLineDeadPixel',
+    label: 'จอเป็นเส้น / เดดพิกเซล',
+    detail: 'มีเส้นขึ้น หน้าจอกระพริบ หรือมี dead pixel',
+    deduction: 24,
+  },
+  {
+    key: 'touchIssue',
+    label: 'ทัชสกรีนผิดปกติ',
+    detail: 'แตะไม่ติด สะดุด หรือบางจุดไม่ตอบสนอง',
+    deduction: 18,
+  },
+  {
+    key: 'batteryIssue',
+    label: 'สภาพแบตเตอรี่ไม่ดี',
+    detail: 'แบตเสื่อม บวม หมดไว หรือแจ้งเตือนสุขภาพแบตต่ำ',
+    deduction: 14,
+  },
+  {
+    key: 'bodyDamage',
+    label: 'ตัวเครื่องบุบ / แตก',
+    detail: 'มีรอยตกกระแทก บิ่น งอ หรือฝาหลังเสียหาย',
+    deduction: 12,
+  },
+  {
+    key: 'cameraIssue',
+    label: 'กล้อง / แฟลชเสีย',
+    detail: 'ถ่ายไม่ได้ เบลอ มีฝ้า หรือแฟลชไม่ทำงาน',
+    deduction: 8,
+  },
+  {
+    key: 'portButtonIssue',
+    label: 'พอร์ต / ปุ่มกดมีปัญหา',
+    detail: 'ชาร์จไม่เข้า ปุ่มค้าง ปุ่มกดเสีย หรือพอร์ตหลวม',
+    deduction: 6,
+  },
+  {
+    key: 'waterIssue',
+    label: 'มีร่องรอยน้ำเข้า / เปิดไม่ติด',
+    detail: 'มีคราบน้ำ สนิม หรือเปิดไม่ติดเป็นปกติ',
+    deduction: 34,
+  },
+];
+
+type ConditionCheckState = Record<ConditionCheckKey, boolean | null>;
+
+const CONDITION_CHECK_KEYS: ConditionCheckKey[] = [
+  'screenCrack',
+  'screenLineDeadPixel',
+  'touchIssue',
+  'batteryIssue',
+  'bodyDamage',
+  'cameraIssue',
+  'portButtonIssue',
+  'waterIssue',
+];
+
+const createInitialConditionChecks = (): ConditionCheckState => ({
+  screenCrack: null,
+  screenLineDeadPixel: null,
+  touchIssue: null,
+  batteryIssue: null,
+  bodyDamage: null,
+  cameraIssue: null,
+  portButtonIssue: null,
+  waterIssue: null,
+});
+
+const calculateConditionScore = (checks: ConditionCheckState) => {
+  const deduction = CONDITION_CHECKLIST.reduce((total, item) => (
+    checks[item.key] ? total + item.deduction : total
+  ), 0);
+
+  return Math.max(0, Math.min(100, 100 - deduction));
+};
+
+const hasStoredConditionChecklist = (checklist: unknown): checklist is ConditionCheckState => {
+  if (!checklist || typeof checklist !== 'object') return false;
+  return CONDITION_CHECK_KEYS.every((key) => typeof (checklist as ConditionCheckState)[key] === 'boolean');
+};
+
+const isConditionChecklistMatch = (
+  pawnerChecklist: ConditionCheckState | null | undefined,
+  dropPointChecklist: ConditionCheckState
+) => {
+  if (!hasStoredConditionChecklist(pawnerChecklist)) return true;
+  return CONDITION_CHECK_KEYS.every((key) => pawnerChecklist[key] === dropPointChecklist[key]);
+};
 
 function DropPointVerifyContent() {
   const router = useRouter();
@@ -29,6 +139,8 @@ function DropPointVerifyContent() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conditionChecks, setConditionChecks] = useState<ConditionCheckState>(createInitialConditionChecks);
+  const [conditionChecklistTouched, setConditionChecklistTouched] = useState(false);
 
   let contractId = searchParams.get('contractId');
   if (!contractId) {
@@ -46,7 +158,7 @@ function DropPointVerifyContent() {
     color_match: null as boolean | null,
     functionality_ok: null as boolean | null,
     mdm_lock_status: null as boolean | null,
-    condition_score: 90,
+    condition_score: 0,
     notes: '',
     verification_photos: [] as string[],
   });
@@ -70,22 +182,24 @@ function DropPointVerifyContent() {
   const hasIncompleteChecks = requiredCheckFields.some((field) => verificationData[field] === null);
   const hasAnyMismatch = requiredCheckFields.some((field) => verificationData[field] === false);
   const expectedConditionScore = Number(contract?.items?.item_condition || 0);
-  const isConditionGapTooHigh = Number.isFinite(expectedConditionScore)
-    ? verificationData.condition_score < (expectedConditionScore - 10)
+  const pawnerConditionChecklist = contract?.items?.condition_checklist as ConditionCheckState | null | undefined;
+  const derivedConditionScore = conditionChecklistTouched
+    ? calculateConditionScore(conditionChecks)
+    : 0;
+  const hasCompletedConditionChecklist = CONDITION_CHECKLIST.every((item) => conditionChecks[item.key] !== null);
+  const hasChecklistMismatch = !isConditionChecklistMatch(pawnerConditionChecklist, conditionChecks);
+  const isConditionGapTooHigh = hasCompletedConditionChecklist && Number.isFinite(expectedConditionScore)
+    ? derivedConditionScore < (expectedConditionScore - 10)
     : false;
-  const mustReject = hasAnyMismatch || isConditionGapTooHigh;
+  const mustReject = hasAnyMismatch || isConditionGapTooHigh || hasChecklistMismatch;
   const hasVerificationPhotos = verificationData.verification_photos.length > 0;
-  const canApprove = !mustReject && !hasIncompleteChecks && isConfirmed && !!storageBoxCode.trim() && hasVerificationPhotos;
+  const canApprove = !mustReject && !hasIncompleteChecks && hasCompletedConditionChecklist && isConfirmed && !!storageBoxCode.trim() && hasVerificationPhotos;
 
   useEffect(() => {
     const load = async () => {
       if (previewMode) {
         const mockContract = getMockContractDetail(contractId);
         setContract(mockContract);
-        setVerificationData((prev) => ({
-          ...prev,
-          condition_score: Number(mockContract?.items?.item_condition || 90),
-        }));
         setLoading(false);
         return;
       }
@@ -94,10 +208,6 @@ function DropPointVerifyContent() {
         setLoading(true);
         const response = await axios.get(`/api/drop-points/contracts/detail/${contractId}?lineId=${profile.userId}`);
         setContract(response.data.contract);
-        setVerificationData((prev) => ({
-          ...prev,
-          condition_score: Number(response.data.contract?.items?.item_condition || 90),
-        }));
       } catch (fetchError: any) {
         setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
       } finally {
@@ -161,6 +271,23 @@ function DropPointVerifyContent() {
     }));
   };
 
+  const handleConditionCheckChange = (key: ConditionCheckKey, value: boolean) => {
+    setConditionChecklistTouched(true);
+    setConditionChecks((prev) => {
+      const nextChecks = {
+        ...prev,
+        [key]: value,
+      };
+
+      setVerificationData((current) => ({
+        ...current,
+        condition_score: calculateConditionScore(nextChecks),
+      }));
+
+      return nextChecks;
+    });
+  };
+
   const submitVerification = async (result: 'APPROVED' | 'REJECTED', pinToken: string) => {
     if (result === 'APPROVED' && !canApprove) {
       alert('กรุณาตรวจสอบข้อมูลให้ครบก่อนยืนยัน');
@@ -185,6 +312,8 @@ function DropPointVerifyContent() {
         storageBoxCode: storageBoxCode.trim().toUpperCase(),
         verificationData: {
           ...verificationData,
+          condition_score: derivedConditionScore,
+          condition_checklist: conditionChecks,
           verification_result: result,
           storage_box_code: storageBoxCode.trim().toUpperCase(),
         },
@@ -324,28 +453,65 @@ function DropPointVerifyContent() {
         <VerificationToggle label="การติดตั้ง MDM" subLabel="ไม่ได้ติดตั้ง" fieldName="mdm_lock_status" />
 
         <DropPointCard>
-          <div className="mb-4 flex items-end justify-between">
-            <label className="register-heading text-sm font-semibold">สภาพสินค้า</label>
-            <span className="register-subtle text-xs">ลูกค้าระบุ {contract.items?.item_condition || 0}%</span>
-          </div>
-          <div className="mb-2 rounded-lg border border-s3/15 bg-background-white px-5 py-3">
-            <VolumeSlider
-              min={0}
-              max={100}
-              step={1}
-              value={verificationData.condition_score}
-              ariaLabel="Condition"
-              onChange={(condition_score) => setVerificationData({ ...verificationData, condition_score })}
-            />
-            <div className="mt-3 flex justify-between text-xs font-semibold text-foreground-subtle">
-              <span>0%</span>
-              <span>100%</span>
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <label className="register-heading text-sm font-semibold">สภาพสินค้า</label>
+              <p className="mt-1 text-xs text-foreground-subtle">
+                ลูกค้าระบุ {contract.items?.item_condition || 0}% และให้ตรวจตาม checklist ด้านล่าง
+              </p>
             </div>
+            <span className="rounded-full border border-s3-border bg-background-white px-3 py-1 text-xs font-semibold text-s3">
+              {derivedConditionScore}%
+            </span>
           </div>
+
+          <div className="grid gap-2">
+            {CONDITION_CHECKLIST.map((item) => {
+              const checked = conditionChecks[item.key];
+              return (
+                <div key={item.key} className="rounded-lg border border-s3-border/60 bg-background-white p-3">
+                  <div className="mb-3">
+                    <div className="text-sm font-semibold text-foreground">{item.label}</div>
+                    <div className="mt-1 text-xs leading-relaxed text-foreground-subtle">{item.detail}</div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleConditionCheckChange(item.key, true)}
+                      aria-pressed={checked === true}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                        checked === true
+                          ? 'border-error bg-error text-primary-fg'
+                          : 'border-error-border bg-background-white text-error/55 hover:bg-background-subtle'
+                      }`}
+                    >
+                      ใช่
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleConditionCheckChange(item.key, false)}
+                      aria-pressed={checked === false}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                        checked === false
+                          ? 'border-success bg-success text-success-fg'
+                          : 'border-primary-border bg-background-white text-foreground-subtle hover:bg-background-subtle'
+                      }`}
+                    >
+                      ไม่ใช่
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="register-subtle">สภาพที่ตรวจ</span>
-            <span className="register-heading font-semibold">{verificationData.condition_score}%</span>
+            <span className="register-heading font-semibold">{derivedConditionScore}%</span>
           </div>
+          <p className="mt-2 text-xs text-foreground-subtle">
+            กดเลือกให้ครบทุกข้อก่อนยืนยัน ถ้าสภาพต่ำกว่าที่ลูกค้าระบุเกิน 10% จะต้องส่งคืนเท่านั้น
+          </p>
           {isConditionGapTooHigh ? <p className="mt-2 text-xs text-error">สภาพต่ำกว่าที่ลูกค้าระบุเกิน 10% ต้องส่งคืนเท่านั้น</p> : null}
         </DropPointCard>
 
@@ -423,6 +589,8 @@ function DropPointVerifyContent() {
             <span className="text-sm text-foreground-muted">ข้อมูลทั้งหมดถูกตรวจสอบเรียบร้อยแล้ว</span>
           </label>
           {hasIncompleteChecks ? <p className="mt-2 text-xs text-warning">กรุณาเลือกผลตรวจสอบให้ครบทุกหัวข้อ</p> : null}
+          {!hasCompletedConditionChecklist ? <p className="mt-2 text-xs text-warning">กรุณาเลือก checklist สภาพสินค้าให้ครบทุกข้อ</p> : null}
+          {hasChecklistMismatch ? <p className="mt-2 text-xs text-error">checklist สภาพสินค้าไม่ตรงกับข้อมูลของลูกค้า ต้องส่งคืนเท่านั้น</p> : null}
           {!hasVerificationPhotos && !mustReject ? <p className="mt-2 text-xs text-warning">กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูป</p> : null}
           {mustReject ? <p className="mt-2 text-xs text-error">พบข้อมูลไม่ตรง ต้องทำรายการส่งคืน</p> : null}
         </DropPointCard>
