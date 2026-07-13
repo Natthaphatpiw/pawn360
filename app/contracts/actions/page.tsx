@@ -66,6 +66,9 @@ const statusLabel: Record<string, string> = {
 
 const getListDisplayStatus = (item: ActionItem) => {
   switch (item.request_status) {
+    case 'SLIP_VERIFIED':
+    case 'AWAITING_SIGNATURE':
+      return 'กำลังยืนยันรายการ';
     case 'AWAITING_PAYMENT':
     case 'SLIP_REJECTED':
       return 'รอผู้ขอสินเชื่ออัปโหลดสลิป';
@@ -79,10 +82,24 @@ const getListDisplayStatus = (item: ActionItem) => {
     case 'INVESTOR_TRANSFERRED':
     case 'AWAITING_PAWNER_CONFIRM':
       return 'รอผู้ขอสินเชื่อยืนยันรับเงิน';
+    case 'INVESTOR_REJECTED':
+      return 'นักลงทุนปฏิเสธ';
+    case 'INVESTOR_SLIP_REJECTED':
+      return 'รอนักลงทุนอัปโหลดสลิปใหม่';
     default:
       return null;
   }
 };
+
+const hiddenRequestStatuses = new Set([
+  'COMPLETED',
+  'CANCELLED',
+  'VOIDED',
+  'SLIP_REJECTED_FINAL',
+  'INVESTOR_SLIP_REJECTED_FINAL',
+]);
+
+const shouldShowActionRequest = (item: ActionItem) => !hiddenRequestStatuses.has(item.request_status);
 
 const principalIncreasePreviewStatuses = [
   'PENDING_INVESTOR_APPROVAL',
@@ -157,7 +174,7 @@ export default function ActionStatusListPage() {
 
   const actionRequests = mockMode ? [...previewPrincipalIncreaseRequests, ...requests] : requests;
 
-  const pendingRequests = actionRequests.filter((req) => Boolean(getListDisplayStatus(req)));
+  const visibleRequests = actionRequests.filter(shouldShowActionRequest);
 
   useEffect(() => {
     if (mockMode) {
@@ -242,18 +259,18 @@ export default function ActionStatusListPage() {
         </div>
 
       <div className="flex-1 space-y-3 pb-20 no-scrollbar">
-        {pendingRequests.length === 0 ? (
+        {visibleRequests.length === 0 ? (
           <div className="rounded-lg border border-primary-border bg-background p-8 text-center shadow-soft">
             <p className="text-primary/50">ไม่มีคำขอที่รอดำเนินการ</p>
           </div>
         ) : (
-          pendingRequests.map((req) => {
+          visibleRequests.map((req) => {
             const item = req.contract?.items;
             const itemName = item?.capacity
               ? `${item.brand} ${item.model} ${item.capacity}`
               : `${[item?.brand, item?.model].filter(Boolean).join(' ') || '-'}`.trim();
             const amount = getAmountLabel(req);
-            const displayStatus = getListDisplayStatus(req);
+            const displayStatus = getListDisplayStatus(req) || statusLabel[req.request_status] || req.request_status;
             return (
               <div
                 key={req.request_id}
