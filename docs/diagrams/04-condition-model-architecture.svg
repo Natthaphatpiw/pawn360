@@ -1,0 +1,170 @@
+<svg viewBox="0 0 1600 1130" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+<title>Astly - In-House Condition-Assessment AI : System Architecture</title>
+<desc>Architecture of Astly's self-trained item-condition assessment model: data flywheel and labeling, GPU training plane (DINOv2/DINOv3 backbone with ordinal grading, defect detection and anomaly heads, two-stage transfer learning), evaluation/calibration/registry, GPU inference plane, integration behind the existing AI provider abstraction, and the active-learning feedback loop.</desc>
+<defs>
+<marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#334155"/></marker>
+<marker id="arP" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#7c3aed"/></marker>
+<style>
+.zone{fill:#ffffff;stroke:#cbd5e1;stroke-width:1.3}
+.zt{font-size:13px;font-weight:700;fill:#0f172a}
+.data{fill:#e7f4f1;stroke:#0f766e;stroke-width:1.4}
+.blue{fill:#eaf1f8;stroke:#1f4e79;stroke-width:1.4}
+.head{fill:#e3edf8;stroke:#1f4e79;stroke-width:1.4}
+.amber{fill:#fff7ed;stroke:#d97706;stroke-width:1.3}
+.indigo{fill:#f1eefb;stroke:#5b21b6;stroke-width:1.4}
+.t{font-size:12.5px;font-weight:700;fill:#0f172a}
+.tb{font-size:12.5px;font-weight:700;fill:#1f4e79}
+.tg{font-size:12.5px;font-weight:700;fill:#0f3f3a}
+.ti{font-size:12.5px;font-weight:700;fill:#4c1d95}
+.ta{font-size:12.5px;font-weight:700;fill:#7c2d12}
+.s{font-size:9.8px;fill:#475569}
+.sa{font-size:9.8px;fill:#7c2d12}
+.flow{stroke:#334155;stroke-width:1.7;fill:none;marker-end:url(#ar)}
+.loop{stroke:#7c3aed;stroke-width:1.6;fill:none;stroke-dasharray:6 4;marker-end:url(#arP)}
+.lbl{font-size:10px;fill:#475569}
+.foot{font-size:10.5px;fill:#334155}
+.loopt{font-size:11px;font-weight:700;fill:#6d28d9}
+</style>
+</defs>
+<rect x="0" y="0" width="1600" height="1130" fill="#ffffff"/>
+
+<!-- Header -->
+<rect x="40" y="26" width="1520" height="72" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="58" y="62" font-size="26" font-weight="700" fill="#0f172a">Astly  -  In-House Condition-Assessment AI</text>
+<text x="58" y="86" font-size="13" fill="#475569">Current design: item-condition scoring framed as ordinal grading + explainable defect detection, served behind the existing AI provider abstraction</text>
+<text x="1544" y="58" text-anchor="end" font-size="12" font-weight="600" fill="#64748b">Self-trained vision model</text>
+<text x="1544" y="80" text-anchor="end" font-size="12" font-weight="600" fill="#64748b">Commercial-licensed stack</text>
+
+<!-- BAND A: DATA -->
+<rect class="zone" x="40" y="118" width="1520" height="132"/>
+<text class="zt" x="58" y="142">1 - DATA FLYWHEEL &amp; LABELING  (offline)</text>
+<rect class="data" x="60" y="162" width="470" height="80" rx="5"/>
+<text class="tg" x="74" y="186">Image Sources</text>
+<text class="s" x="74" y="205">App uploads (S3 photos)</text>
+<text class="s" x="74" y="220">Drop-point physical-verification ground truth</text>
+<text class="s" x="74" y="235">Multi-angle shots + item metadata</text>
+<rect class="data" x="565" y="162" width="470" height="80" rx="5"/>
+<text class="tg" x="579" y="186">Labeling &amp; Curation</text>
+<text class="s" x="579" y="205">Grading rubric · multi-annotator consensus</text>
+<text class="s" x="579" y="220">Ordinal grades + per-aspect (screen/body/buttons/camera)</text>
+<text class="s" x="579" y="235">Class balance across all condition levels</text>
+<rect class="data" x="1070" y="162" width="470" height="80" rx="5"/>
+<text class="tg" x="1084" y="186">Dataset Pipeline</text>
+<text class="s" x="1084" y="205">PDPA redaction (mask serial / PII)</text>
+<text class="s" x="1084" y="220">Versioned dataset (DVC / LakeFS)</text>
+<text class="s" x="1084" y="235">train / val / test splits</text>
+
+<!-- BAND B: TRAINING -->
+<rect class="zone" x="40" y="268" width="1520" height="300"/>
+<text class="zt" x="58" y="292">2 - TRAINING PLANE  (GPU, off-Vercel)</text>
+<!-- left: backbone + 2-stage -->
+<rect class="blue" x="60" y="310" width="470" height="92" rx="5"/>
+<text class="tb" x="74" y="332">Backbone (feature extractor)</text>
+<text class="s" x="74" y="351">DINOv2 - Apache-2.0 (safe commercial default)</text>
+<text class="s" x="74" y="366">or DINOv3 - higher accuracy, Meta license (attribution if distributed)</text>
+<text class="s" x="74" y="381">ViT-S / ViT-B · frozen dense patch features</text>
+<rect class="blue" x="60" y="414" width="470" height="140" rx="5"/>
+<text class="tb" x="74" y="436">Transfer Learning - 2 stages</text>
+<text class="s" x="74" y="456">Stage 1: linear probe (backbone frozen) - fast baseline, low data</text>
+<text class="s" x="74" y="472">Stage 2: partial fine-tune - discriminative / layer-wise LR</text>
+<text class="s" x="74" y="488">LR: head ~1e-3, backbone ~1e-5..1e-4 · warmup + cosine decay</text>
+<text class="s" x="74" y="504">AdamW (wd ~0.05) · stochastic depth ~0.1-0.2</text>
+<text class="s" x="74" y="520">Input resolution 448 / 512 (captures small scratches)</text>
+<text class="s" x="74" y="536">Early stopping on val · ensemble for uncertainty</text>
+<!-- mid: heads -->
+<rect class="head" x="565" y="310" width="470" height="74" rx="5"/>
+<text class="tb" x="579" y="332">Ordinal Grading Head</text>
+<text class="s" x="579" y="351">CORN / CORAL ordinal loss (not plain CE / MSE)</text>
+<text class="s" x="579" y="366">-&gt; condition score + per-aspect sub-scores</text>
+<rect class="head" x="565" y="396" width="470" height="74" rx="5"/>
+<text class="tb" x="579" y="418">Defect Detection Head</text>
+<text class="s" x="579" y="437">RT-DETR / RF-DETR (commercial-safe, avoids AGPL)</text>
+<text class="s" x="579" y="452">localizes scratches · dents · cracks · wear</text>
+<rect class="head" x="565" y="482" width="470" height="72" rx="5"/>
+<text class="tb" x="579" y="504">Anomaly Detection Head</text>
+<text class="s" x="579" y="523">PatchCore / EfficientAD - learns the 'good' baseline</text>
+<text class="s" x="579" y="538">few-shot: flags defects without labeling every type</text>
+<!-- right: augmentation, tracking, framing -->
+<rect class="amber" x="1070" y="310" width="470" height="110" rx="5"/>
+<text class="ta" x="1084" y="332">Augmentation Policy (critical)</text>
+<text class="sa" x="1084" y="352">SAFE: flip / rotate / mild brightness-contrast / slight blur</text>
+<text class="sa" x="1084" y="368">AVOID: heavy color-jitter, cutout / random-erasing, heavy noise</text>
+<text class="sa" x="1084" y="384">these create or hide defects -&gt; corrupt the condition label</text>
+<text class="sa" x="1084" y="404">rule: augmentation must not change the correct grade</text>
+<rect class="blue" x="1070" y="434" width="470" height="54" rx="5"/>
+<text class="tb" x="1084" y="456">Experiment Tracking</text>
+<text class="s" x="1084" y="474">Weights &amp; Biases / MLflow · reproducible configs</text>
+<rect class="blue" x="1070" y="500" width="470" height="54" rx="5"/>
+<text class="tb" x="1084" y="522">Problem Framing</text>
+<text class="s" x="1084" y="540">ordinal grading + defect detection (NOT plain regression)</text>
+
+<!-- BAND C: EVAL / CALIBRATION / REGISTRY -->
+<rect class="zone" x="40" y="586" width="1520" height="120"/>
+<text class="zt" x="58" y="610">3 - EVALUATION, CALIBRATION &amp; REGISTRY</text>
+<rect class="blue" x="60" y="626" width="350" height="74" rx="5"/>
+<text class="tb" x="74" y="648">Evaluation Metrics</text>
+<text class="s" x="74" y="667">MAE · QWK (quadratic weighted kappa)</text>
+<text class="s" x="74" y="682">within ±1 grade · per-category</text>
+<rect class="blue" x="437" y="626" width="350" height="74" rx="5"/>
+<text class="tb" x="451" y="648">Calibration</text>
+<text class="s" x="451" y="667">isotonic regression / temperature scaling</text>
+<text class="s" x="451" y="682">-&gt; business-aligned condition %</text>
+<rect class="blue" x="814" y="626" width="350" height="74" rx="5"/>
+<text class="tb" x="828" y="648">Uncertainty</text>
+<text class="s" x="828" y="667">MC dropout / ensemble</text>
+<text class="s" x="828" y="682">-&gt; confidence per prediction</text>
+<rect class="data" x="1191" y="626" width="349" height="74" rx="5"/>
+<text class="tg" x="1205" y="648">Model Registry + Cards</text>
+<text class="s" x="1205" y="667">versioned artifacts · metrics</text>
+<text class="s" x="1205" y="682">license / dataset provenance</text>
+
+<!-- BAND E: INFERENCE -->
+<rect class="zone" x="40" y="724" width="1520" height="150"/>
+<text class="zt" x="58" y="748">4 - INFERENCE PLANE  (GPU endpoint · private HTTPS · off-Vercel)</text>
+<rect class="indigo" x="60" y="766" width="940" height="92" rx="5"/>
+<text class="ti" x="74" y="792">Inference Graph</text>
+<text class="s" x="74" y="814">Backbone features  -&gt;  { Ordinal grade head · Defect detector · Anomaly map }  -&gt;  Calibration  -&gt;  Uncertainty gate</text>
+<text class="s" x="74" y="834">Served via Triton / vLLM-class / BentoML · batched · GPU autoscale</text>
+<rect class="indigo" x="1020" y="766" width="520" height="92" rx="5"/>
+<text class="ti" x="1034" y="792">Structured Output</text>
+<text class="s" x="1034" y="814">condition score (0-1) + per-aspect sub-scores</text>
+<text class="s" x="1034" y="834">localized defects (explainable) + confidence</text>
+
+<!-- BAND F: INTEGRATION -->
+<rect class="zone" x="40" y="892" width="1520" height="130"/>
+<text class="zt" x="58" y="916">5 - INTEGRATION WITH ASTLY</text>
+<rect class="blue" x="60" y="932" width="350" height="78" rx="5"/>
+<text class="tb" x="74" y="954">Provider Abstraction</text>
+<text class="s" x="74" y="973">same seam as Claude / Gemini</text>
+<text class="s" x="74" y="988">selected by configuration</text>
+<rect class="blue" x="437" y="932" width="350" height="78" rx="5"/>
+<text class="tb" x="451" y="954">Routes</text>
+<text class="s" x="451" y="973">/api/analyze-condition -&gt; aiCondition</text>
+<text class="s" x="451" y="988">-&gt; /api/estimate (pricing math unchanged)</text>
+<rect class="blue" x="814" y="932" width="350" height="78" rx="5"/>
+<text class="tb" x="828" y="954">Human-in-the-loop</text>
+<text class="s" x="828" y="973">low-confidence / high-value items</text>
+<text class="s" x="828" y="988">-&gt; operator review</text>
+<rect class="blue" x="1191" y="932" width="349" height="78" rx="5"/>
+<text class="tb" x="1205" y="954">Rollout</text>
+<text class="s" x="1205" y="973">shadow -&gt; canary -&gt; primary</text>
+<text class="s" x="1205" y="988">automatic LLM fallback</text>
+
+<!-- vertical pipeline arrows -->
+<line class="flow" x1="800" y1="250" x2="800" y2="268"/><text class="lbl" x="812" y="263">labeled, versioned dataset</text>
+<line class="flow" x1="800" y1="568" x2="800" y2="586"/><text class="lbl" x="812" y="581">candidate model</text>
+<line class="flow" x1="800" y1="706" x2="800" y2="724"/><text class="lbl" x="812" y="719">approved model -&gt; deploy</text>
+<line class="flow" x1="800" y1="874" x2="800" y2="892"/><text class="lbl" x="812" y="887">served via private endpoint</text>
+
+<!-- active-learning loop (right side) -->
+<polyline class="loop" points="1540,955 1578,955 1578,205 1542,205"/>
+<text class="loopt" x="1590" y="580" text-anchor="middle" transform="rotate(-90 1590 580)">ACTIVE-LEARNING LOOP  -  operator corrections &amp; disagreements become new labels</text>
+
+<!-- legend / notes -->
+<rect class="zone" x="40" y="1040" width="1520" height="76"/>
+<text class="zt" x="58" y="1062">LEGEND &amp; KEY NOTES</text>
+<line class="flow" x1="62" y1="1083" x2="104" y2="1083"/><text class="foot" x="114" y="1087">pipeline flow</text>
+<line class="loop" x1="240" y1="1083" x2="282" y2="1083"/><text class="foot" x="292" y="1087">active-learning feedback</text>
+<text class="foot" x="440" y="1087">Shapes: teal = data/registry · blue = training/model · indigo = inference · amber = guardrail.</text>
+<text class="foot" x="58" y="1106">Licensing: backbone DINOv2 (Apache-2.0, default) or DINOv3 (Meta license - "Built with DINOv3" attribution if weights distributed) · defect detector RT-DETR / RF-DETR (avoid Ultralytics YOLO AGPL for closed-source) · anomaly: PatchCore / EfficientAD.</text>
+</svg>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Upload, X, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
@@ -10,9 +10,7 @@ import { isPreviewMode } from '../../_lib/preview';
 
 export default function RedemptionReceiptPage() {
   const router = useRouter();
-  const params = useParams();
   const searchParams = useSearchParams();
-  const contractId = params.contractId as string;
   const redemptionId = searchParams.get('redemptionId');
   const previewMode = isPreviewMode(searchParams);
 

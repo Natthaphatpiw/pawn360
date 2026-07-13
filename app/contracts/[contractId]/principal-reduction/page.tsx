@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { AlertTriangle, Info } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
-import ContractActionTabs from '../_components/ContractActionTabs';
 import TransactionHeader from '../_components/TransactionHeader';
 import { withPreview } from '../_lib/preview';
 

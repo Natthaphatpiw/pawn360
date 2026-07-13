@@ -1,0 +1,80 @@
+<svg viewBox="0 0 1720 900" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+<title>Astly - Sequence: Redemption and Settlement</title>
+<desc>Sequence diagram of the Supabase redemption_requests flow: create request with penalty check, pay and verify slip, drop-point physical return with investor settlement, and borrower confirmation or 48-hour auto-confirm cron.</desc>
+<defs>
+<marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#334155"/></marker>
+<marker id="arA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#64748b"/></marker>
+<style>
+.title{font-size:22px;font-weight:700;fill:#0f172a}
+.sub{font-size:13px;fill:#475569}
+.client{fill:#eef4fb;stroke:#3b6aa0;stroke-width:1.4}
+.plat{fill:#eaf1f8;stroke:#1f4e79;stroke-width:1.4}
+.data{fill:#e7f4f1;stroke:#0f766e;stroke-width:1.4}
+.ext{fill:#f1f1f3;stroke:#4b5563;stroke-width:1.4}
+.ph{font-size:12px;font-weight:700;fill:#1f2937}
+.life{stroke:#94a3b8;stroke-width:1.2;stroke-dasharray:4 4}
+.msg{stroke:#334155;stroke-width:1.5;fill:none;marker-end:url(#ar)}
+.ret{stroke:#64748b;stroke-width:1.4;fill:none;stroke-dasharray:5 4;marker-end:url(#arA)}
+.ml{font-size:11.5px;font-weight:500;fill:#1f2937}
+.note{fill:#fff7ed;stroke:#d97706;stroke-width:1.2}
+.nt{font-size:11px;font-weight:500;fill:#7c2d12}
+.div{stroke:#cbd5e1;stroke-width:1}
+.dl{font-size:11px;font-weight:700;fill:#64748b}
+</style>
+</defs>
+<rect x="0" y="0" width="1720" height="900" fill="#ffffff"/>
+<text class="title" x="40" y="40">Astly  -  Sequence: Redemption and Settlement</text>
+<text class="sub" x="40" y="62">Supabase redemption_requests flow:  PENDING  ->  AMOUNT_VERIFIED  ->  COMPLETED  ->  BORROWER_CONFIRMED</text>
+
+<!-- lifelines -->
+<line class="life" x1="160" y1="120" x2="160" y2="800"/>
+<line class="life" x1="395" y1="120" x2="395" y2="800"/>
+<line class="life" x1="625" y1="120" x2="625" y2="800"/>
+<line class="life" x1="860" y1="120" x2="860" y2="800"/>
+<line class="life" x1="1090" y1="120" x2="1090" y2="800"/>
+<line class="life" x1="1325" y1="120" x2="1325" y2="800"/>
+<line class="life" x1="1560" y1="120" x2="1560" y2="800"/>
+
+<!-- participants -->
+<rect class="client" x="62" y="82" width="196" height="38" rx="5"/><text class="ph" x="160" y="106" text-anchor="middle">Borrower (LIFF)</text>
+<rect class="plat" x="297" y="82" width="196" height="38" rx="5"/><text class="ph" x="395" y="106" text-anchor="middle">Astly API (Fn)</text>
+<rect class="data" x="527" y="82" width="196" height="38" rx="5"/><text class="ph" x="625" y="106" text-anchor="middle">Supabase</text>
+<rect class="ext" x="762" y="82" width="196" height="38" rx="5"/><text class="ph" x="860" y="106" text-anchor="middle">Slip Verify</text>
+<rect class="client" x="992" y="82" width="196" height="38" rx="5"/><text class="ph" x="1090" y="106" text-anchor="middle">Drop-Point (LIFF)</text>
+<rect class="client" x="1227" y="82" width="196" height="38" rx="5"/><text class="ph" x="1325" y="106" text-anchor="middle">Investor (LINE)</text>
+<rect class="plat" x="1462" y="82" width="196" height="38" rx="5"/><text class="ph" x="1560" y="106" text-anchor="middle">Vercel Cron</text>
+
+<!-- Phase A: request -->
+<line class="msg" x1="160" y1="152" x2="395" y2="152"/><text class="ml" x="277" y="145" text-anchor="middle">1. POST /api/redemptions/create  (PIN-gated)</text>
+<line class="msg" x1="395" y1="188" x2="625" y2="188"/><text class="ml" x="510" y="181" text-anchor="middle">2. verify contract (ACTIVE|CONFIRMED) + penalty</text>
+<line class="ret" x1="625" y1="220" x2="395" y2="220"/><text class="ml" x="510" y="213" text-anchor="middle">3. contract + penalty requirement</text>
+<rect class="note" x="640" y="170" width="430" height="26" rx="4"/><text class="nt" x="650" y="187">If overdue: ensurePenaltyPaymentRecord (100 THB/day).</text>
+<line class="msg" x1="395" y1="256" x2="625" y2="256"/><text class="ml" x="510" y="249" text-anchor="middle">4. insert redemption_request (PENDING)</text>
+<line class="ret" x1="395" y1="292" x2="160" y2="292"/><text class="ml" x="277" y="285" text-anchor="middle">5. 201 created (amount due)</text>
+
+<!-- Phase B: payment -->
+<line class="div" x1="40" y1="314" x2="1680" y2="314"/><text class="dl" x="48" y="328">PAYMENT</text>
+<line class="msg" x1="160" y1="356" x2="395" y2="356"/><text class="ml" x="277" y="349" text-anchor="middle">6. POST /api/redemptions/upload-slip {slipUrl}</text>
+<line class="msg" x1="395" y1="392" x2="860" y2="392"/><text class="ml" x="627" y="385" text-anchor="middle">7. verifyPaymentSlip(slip, expectedAmount)</text>
+<line class="ret" x1="860" y1="424" x2="395" y2="424"/><text class="ml" x="627" y="417" text-anchor="middle">8. MATCHED | UNDERPAID | INVALID (+ saveSlipVerification)</text>
+<rect class="note" x="900" y="374" width="500" height="26" rx="4"/><text class="nt" x="910" y="391">SlipOK API when configured, else Claude Haiku 4.5 vision OCR.</text>
+<line class="msg" x1="395" y1="460" x2="625" y2="460"/><text class="ml" x="510" y="453" text-anchor="middle">9. request_status = AMOUNT_VERIFIED (else AMOUNT_MISMATCH)</text>
+
+<!-- Phase C: return + settlement -->
+<line class="div" x1="40" y1="482" x2="1680" y2="482"/><text class="dl" x="48" y="496">PHYSICAL RETURN AND SETTLEMENT</text>
+<line class="msg" x1="1090" y1="524" x2="395" y2="524"/><text class="ml" x="742" y="517" text-anchor="middle">10. POST /api/drop-points/returns/confirm {2 photos, bagNo}  (PIN-gated DROP_POINT)</text>
+<line class="msg" x1="395" y1="560" x2="625" y2="560"/><text class="ml" x="510" y="553" text-anchor="middle">11. redemption + contract = COMPLETED; item = RETURNED; box = AVAILABLE</text>
+<line class="msg" x1="395" y1="596" x2="625" y2="596"/><text class="ml" x="510" y="589" text-anchor="middle">12. investor interest = principal x rate x days/30 - platform_fee</text>
+<line class="ret" x1="395" y1="632" x2="1325" y2="632"/><text class="ml" x="860" y="625" text-anchor="middle">13. push settlement summary (net profit) + refreshInvestorTier</text>
+<line class="ret" x1="395" y1="668" x2="160" y2="668"/><text class="ml" x="277" y="661" text-anchor="middle">14. push 'confirm receipt' card</text>
+
+<!-- Phase D: acknowledgement -->
+<line class="div" x1="40" y1="690" x2="1680" y2="690"/><text class="dl" x="48" y="704">ACKNOWLEDGEMENT (manual or auto)</text>
+<line class="msg" x1="160" y1="730" x2="395" y2="730"/><text class="ml" x="277" y="723" text-anchor="middle">15. confirm received (manual)</text>
+<line class="msg" x1="1560" y1="730" x2="395" y2="730"/><text class="ml" x="1000" y="723" text-anchor="middle">16. OR cron GET /api/redemptions/auto-confirm-received (every 5 min)</text>
+<line class="msg" x1="395" y1="768" x2="625" y2="768"/><text class="ml" x="510" y="761" text-anchor="middle">17. if COMPLETED and &gt; 48h -> BORROWER_CONFIRMED</text>
+
+<rect class="note" x="40" y="816" width="1640" height="44" rx="4" fill="#eef4fb" stroke="#3b6aa0"/>
+<text class="nt" x="52" y="835" fill="#1e3a5f">Dual mechanism: the customer-facing variant /api/customer/request-redemption writes a MongoDB notification and calls the separate Shop System; its callback /api/webhooks/shop-notification</text>
+<text class="nt" x="52" y="851" fill="#1e3a5f">advances a 7-state machine (pending -> confirmed -> payment_pending -> payment_uploaded -> completed | failed). The two stores are kept in sync at write time; there is no replication layer.</text>
+</svg>

@@ -7,6 +7,7 @@ import MapEmbed from '@/components/MapEmbed';
 import { haversineDistanceMeters } from '@/lib/services/geo';
 import { openLiffEntry } from '@/lib/liff/navigation';
 import { savePawnerEstimateResume } from '@/lib/pawner-estimate-resume';
+import { isSerialRequiredForType } from '@/lib/utils/serial-types';
 import {
   createMockLoanRequest,
   getMockBranches,
@@ -14,17 +15,6 @@ import {
   saveMockDraft,
   waitMock,
 } from '@/lib/mock-pawner';
-
-const SERIAL_OPTIONAL_TYPES = new Set([
-  'อุปกรณ์เสริมโทรศัพท์',
-  'กล้อง',
-  'อุปกรณ์คอมพิวเตอร์',
-]);
-
-const isSerialRequiredForType = (itemType?: string) => {
-  if (!itemType) return false;
-  return !SERIAL_OPTIONAL_TYPES.has(itemType);
-};
 
 const safeParseJson = <T,>(raw: string, fallback: T): T => {
   if (!raw) return fallback;

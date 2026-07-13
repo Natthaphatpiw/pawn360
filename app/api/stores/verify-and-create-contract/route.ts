@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
     const storesCollection = db.collection('stores');
     const itemsCollection = db.collection('items');
     const customersCollection = db.collection('customers');
-    const contractsCollection = db.collection('contracts');
 
     // 1. ดึงข้อมูลร้านค้าและตรวจสอบรหัสผ่าน
     const store = await storesCollection.findOne({ _id: new ObjectId(storeId) });

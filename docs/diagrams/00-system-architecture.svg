@@ -1,0 +1,209 @@
+<svg viewBox="0 0 1680 2010" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+<title>Astly - System Architecture</title>
+<desc>Layered C4 container-level architecture for Astly, a P2P collateral-backed lending platform hosted on Vercel: client LIFF apps, Vercel edge and functions, data plane, external integrations, asynchronous lifecycle engine, and the planned self-hosted condition-assessment model.</desc>
+<defs>
+<marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#334155"/></marker>
+<marker id="arA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#64748b"/></marker>
+<marker id="arF" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#7c3aed"/></marker>
+<style>
+.zone{fill:#ffffff;stroke:#cbd5e1;stroke-width:1.4}
+.zt{font-size:14px;font-weight:700;fill:#0f172a}
+.tl{font-size:11px;font-weight:600;fill:#94a3b8}
+.client{fill:#eef4fb;stroke:#3b6aa0;stroke-width:1.4}
+.edge{fill:#eaf1f8;stroke:#1f4e79;stroke-width:1.4}
+.fn{fill:#f6f9fc;stroke:#7d97b5;stroke-width:1.2}
+.node{fill:#e3edf8;stroke:#1f4e79;stroke-width:1.6}
+.ext{fill:#f1f1f3;stroke:#4b5563;stroke-width:1.3}
+.futb{fill:#ffffff;stroke:#7c3aed;stroke-width:1.2;stroke-dasharray:5 4}
+.t{font-size:13px;font-weight:700;fill:#0f172a}
+.tb{font-size:13px;font-weight:700;fill:#1f4e79}
+.ts{font-size:10.5px;font-weight:400;fill:#475569}
+.tx{font-size:12px;font-weight:600;fill:#1f2937}
+.xs{font-size:10px;font-weight:400;fill:#5b6573}
+.li{font-size:11px;font-weight:500;fill:#243240}
+.td{font-size:12.5px;font-weight:700;fill:#0f3f3a}
+.tds{font-size:9.5px;font-weight:400;fill:#33514c}
+.tf{font-size:11.5px;font-weight:600;fill:#4c1d95}
+.tfs{font-size:10px;font-weight:400;fill:#5b4a86}
+.lbl{font-size:9.5px;font-weight:500;fill:#475569}
+.lblF{font-size:9.5px;font-weight:600;fill:#6d28d9}
+.flow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#ar)}
+.async{stroke:#64748b;stroke-width:1.5;fill:none;stroke-dasharray:6 4;marker-end:url(#arA)}
+.fasync{stroke:#7c3aed;stroke-width:1.5;fill:none;stroke-dasharray:6 4;marker-end:url(#arF)}
+.trust{fill:none;stroke:#9ca3af;stroke-width:1.3;stroke-dasharray:7 5}
+</style>
+</defs>
+
+<rect x="0" y="0" width="1680" height="2010" fill="#ffffff"/>
+
+<rect x="40" y="26" width="1600" height="74" rx="6" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="60" y="62" font-size="27" font-weight="700" fill="#0f172a">Astly  -  System Architecture</text>
+<text x="60" y="88" font-size="13" fill="#475569">C4 Container-Level View    |    Production on Vercel    |    P2P Collateral-Backed Lending Platform</text>
+<text x="1620" y="56" text-anchor="end" font-size="13" font-weight="600" fill="#64748b">Version 1.0</text>
+<text x="1620" y="80" text-anchor="end" font-size="13" font-weight="600" fill="#64748b">Domain: Astly.co</text>
+
+<rect class="zone trust" x="40" y="120" width="1600" height="150"/>
+<text class="zt" x="60" y="146">CLIENT ZONE   -   LINE LIFF Mini-Apps (browser; authenticated via LINE Login)</text>
+<text class="tl" x="1620" y="146" text-anchor="end">TRUST BOUNDARY: UNTRUSTED</text>
+<g>
+<rect class="client" x="60" y="180" width="290" height="74" rx="6"/><text class="t" x="205" y="213" text-anchor="middle">Borrower LIFF</text><text class="ts" x="205" y="232" text-anchor="middle">LINE ch. 2008216710</text>
+<rect class="client" x="377" y="180" width="290" height="74" rx="6"/><text class="t" x="522" y="213" text-anchor="middle">Store LIFF</text><text class="ts" x="522" y="232" text-anchor="middle">LINE ch. 2008216710</text>
+<rect class="client" x="694" y="180" width="290" height="74" rx="6"/><text class="t" x="839" y="213" text-anchor="middle">Investor LIFF</text><text class="ts" x="839" y="232" text-anchor="middle">LINE ch. 2008641671</text>
+<rect class="client" x="1011" y="180" width="290" height="74" rx="6"/><text class="t" x="1156" y="213" text-anchor="middle">Drop-Point LIFF</text><text class="ts" x="1156" y="232" text-anchor="middle">LINE ch. 2008651088</text>
+<rect class="client" x="1328" y="180" width="290" height="74" rx="6"/><text class="t" x="1473" y="213" text-anchor="middle">Admin Console</text><text class="ts" x="1473" y="232" text-anchor="middle">push notifications only</text>
+</g>
+
+<text class="tl" x="1172" y="294" text-anchor="end">TRUST BOUNDARY: VERCEL TRUSTED COMPUTE (secrets reside here)</text>
+
+<rect class="zone" x="48" y="300" width="1124" height="185"/>
+<text class="zt" x="64" y="326">VERCEL EDGE NETWORK   -   Single Ingress (no Cloudflare in path)</text>
+<rect class="edge" x="64" y="346" width="530" height="58" rx="6"/><text class="tx" x="329" y="370" text-anchor="middle">Global Anycast Edge / CDN</text><text class="xs" x="329" y="388" text-anchor="middle">static assets, immutable cache</text>
+<rect class="edge" x="614" y="346" width="530" height="58" rx="6"/><text class="tx" x="879" y="370" text-anchor="middle">Automatic TLS</text><text class="xs" x="879" y="388" text-anchor="middle">HTTP/2, HTTP/3, HSTS</text>
+<rect class="edge" x="64" y="414" width="530" height="58" rx="6"/><text class="tx" x="329" y="438" text-anchor="middle">Vercel Firewall / WAF + DDoS</text><text class="xs" x="329" y="456" text-anchor="middle">managed rules, rate limiting</text>
+<rect class="edge" x="614" y="414" width="530" height="58" rx="6"/><text class="tx" x="879" y="438" text-anchor="middle">DNS &amp; Domain: Astly.co</text><text class="xs" x="879" y="456" text-anchor="middle">Vercel-managed nameservers</text>
+
+<rect class="zone" x="48" y="505" width="1124" height="567"/>
+<text class="zt" x="64" y="531">VERCEL FUNCTIONS   -   Trusted Compute (Next.js Route Handlers; Node.js runtime; region sin1)</text>
+<rect class="node" x="64" y="548" width="530" height="54" rx="5"/><text class="tb" x="329" y="572" text-anchor="middle">Frontend: 76 Pages / 39 LIFF Layouts</text><text class="ts" x="329" y="589" text-anchor="middle">React 19, App Router</text>
+<rect class="node" x="614" y="548" width="530" height="54" rx="5"/><text class="tb" x="879" y="572" text-anchor="middle">API Layer: 115 Route Handlers</text><text class="ts" x="879" y="589" text-anchor="middle">domain-grouped /api/*</text>
+
+<rect class="fn" x="64" y="624" width="530" height="104" rx="5"/><text class="tx" x="80" y="645">Scheduled Functions  -  Vercel Cron (every 5 min)</text>
+<text class="li" x="80" y="673">/api/contracts/process-ticket-queue</text>
+<text class="li" x="80" y="697">/api/redemptions/auto-confirm-received</text>
+<text class="xs" x="80" y="718">issues loan-ticket links; 48h redemption auto-confirm</text>
+
+<rect class="fn" x="64" y="742" width="530" height="150" rx="5"/><text class="tx" x="80" y="763">Domain Services (lib/)</text>
+<text class="li" x="80" y="789">Pricing Engine (price-representative)</text>
+<text class="li" x="80" y="813">PIN Auth &amp; Session (lib/security)</text>
+<text class="li" x="80" y="837">LINE Clients &amp; Flex (lib/line)</text>
+<text class="li" x="340" y="789">Investor Tier &amp; Penalty</text>
+<text class="li" x="340" y="813">Slip Verification</text>
+<text class="li" x="340" y="837">Geo / Calculations (lib/utils)</text>
+<text class="xs" x="80" y="866">Stateless handlers; module-level singletons reused across</text>
+<text class="xs" x="80" y="881">warm invocations (Mongo / S3 / Redis clients)</text>
+
+<rect class="fn" x="614" y="624" width="530" height="190" rx="5"/><text class="tx" x="630" y="645">Inbound Webhook Handlers (8)</text>
+<text class="li" x="630" y="669">/api/webhook  (customer)</text>
+<text class="li" x="630" y="689">/api/line/webhook  (alt customer)</text>
+<text class="li" x="630" y="709">/api/webhook-store  (store)</text>
+<text class="li" x="630" y="729">/api/webhook-droppoint  (drop point)</text>
+<text class="li" x="630" y="749">/api/webhooks/shop-notification  (Shop System)</text>
+<text class="li" x="630" y="769">/api/webhooks/line-invest  (investor)</text>
+<text class="li" x="630" y="789">/api/ekyc/webhook  (borrower eKYC)</text>
+<text class="li" x="630" y="809">/api/webhooks/uppass-invest  (investor eKYC)</text>
+
+<rect class="node" x="614" y="828" width="530" height="64" rx="5"/><text class="tb" x="879" y="852" text-anchor="middle">Anthropic LLM Client (provider abstraction)</text><text class="ts" x="879" y="871" text-anchor="middle">Sonnet 4.6 text  •  Haiku 4.5 vision  •  4-key rotation</text>
+
+<rect class="node" x="64" y="912" width="1080" height="56" rx="5"/><text class="tb" x="604" y="936" text-anchor="middle">Core AI Routes</text><text class="ts" x="604" y="955" text-anchor="middle">/api/estimate (pricing pipeline)    •    /api/analyze-condition (condition scoring  -&gt;  aiCondition)</text>
+<line class="fasync" x1="604" y1="1058" x2="604" y2="970"/>
+<text class="lblF" x="612" y="1040">from self-hosted condition model (Zone 7):</text>
+<text class="lblF" x="612" y="1053">new vision provider  -  shadow / canary / primary, LLM fallback</text>
+
+<rect class="zone" x="1200" y="300" width="440" height="772"/>
+<text class="zt" x="1216" y="326">EXTERNAL THIRD-PARTY SYSTEMS</text>
+<text class="tl" x="1624" y="1060" text-anchor="end">SIGNATURE / SECRET AUTH</text>
+<g>
+<polygon class="ext" points="1232,350 1608,350 1624,383 1608,416 1232,416 1216,383"/><text class="tx" x="1420" y="378" text-anchor="middle">LINE Messaging API</text><text class="xs" x="1420" y="394" text-anchor="middle">4 Official Accounts</text>
+<polygon class="ext" points="1232,434 1608,434 1624,467 1608,500 1232,500 1216,467"/><text class="tx" x="1420" y="462" text-anchor="middle">Anthropic Claude API</text><text class="xs" x="1420" y="478" text-anchor="middle">Sonnet 4.6 + Haiku 4.5 vision</text>
+<polygon class="ext" points="1232,518 1608,518 1624,551 1608,584 1232,584 1216,551"/><text class="tx" x="1420" y="546" text-anchor="middle">Google Gemini API</text><text class="xs" x="1420" y="562" text-anchor="middle">condition scoring</text>
+<polygon class="ext" points="1232,602 1608,602 1624,635 1608,668 1232,668 1216,635"/><text class="tx" x="1420" y="630" text-anchor="middle">OpenAI API</text><text class="xs" x="1420" y="646" text-anchor="middle">optional web-search provider</text>
+<polygon class="ext" points="1232,686 1608,686 1624,719 1608,752 1232,752 1216,719"/><text class="tx" x="1420" y="714" text-anchor="middle">SerpAPI</text><text class="xs" x="1420" y="730" text-anchor="middle">Google Shopping price candidates</text>
+<polygon class="ext" points="1232,770 1608,770 1624,803 1608,836 1232,836 1216,803"/><text class="tx" x="1420" y="798" text-anchor="middle">UPPASS</text><text class="xs" x="1420" y="814" text-anchor="middle">eKYC (borrower + investor)</text>
+<polygon class="ext" points="1232,854 1608,854 1624,887 1608,920 1232,920 1216,887"/><text class="tx" x="1420" y="882" text-anchor="middle">SlipOK</text><text class="xs" x="1420" y="898" text-anchor="middle">bank-slip verification</text>
+<polygon class="ext" points="1232,938 1608,938 1624,971 1608,1004 1232,1004 1216,971"/><text class="tx" x="1420" y="966" text-anchor="middle">Shop System</text><text class="xs" x="1420" y="982" text-anchor="middle">separate Vercel application</text>
+</g>
+
+<rect class="zone" x="48" y="1092" width="1124" height="238"/>
+<text class="zt" x="64" y="1118">DATA PLANE   -   Privileged Server-Side Access Only (service-role; RLS backstop)</text>
+<text class="tl" x="1156" y="1118" text-anchor="end">PRIVILEGED DATA ACCESS</text>
+<g>
+<path d="M64,1145 v145 a125,14 0 0,0 250,0 v-145" fill="#e7f4f1" stroke="#0f766e" stroke-width="1.5"/><ellipse cx="189" cy="1145" rx="125" ry="14" fill="#d3ebe5" stroke="#0f766e" stroke-width="1.5"/>
+<text class="td" x="189" y="1168" text-anchor="middle">MongoDB Atlas</text><text class="tds" x="189" y="1185" text-anchor="middle">Customer OLTP</text><text class="tds" x="189" y="1201" text-anchor="middle">customers, items, contracts,</text><text class="tds" x="189" y="1215" text-anchor="middle">notifications, negotiation-reqs</text>
+<path d="M345,1145 v145 a125,14 0 0,0 250,0 v-145" fill="#e7f4f1" stroke="#0f766e" stroke-width="1.5"/><ellipse cx="470" cy="1145" rx="125" ry="14" fill="#d3ebe5" stroke="#0f766e" stroke-width="1.5"/>
+<text class="td" x="470" y="1168" text-anchor="middle">Supabase PostgreSQL</text><text class="tds" x="470" y="1185" text-anchor="middle">Investor / Finance / Logistics</text><text class="tds" x="470" y="1201" text-anchor="middle">RLS enabled;</text><text class="tds" x="470" y="1215" text-anchor="middle">service-role only</text>
+<path d="M626,1145 v145 a125,14 0 0,0 250,0 v-145" fill="#e7f4f1" stroke="#0f766e" stroke-width="1.5"/><ellipse cx="751" cy="1145" rx="125" ry="14" fill="#d3ebe5" stroke="#0f766e" stroke-width="1.5"/>
+<text class="td" x="751" y="1168" text-anchor="middle">Upstash Redis</text><text class="tds" x="751" y="1185" text-anchor="middle">(Vercel KV)</text><text class="tds" x="751" y="1201" text-anchor="middle">Estimate + Image-Hash</text><text class="tds" x="751" y="1215" text-anchor="middle">cache</text>
+<path d="M907,1145 v145 a125,14 0 0,0 250,0 v-145" fill="#e7f4f1" stroke="#0f766e" stroke-width="1.5"/><ellipse cx="1032" cy="1145" rx="125" ry="14" fill="#d3ebe5" stroke="#0f766e" stroke-width="1.5"/>
+<text class="td" x="1032" y="1168" text-anchor="middle">AWS S3</text><text class="tds" x="1032" y="1185" text-anchor="middle">piwp360 (ap-southeast-2)</text><text class="tds" x="1032" y="1201" text-anchor="middle">images, contracts, tickets,</text><text class="tds" x="1032" y="1215" text-anchor="middle">QR (presigned URLs)</text>
+</g>
+
+<rect class="fn" x="1200" y="1092" width="440" height="238" rx="5"/>
+<text class="zt" x="1216" y="1116" font-size="13">ASYNCHRONOUS LIFECYCLE ENGINE</text>
+<text class="li" x="1216" y="1142">Redemption / Extension / Principal-Change</text>
+<text class="xs" x="1216" y="1162">Durable envelopes (dual mechanism):</text>
+<text class="li" x="1228" y="1182">• MongoDB notifications collection</text>
+<text class="li" x="1228" y="1202">• Supabase contract_action_requests</text>
+<text class="xs" x="1216" y="1224">Advanced by webhooks + Vercel Cron.</text>
+<text class="xs" x="1216" y="1244">7-state machine:</text>
+<text class="li" x="1216" y="1264">pending -&gt; confirmed -&gt; payment_pending</text>
+<text class="li" x="1216" y="1284">-&gt; payment_uploaded -&gt; completed | failed</text>
+<text class="xs" x="1216" y="1310">Notification.contractId actually holds an item id.</text>
+
+<rect class="zone" x="48" y="1352" width="1592" height="468" stroke="#7c3aed" stroke-width="1.6" stroke-dasharray="8 5"/>
+<text class="zt" x="64" y="1380" fill="#4c1d95">PLANNED   -   Self-Hosted Open-Source Condition-Assessment Model (dedicated GPU plane, off Vercel)</text>
+<g>
+<rect class="futb" x="64" y="1420" width="236" height="96" rx="5"/><text class="tf" x="182" y="1452" text-anchor="middle">Data Flywheel</text><text class="tfs" x="182" y="1470" text-anchor="middle">S3 photos + drop-point</text><text class="tfs" x="182" y="1485" text-anchor="middle">ground truth + outcomes</text>
+<rect class="futb" x="329" y="1420" width="236" height="96" rx="5"/><text class="tf" x="447" y="1452" text-anchor="middle">Versioned Dataset</text><text class="tfs" x="447" y="1470" text-anchor="middle">PDPA redaction</text><text class="tfs" x="447" y="1485" text-anchor="middle">(DVC / LakeFS)</text>
+<rect class="futb" x="594" y="1420" width="236" height="96" rx="5"/><text class="tf" x="712" y="1452" text-anchor="middle">GPU Training Plane</text><text class="tfs" x="712" y="1470" text-anchor="middle">Modal/RunPod/SageMaker</text><text class="tfs" x="712" y="1485" text-anchor="middle">W&amp;B / MLflow</text>
+<rect class="futb" x="859" y="1420" width="236" height="96" rx="5"/><text class="tf" x="977" y="1448" text-anchor="middle">Model: Vision Encoder</text><text class="tfs" x="977" y="1465" text-anchor="middle">+ Multi-Task Heads</text><text class="tfs" x="977" y="1480" text-anchor="middle">condition, sub-scores,</text><text class="tfs" x="977" y="1495" text-anchor="middle">defects, item-type [OSS]</text>
+<rect class="futb" x="1124" y="1420" width="236" height="96" rx="5"/><text class="tf" x="1242" y="1452" text-anchor="middle">Model Registry</text><text class="tfs" x="1242" y="1470" text-anchor="middle">+ Model Cards</text><text class="tfs" x="1242" y="1485" text-anchor="middle">versioned artifacts</text>
+<rect class="futb" x="1389" y="1420" width="236" height="96" rx="5"/><text class="tf" x="1507" y="1452" text-anchor="middle">GPU Inference Endpoint</text><text class="tfs" x="1507" y="1470" text-anchor="middle">Triton / vLLM / BentoML</text><text class="tfs" x="1507" y="1485" text-anchor="middle">private HTTPS</text>
+<line class="fasync" x1="300" y1="1468" x2="327" y2="1468"/>
+<line class="fasync" x1="565" y1="1468" x2="592" y2="1468"/>
+<line class="fasync" x1="830" y1="1468" x2="857" y2="1468"/>
+<line class="fasync" x1="1095" y1="1468" x2="1122" y2="1468"/>
+<line class="fasync" x1="1360" y1="1468" x2="1387" y2="1468"/>
+<rect class="futb" x="859" y="1548" width="236" height="58" rx="5"/><text class="tf" x="977" y="1573" text-anchor="middle">Optional: Fine-tuned Open VLM</text><text class="tfs" x="977" y="1590" text-anchor="middle">explanatory JSON</text>
+<line class="fasync" x1="977" y1="1516" x2="977" y2="1546"/>
+<line class="fasync" x1="1507" y1="1420" x2="1507" y2="1392"/>
+<text class="lblF" x="1624" y="1384" text-anchor="end">-&gt; /api/analyze-condition (Zone 3)</text>
+</g>
+<text class="tf" x="64" y="1650">Integration:  introduced behind the existing provider abstraction (a new self-hosted condition provider, mirroring PRICE_SEARCH_PROVIDER / ANTHROPIC_VISION_MODEL).</text>
+<text class="tf" x="64" y="1675">Rollout:  shadow  -&gt;  canary  -&gt;  A/B  -&gt;  primary, with automatic third-party LLM fallback on low confidence, timeout, or error.</text>
+<text class="tf" x="64" y="1700">Placement:  dedicated GPU plane off Vercel.  Vercel remains the product and orchestration front end; connected only by a private HTTPS contract.</text>
+<text class="tfs" x="64" y="1724">Money-gating evaluation:  agreement with drop-point ground truth on the condition that drives the loan amount, not aggregate accuracy.  PDPA-governed training data.</text>
+<text class="lblF" x="120" y="1410">^ training images + ground-truth labels (from S3 / Supabase drop_point_verifications)</text>
+
+<line class="flow" x1="430" y1="270" x2="430" y2="300"/>
+<line class="flow" x1="900" y1="270" x2="900" y2="300"/>
+<text class="lbl" x="912" y="290">HTTPS (all clients)</text>
+<line class="flow" x1="610" y1="485" x2="610" y2="505"/>
+<text class="lbl" x="620" y="500">route dynamic requests</text>
+
+<line class="flow" x1="200" y1="980" x2="189" y2="1129"/><text class="lbl" x="120" y="1058">MongoDB wire (TLS)</text>
+<line class="flow" x1="430" y1="980" x2="468" y2="1129"/><text class="lbl" x="430" y="1058">supabase-js / service role</text>
+<line class="flow" x1="740" y1="980" x2="751" y2="1129"/><text class="lbl" x="720" y="1058">REST</text>
+<line class="flow" x1="980" y1="980" x2="1030" y2="1129"/><text class="lbl" x="980" y="1058">AWS SDK / presigned</text>
+
+<line class="flow" x1="1144" y1="850" x2="1214" y2="471"/><text class="lbl" x="1150" y="660">x-api-key (text + vision)</text>
+<line class="flow" x1="1144" y1="858" x2="1214" y2="555"/><text class="lbl" x="1150" y="676">condition scoring</text>
+<line class="flow" x1="1144" y1="845" x2="1214" y2="639"/><text class="lbl" x="1150" y="690">optional web-search</text>
+<line class="flow" x1="1144" y1="700" x2="1214" y2="719"/><text class="lbl" x="1150" y="706">shopping search</text>
+<line class="flow" x1="1144" y1="760" x2="1214" y2="887"/><text class="lbl" x="1150" y="840">slip OCR (fallback)</text>
+<line class="flow" x1="1144" y1="660" x2="1214" y2="965"/><text class="lbl" x="1150" y="930">signed request (HMAC)</text>
+
+<line class="async" x1="1214" y1="395" x2="1146" y2="668"/><text class="lbl" x="1000" y="500" fill="#64748b">LINE webhooks (HMAC)</text>
+<line class="async" x1="1214" y1="803" x2="1146" y2="740"/><text class="lbl" x="1000" y="760" fill="#64748b">eKYC result callback</text>
+<line class="async" x1="1214" y1="983" x2="1146" y2="780"/><text class="lbl" x="1000" y="800" fill="#64748b">shop callbacks (HMAC, replay)</text>
+
+<line class="fasync" x1="470" y1="1304" x2="300" y2="1350"/>
+<line class="fasync" x1="1032" y1="1304" x2="320" y2="1348"/>
+
+<rect class="zone" x="48" y="1840" width="1592" height="150"/>
+<text class="zt" x="64" y="1866">LEGEND</text>
+<g>
+<line class="flow" x1="70" y1="1898" x2="120" y2="1898"/><text class="li" x="132" y="1902">Synchronous call / request</text>
+<line class="async" x1="70" y1="1924" x2="120" y2="1924"/><text class="li" x="132" y="1928">Asynchronous / webhook / event</text>
+<line class="fasync" x1="70" y1="1950" x2="120" y2="1950"/><text class="li" x="132" y="1954">Planned ML data / inference flow</text>
+<rect class="node" x="430" y="1888" width="34" height="22" rx="4"/><text class="li" x="474" y="1903">Service / Vercel Function (blue)</text>
+<rect class="edge" x="430" y="1916" width="34" height="22" rx="11"/><text class="li" x="474" y="1931">Managed / Edge service</text>
+<path d="M430,1948 v18 a17,5 0 0,0 34,0 v-18" fill="#e7f4f1" stroke="#0f766e"/><ellipse cx="447" cy="1948" rx="17" ry="5" fill="#d3ebe5" stroke="#0f766e"/><text class="li" x="474" y="1958">Datastore (teal)</text>
+<polygon class="ext" points="770,1890 838,1890 848,1901 838,1912 770,1912 760,1901"/><text class="li" x="858" y="1905">External third-party (grey hexagon)</text>
+<rect class="futb" x="760" y="1920" width="88" height="22" rx="4"/><text class="li" x="858" y="1935">Future / planned component</text>
+<rect class="zone trust" x="760" y="1948" width="88" height="22"/><text class="li" x="858" y="1963">Trust boundary (dashed zone)</text>
+<text class="xs" x="1120" y="1895">Colors:  blue = Vercel platform,  teal = data stores,  grey = external systems,</text>
+<text class="xs" x="1120" y="1913">indigo dashed = planned ML plane.</text>
+<text class="xs" x="1120" y="1937">Cross-zone connectors use paired labeled stubs (Zone 3  &lt;-&gt;  Zone 7).</text>
+<text class="xs" x="1120" y="1955">Dual system of record: MongoDB (customer) + Supabase (investor/finance); no replication.</text>
+</g>
+</svg>

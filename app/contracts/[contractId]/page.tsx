@@ -100,7 +100,7 @@ export default function PawnContractDetail() {
 
   // Modal states
   const [activeModal, setActiveModal] = useState<ModalType>(null);
-  const [modalStep, setModalStep] = useState(1);
+  const [, setModalStep] = useState(1);
 
   useEffect(() => {
     if (contractId) {

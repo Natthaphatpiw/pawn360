@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { sendAdminMessage } from '@/lib/line/admin-client';
 import { createManualEstimateRequestMessage } from '@/lib/line/manual-estimate';
+import { parseBoolEnv } from '@/lib/utils/env';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const isManualEstimateEnabled = () => {
-  const value = (process.env.MANUAL_ESTIMATE_ENABLED || '').trim().toLowerCase();
-  return value === 'true' || value === '1' || value === 'yes' || value === 'on';
-};
+const isManualEstimateEnabled = () => parseBoolEnv(process.env.MANUAL_ESTIMATE_ENABLED);
 
 const normalizeNumber = (value: unknown) => {
   const num = typeof value === 'string' ? Number(value) : Number(value);

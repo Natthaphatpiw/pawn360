@@ -248,7 +248,6 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 const itemsCollection = db.collection('items');
                 const contractsCollection = db.collection('contracts');
                 const customersCollection = db.collection('customers');
-                const storesCollection = db.collection('stores');
 
                 // ดึงข้อมูล item ที่มีข้อมูลการยืนยัน
                 const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
@@ -1086,8 +1085,6 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
     // Investor reports problem
     if (action === 'investor_report_problem') {
-      const redemptionId = params.get('redemptionId');
-
       try {
         const invClient = getInvestorLineClient();
         if (!invClient) throw new Error('Investor LINE client not configured');

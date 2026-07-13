@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
-import { Client, FlexMessage } from '@line/bot-sdk';
+import { Client } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
 
 // LINE clients

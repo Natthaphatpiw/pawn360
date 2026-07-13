@@ -76,15 +76,6 @@ export default function PawnerRegister() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const navigateToLiff = (liffId: string | undefined, fallbackPath: string) => {
-    const trimmed = (liffId || '').trim();
-    if (trimmed) {
-      window.location.href = `https://liff.line.me/${trimmed}`;
-      return;
-    }
-    router.push(fallbackPath);
-  };
-
   // Check if user exists in database and KYC status
   useEffect(() => {
     if (liffLoading) return;

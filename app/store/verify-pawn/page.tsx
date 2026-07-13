@@ -46,7 +46,7 @@ function StoreVerifyPawnContent() {
 
   const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
   const [username, setUsername] = useState('');
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [, setSelectedStore] = useState<Store | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 

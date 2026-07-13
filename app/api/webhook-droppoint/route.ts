@@ -144,8 +144,6 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
 
   if (!userId) return;
 
-  const supabase = supabaseAdmin();
-
   if (action === 'verify_item' && contractId) {
     // Send verification page link
     const verifyLink = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_LIST || '2008651088-6wNs8Yrr'}?contractId=${contractId}`;

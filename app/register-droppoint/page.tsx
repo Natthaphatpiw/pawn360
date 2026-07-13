@@ -4,12 +4,10 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { MapPin, Phone, Mail, Clock, User, Building2 } from 'lucide-react';
+import { MapPin, Phone, Mail, User, Building2 } from 'lucide-react';
 
 function RegisterDropPointContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { liffObject, profile, isLoggedIn, isLoading: liffLoading } = useLiff();
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const [loading, setLoading] = useState(false);
   const [existingDropPoint, setExistingDropPoint] = useState<any>(null);

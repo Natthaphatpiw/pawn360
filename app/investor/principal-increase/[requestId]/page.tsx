@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { TrendingUp, User, CheckCircle, X, Wallet } from 'lucide-react';
+import { User, CheckCircle, X } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { openLiffEntry } from '@/lib/liff/navigation';

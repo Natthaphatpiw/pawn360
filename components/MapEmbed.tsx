@@ -1,7 +1,5 @@
 'use client';
 
-import React from 'react';
-
 type MapEmbedProps = {
   embedHtml?: string | null;
   className?: string;

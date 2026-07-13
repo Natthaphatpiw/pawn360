@@ -11,11 +11,6 @@ const sarabun = Noto_Sans_Thai({
   weight: ['400', '500', '600', '700'],
 });
 
-interface Store {
-  _id: string;
-  storeName: string;
-}
-
 interface Item {
   _id: string;
   brand: string;

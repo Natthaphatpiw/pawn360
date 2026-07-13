@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
-import { CheckCircle, Upload, X } from 'lucide-react';
+import { CheckCircle, Upload } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../../_components/TransactionHeader';

@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { AlertTriangle, CalendarDays, MapPin, Truck, Warehouse, Info } from 'lucide-react';
 import axios from 'axios';
 import MapEmbed from '@/components/MapEmbed';
 import { useLiff } from '@/lib/liff/liff-provider';
-import ContractActionTabs from '../_components/ContractActionTabs';
 import TransactionHeader from '../_components/TransactionHeader';
 import {
   getMockNearDueCentralRedemptionContract,

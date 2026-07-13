@@ -1,0 +1,76 @@
+<svg viewBox="0 0 1600 880" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+<title>Astly - Sequence: Estimate Pricing</title>
+<desc>Sequence diagram of POST /api/estimate: cache check, Claude input normalization, parallel Claude web-search pricing and SerpAPI shopping with Claude filter, representative price estimation, 60 percent LTV and condition blend, cache store, and response.</desc>
+<defs>
+<marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#334155"/></marker>
+<marker id="arA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#64748b"/></marker>
+<style>
+.title{font-size:22px;font-weight:700;fill:#0f172a}
+.sub{font-size:13px;fill:#475569}
+.client{fill:#eef4fb;stroke:#3b6aa0;stroke-width:1.4}
+.plat{fill:#eaf1f8;stroke:#1f4e79;stroke-width:1.4}
+.lib{fill:#f6f9fc;stroke:#7d97b5;stroke-width:1.4}
+.data{fill:#e7f4f1;stroke:#0f766e;stroke-width:1.4}
+.ext{fill:#f1f1f3;stroke:#4b5563;stroke-width:1.4}
+.ph{font-size:12.5px;font-weight:700;fill:#1f2937}
+.life{stroke:#94a3b8;stroke-width:1.2;stroke-dasharray:4 4}
+.msg{stroke:#334155;stroke-width:1.5;fill:none;marker-end:url(#ar)}
+.ret{stroke:#64748b;stroke-width:1.4;fill:none;stroke-dasharray:5 4;marker-end:url(#arA)}
+.ml{font-size:12px;font-weight:500;fill:#1f2937}
+.note{fill:#fff7ed;stroke:#d97706;stroke-width:1.2}
+.nt{font-size:11px;font-weight:500;fill:#7c2d12}
+.frame{fill:none;stroke:#7c3aed;stroke-width:1.2;stroke-dasharray:6 4}
+.ft{font-size:11px;font-weight:700;fill:#6d28d9}
+</style>
+</defs>
+<rect x="0" y="0" width="1600" height="880" fill="#ffffff"/>
+<text class="title" x="40" y="40">Astly  -  Sequence: Estimate Pricing</text>
+<text class="sub" x="40" y="62">POST /api/estimate    -    representative market price (ราคากลาง) to loan principal (ราคาจำนำ)</text>
+
+<!-- lifelines -->
+<line class="life" x1="160" y1="118" x2="160" y2="800"/>
+<line class="life" x1="415" y1="118" x2="415" y2="800"/>
+<line class="life" x1="670" y1="118" x2="670" y2="800"/>
+<line class="life" x1="925" y1="118" x2="925" y2="800"/>
+<line class="life" x1="1180" y1="118" x2="1180" y2="800"/>
+<line class="life" x1="1435" y1="118" x2="1435" y2="800"/>
+
+<!-- participants -->
+<rect class="client" x="70" y="80" width="180" height="38" rx="5"/><text class="ph" x="160" y="104" text-anchor="middle">Borrower (LIFF)</text>
+<rect class="plat" x="325" y="80" width="180" height="38" rx="5"/><text class="ph" x="415" y="104" text-anchor="middle">/api/estimate (Fn)</text>
+<rect class="data" x="580" y="80" width="180" height="38" rx="5"/><text class="ph" x="670" y="104" text-anchor="middle">Redis / Vercel KV</text>
+<rect class="ext" x="835" y="80" width="180" height="38" rx="5"/><text class="ph" x="925" y="104" text-anchor="middle">Claude Sonnet 4.6</text>
+<rect class="ext" x="1090" y="80" width="180" height="38" rx="5"/><text class="ph" x="1180" y="104" text-anchor="middle">SerpAPI</text>
+<rect class="lib" x="1345" y="80" width="180" height="38" rx="5"/><text class="ph" x="1435" y="104" text-anchor="middle">Price Estimator</text>
+
+<!-- messages -->
+<line class="msg" x1="160" y1="150" x2="415" y2="150"/><text class="ml" x="287" y="143" text-anchor="middle">1. POST {item, images, borrowerCondition, aiCondition}</text>
+<line class="msg" x1="415" y1="192" x2="670" y2="192"/><text class="ml" x="542" y="185" text-anchor="middle">2. GET cache (normalized fields + image content-hashes)</text>
+<line class="ret" x1="670" y1="224" x2="415" y2="224"/><text class="ml" x="542" y="217" text-anchor="middle">3. miss</text>
+<rect class="note" x="600" y="236" width="520" height="26" rx="4"/><text class="nt" x="610" y="253">On cache hit: short-circuit and return the cached EstimateResponse.</text>
+
+<line class="msg" x1="415" y1="290" x2="925" y2="290"/><text class="ml" x="670" y="283" text-anchor="middle">4. normalizeInput (Claude Sonnet 4.6, structured tool-use)</text>
+<line class="ret" x1="925" y1="322" x2="415" y2="322"/><text class="ml" x="670" y="315" text-anchor="middle">5. productName (color and serial stripped)</text>
+
+<!-- parallel frame -->
+<rect class="frame" x="385" y="348" width="830" height="210"/><text class="ft" x="395" y="364">par  [web search and shopping run in parallel]</text>
+<line class="msg" x1="415" y1="392" x2="925" y2="392"/><text class="ml" x="670" y="385" text-anchor="middle">6. web_search prices (Thai used-market listings)</text>
+<line class="ret" x1="925" y1="424" x2="415" y2="424"/><text class="ml" x="670" y="417" text-anchor="middle">7. 4-8 listings in THB</text>
+<line class="msg" x1="415" y1="456" x2="1180" y2="456"/><text class="ml" x="797" y="449" text-anchor="middle">8. google_shopping_light query</text>
+<line class="ret" x1="1180" y1="488" x2="415" y2="488"/><text class="ml" x="797" y="481" text-anchor="middle">9. raw shopping candidates</text>
+<line class="msg" x1="415" y1="520" x2="925" y2="520"/><text class="ml" x="670" y="513" text-anchor="middle">10. filter candidates (return keep_item_ids)</text>
+<line class="ret" x1="925" y1="550" x2="415" y2="550"/><text class="ml" x="670" y="543" text-anchor="middle">11. kept item IDs</text>
+
+<line class="msg" x1="415" y1="586" x2="1435" y2="586"/><text class="ml" x="925" y="579" text-anchor="middle">12. computeRepresentativeUsedPriceTHB(combined listings)</text>
+<line class="ret" x1="1435" y1="618" x2="415" y2="618"/><text class="ml" x="925" y="611" text-anchor="middle">13. representativePrice (winsorized percentile estimator)</text>
+
+<rect class="note" x="220" y="636" width="1160" height="48" rx="4"/>
+<text class="nt" x="232" y="657">marketPrice = max(representativePrice, 100)   |   principal = round(marketPrice x 0.6)  [fixed 60% LTV]   |   condition = 0.6 x borrowerCondition + 0.4 x aiCondition</text>
+<text class="nt" x="232" y="676">finalPrice = round(principal x condition), clamped to >= 100 THB, then snapped to the nearest 500 THB</text>
+
+<line class="msg" x1="415" y1="712" x2="670" y2="712"/><text class="ml" x="542" y="705" text-anchor="middle">14. SET cache (TTL ~30 days)</text>
+<line class="ret" x1="415" y1="748" x2="160" y2="748"/><text class="ml" x="287" y="741" text-anchor="middle">15. 200 { estimatedPrice, marketPrice, principal, condition }</text>
+
+<rect class="note" x="40" y="772" width="1520" height="26" rx="4" fill="#eef4fb" stroke="#3b6aa0"/>
+<text class="nt" x="52" y="789" fill="#1e3a5f">All LLM calls route through the provider abstraction (lib/services/anthropic-llm). The web-search provider is switchable via PRICE_SEARCH_PROVIDER (anthropic default | openai). If no KV credentials are set, the cache steps are skipped.</text>
+</svg>

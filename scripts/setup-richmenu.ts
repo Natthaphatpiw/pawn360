@@ -1,6 +1,4 @@
 import { Client } from '@line/bot-sdk';
-import fs from 'fs';
-import path from 'path';
 import dotenv from 'dotenv';
 
 // Load environment variables

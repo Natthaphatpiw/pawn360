@@ -343,8 +343,6 @@ export function createPaymentFailureFlexMessage(
   message: string,
   actionType: 'redemption' | 'extension'
 ): FlexMessage {
-  const actionText = actionType === 'redemption' ? 'ไถ่ถอนสัญญา' : 'ต่อดอกเบี้ย';
-
   const bubble: FlexBubble = {
     type: 'bubble',
     header: {

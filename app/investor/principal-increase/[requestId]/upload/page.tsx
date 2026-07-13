@@ -6,7 +6,6 @@ import { Upload, X, AlertTriangle, CheckCircle, Wallet } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { getInvestorPrincipalIncreaseStatusMeta, getMockPrincipalIncreaseRequest, isInvestorPreviewMode } from '@/lib/mock-investment';
-import TransactionHeader from '@/app/contracts/[contractId]/_components/TransactionHeader';
 
 export default function InvestorPrincipalIncreaseUploadPage() {
   const params = useParams();

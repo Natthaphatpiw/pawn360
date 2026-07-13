@@ -1,0 +1,4707 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-09",
+  "scoreScale": {
+    "cpu": "PassMark CPU Mark (approx)",
+    "gpu": "PassMark G3D Mark (approx)"
+  },
+  "entries": [
+    {
+      "id": "a4-9120",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A4-9120",
+      "aliases": [
+        "a4-9120",
+        "a4 9120",
+        "amd a4 9120",
+        "9120"
+      ],
+      "score": 1450,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "a6-9220",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A6-9220",
+      "aliases": [
+        "a6-9220",
+        "a6 9220",
+        "amd a6 9220",
+        "9220"
+      ],
+      "score": 1700,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "a6-9225",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A6-9225",
+      "aliases": [
+        "a6-9225",
+        "a6 9225",
+        "amd a6 9225",
+        "9225"
+      ],
+      "score": 1900,
+      "year": 2018,
+      "tier": "entry"
+    },
+    {
+      "id": "a9-9420",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A9-9420",
+      "aliases": [
+        "a9-9420",
+        "a9 9420",
+        "amd a9 9420",
+        "9420"
+      ],
+      "score": 2100,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "a9-9425",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A9-9425",
+      "aliases": [
+        "a9-9425",
+        "a9 9425",
+        "amd a9 9425",
+        "9425"
+      ],
+      "score": 2250,
+      "year": 2018,
+      "tier": "entry"
+    },
+    {
+      "id": "a10-9600p",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A10-9600P",
+      "aliases": [
+        "a10-9600p",
+        "a10 9600p",
+        "amd a10 9600p",
+        "9600p"
+      ],
+      "score": 2500,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "athlon-3020e",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD 3020e",
+      "aliases": [
+        "3020e",
+        "amd 3020e",
+        "athlon 3020e"
+      ],
+      "score": 2600,
+      "year": 2020,
+      "tier": "entry"
+    },
+    {
+      "id": "a12-9720p",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD A12-9720P",
+      "aliases": [
+        "a12-9720p",
+        "a12 9720p",
+        "amd a12 9720p",
+        "9720p"
+      ],
+      "score": 2900,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "athlon-silver-3050u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Athlon Silver 3050U",
+      "aliases": [
+        "athlon silver 3050u",
+        "athlon 3050u",
+        "3050u",
+        "amd athlon silver 3050u"
+      ],
+      "score": 3300,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-3-2200u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 2200U",
+      "aliases": [
+        "ryzen 3 2200u",
+        "r3 2200u",
+        "2200u",
+        "amd ryzen 3 2200u"
+      ],
+      "score": 3400,
+      "year": 2018,
+      "tier": "low"
+    },
+    {
+      "id": "athlon-300u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Athlon 300U",
+      "aliases": [
+        "athlon 300u",
+        "300u",
+        "amd athlon 300u"
+      ],
+      "score": 4000,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-3-3200u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 3200U",
+      "aliases": [
+        "ryzen 3 3200u",
+        "r3 3200u",
+        "3200u",
+        "amd ryzen 3 3200u"
+      ],
+      "score": 4000,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "athlon-gold-3150u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Athlon Gold 3150U",
+      "aliases": [
+        "athlon gold 3150u",
+        "athlon 3150u",
+        "3150u",
+        "amd athlon gold 3150u"
+      ],
+      "score": 4200,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-3-3250u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 3250U",
+      "aliases": [
+        "ryzen 3 3250u",
+        "r3 3250u",
+        "3250u",
+        "amd ryzen 3 3250u"
+      ],
+      "score": 4300,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-3-3300u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 3300U",
+      "aliases": [
+        "ryzen 3 3300u",
+        "r3 3300u",
+        "3300u",
+        "amd ryzen 3 3300u"
+      ],
+      "score": 6200,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-2500u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 2500U",
+      "aliases": [
+        "ryzen 5 2500u",
+        "r5 2500u",
+        "2500u",
+        "amd ryzen 5 2500u"
+      ],
+      "score": 6800,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-7-2700u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 2700U",
+      "aliases": [
+        "ryzen 7 2700u",
+        "r7 2700u",
+        "2700u",
+        "amd ryzen 7 2700u"
+      ],
+      "score": 7000,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-3500u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 3500U",
+      "aliases": [
+        "ryzen 5 3500u",
+        "r5 3500u",
+        "3500u",
+        "amd ryzen 5 3500u"
+      ],
+      "score": 7100,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-7-3700u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 3700U",
+      "aliases": [
+        "ryzen 7 3700u",
+        "r7 3700u",
+        "3700u",
+        "amd ryzen 7 3700u"
+      ],
+      "score": 7250,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-3550h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 3550H",
+      "aliases": [
+        "ryzen 5 3550h",
+        "r5 3550h",
+        "3550h",
+        "amd ryzen 5 3550h"
+      ],
+      "score": 7700,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-3-4300u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 4300U",
+      "aliases": [
+        "ryzen 3 4300u",
+        "r3 4300u",
+        "4300u",
+        "amd ryzen 3 4300u"
+      ],
+      "score": 7800,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-7-3750h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 3750H",
+      "aliases": [
+        "ryzen 7 3750h",
+        "r7 3750h",
+        "3750h",
+        "amd ryzen 7 3750h"
+      ],
+      "score": 7900,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-3-7320u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 7320U",
+      "aliases": [
+        "ryzen 3 7320u",
+        "amd ryzen 3 7320u",
+        "r3 7320u",
+        "7320u"
+      ],
+      "score": 9800,
+      "year": 2022,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-3-5300u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 5300U",
+      "aliases": [
+        "ryzen 3 5300u",
+        "r3 5300u",
+        "5300u",
+        "amd ryzen 3 5300u"
+      ],
+      "score": 10100,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-7520u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7520U",
+      "aliases": [
+        "ryzen 5 7520u",
+        "amd ryzen 5 7520u",
+        "r5 7520u",
+        "7520u"
+      ],
+      "score": 10200,
+      "year": 2022,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-3-7330u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 7330U",
+      "aliases": [
+        "ryzen 3 7330u",
+        "amd ryzen 3 7330u",
+        "r3 7330u",
+        "7330u"
+      ],
+      "score": 10400,
+      "year": 2023,
+      "tier": "low"
+    },
+    {
+      "id": "ryzen-5-4500u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 4500U",
+      "aliases": [
+        "ryzen 5 4500u",
+        "r5 4500u",
+        "4500u",
+        "amd ryzen 5 4500u"
+      ],
+      "score": 10600,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-5500u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 5500U",
+      "aliases": [
+        "ryzen 5 5500u",
+        "r5 5500u",
+        "5500u",
+        "amd ryzen 5 5500u"
+      ],
+      "score": 13000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-4600u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 4600U",
+      "aliases": [
+        "ryzen 5 4600u",
+        "r5 4600u",
+        "4600u",
+        "amd ryzen 5 4600u"
+      ],
+      "score": 13300,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-4700u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 4700U",
+      "aliases": [
+        "ryzen 7 4700u",
+        "r7 4700u",
+        "4700u",
+        "amd ryzen 7 4700u"
+      ],
+      "score": 13500,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-ai-5-330",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen AI 5 330",
+      "aliases": [
+        "ryzen ai 5 330",
+        "amd ryzen ai 5 330",
+        "ai 5 330",
+        "ryzen ai 330"
+      ],
+      "score": 14000,
+      "year": 2025,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-7235hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7235HS",
+      "aliases": [
+        "ryzen 5 7235hs",
+        "amd ryzen 5 7235hs",
+        "r5 7235hs",
+        "7235hs"
+      ],
+      "score": 14500,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-4600h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 4600H",
+      "aliases": [
+        "ryzen 5 4600h",
+        "r5 4600h",
+        "4600h",
+        "amd ryzen 5 4600h"
+      ],
+      "score": 14700,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-7430u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7430U",
+      "aliases": [
+        "ryzen 5 7430u",
+        "amd ryzen 5 7430u",
+        "r5 7430u",
+        "7430u"
+      ],
+      "score": 15000,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-3-210",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 3 210",
+      "aliases": [
+        "ryzen 3 210",
+        "amd ryzen 3 210",
+        "r3 210"
+      ],
+      "score": 15000,
+      "year": 2025,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-7-5700u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 5700U",
+      "aliases": [
+        "ryzen 7 5700u",
+        "r7 5700u",
+        "5700u",
+        "amd ryzen 7 5700u"
+      ],
+      "score": 15900,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-5600u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 5600U",
+      "aliases": [
+        "ryzen 5 5600u",
+        "r5 5600u",
+        "5600u",
+        "amd ryzen 5 5600u"
+      ],
+      "score": 16000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-7530u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7530U",
+      "aliases": [
+        "ryzen 5 7530u",
+        "amd ryzen 5 7530u",
+        "r5 7530u",
+        "7530u"
+      ],
+      "score": 16200,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-7-4800u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 4800U",
+      "aliases": [
+        "ryzen 7 4800u",
+        "r7 4800u",
+        "4800u",
+        "amd ryzen 7 4800u"
+      ],
+      "score": 16800,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-6600u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 6600U",
+      "aliases": [
+        "ryzen 5 6600u",
+        "amd ryzen 5 6600u",
+        "r5 6600u",
+        "6600u"
+      ],
+      "score": 16800,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-5600hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 5600HS",
+      "aliases": [
+        "ryzen 5 5600hs",
+        "r5 5600hs",
+        "5600hs",
+        "amd ryzen 5 5600hs"
+      ],
+      "score": 17000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-5600h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 5600H",
+      "aliases": [
+        "ryzen 5 5600h",
+        "r5 5600h",
+        "5600h",
+        "amd ryzen 5 5600h"
+      ],
+      "score": 17600,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-7730u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7730U",
+      "aliases": [
+        "ryzen 7 7730u",
+        "amd ryzen 7 7730u",
+        "r7 7730u",
+        "7730u"
+      ],
+      "score": 17600,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-5-7535u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7535U",
+      "aliases": [
+        "ryzen 5 7535u",
+        "amd ryzen 5 7535u",
+        "r5 7535u",
+        "7535u"
+      ],
+      "score": 18500,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "ryzen-7-4800hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 4800HS",
+      "aliases": [
+        "ryzen 7 4800hs",
+        "r7 4800hs",
+        "4800hs",
+        "amd ryzen 7 4800hs"
+      ],
+      "score": 18700,
+      "year": 2020,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-7-4800h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 4800H",
+      "aliases": [
+        "ryzen 7 4800h",
+        "r7 4800h",
+        "4800h",
+        "amd ryzen 7 4800h"
+      ],
+      "score": 19000,
+      "year": 2020,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-7-5800u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 5800U",
+      "aliases": [
+        "ryzen 7 5800u",
+        "r7 5800u",
+        "5800u",
+        "amd ryzen 7 5800u"
+      ],
+      "score": 19000,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-9-4900hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 4900HS",
+      "aliases": [
+        "ryzen 9 4900hs",
+        "r9 4900hs",
+        "4900hs",
+        "amd ryzen 9 4900hs"
+      ],
+      "score": 19600,
+      "year": 2020,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-7-6800u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 6800U",
+      "aliases": [
+        "ryzen 7 6800u",
+        "amd ryzen 7 6800u",
+        "r7 6800u",
+        "6800u"
+      ],
+      "score": 19600,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-7535hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7535HS",
+      "aliases": [
+        "ryzen 5 7535hs",
+        "amd ryzen 5 7535hs",
+        "r5 7535hs",
+        "7535hs"
+      ],
+      "score": 19700,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-6600h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 6600H",
+      "aliases": [
+        "ryzen 5 6600h",
+        "amd ryzen 5 6600h",
+        "r5 6600h",
+        "6600h"
+      ],
+      "score": 19800,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-5800hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 5800HS",
+      "aliases": [
+        "ryzen 7 5800hs",
+        "r7 5800hs",
+        "5800hs",
+        "amd ryzen 7 5800hs"
+      ],
+      "score": 20600,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-5-8540u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 8540U",
+      "aliases": [
+        "ryzen 5 8540u",
+        "amd ryzen 5 8540u",
+        "r5 8540u",
+        "8540u"
+      ],
+      "score": 20800,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-220",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 220",
+      "aliases": [
+        "ryzen 5 220",
+        "amd ryzen 5 220",
+        "r5 220"
+      ],
+      "score": 21000,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-5800h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 5800H",
+      "aliases": [
+        "ryzen 7 5800h",
+        "r7 5800h",
+        "5800h",
+        "amd ryzen 7 5800h"
+      ],
+      "score": 21400,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-7-7735u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7735U",
+      "aliases": [
+        "ryzen 7 7735u",
+        "amd ryzen 7 7735u",
+        "r7 7735u",
+        "7735u"
+      ],
+      "score": 21500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-ai-5-340",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen AI 5 340",
+      "aliases": [
+        "ryzen ai 5 340",
+        "amd ryzen ai 5 340",
+        "ai 5 340",
+        "ryzen ai 340"
+      ],
+      "score": 21500,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-9-5900hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 5900HS",
+      "aliases": [
+        "ryzen 9 5900hs",
+        "r9 5900hs",
+        "5900hs",
+        "amd ryzen 9 5900hs"
+      ],
+      "score": 22200,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-5-230",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 230",
+      "aliases": [
+        "ryzen 5 230",
+        "amd ryzen 5 230",
+        "r5 230"
+      ],
+      "score": 22200,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-7435hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7435HS",
+      "aliases": [
+        "ryzen 7 7435hs",
+        "amd ryzen 7 7435hs",
+        "r7 7435hs",
+        "7435hs"
+      ],
+      "score": 22400,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-6800hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 6800HS",
+      "aliases": [
+        "ryzen 7 6800hs",
+        "amd ryzen 7 6800hs",
+        "r7 6800hs",
+        "6800hs"
+      ],
+      "score": 22500,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-7735hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7735HS",
+      "aliases": [
+        "ryzen 7 7735hs",
+        "amd ryzen 7 7735hs",
+        "r7 7735hs",
+        "7735hs"
+      ],
+      "score": 23000,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-9-5900hx",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 5900HX",
+      "aliases": [
+        "ryzen 9 5900hx",
+        "r9 5900hx",
+        "5900hx",
+        "amd ryzen 9 5900hx"
+      ],
+      "score": 23200,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-7-6800h",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 6800H",
+      "aliases": [
+        "ryzen 7 6800h",
+        "amd ryzen 7 6800h",
+        "r7 6800h",
+        "6800h"
+      ],
+      "score": 23200,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-9-6900hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 6900HS",
+      "aliases": [
+        "ryzen 9 6900hs",
+        "amd ryzen 9 6900hs",
+        "r9 6900hs",
+        "6900hs"
+      ],
+      "score": 23600,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-9-5980hx",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 5980HX",
+      "aliases": [
+        "ryzen 9 5980hx",
+        "r9 5980hx",
+        "5980hx",
+        "amd ryzen 9 5980hx"
+      ],
+      "score": 23800,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-5-8640hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 8640HS",
+      "aliases": [
+        "ryzen 5 8640hs",
+        "amd ryzen 5 8640hs",
+        "r5 8640hs",
+        "8640hs"
+      ],
+      "score": 23800,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-9-6900hx",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 6900HX",
+      "aliases": [
+        "ryzen 9 6900hx",
+        "amd ryzen 9 6900hx",
+        "r9 6900hx",
+        "6900hx"
+      ],
+      "score": 24200,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-7640hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 7640HS",
+      "aliases": [
+        "ryzen 5 7640hs",
+        "amd ryzen 5 7640hs",
+        "r5 7640hs",
+        "7640hs"
+      ],
+      "score": 24200,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-5-8645hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 5 8645HS",
+      "aliases": [
+        "ryzen 5 8645hs",
+        "amd ryzen 5 8645hs",
+        "r5 8645hs",
+        "8645hs"
+      ],
+      "score": 24500,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-8840u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 8840U",
+      "aliases": [
+        "ryzen 7 8840u",
+        "amd ryzen 7 8840u",
+        "r7 8840u",
+        "8840u"
+      ],
+      "score": 26800,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-7840u",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7840U",
+      "aliases": [
+        "ryzen 7 7840u",
+        "amd ryzen 7 7840u",
+        "r7 7840u",
+        "7840u"
+      ],
+      "score": 27000,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-250",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 250",
+      "aliases": [
+        "ryzen 7 250",
+        "amd ryzen 7 250",
+        "r7 250"
+      ],
+      "score": 27000,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-ai-7-350",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen AI 7 350",
+      "aliases": [
+        "ryzen ai 7 350",
+        "amd ryzen ai 7 350",
+        "ai 7 350",
+        "ryzen ai 350"
+      ],
+      "score": 27300,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-8840hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 8840HS",
+      "aliases": [
+        "ryzen 7 8840hs",
+        "amd ryzen 7 8840hs",
+        "r7 8840hs",
+        "8840hs"
+      ],
+      "score": 28300,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-7840hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7840HS",
+      "aliases": [
+        "ryzen 7 7840hs",
+        "amd ryzen 7 7840hs",
+        "r7 7840hs",
+        "7840hs"
+      ],
+      "score": 29000,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-260",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 260",
+      "aliases": [
+        "ryzen 7 260",
+        "amd ryzen 7 260",
+        "r7 260"
+      ],
+      "score": 29000,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-8845hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 8845HS",
+      "aliases": [
+        "ryzen 7 8845hs",
+        "amd ryzen 7 8845hs",
+        "r7 8845hs",
+        "8845hs"
+      ],
+      "score": 29400,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-7-7745hx",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 7 7745HX",
+      "aliases": [
+        "ryzen 7 7745hx",
+        "amd ryzen 7 7745hx",
+        "r7 7745hx",
+        "7745hx"
+      ],
+      "score": 29700,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ryzen-9-7940hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 7940HS",
+      "aliases": [
+        "ryzen 9 7940hs",
+        "amd ryzen 9 7940hs",
+        "r9 7940hs",
+        "7940hs"
+      ],
+      "score": 30200,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-ai-9-365",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen AI 9 365",
+      "aliases": [
+        "ryzen ai 9 365",
+        "amd ryzen ai 9 365",
+        "ai 9 365",
+        "ryzen ai 365"
+      ],
+      "score": 30500,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-9-8945hs",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 8945HS",
+      "aliases": [
+        "ryzen 9 8945hs",
+        "amd ryzen 9 8945hs",
+        "r9 8945hs",
+        "8945hs"
+      ],
+      "score": 31000,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-9-270",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 270",
+      "aliases": [
+        "ryzen 9 270",
+        "amd ryzen 9 270",
+        "r9 270"
+      ],
+      "score": 31200,
+      "year": 2025,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-ai-9-hx-370",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen AI 9 HX 370",
+      "aliases": [
+        "ryzen ai 9 hx 370",
+        "amd ryzen ai 9 hx 370",
+        "ai 9 hx 370",
+        "hx 370",
+        "ryzen ai 9 370"
+      ],
+      "score": 35300,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-ai-9-hx-375",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen AI 9 HX 375",
+      "aliases": [
+        "ryzen ai 9 hx 375",
+        "amd ryzen ai 9 hx 375",
+        "ai 9 hx 375",
+        "hx 375",
+        "ryzen ai 9 375"
+      ],
+      "score": 36500,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-9-7845hx",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 7845HX",
+      "aliases": [
+        "ryzen 9 7845hx",
+        "amd ryzen 9 7845hx",
+        "r9 7845hx",
+        "7845hx"
+      ],
+      "score": 41000,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "ryzen-9-7945hx",
+      "kind": "cpu",
+      "brand": "amd",
+      "name": "AMD Ryzen 9 7945HX",
+      "aliases": [
+        "ryzen 9 7945hx",
+        "amd ryzen 9 7945hx",
+        "r9 7945hx",
+        "7945hx"
+      ],
+      "score": 52000,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "m1",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M1",
+      "aliases": [
+        "m1",
+        "apple m1",
+        "apple silicon m1",
+        "macbook m1"
+      ],
+      "score": 15000,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "m2",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M2",
+      "aliases": [
+        "m2",
+        "apple m2",
+        "apple silicon m2",
+        "macbook m2"
+      ],
+      "score": 15800,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "m3",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M3",
+      "aliases": [
+        "m3",
+        "apple m3",
+        "apple silicon m3",
+        "macbook m3"
+      ],
+      "score": 17700,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "m1-pro",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M1 Pro",
+      "aliases": [
+        "m1 pro",
+        "apple m1 pro",
+        "m1pro"
+      ],
+      "score": 21500,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "m1-max",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M1 Max",
+      "aliases": [
+        "m1 max",
+        "apple m1 max",
+        "m1max"
+      ],
+      "score": 23000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "m4",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M4",
+      "aliases": [
+        "m4",
+        "apple m4",
+        "apple silicon m4",
+        "macbook m4"
+      ],
+      "score": 23000,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "m2-pro",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M2 Pro",
+      "aliases": [
+        "m2 pro",
+        "apple m2 pro",
+        "m2pro"
+      ],
+      "score": 23500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "m3-pro",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M3 Pro",
+      "aliases": [
+        "m3 pro",
+        "apple m3 pro",
+        "m3pro"
+      ],
+      "score": 25000,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "m2-max",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M2 Max",
+      "aliases": [
+        "m2 max",
+        "apple m2 max",
+        "m2max"
+      ],
+      "score": 26500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "m3-max",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M3 Max",
+      "aliases": [
+        "m3 max",
+        "apple m3 max",
+        "m3max"
+      ],
+      "score": 33500,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "m4-pro",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M4 Pro",
+      "aliases": [
+        "m4 pro",
+        "apple m4 pro",
+        "m4pro"
+      ],
+      "score": 35000,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "m4-max",
+      "kind": "cpu",
+      "brand": "apple",
+      "name": "Apple M4 Max",
+      "aliases": [
+        "m4 max",
+        "apple m4 max",
+        "m4max"
+      ],
+      "score": 42000,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "celeron-n3050",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N3050",
+      "aliases": [
+        "n3050",
+        "celeron n3050",
+        "intel celeron n3050"
+      ],
+      "score": 600,
+      "year": 2015,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n3060",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N3060",
+      "aliases": [
+        "n3060",
+        "celeron n3060",
+        "intel celeron n3060"
+      ],
+      "score": 700,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n3350",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N3350",
+      "aliases": [
+        "n3350",
+        "celeron n3350",
+        "intel celeron n3350"
+      ],
+      "score": 1100,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n4000",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N4000",
+      "aliases": [
+        "n4000",
+        "celeron n4000",
+        "intel celeron n4000"
+      ],
+      "score": 1390,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "pentium-n3710",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Pentium N3710",
+      "aliases": [
+        "n3710",
+        "pentium n3710",
+        "intel pentium n3710"
+      ],
+      "score": 1420,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n4020",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N4020",
+      "aliases": [
+        "n4020",
+        "celeron n4020",
+        "intel celeron n4020"
+      ],
+      "score": 1600,
+      "year": 2019,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n4500",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N4500",
+      "aliases": [
+        "n4500",
+        "celeron n4500",
+        "intel celeron n4500"
+      ],
+      "score": 1930,
+      "year": 2021,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n3450",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N3450",
+      "aliases": [
+        "n3450",
+        "celeron n3450",
+        "intel celeron n3450"
+      ],
+      "score": 1950,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "i3-6006u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-6006U",
+      "aliases": [
+        "i3-6006u",
+        "core i3 6006u",
+        "6006u"
+      ],
+      "score": 2250,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "pentium-silver-n5000",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Pentium Silver N5000",
+      "aliases": [
+        "n5000",
+        "pentium n5000",
+        "pentium silver n5000",
+        "intel pentium silver n5000"
+      ],
+      "score": 2400,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n4100",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N4100",
+      "aliases": [
+        "n4100",
+        "celeron n4100",
+        "intel celeron n4100"
+      ],
+      "score": 2450,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "pentium-4415u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Pentium 4415U",
+      "aliases": [
+        "4415u",
+        "pentium 4415u",
+        "intel pentium 4415u",
+        "pentium gold 4415u"
+      ],
+      "score": 2460,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "i3-7020u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-7020U",
+      "aliases": [
+        "i3-7020u",
+        "core i3 7020u",
+        "7020u"
+      ],
+      "score": 2500,
+      "year": 2018,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n4120",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N4120",
+      "aliases": [
+        "n4120",
+        "celeron n4120",
+        "intel celeron n4120"
+      ],
+      "score": 2550,
+      "year": 2019,
+      "tier": "entry"
+    },
+    {
+      "id": "pentium-silver-n5030",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Pentium Silver N5030",
+      "aliases": [
+        "n5030",
+        "pentium n5030",
+        "pentium silver n5030",
+        "intel pentium silver n5030"
+      ],
+      "score": 2650,
+      "year": 2019,
+      "tier": "entry"
+    },
+    {
+      "id": "i3-6100u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-6100U",
+      "aliases": [
+        "i3-6100u",
+        "core i3 6100u",
+        "6100u"
+      ],
+      "score": 2750,
+      "year": 2015,
+      "tier": "entry"
+    },
+    {
+      "id": "i3-7100u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-7100U",
+      "aliases": [
+        "i3-7100u",
+        "core i3 7100u",
+        "7100u"
+      ],
+      "score": 2900,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "i5-6200u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-6200U",
+      "aliases": [
+        "i5-6200u",
+        "core i5 6200u",
+        "6200u"
+      ],
+      "score": 3250,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "pentium-silver-n6000",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Pentium Silver N6000",
+      "aliases": [
+        "n6000",
+        "pentium n6000",
+        "pentium silver n6000",
+        "intel pentium silver n6000"
+      ],
+      "score": 3250,
+      "year": 2021,
+      "tier": "entry"
+    },
+    {
+      "id": "celeron-n5100",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Celeron N5100",
+      "aliases": [
+        "n5100",
+        "celeron n5100",
+        "intel celeron n5100"
+      ],
+      "score": 3350,
+      "year": 2021,
+      "tier": "entry"
+    },
+    {
+      "id": "i5-7200u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-7200U",
+      "aliases": [
+        "i5-7200u",
+        "core i5 7200u",
+        "7200u"
+      ],
+      "score": 3400,
+      "year": 2016,
+      "tier": "low"
+    },
+    {
+      "id": "i5-6300u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-6300U",
+      "aliases": [
+        "i5-6300u",
+        "core i5 6300u",
+        "6300u"
+      ],
+      "score": 3500,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "i7-6500u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-6500U",
+      "aliases": [
+        "i7-6500u",
+        "core i7 6500u",
+        "6500u"
+      ],
+      "score": 3650,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "i7-7500u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-7500U",
+      "aliases": [
+        "i7-7500u",
+        "core i7 7500u",
+        "7500u"
+      ],
+      "score": 3700,
+      "year": 2016,
+      "tier": "low"
+    },
+    {
+      "id": "i5-7300u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-7300U",
+      "aliases": [
+        "i5-7300u",
+        "core i5 7300u",
+        "7300u"
+      ],
+      "score": 3750,
+      "year": 2017,
+      "tier": "low"
+    },
+    {
+      "id": "i3-8130u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-8130U",
+      "aliases": [
+        "i3-8130u",
+        "core i3 8130u",
+        "8130u"
+      ],
+      "score": 3800,
+      "year": 2018,
+      "tier": "low"
+    },
+    {
+      "id": "i7-6600u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-6600U",
+      "aliases": [
+        "i7-6600u",
+        "core i7 6600u",
+        "6600u"
+      ],
+      "score": 3850,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "i3-8145u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-8145U",
+      "aliases": [
+        "i3-8145u",
+        "core i3 8145u",
+        "8145u"
+      ],
+      "score": 4000,
+      "year": 2018,
+      "tier": "low"
+    },
+    {
+      "id": "i3-10110u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-10110U",
+      "aliases": [
+        "i3-10110u",
+        "core i3 10110u",
+        "10110u"
+      ],
+      "score": 4150,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "i5-6300hq",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-6300HQ",
+      "aliases": [
+        "i5-6300hq",
+        "core i5 6300hq",
+        "6300hq"
+      ],
+      "score": 4650,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "pentium-gold-7505",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Pentium Gold 7505",
+      "aliases": [
+        "7505",
+        "pentium 7505",
+        "pentium gold 7505",
+        "intel pentium gold 7505",
+        "gold 7505"
+      ],
+      "score": 4950,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "i5-7300hq",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-7300HQ",
+      "aliases": [
+        "i5-7300hq",
+        "core i5 7300hq",
+        "7300hq"
+      ],
+      "score": 5050,
+      "year": 2017,
+      "tier": "low"
+    },
+    {
+      "id": "i3-1005g1",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-1005G1",
+      "aliases": [
+        "i3-1005g1",
+        "core i3 1005g1",
+        "1005g1"
+      ],
+      "score": 5250,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "n95",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Processor N95",
+      "aliases": [
+        "n95",
+        "intel n95",
+        "processor n95",
+        "intel processor n95"
+      ],
+      "score": 5400,
+      "year": 2023,
+      "tier": "low"
+    },
+    {
+      "id": "n100",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Processor N100",
+      "aliases": [
+        "n100",
+        "intel n100",
+        "processor n100",
+        "intel processor n100"
+      ],
+      "score": 5550,
+      "year": 2023,
+      "tier": "low"
+    },
+    {
+      "id": "n150",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Processor N150",
+      "aliases": [
+        "n150",
+        "intel n150",
+        "processor n150",
+        "intel processor n150",
+        "core n150"
+      ],
+      "score": 5750,
+      "year": 2025,
+      "tier": "low"
+    },
+    {
+      "id": "i5-8250u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-8250U",
+      "aliases": [
+        "i5-8250u",
+        "core i5 8250u",
+        "8250u"
+      ],
+      "score": 5900,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "n200",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Processor N200",
+      "aliases": [
+        "n200",
+        "intel n200",
+        "processor n200",
+        "intel processor n200"
+      ],
+      "score": 5900,
+      "year": 2023,
+      "tier": "low"
+    },
+    {
+      "id": "i7-8550u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-8550U",
+      "aliases": [
+        "i7-8550u",
+        "core i7 8550u",
+        "8550u"
+      ],
+      "score": 6000,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-8350u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-8350U",
+      "aliases": [
+        "i5-8350u",
+        "core i5 8350u",
+        "8350u"
+      ],
+      "score": 6050,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-8265u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-8265U",
+      "aliases": [
+        "i5-8265u",
+        "core i5 8265u",
+        "8265u"
+      ],
+      "score": 6150,
+      "year": 2018,
+      "tier": "mid"
+    },
+    {
+      "id": "i3-1115g4",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-1115G4",
+      "aliases": [
+        "i3-1115g4",
+        "core i3 1115g4",
+        "1115g4"
+      ],
+      "score": 6300,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-8565u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-8565U",
+      "aliases": [
+        "i7-8565u",
+        "core i7 8565u",
+        "8565u"
+      ],
+      "score": 6350,
+      "year": 2018,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-10210u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-10210U",
+      "aliases": [
+        "i5-10210u",
+        "core i5 10210u",
+        "10210u"
+      ],
+      "score": 6450,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-6700hq",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-6700HQ",
+      "aliases": [
+        "i7-6700hq",
+        "core i7 6700hq",
+        "6700hq"
+      ],
+      "score": 6650,
+      "year": 2015,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-7700hq",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-7700HQ",
+      "aliases": [
+        "i7-7700hq",
+        "core i7 7700hq",
+        "7700hq"
+      ],
+      "score": 7050,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-10510u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-10510U",
+      "aliases": [
+        "i7-10510u",
+        "core i7 10510u",
+        "10510u"
+      ],
+      "score": 7050,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-1035g1",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1035G1",
+      "aliases": [
+        "i5-1035g1",
+        "core i5 1035g1",
+        "1035g1"
+      ],
+      "score": 7900,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-8300h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-8300H",
+      "aliases": [
+        "i5-8300h",
+        "core i5 8300h",
+        "8300h"
+      ],
+      "score": 8000,
+      "year": 2018,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-9300h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-9300H",
+      "aliases": [
+        "i5-9300h",
+        "core i5 9300h",
+        "9300h"
+      ],
+      "score": 8050,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-10200h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-10200H",
+      "aliases": [
+        "i5-10200h",
+        "core i5 10200h",
+        "10200h"
+      ],
+      "score": 8500,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-10300h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-10300H",
+      "aliases": [
+        "i5-10300h",
+        "core i5 10300h",
+        "10300h"
+      ],
+      "score": 8800,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1065g7",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1065G7",
+      "aliases": [
+        "i7-1065g7",
+        "core i7 1065g7",
+        "1065g7"
+      ],
+      "score": 8850,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-1135g7",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1135G7",
+      "aliases": [
+        "i5-1135g7",
+        "core i5 1135g7",
+        "1135g7"
+      ],
+      "score": 9600,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-1155g7",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1155G7",
+      "aliases": [
+        "i5-1155g7",
+        "core i5 1155g7",
+        "1155g7"
+      ],
+      "score": 10000,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "i3-n305",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-N305",
+      "aliases": [
+        "i3-n305",
+        "n305",
+        "i3 n305",
+        "core i3 n305",
+        "intel n305",
+        "intel core i3 n305"
+      ],
+      "score": 10000,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-8750h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-8750H",
+      "aliases": [
+        "i7-8750h",
+        "core i7 8750h",
+        "8750h"
+      ],
+      "score": 10150,
+      "year": 2018,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1165g7",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1165G7",
+      "aliases": [
+        "i7-1165g7",
+        "core i7 1165g7",
+        "1165g7"
+      ],
+      "score": 10200,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1185g7",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1185G7",
+      "aliases": [
+        "i7-1185g7",
+        "core i7 1185g7",
+        "1185g7"
+      ],
+      "score": 10750,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-11300h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-11300H",
+      "aliases": [
+        "i5-11300h",
+        "core i5 11300h",
+        "11300h"
+      ],
+      "score": 10800,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1195g7",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1195G7",
+      "aliases": [
+        "i7-1195g7",
+        "core i7 1195g7",
+        "1195g7"
+      ],
+      "score": 11100,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-9750h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-9750H",
+      "aliases": [
+        "i7-9750h",
+        "core i7 9750h",
+        "9750h"
+      ],
+      "score": 11350,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "i3-1215u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-1215U",
+      "aliases": [
+        "i3-1215u",
+        "core i3 1215u",
+        "intel core i3-1215u",
+        "1215u"
+      ],
+      "score": 11800,
+      "year": 2022,
+      "tier": "low"
+    },
+    {
+      "id": "i7-11370h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-11370H",
+      "aliases": [
+        "i7-11370h",
+        "core i7 11370h",
+        "11370h"
+      ],
+      "score": 11800,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "i7-10750h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-10750H",
+      "aliases": [
+        "i7-10750h",
+        "core i7 10750h",
+        "10750h"
+      ],
+      "score": 12250,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "i3-1315u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-1315U",
+      "aliases": [
+        "i3-1315u",
+        "core i3 1315u",
+        "intel core i3-1315u",
+        "1315u"
+      ],
+      "score": 12400,
+      "year": 2023,
+      "tier": "low"
+    },
+    {
+      "id": "i5-1235u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1235U",
+      "aliases": [
+        "i5-1235u",
+        "core i5 1235u",
+        "intel core i5-1235u",
+        "1235u"
+      ],
+      "score": 13200,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1255u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1255U",
+      "aliases": [
+        "i7-1255u",
+        "core i7 1255u",
+        "intel core i7-1255u",
+        "1255u"
+      ],
+      "score": 13600,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-5-125u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 5 125U",
+      "aliases": [
+        "ultra 5 125u",
+        "core ultra 5 125u",
+        "intel core ultra 5 125u",
+        "125u"
+      ],
+      "score": 13800,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-1334u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1334U",
+      "aliases": [
+        "i5-1334u",
+        "core i5 1334u",
+        "intel core i5-1334u",
+        "1334u"
+      ],
+      "score": 14000,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "i3-1220p",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i3-1220P",
+      "aliases": [
+        "i3-1220p",
+        "core i3 1220p",
+        "intel core i3-1220p",
+        "1220p"
+      ],
+      "score": 14300,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-1335u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1335U",
+      "aliases": [
+        "i5-1335u",
+        "core i5 1335u",
+        "intel core i5-1335u",
+        "1335u"
+      ],
+      "score": 14300,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-7-155u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 155U",
+      "aliases": [
+        "ultra 7 155u",
+        "core ultra 7 155u",
+        "intel core ultra 7 155u",
+        "155u"
+      ],
+      "score": 14400,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-11260h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-11260H",
+      "aliases": [
+        "i5-11260h",
+        "core i5 11260h",
+        "11260h"
+      ],
+      "score": 14700,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "i7-1355u",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1355U",
+      "aliases": [
+        "i7-1355u",
+        "core i7 1355u",
+        "intel core i7-1355u",
+        "1355u"
+      ],
+      "score": 14900,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-10870h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-10870H",
+      "aliases": [
+        "i7-10870h",
+        "core i7 10870h",
+        "10870h"
+      ],
+      "score": 15000,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "i7-10875h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-10875H",
+      "aliases": [
+        "i7-10875h",
+        "core i7 10875h",
+        "10875h"
+      ],
+      "score": 15600,
+      "year": 2020,
+      "tier": "high"
+    },
+    {
+      "id": "i5-12450h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-12450H",
+      "aliases": [
+        "i5-12450h",
+        "core i5 12450h",
+        "intel core i5-12450h",
+        "12450h"
+      ],
+      "score": 16000,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-11400h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-11400H",
+      "aliases": [
+        "i5-11400h",
+        "core i5 11400h",
+        "11400h"
+      ],
+      "score": 16000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "i5-1240p",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1240P",
+      "aliases": [
+        "i5-1240p",
+        "core i5 1240p",
+        "intel core i5-1240p",
+        "1240p"
+      ],
+      "score": 17300,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-5-226v",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 5 226V",
+      "aliases": [
+        "ultra 5 226v",
+        "core ultra 5 226v",
+        "intel core ultra 5 226v",
+        "226v"
+      ],
+      "score": 17300,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-13420h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-13420H",
+      "aliases": [
+        "i5-13420h",
+        "core i5 13420h",
+        "intel core i5-13420h",
+        "13420h"
+      ],
+      "score": 17600,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1260p",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1260P",
+      "aliases": [
+        "i7-1260p",
+        "core i7 1260p",
+        "intel core i7-1260p",
+        "1260p"
+      ],
+      "score": 17800,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-5-228v",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 5 228V",
+      "aliases": [
+        "ultra 5 228v",
+        "core ultra 5 228v",
+        "intel core ultra 5 228v",
+        "228v"
+      ],
+      "score": 18000,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "i5-1340p",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-1340P",
+      "aliases": [
+        "i5-1340p",
+        "core i5 1340p",
+        "intel core i5-1340p",
+        "1340p"
+      ],
+      "score": 18100,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-7-256v",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 256V",
+      "aliases": [
+        "ultra 7 256v",
+        "core ultra 7 256v",
+        "intel core ultra 7 256v",
+        "256v"
+      ],
+      "score": 18700,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1360p",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1360P",
+      "aliases": [
+        "i7-1360p",
+        "core i7 1360p",
+        "intel core i7-1360p",
+        "1360p"
+      ],
+      "score": 18800,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "i7-1280p",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-1280P",
+      "aliases": [
+        "i7-1280p",
+        "core i7 1280p",
+        "intel core i7-1280p",
+        "1280p"
+      ],
+      "score": 19200,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-7-258v",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 258V",
+      "aliases": [
+        "ultra 7 258v",
+        "core ultra 7 258v",
+        "intel core ultra 7 258v",
+        "258v"
+      ],
+      "score": 19200,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "ultra-9-288v",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 9 288V",
+      "aliases": [
+        "ultra 9 288v",
+        "core ultra 9 288v",
+        "intel core ultra 9 288v",
+        "288v"
+      ],
+      "score": 20400,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i7-11800h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-11800H",
+      "aliases": [
+        "i7-11800h",
+        "core i7 11800h",
+        "11800h"
+      ],
+      "score": 20600,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ultra-5-125h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 5 125H",
+      "aliases": [
+        "ultra 5 125h",
+        "core ultra 5 125h",
+        "intel core ultra 5 125h",
+        "125h"
+      ],
+      "score": 20700,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "i5-12500h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-12500H",
+      "aliases": [
+        "i5-12500h",
+        "core i5 12500h",
+        "intel core i5-12500h",
+        "12500h"
+      ],
+      "score": 20800,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "i7-12650h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-12650H",
+      "aliases": [
+        "i7-12650h",
+        "core i7 12650h",
+        "intel core i7-12650h",
+        "12650h"
+      ],
+      "score": 21600,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "i5-13450hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-13450HX",
+      "aliases": [
+        "i5-13450hx",
+        "core i5 13450hx",
+        "intel core i5-13450hx",
+        "13450hx"
+      ],
+      "score": 21600,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ultra-5-135h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 5 135H",
+      "aliases": [
+        "ultra 5 135h",
+        "core ultra 5 135h",
+        "intel core ultra 5 135h",
+        "135h"
+      ],
+      "score": 21700,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i5-13500h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-13500H",
+      "aliases": [
+        "i5-13500h",
+        "core i5 13500h",
+        "intel core i5-13500h",
+        "13500h"
+      ],
+      "score": 22300,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "i5-14450hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-14450HX",
+      "aliases": [
+        "i5-14450hx",
+        "core i5 14450hx",
+        "intel core i5-14450hx",
+        "14450hx"
+      ],
+      "score": 22600,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i7-13620h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-13620H",
+      "aliases": [
+        "i7-13620h",
+        "core i7 13620h",
+        "intel core i7-13620h",
+        "13620h"
+      ],
+      "score": 22900,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "i9-11980hk",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-11980HK",
+      "aliases": [
+        "i9-11980hk",
+        "core i9 11980hk",
+        "11980hk"
+      ],
+      "score": 23000,
+      "year": 2021,
+      "tier": "ultra"
+    },
+    {
+      "id": "ultra-7-155h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 155H",
+      "aliases": [
+        "ultra 7 155h",
+        "core ultra 7 155h",
+        "intel core ultra 7 155h",
+        "155h"
+      ],
+      "score": 23300,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ultra-5-225h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 5 225H",
+      "aliases": [
+        "ultra 5 225h",
+        "core ultra 5 225h",
+        "intel core ultra 5 225h",
+        "225h"
+      ],
+      "score": 23600,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "i7-12700h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-12700H",
+      "aliases": [
+        "i7-12700h",
+        "core i7 12700h",
+        "intel core i7-12700h",
+        "12700h"
+      ],
+      "score": 23900,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "ultra-7-165h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 165H",
+      "aliases": [
+        "ultra 7 165h",
+        "core ultra 7 165h",
+        "intel core ultra 7 165h",
+        "165h"
+      ],
+      "score": 24300,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i7-13700h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-13700H",
+      "aliases": [
+        "i7-13700h",
+        "core i7 13700h",
+        "intel core i7-13700h",
+        "13700h"
+      ],
+      "score": 25400,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ultra-9-185h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 9 185H",
+      "aliases": [
+        "ultra 9 185h",
+        "core ultra 9 185h",
+        "intel core ultra 9 185h",
+        "185h"
+      ],
+      "score": 25500,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i9-12900h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-12900H",
+      "aliases": [
+        "i9-12900h",
+        "core i9 12900h",
+        "intel core i9-12900h",
+        "12900h"
+      ],
+      "score": 25600,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "i5-14500hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-14500HX",
+      "aliases": [
+        "i5-14500hx",
+        "core i5 14500hx",
+        "intel core i5-14500hx",
+        "14500hx"
+      ],
+      "score": 26200,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i9-12900hk",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-12900HK",
+      "aliases": [
+        "i9-12900hk",
+        "core i9 12900hk",
+        "intel core i9-12900hk",
+        "12900hk"
+      ],
+      "score": 26300,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "i7-13650hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-13650HX",
+      "aliases": [
+        "i7-13650hx",
+        "core i7 13650hx",
+        "intel core i7-13650hx",
+        "13650hx"
+      ],
+      "score": 26900,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "i9-13900h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-13900H",
+      "aliases": [
+        "i9-13900h",
+        "core i9 13900h",
+        "intel core i9-13900h",
+        "13900h"
+      ],
+      "score": 27300,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ultra-7-255h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 255H",
+      "aliases": [
+        "ultra 7 255h",
+        "core ultra 7 255h",
+        "intel core ultra 7 255h",
+        "255h"
+      ],
+      "score": 27600,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "i7-14650hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-14650HX",
+      "aliases": [
+        "i7-14650hx",
+        "core i7 14650hx",
+        "intel core i7-14650hx",
+        "14650hx"
+      ],
+      "score": 29500,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "i7-13700hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-13700HX",
+      "aliases": [
+        "i7-13700hx",
+        "core i7 13700hx",
+        "intel core i7-13700hx",
+        "13700hx"
+      ],
+      "score": 30800,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "ultra-9-285h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 9 285H",
+      "aliases": [
+        "ultra 9 285h",
+        "core ultra 9 285h",
+        "intel core ultra 9 285h",
+        "285h"
+      ],
+      "score": 30800,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "i7-14700hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-14700HX",
+      "aliases": [
+        "i7-14700hx",
+        "core i7 14700hx",
+        "intel core i7-14700hx",
+        "14700hx"
+      ],
+      "score": 33500,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "ultra-7-255hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 7 255HX",
+      "aliases": [
+        "ultra 7 255hx",
+        "core ultra 7 255hx",
+        "intel core ultra 7 255hx",
+        "255hx"
+      ],
+      "score": 35000,
+      "year": 2025,
+      "tier": "ultra"
+    },
+    {
+      "id": "i9-13900hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-13900HX",
+      "aliases": [
+        "i9-13900hx",
+        "core i9 13900hx",
+        "intel core i9-13900hx",
+        "13900hx"
+      ],
+      "score": 36700,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "i9-13980hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-13980HX",
+      "aliases": [
+        "i9-13980hx",
+        "core i9 13980hx",
+        "intel core i9-13980hx",
+        "13980hx"
+      ],
+      "score": 38200,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "i9-14900hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i9-14900HX",
+      "aliases": [
+        "i9-14900hx",
+        "core i9 14900hx",
+        "intel core i9-14900hx",
+        "14900hx"
+      ],
+      "score": 38500,
+      "year": 2024,
+      "tier": "ultra"
+    },
+    {
+      "id": "ultra-9-275hx",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core Ultra 9 275HX",
+      "aliases": [
+        "ultra 9 275hx",
+        "core ultra 9 275hx",
+        "intel core ultra 9 275hx",
+        "275hx"
+      ],
+      "score": 42000,
+      "year": 2025,
+      "tier": "ultra"
+    },
+    {
+      "id": "snapdragon-x",
+      "kind": "cpu",
+      "brand": "qualcomm",
+      "name": "Qualcomm Snapdragon X",
+      "aliases": [
+        "snapdragon x",
+        "qualcomm snapdragon x",
+        "x1-26-100",
+        "x1 26 100",
+        "snapdragon x1"
+      ],
+      "score": 15000,
+      "year": 2025,
+      "tier": "mid"
+    },
+    {
+      "id": "snapdragon-x-plus",
+      "kind": "cpu",
+      "brand": "qualcomm",
+      "name": "Qualcomm Snapdragon X Plus",
+      "aliases": [
+        "snapdragon x plus",
+        "x plus",
+        "qualcomm snapdragon x plus",
+        "x1p-64-100",
+        "x1p 64 100",
+        "x1p-42-100",
+        "x1p 42 100",
+        "snapdragon xplus"
+      ],
+      "score": 20500,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "snapdragon-x-elite",
+      "kind": "cpu",
+      "brand": "qualcomm",
+      "name": "Qualcomm Snapdragon X Elite",
+      "aliases": [
+        "snapdragon x elite",
+        "x elite",
+        "qualcomm snapdragon x elite",
+        "x1e-78-100",
+        "x1e 78 100",
+        "x1e-80-100",
+        "x1e 80 100",
+        "x1e-84-100",
+        "x1e 84 100",
+        "snapdragon xelite"
+      ],
+      "score": 23500,
+      "year": 2024,
+      "tier": "high"
+    },
+    {
+      "id": "vega-3",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon Vega 3",
+      "aliases": [
+        "vega 3",
+        "radeon vega 3",
+        "amd vega 3",
+        "amd radeon vega 3"
+      ],
+      "score": 1250,
+      "year": 2018,
+      "tier": "entry"
+    },
+    {
+      "id": "radeon-610m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 610M",
+      "aliases": [
+        "radeon 610m",
+        "amd radeon 610m",
+        "610m",
+        "rx 610m"
+      ],
+      "score": 1600,
+      "year": 2022,
+      "tier": "entry"
+    },
+    {
+      "id": "vega-6",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon Vega 6",
+      "aliases": [
+        "vega 6",
+        "radeon vega 6",
+        "amd vega 6",
+        "amd radeon vega 6"
+      ],
+      "score": 1700,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "vega-7",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon Vega 7",
+      "aliases": [
+        "vega 7",
+        "radeon vega 7",
+        "amd vega 7",
+        "amd radeon vega 7"
+      ],
+      "score": 2200,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "vega-8",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon Vega 8",
+      "aliases": [
+        "vega 8",
+        "radeon vega 8",
+        "amd vega 8",
+        "amd radeon vega 8",
+        "rx vega 8"
+      ],
+      "score": 2400,
+      "year": 2018,
+      "tier": "low"
+    },
+    {
+      "id": "radeon-740m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 740M",
+      "aliases": [
+        "radeon 740m",
+        "amd radeon 740m",
+        "740m",
+        "rx 740m"
+      ],
+      "score": 3000,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "radeon-660m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 660M",
+      "aliases": [
+        "radeon 660m",
+        "amd radeon 660m",
+        "660m",
+        "rx 660m"
+      ],
+      "score": 3300,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "radeon-760m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 760M",
+      "aliases": [
+        "radeon 760m",
+        "amd radeon 760m",
+        "760m",
+        "rx 760m"
+      ],
+      "score": 3900,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "radeon-680m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 680M",
+      "aliases": [
+        "radeon 680m",
+        "amd radeon 680m",
+        "680m",
+        "rx 680m"
+      ],
+      "score": 4100,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "radeon-780m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 780M",
+      "aliases": [
+        "radeon 780m",
+        "amd radeon 780m",
+        "780m",
+        "rx 780m"
+      ],
+      "score": 4400,
+      "year": 2023,
+      "tier": "mid"
+    },
+    {
+      "id": "radeon-880m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 880M",
+      "aliases": [
+        "radeon 880m",
+        "amd radeon 880m",
+        "880m",
+        "rx 880m"
+      ],
+      "score": 4800,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "radeon-890m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "AMD Radeon 890M",
+      "aliases": [
+        "radeon 890m",
+        "amd radeon 890m",
+        "890m",
+        "rx 890m"
+      ],
+      "score": 5400,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "rx-5500m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "Radeon RX 5500M",
+      "aliases": [
+        "rx 5500m",
+        "rx5500m",
+        "radeon rx 5500m",
+        "radeon 5500m",
+        "5500m"
+      ],
+      "score": 8000,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "rx-6600m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "Radeon RX 6600M",
+      "aliases": [
+        "rx 6600m",
+        "rx6600m",
+        "radeon rx 6600m",
+        "radeon 6600m",
+        "6600m"
+      ],
+      "score": 12800,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "rx-6700m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "Radeon RX 6700M",
+      "aliases": [
+        "rx 6700m",
+        "rx6700m",
+        "radeon rx 6700m",
+        "radeon 6700m",
+        "6700m"
+      ],
+      "score": 14500,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "rx-7600m-xt",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "Radeon RX 7600M XT",
+      "aliases": [
+        "rx 7600m xt",
+        "rx7600mxt",
+        "rx 7600m",
+        "radeon rx 7600m xt",
+        "radeon 7600m xt",
+        "7600m xt",
+        "7600m"
+      ],
+      "score": 15500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "rx-6800m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "Radeon RX 6800M",
+      "aliases": [
+        "rx 6800m",
+        "rx6800m",
+        "radeon rx 6800m",
+        "radeon 6800m",
+        "6800m"
+      ],
+      "score": 16000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rx-7900m",
+      "kind": "gpu",
+      "brand": "amd",
+      "name": "Radeon RX 7900M",
+      "aliases": [
+        "rx 7900m",
+        "rx7900m",
+        "radeon rx 7900m",
+        "radeon 7900m",
+        "7900m"
+      ],
+      "score": 24000,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "hd-520",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel HD Graphics 520",
+      "aliases": [
+        "hd 520",
+        "intel hd 520",
+        "hd graphics 520",
+        "intel hd graphics 520"
+      ],
+      "score": 950,
+      "year": 2015,
+      "tier": "entry"
+    },
+    {
+      "id": "hd-620",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel HD Graphics 620",
+      "aliases": [
+        "hd 620",
+        "intel hd 620",
+        "hd graphics 620",
+        "intel hd graphics 620"
+      ],
+      "score": 1000,
+      "year": 2016,
+      "tier": "entry"
+    },
+    {
+      "id": "uhd-620",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel UHD Graphics 620",
+      "aliases": [
+        "uhd 620",
+        "intel uhd 620",
+        "uhd graphics 620",
+        "intel uhd graphics 620"
+      ],
+      "score": 1050,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "uhd-graphics",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel UHD Graphics (Gen11/12 base)",
+      "aliases": [
+        "uhd graphics",
+        "intel uhd graphics",
+        "intel uhd",
+        "uhd"
+      ],
+      "score": 1500,
+      "year": 2019,
+      "tier": "entry"
+    },
+    {
+      "id": "iris-plus",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel Iris Plus Graphics",
+      "aliases": [
+        "iris plus",
+        "intel iris plus",
+        "iris plus graphics",
+        "iris plus g7"
+      ],
+      "score": 1900,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "iris-xe",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel Iris Xe Graphics (80-96EU)",
+      "aliases": [
+        "iris xe",
+        "intel iris xe",
+        "iris xe graphics",
+        "intel iris xe graphics",
+        "xe graphics"
+      ],
+      "score": 2600,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "arc-a350m",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Arc A350M",
+      "aliases": [
+        "arc a350m",
+        "a350m",
+        "intel arc a350m",
+        "arc 350m"
+      ],
+      "score": 4200,
+      "year": 2022,
+      "tier": "low"
+    },
+    {
+      "id": "arc-a370m",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Arc A370M",
+      "aliases": [
+        "arc a370m",
+        "a370m",
+        "intel arc a370m",
+        "arc 370m"
+      ],
+      "score": 5200,
+      "year": 2022,
+      "tier": "low"
+    },
+    {
+      "id": "arc-140v",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Intel Arc Graphics 140V",
+      "aliases": [
+        "arc 140v",
+        "intel arc 140v",
+        "arc graphics 140v",
+        "intel arc graphics",
+        "140v"
+      ],
+      "score": 5800,
+      "year": 2024,
+      "tier": "mid"
+    },
+    {
+      "id": "arc-a730m",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Arc A730M",
+      "aliases": [
+        "arc a730m",
+        "a730m",
+        "intel arc a730m",
+        "arc 730m"
+      ],
+      "score": 9500,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "arc-a770m",
+      "kind": "gpu",
+      "brand": "intel",
+      "name": "Arc A770M",
+      "aliases": [
+        "arc a770m",
+        "a770m",
+        "intel arc a770m",
+        "arc 770m"
+      ],
+      "score": 11500,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "mx110",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX110",
+      "aliases": [
+        "mx110",
+        "mx 110",
+        "geforce mx110",
+        "nvidia mx110"
+      ],
+      "score": 1900,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "mx130",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX130",
+      "aliases": [
+        "mx130",
+        "mx 130",
+        "geforce mx130",
+        "nvidia mx130"
+      ],
+      "score": 2350,
+      "year": 2017,
+      "tier": "entry"
+    },
+    {
+      "id": "mx230",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX230",
+      "aliases": [
+        "mx230",
+        "mx 230",
+        "geforce mx230",
+        "nvidia mx230"
+      ],
+      "score": 2600,
+      "year": 2019,
+      "tier": "entry"
+    },
+    {
+      "id": "mx150",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX150",
+      "aliases": [
+        "mx150",
+        "mx 150",
+        "geforce mx150",
+        "nvidia mx150"
+      ],
+      "score": 3200,
+      "year": 2017,
+      "tier": "low"
+    },
+    {
+      "id": "gtx-950m-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 950M (Laptop)",
+      "aliases": [
+        "gtx 950m",
+        "950m",
+        "gtx950m",
+        "geforce gtx 950m",
+        "gtx 950m laptop"
+      ],
+      "score": 3350,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "mx250",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX250",
+      "aliases": [
+        "mx250",
+        "mx 250",
+        "geforce mx250",
+        "nvidia mx250"
+      ],
+      "score": 3450,
+      "year": 2019,
+      "tier": "low"
+    },
+    {
+      "id": "mx330",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX330",
+      "aliases": [
+        "mx330",
+        "mx 330",
+        "geforce mx330",
+        "nvidia mx330"
+      ],
+      "score": 3500,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "mx350",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX350",
+      "aliases": [
+        "mx350",
+        "mx 350",
+        "geforce mx350",
+        "nvidia mx350"
+      ],
+      "score": 3600,
+      "year": 2020,
+      "tier": "low"
+    },
+    {
+      "id": "gtx-960m-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 960M (Laptop)",
+      "aliases": [
+        "gtx 960m",
+        "960m",
+        "gtx960m",
+        "geforce gtx 960m",
+        "gtx 960m laptop"
+      ],
+      "score": 3900,
+      "year": 2015,
+      "tier": "low"
+    },
+    {
+      "id": "t500",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA T500 Laptop",
+      "aliases": [
+        "t500",
+        "nvidia t500",
+        "quadro t500",
+        "t500 laptop"
+      ],
+      "score": 5000,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "mx450",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX450",
+      "aliases": [
+        "mx450",
+        "mx 450",
+        "geforce mx450",
+        "nvidia mx450"
+      ],
+      "score": 5100,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1050-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1050 (Laptop)",
+      "aliases": [
+        "gtx 1050",
+        "1050",
+        "gtx1050",
+        "geforce gtx 1050",
+        "gtx 1050 laptop",
+        "gtx 1050 mobile"
+      ],
+      "score": 5400,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "t550",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA T550 Laptop",
+      "aliases": [
+        "t550",
+        "nvidia t550",
+        "quadro t550",
+        "t550 laptop"
+      ],
+      "score": 5400,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "mx550",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX550",
+      "aliases": [
+        "mx550",
+        "mx 550",
+        "geforce mx550",
+        "nvidia mx550"
+      ],
+      "score": 5500,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "t600",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA T600 Laptop",
+      "aliases": [
+        "t600",
+        "nvidia t600",
+        "quadro t600",
+        "t600 laptop"
+      ],
+      "score": 6000,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1050-ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1050 Ti (Laptop)",
+      "aliases": [
+        "gtx 1050 ti",
+        "1050 ti",
+        "1050ti",
+        "gtx 1050ti",
+        "gtx1050ti",
+        "geforce gtx 1050 ti",
+        "gtx 1050 ti laptop"
+      ],
+      "score": 6500,
+      "year": 2017,
+      "tier": "mid"
+    },
+    {
+      "id": "rtx-a500",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX A500 Laptop",
+      "aliases": [
+        "rtx a500",
+        "a500",
+        "nvidia rtx a500",
+        "rtx a500 laptop"
+      ],
+      "score": 6800,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "mx570",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce MX570",
+      "aliases": [
+        "mx570",
+        "mx 570",
+        "geforce mx570",
+        "nvidia mx570"
+      ],
+      "score": 7400,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "rtx-2050-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 2050 (Laptop)",
+      "aliases": [
+        "rtx 2050",
+        "2050",
+        "rtx2050",
+        "geforce rtx 2050",
+        "rtx 2050 laptop",
+        "rtx 2050 mobile"
+      ],
+      "score": 7400,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "t1000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA Quadro T1000 Laptop",
+      "aliases": [
+        "t1000",
+        "quadro t1000",
+        "nvidia t1000",
+        "t1000 laptop"
+      ],
+      "score": 7500,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1650-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1650 (Laptop)",
+      "aliases": [
+        "gtx 1650",
+        "1650",
+        "gtx1650",
+        "geforce gtx 1650",
+        "gtx 1650 laptop",
+        "gtx 1650 mobile"
+      ],
+      "score": 7700,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "t1200",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA T1200 Laptop",
+      "aliases": [
+        "t1200",
+        "nvidia t1200",
+        "quadro t1200",
+        "t1200 laptop"
+      ],
+      "score": 7900,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1650-ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1650 Ti (Laptop)",
+      "aliases": [
+        "gtx 1650 ti",
+        "1650 ti",
+        "1650ti",
+        "gtx 1650ti",
+        "gtx1650ti",
+        "geforce gtx 1650 ti",
+        "gtx 1650 ti laptop"
+      ],
+      "score": 8300,
+      "year": 2020,
+      "tier": "mid"
+    },
+    {
+      "id": "t2000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA Quadro T2000 Laptop",
+      "aliases": [
+        "t2000",
+        "quadro t2000",
+        "nvidia t2000",
+        "t2000 laptop"
+      ],
+      "score": 8600,
+      "year": 2019,
+      "tier": "mid"
+    },
+    {
+      "id": "rtx-a1000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX A1000 Laptop",
+      "aliases": [
+        "rtx a1000",
+        "a1000",
+        "nvidia rtx a1000",
+        "rtx a1000 laptop"
+      ],
+      "score": 9000,
+      "year": 2022,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1060-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1060 (Laptop)",
+      "aliases": [
+        "gtx 1060",
+        "1060",
+        "gtx1060",
+        "geforce gtx 1060",
+        "gtx 1060 laptop",
+        "gtx 1060 mobile"
+      ],
+      "score": 9200,
+      "year": 2016,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3050-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3050 Laptop",
+      "aliases": [
+        "rtx 3050",
+        "rtx3050",
+        "rtx 3050 laptop",
+        "rtx 3050 mobile",
+        "geforce rtx 3050",
+        "3050"
+      ],
+      "score": 9500,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "rtx-a2000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX A2000 Laptop",
+      "aliases": [
+        "rtx a2000",
+        "a2000",
+        "nvidia rtx a2000",
+        "rtx a2000 laptop"
+      ],
+      "score": 10200,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3050ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3050 Ti Laptop",
+      "aliases": [
+        "rtx 3050 ti",
+        "rtx3050ti",
+        "rtx 3050ti",
+        "rtx 3050 ti laptop",
+        "geforce rtx 3050 ti",
+        "3050 ti",
+        "3050ti"
+      ],
+      "score": 10400,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1660-ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1660 Ti (Laptop)",
+      "aliases": [
+        "gtx 1660 ti",
+        "1660 ti",
+        "1660ti",
+        "gtx 1660ti",
+        "gtx1660ti",
+        "geforce gtx 1660 ti",
+        "gtx 1660 ti laptop",
+        "gtx 1660 ti mobile"
+      ],
+      "score": 10800,
+      "year": 2019,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-2060-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 2060 (Laptop)",
+      "aliases": [
+        "rtx 2060",
+        "2060",
+        "rtx2060",
+        "geforce rtx 2060",
+        "rtx 2060 laptop",
+        "rtx 2060 mobile"
+      ],
+      "score": 11800,
+      "year": 2019,
+      "tier": "high"
+    },
+    {
+      "id": "gtx-1070-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1070 (Laptop)",
+      "aliases": [
+        "gtx 1070",
+        "1070",
+        "gtx1070",
+        "geforce gtx 1070",
+        "gtx 1070 laptop",
+        "gtx 1070 mobile"
+      ],
+      "score": 12000,
+      "year": 2016,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-a3000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX A3000 Laptop",
+      "aliases": [
+        "rtx a3000",
+        "a3000",
+        "nvidia rtx a3000",
+        "rtx a3000 laptop"
+      ],
+      "score": 12000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-2070-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 2070 (Laptop)",
+      "aliases": [
+        "rtx 2070",
+        "2070",
+        "rtx2070",
+        "geforce rtx 2070",
+        "rtx 2070 laptop",
+        "rtx 2070 mobile",
+        "rtx 2070 max-q"
+      ],
+      "score": 13800,
+      "year": 2019,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3060-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3060 Laptop",
+      "aliases": [
+        "rtx 3060",
+        "rtx3060",
+        "rtx 3060 laptop",
+        "rtx 3060 mobile",
+        "geforce rtx 3060",
+        "3060"
+      ],
+      "score": 13800,
+      "year": 2021,
+      "tier": "mid"
+    },
+    {
+      "id": "gtx-1080-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce GTX 1080 (Laptop)",
+      "aliases": [
+        "gtx 1080",
+        "1080",
+        "gtx1080",
+        "geforce gtx 1080",
+        "gtx 1080 laptop",
+        "gtx 1080 mobile"
+      ],
+      "score": 14200,
+      "year": 2016,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-a4000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX A4000 Laptop",
+      "aliases": [
+        "rtx a4000",
+        "a4000",
+        "nvidia rtx a4000",
+        "rtx a4000 laptop"
+      ],
+      "score": 14500,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-2070-super-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 2070 Super (Laptop)",
+      "aliases": [
+        "rtx 2070 super",
+        "2070 super",
+        "2070s",
+        "rtx 2070s",
+        "rtx2070super",
+        "geforce rtx 2070 super",
+        "rtx 2070 super laptop",
+        "rtx 2070 super mobile"
+      ],
+      "score": 14900,
+      "year": 2020,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-3070-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3070 Laptop",
+      "aliases": [
+        "rtx 3070",
+        "rtx3070",
+        "rtx 3070 laptop",
+        "rtx 3070 mobile",
+        "geforce rtx 3070",
+        "3070"
+      ],
+      "score": 15900,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-2080-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 2080 (Laptop)",
+      "aliases": [
+        "rtx 2080",
+        "2080",
+        "rtx2080",
+        "geforce rtx 2080",
+        "rtx 2080 laptop",
+        "rtx 2080 mobile",
+        "rtx 2080 max-q"
+      ],
+      "score": 16000,
+      "year": 2019,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-a5000",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX A5000 Laptop",
+      "aliases": [
+        "rtx a5000",
+        "a5000",
+        "nvidia rtx a5000",
+        "rtx a5000 laptop"
+      ],
+      "score": 16000,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-2080-super-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 2080 Super (Laptop)",
+      "aliases": [
+        "rtx 2080 super",
+        "2080 super",
+        "2080s",
+        "rtx 2080s",
+        "rtx2080super",
+        "geforce rtx 2080 super",
+        "rtx 2080 super laptop",
+        "rtx 2080 super mobile"
+      ],
+      "score": 16500,
+      "year": 2020,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-4050-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 4050 Laptop",
+      "aliases": [
+        "rtx 4050",
+        "rtx4050",
+        "rtx 4050 laptop",
+        "rtx 4050 mobile",
+        "geforce rtx 4050",
+        "4050"
+      ],
+      "score": 16500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-2000-ada",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX 2000 Ada Laptop",
+      "aliases": [
+        "rtx 2000 ada",
+        "rtx 2000 ada generation",
+        "rtx 2000 ada laptop",
+        "rtx 2000"
+      ],
+      "score": 16500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3070ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3070 Ti Laptop",
+      "aliases": [
+        "rtx 3070 ti",
+        "rtx3070ti",
+        "rtx 3070ti",
+        "rtx 3070 ti laptop",
+        "geforce rtx 3070 ti",
+        "3070 ti",
+        "3070ti"
+      ],
+      "score": 16900,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3080-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3080 Laptop",
+      "aliases": [
+        "rtx 3080",
+        "rtx3080",
+        "rtx 3080 laptop",
+        "rtx 3080 mobile",
+        "geforce rtx 3080",
+        "3080"
+      ],
+      "score": 17500,
+      "year": 2021,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3080ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 3080 Ti Laptop",
+      "aliases": [
+        "rtx 3080 ti",
+        "rtx3080ti",
+        "rtx 3080ti",
+        "rtx 3080 ti laptop",
+        "geforce rtx 3080 ti",
+        "3080 ti",
+        "3080ti"
+      ],
+      "score": 18400,
+      "year": 2022,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-5050-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 5050 Laptop",
+      "aliases": [
+        "rtx 5050",
+        "rtx5050",
+        "rtx 5050 laptop",
+        "rtx 5050 mobile",
+        "geforce rtx 5050",
+        "5050"
+      ],
+      "score": 18500,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-4060-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 4060 Laptop",
+      "aliases": [
+        "rtx 4060",
+        "rtx4060",
+        "rtx 4060 laptop",
+        "rtx 4060 mobile",
+        "geforce rtx 4060",
+        "4060"
+      ],
+      "score": 19000,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3000-ada",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX 3000 Ada Laptop",
+      "aliases": [
+        "rtx 3000 ada",
+        "rtx 3000 ada generation",
+        "rtx 3000 ada laptop",
+        "rtx 3000"
+      ],
+      "score": 19500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-4070-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 4070 Laptop",
+      "aliases": [
+        "rtx 4070",
+        "rtx4070",
+        "rtx 4070 laptop",
+        "rtx 4070 mobile",
+        "geforce rtx 4070",
+        "4070"
+      ],
+      "score": 21000,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-5060-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 5060 Laptop",
+      "aliases": [
+        "rtx 5060",
+        "rtx5060",
+        "rtx 5060 laptop",
+        "rtx 5060 mobile",
+        "geforce rtx 5060",
+        "5060"
+      ],
+      "score": 21500,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-3500-ada",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "NVIDIA RTX 3500 Ada Laptop",
+      "aliases": [
+        "rtx 3500 ada",
+        "rtx 3500 ada generation",
+        "rtx 3500 ada laptop",
+        "rtx 3500"
+      ],
+      "score": 21500,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-5070-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 5070 Laptop",
+      "aliases": [
+        "rtx 5070",
+        "rtx5070",
+        "rtx 5070 laptop",
+        "rtx 5070 mobile",
+        "geforce rtx 5070",
+        "5070"
+      ],
+      "score": 23000,
+      "year": 2025,
+      "tier": "high"
+    },
+    {
+      "id": "rtx-5070ti-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 5070 Ti Laptop",
+      "aliases": [
+        "rtx 5070 ti",
+        "rtx5070ti",
+        "rtx 5070ti",
+        "rtx 5070 ti laptop",
+        "geforce rtx 5070 ti",
+        "5070 ti",
+        "5070ti"
+      ],
+      "score": 26500,
+      "year": 2025,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-4080-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 4080 Laptop",
+      "aliases": [
+        "rtx 4080",
+        "rtx4080",
+        "rtx 4080 laptop",
+        "rtx 4080 mobile",
+        "geforce rtx 4080",
+        "4080"
+      ],
+      "score": 27500,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-5080-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 5080 Laptop",
+      "aliases": [
+        "rtx 5080",
+        "rtx5080",
+        "rtx 5080 laptop",
+        "rtx 5080 mobile",
+        "geforce rtx 5080",
+        "5080"
+      ],
+      "score": 30000,
+      "year": 2025,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-4090-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 4090 Laptop",
+      "aliases": [
+        "rtx 4090",
+        "rtx4090",
+        "rtx 4090 laptop",
+        "rtx 4090 mobile",
+        "geforce rtx 4090",
+        "4090"
+      ],
+      "score": 30500,
+      "year": 2023,
+      "tier": "ultra"
+    },
+    {
+      "id": "rtx-5090-laptop",
+      "kind": "gpu",
+      "brand": "nvidia",
+      "name": "GeForce RTX 5090 Laptop",
+      "aliases": [
+        "rtx 5090",
+        "rtx5090",
+        "rtx 5090 laptop",
+        "rtx 5090 mobile",
+        "geforce rtx 5090",
+        "5090"
+      ],
+      "score": 34000,
+      "year": 2025,
+      "tier": "ultra"
+    }
+  ]
+}
