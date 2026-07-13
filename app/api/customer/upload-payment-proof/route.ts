@@ -2,27 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { getS3Client } from '@/lib/aws/s3';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { Client } from '@line/bot-sdk';
-
-// Lazy initialization of LINE client
-let lineClient: Client | null = null;
-
-function getLineClient(): Client {
-  if (!lineClient) {
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const channelSecret = process.env.LINE_CHANNEL_SECRET;
-
-    if (!channelAccessToken || !channelSecret) {
-      throw new Error('LINE channel access token or secret not configured');
-    }
-
-    lineClient = new Client({
-      channelAccessToken,
-      channelSecret,
-    });
-  }
-  return lineClient;
-}
+import { getLineClient } from '@/lib/line/client';
 
 /**
  * Downloads image from LINE Message API

@@ -8,8 +8,7 @@
 // Calls the Anthropic Messages REST API directly (no SDK dependency) with key rotation
 // on rate-limit / overloaded / network errors, mirroring the OpenAI fallback pattern.
 
-const collectEnvKeys = (values: Array<string | undefined>) =>
-  values.map((value) => value?.trim()).filter((value): value is string => Boolean(value));
+import { collectEnvKeys } from '@/lib/utils/env';
 
 const ANTHROPIC_KEYS = collectEnvKeys([
   process.env.ANTHROPIC_API_KEY,
@@ -115,7 +114,7 @@ export function parseJsonFromText<T>(text: string): T | null {
 }
 
 // Builds an Anthropic image content block from a `data:` URL (base64) or a remote URL.
-export function toAnthropicImageBlock(image: string): any | null {
+function toAnthropicImageBlock(image: string): any | null {
   if (!image || typeof image !== 'string') return null;
   if (image.startsWith('data:')) {
     const match = image.match(/^data:([^;]+);base64,(.*)$/);

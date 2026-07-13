@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, use, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { ArrowRight, Download, TrendingUp } from 'lucide-react';
+import { ArrowRight, TrendingUp } from 'lucide-react';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 import { openLiffEntry } from '@/lib/liff/navigation';
@@ -45,7 +45,6 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
   const [loading, setLoading] = useState(true);
   const [pinVerified, setPinVerified] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const redirectToInvestorVerification = () => {
@@ -130,36 +129,6 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
       setError(fetchError.response?.data?.error || 'ไม่สามารถโหลดข้อมูลได้');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    try {
-      setDownloadingPdf(true);
-      if (isInvestorPreviewMode()) {
-        alert('Mock mode: เปิดหน้า ticket เพื่อดูตัวอย่างเอกสารได้');
-        return;
-      }
-
-      const response = await fetch(`/api/contracts/pawn-ticket/${contractId}?viewer=investor&format=pdf`);
-      if (!response.ok) {
-        throw new Error('ไม่สามารถสร้าง PDF ได้');
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${contract?.contract_number || `pawn-ticket-${contractId}`}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (downloadError: any) {
-      console.error('Error downloading PDF:', downloadError);
-      alert(downloadError.message || 'ไม่สามารถดาวน์โหลด PDF ได้');
-    } finally {
-      setDownloadingPdf(false);
     }
   };
 

@@ -1,4 +1,5 @@
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
+import { MS_PER_DAY } from '@/lib/utils/time';
+
 const DAYS_PER_PENALTY_MONTH = 30;
 const OVERDUE_INTEREST_PER_MONTH = 0.03;
 

@@ -56,9 +56,6 @@ export async function POST(request: NextRequest) {
       branchId,
       userLocation,
       duration,
-      interestRate,
-      totalInterest,
-      totalRepayment,
       draftItemId,
     } = body;
 

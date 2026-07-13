@@ -1,10 +1,9 @@
-import { Client, ClientConfig, WebhookEvent, FlexMessage } from '@line/bot-sdk';
-import axios from 'axios';
+import { Client, ClientConfig, FlexMessage } from '@line/bot-sdk';
 
 // Lazy initialization of LINE client
 let lineClient: Client | null = null;
 
-function getLineClient(): Client {
+export function getLineClient(): Client {
   if (!lineClient) {
     const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     const channelSecret = process.env.LINE_CHANNEL_SECRET;
@@ -1051,18 +1050,6 @@ export async function sendTextMessage(userId: string, text: string) {
     return { success: true };
   } catch (error) {
     console.error('Error sending text message:', error);
-    throw error;
-  }
-}
-
-// Get User Profile
-export async function getUserProfile(userId: string) {
-  try {
-    const client = getLineClient();
-    const profile = await client.getProfile(userId);
-    return profile;
-  } catch (error) {
-    console.error('Error getting user profile:', error);
     throw error;
   }
 }

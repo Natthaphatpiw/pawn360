@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { anthropicStructured, hasAnthropicKeys, getAnthropicVisionModel } from '@/lib/services/anthropic-llm';
-
-const collectEnvKeys = (values: Array<string | undefined>) => (
-  values
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value))
-);
+import { anthropicStructured, hasAnthropicKeys, getAnthropicVisionModel, parseJsonFromText } from '@/lib/services/anthropic-llm';
+import { collectEnvKeys } from '@/lib/utils/env';
 
 const GEMINI_KEYS = collectEnvKeys([
   process.env.GEMINI_API_KEY,
@@ -55,20 +50,6 @@ async function runWithGeminiFallback<T>(task: (client: GoogleGenerativeAI) => Pr
     }
   }
   throw lastError;
-}
-
-function parseJsonFromText<T>(text: string): T | null {
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]) as T;
-    } catch {
-      return null;
-    }
-  }
 }
 
 type ConditionResult = {
@@ -524,13 +505,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const processedImages = normalizedImages;
-
     console.log(`✅ Processed size: ${originalSizeMB.toFixed(2)}MB`);
 
     console.log('🔍 Prechecking images with Claude...');
     const precheck = await precheckImages({
-      images: processedImages,
+      images: normalizedImages,
       itemType,
       brand,
       model,
@@ -547,7 +526,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔄 Analyzing condition with Gemini...');
-    const conditionResult = await analyzeConditionWithGemini(processedImages, {
+    const conditionResult = await analyzeConditionWithGemini(normalizedImages, {
       itemType,
       brand,
       model,

@@ -3,14 +3,16 @@
 import { Suspense, useState, useRef, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
+import { runEstimateJob } from '@/lib/estimate-job-client';
 import Image from 'next/image';
-import { Camera, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { ChevronUp, ChevronDown, Check } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import PawnSummary from './pawn-summary';
 import ContractAgreementStep from './contract-agreement-step';
 import ContractSuccess from './contract-success';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { isSerialRequiredForType } from '@/lib/utils/serial-types';
 import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
 import {
   buildMockEstimate,
@@ -40,17 +42,6 @@ const BRANDS_BY_TYPE: Record<string, string[]> = {
   'กล้อง': ['Canon', 'Nikon', 'Sony', 'Fujifilm', 'Panasonic', 'GoPro', 'DJI', 'อื่นๆ'],
   'โน้ตบุค': ['Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
   'อุปกรณ์คอมพิวเตอร์': ['Intel', 'AMD', 'NVIDIA', 'ASUS', 'MSI', 'Gigabyte', 'ASRock', 'Corsair', 'Kingston', 'Crucial', 'Seagate', 'WD', 'Samsung', 'Cooler Master', 'Thermaltake', 'NZXT', 'Logitech', 'Razer', 'SteelSeries', 'อื่นๆ'],
-};
-
-const SERIAL_OPTIONAL_TYPES = new Set([
-  'อุปกรณ์เสริมโทรศัพท์',
-  'กล้อง',
-  'อุปกรณ์คอมพิวเตอร์',
-]);
-
-const isSerialRequiredForType = (itemType?: string) => {
-  if (!itemType) return false;
-  return !SERIAL_OPTIONAL_TYPES.has(itemType);
 };
 
 const APPLE_CATEGORIES = [
@@ -610,7 +601,7 @@ function EstimatePageInner() {
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [pawnDuration, setPawnDuration] = useState<string>('30');
-  const [interestCalculationType, setInterestCalculationType] = useState<'daily' | 'monthly'>('monthly');
+  const [interestCalculationType] = useState<'daily' | 'monthly'>('monthly');
   const [interestAmount, setInterestAmount] = useState<number>(0);
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [desiredPrice, setDesiredPrice] = useState<string>('');
@@ -1229,6 +1220,7 @@ function EstimatePageInner() {
         if (!formData.model) return 'กรุณาระบุรุ่น';
         if (!formData.cpu) return 'กรุณาระบุ CPU';
         if (!formData.ram) return 'กรุณาระบุ RAM';
+        if (!formData.storage) return 'กรุณาระบุความจุ/สตอเรจ';
         if (!formData.gpu) return 'กรุณาระบุการ์ดจอ';
         break;
 
@@ -1543,10 +1535,12 @@ function EstimatePageInner() {
         }),
       };
 
-      const estimateResponse = await axios.post('/api/estimate', estimateData, { signal });
-      console.log('✅ Price estimation completed:', estimateResponse.data);
-      setEstimateResult(estimateResponse.data);
-      setDesiredPrice(estimateResponse.data.estimatedPrice.toString());
+      // Async job queue: enqueue then poll (the API responds in ms; the heavy
+      // pipeline runs in the background) — same spinner/cancel UX as before.
+      const estimateResultData = await runEstimateJob(estimateData, signal);
+      console.log('✅ Price estimation completed:', estimateResultData);
+      setEstimateResult(estimateResultData);
+      setDesiredPrice(estimateResultData.estimatedPrice.toString());
       updateProcessingStatus(100, 'สรุปผล', 'กำลังจัดเตรียมผลการประเมิน');
 
       // Update form data with blended condition
@@ -2019,6 +2013,26 @@ function EstimatePageInner() {
                         placeholder="RAM"
                         className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
                       />
+                    </div>
+                    <div className="mb-4">
+                      <FormLabel thai="ความจุ/สตอเรจ" eng="Storage" required />
+                      <input
+                        type="text"
+                        name="storage"
+                        value={formData.storage}
+                        onChange={handleInputChange}
+                        placeholder="เช่น 512GB SSD NVMe"
+                        list="notebook-storage-options"
+                        className="w-full min-h-12 p-3 border border-primary-border rounded-full bg-background-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary placeholder:text-foreground-subtle text-sm md:text-sm text-foreground-muted"
+                      />
+                      <datalist id="notebook-storage-options">
+                        <option value="256GB SSD NVMe" />
+                        <option value="512GB SSD NVMe" />
+                        <option value="1TB SSD NVMe" />
+                        <option value="256GB SSD SATA" />
+                        <option value="512GB SSD SATA" />
+                        <option value="1TB HDD" />
+                      </datalist>
                     </div>
                     <div className="mb-4">
                       <FormLabel thai="การ์ดจอ" eng="GPU" required />

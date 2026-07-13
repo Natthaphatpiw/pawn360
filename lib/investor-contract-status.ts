@@ -1,3 +1,5 @@
+import { MS_PER_DAY } from '@/lib/utils/time';
+
 export type InvestorContractDisplayStatus =
   | 'APPROVAL'
   | 'PENDING'
@@ -21,7 +23,7 @@ export const getInvestorContractDaysRemaining = (endDate?: string | null) => {
   if (!Number.isFinite(endTime)) return null;
 
   const now = new Date();
-  return Math.ceil((endTime - now.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.ceil((endTime - now.getTime()) / MS_PER_DAY);
 };
 
 export const getInvestorContractDisplayStatus = (

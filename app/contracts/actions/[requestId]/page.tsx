@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { getMockActionRequestById, getMockContractsEnabled } from '@/lib/mock-contracts';

@@ -48,7 +48,7 @@ export default function DraftDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
-  const [isCreatingContract, setIsCreatingContract] = useState(false);
+  const [isCreatingContract] = useState(false);
 
   useEffect(() => {
     if ((mockMode || profile?.userId) && itemId) {

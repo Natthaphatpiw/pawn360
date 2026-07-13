@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -52,7 +52,7 @@ export default function PawnerContractList() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userName, setUserName] = useState('');
+  const [, setUserName] = useState('');
   const [pinVerified, setPinVerified] = useState(false);
   const [pinModalOpen, setPinModalOpen] = useState(false);
 

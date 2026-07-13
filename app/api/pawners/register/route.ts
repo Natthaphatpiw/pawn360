@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { VALID_BANK_ACCOUNT_TYPES } from '@/lib/utils/bank-account-types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,13 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and normalize bank_account_type
-    const validBankAccountTypes = [
-      'บัญชีออมทรัพย์',
-      'บัญชีเงินฝากประจำ',
-      'บัญชีกระแสรายวัน',
-      'บัญชีเงินตราต่างประเทศ',
-      'พร้อมเพย์'
-    ];
+    const validBankAccountTypes = VALID_BANK_ACCOUNT_TYPES;
 
     // Convert empty string to null, and validate the type
     let bankAccountType = bankInfo?.accountType?.trim() || null;

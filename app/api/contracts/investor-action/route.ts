@@ -4,11 +4,6 @@ import { Client, FlexMessage } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
 import { getInvestorRateForTier, resolveInvestorTier } from '@/lib/services/investor-tier';
 
-const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
-});
-
 const pawnerLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
   channelSecret: process.env.LINE_CHANNEL_SECRET || ''

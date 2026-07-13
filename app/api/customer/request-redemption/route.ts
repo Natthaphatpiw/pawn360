@@ -1,35 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
-import { Client } from '@line/bot-sdk';
+import { getLineClient } from '@/lib/line/client';
 import { createPendingApprovalMessage } from '@/lib/line/flex-templates';
 import { calculateRedemptionAmount } from '@/lib/utils/calculations';
 import { requirePinToken } from '@/lib/security/pin';
 
-// Lazy initialization of LINE client
-let lineClient: Client | null = null;
-
-function getLineClient(): Client {
-  if (!lineClient) {
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const channelSecret = process.env.LINE_CHANNEL_SECRET;
-
-    if (!channelAccessToken || !channelSecret) {
-      throw new Error('LINE channel access token or secret not configured');
-    }
-
-    lineClient = new Client({
-      channelAccessToken,
-      channelSecret,
-    });
-  }
-  return lineClient;
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contractId, lineUserId, message, pinToken } = body;
+    const { contractId, lineUserId, pinToken } = body;
 
     if (!contractId || !lineUserId) {
       return NextResponse.json(
@@ -87,7 +67,6 @@ export async function POST(request: NextRequest) {
 
     // 6. Send request to Shop System
     const shopSystemUrl = process.env.SHOP_SYSTEM_URL || 'https://pawn360-ver.vercel.app';
-    const shopNotificationId = `REDEMPTION-${Date.now()}-${contractId}`;
 
     try {
       const response = await fetch(`${shopSystemUrl}/api/notifications/redemption`, {

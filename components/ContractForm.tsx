@@ -294,9 +294,6 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
   // Camera input ref
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Contract content ref for PDF generation
-  const contractContentRef = useRef<HTMLDivElement>(null);
-
   // Contract data calculation
   const calculateInterest = () => {
     const pawnedPrice = parseFloat(contractDetails.pawnPrice) || 0;

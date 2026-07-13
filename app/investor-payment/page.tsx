@@ -1,16 +1,15 @@
 'use client';
 
 import { useState, useEffect, Suspense, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
-import { X, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { openLiffEntry } from '@/lib/liff/navigation';
 import { getMockContractById, isInvestorPreviewMode, MOCK_CONTRACT_IDS } from '@/lib/mock-investment';
 
 function InvestorPaymentContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { profile, isLoading: liffLoading } = useLiff();
   const fileInputRef = useRef<HTMLInputElement>(null);

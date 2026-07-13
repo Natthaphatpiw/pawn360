@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Clock, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import axios from 'axios';

@@ -11,7 +11,7 @@ const pawnerLineClient = new Client({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { redemptionId, action, additionalAmount, reason } = body;
+    const { redemptionId, action, additionalAmount } = body;
 
     if (!redemptionId || !action) {
       return NextResponse.json(

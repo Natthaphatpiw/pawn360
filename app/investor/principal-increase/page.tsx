@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 function InvestorPrincipalIncreaseEntryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [requestId, setRequestId] = useState<string | null>(null);
+  const [, setRequestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const resolvedRequestId = useMemo(() => {

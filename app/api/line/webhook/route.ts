@@ -1,29 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
-import { ObjectId } from 'mongodb';
-import { Client, middleware } from '@line/bot-sdk';
 import { verifyLineSignature } from '@/lib/security/line';
-import { downloadLineImage } from '@/lib/line/client';
-
-// Lazy initialization of LINE client
-let lineClient: Client | null = null;
-
-function getLineClient(): Client {
-  if (!lineClient) {
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const channelSecret = process.env.LINE_CHANNEL_SECRET;
-
-    if (!channelAccessToken || !channelSecret) {
-      throw new Error('LINE channel access token or secret not configured');
-    }
-
-    lineClient = new Client({
-      channelAccessToken,
-      channelSecret,
-    });
-  }
-  return lineClient;
-}
+import { downloadLineImage, getLineClient } from '@/lib/line/client';
 
 export async function POST(request: NextRequest) {
   try {

@@ -2,14 +2,7 @@
  * Utility functions for financial calculations in pawn system
  */
 
-/**
- * Calculate due date from createdAt date and loan days
- */
-export function calculateDueDate(createdAt: Date, loanDays: number): Date {
-  const dueDate = new Date(createdAt);
-  dueDate.setDate(dueDate.getDate() + loanDays);
-  return dueDate;
-}
+import { MS_PER_DAY } from '@/lib/utils/time';
 
 /**
  * Calculate interest amount based on principal, interest rate, and days
@@ -27,13 +20,6 @@ export function calculateInterest(
 }
 
 /**
- * Calculate total amount (principal + interest)
- */
-export function calculateTotalAmount(principal: number, interest: number): number {
-  return principal + interest;
-}
-
-/**
  * Calculate accrued interest from last cutoff date to current date
  */
 export function calculateAccruedInterest(
@@ -43,7 +29,7 @@ export function calculateAccruedInterest(
   currentDate: Date = new Date()
 ): number {
   const daysDiff = Math.floor(
-    (currentDate.getTime() - lastCutoffDate.getTime()) / (1000 * 60 * 60 * 24)
+    (currentDate.getTime() - lastCutoffDate.getTime()) / MS_PER_DAY
   );
 
   if (daysDiff <= 0) return 0;
@@ -102,7 +88,7 @@ export function calculateRedemptionAmount(item: any): {
   );
 
   const daysSinceLastCutoff = Math.floor(
-    (new Date().getTime() - new Date(lastCutoffDate).getTime()) / (1000 * 60 * 60 * 24)
+    (new Date().getTime() - new Date(lastCutoffDate).getTime()) / MS_PER_DAY
   );
 
   return {

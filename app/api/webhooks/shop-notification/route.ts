@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { Client } from '@line/bot-sdk';
+import { getLineClient } from '@/lib/line/client';
 import {
   createQRCodeCard,
   createRejectionCard,
@@ -11,26 +12,6 @@ import {
 } from '@/lib/line/flex-templates';
 import { verifyWebhookSignature, isTimestampValid } from '@/lib/security/webhook';
 import { calculateReducePrincipalPayment } from '@/lib/utils/calculations';
-
-// Lazy initialization of LINE client
-let lineClient: Client | null = null;
-
-function getLineClient(): Client {
-  if (!lineClient) {
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const channelSecret = process.env.LINE_CHANNEL_SECRET;
-
-    if (!channelAccessToken || !channelSecret) {
-      throw new Error('LINE channel access token or secret not configured');
-    }
-
-    lineClient = new Client({
-      channelAccessToken,
-      channelSecret,
-    });
-  }
-  return lineClient;
-}
 
 /**
  * POST /api/webhooks/shop-notification
@@ -44,8 +25,7 @@ export async function POST(request: NextRequest) {
       notificationId,
       type,
       data,
-      timestamp,
-      shopSystemUrl
+      timestamp
     } = body;
 
     console.log('Received webhook:', { notificationId, type, timestamp });
@@ -276,7 +256,7 @@ async function handlePaymentVerified(
   item: any,
   data: any
 ) {
-  const { verified, message, status } = data;
+  const { verified, message } = data;
 
   if (verified) {
     // ยืนยันการชำระเงิน

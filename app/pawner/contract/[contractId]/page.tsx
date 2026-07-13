@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import { useRouter, useParams } from 'next/navigation';
 import axios from 'axios';
-import { ChevronDown, AlertCircle, ChevronLeft, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, X } from 'lucide-react';
 
 interface ContractDetail {
   contract_id: string;

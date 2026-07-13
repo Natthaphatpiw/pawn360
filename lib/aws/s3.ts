@@ -3,6 +3,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const BUCKET_NAME = 'piwp360';
 const FOLDER_PREFIX = 'cont360/';
+const PRESIGNED_URL_EXPIRATION_SECONDS = 7 * 24 * 3600;
 
 // Create S3 client lazily to ensure env vars are loaded
 let s3Client: S3Client | null = null;
@@ -68,7 +69,7 @@ export async function uploadQRCodeToS3(
  * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
  * @returns Presigned URL
  */
-export async function getQRCodePresignedUrl(itemId: string, expiresIn: number = 7 * 24 * 3600): Promise<string> {
+export async function getQRCodePresignedUrl(itemId: string, expiresIn: number = PRESIGNED_URL_EXPIRATION_SECONDS): Promise<string> {
   try {
     const client = getS3Client();
     const fileName = `qr-${itemId}.png`;
@@ -93,7 +94,7 @@ export async function getQRCodePresignedUrl(itemId: string, expiresIn: number = 
  * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
  * @returns Presigned URL
  */
-export async function getImagePresignedUrl(imageKey: string, expiresIn: number = 7 * 24 * 3600): Promise<string> {
+export async function getImagePresignedUrl(imageKey: string, expiresIn: number = PRESIGNED_URL_EXPIRATION_SECONDS): Promise<string> {
   try {
     const client = getS3Client();
     const command = new GetObjectCommand({
@@ -199,7 +200,7 @@ export async function uploadSignatureToS3(
  * @param expiresIn - ระยะเวลาที่ URL ใช้งานได้ (วินาที) ค่าเริ่มต้น 7 วัน
  * @returns Presigned URL
  */
-export async function getSignaturePresignedUrl(contractId: string, expiresIn: number = 7 * 24 * 3600): Promise<string> {
+export async function getSignaturePresignedUrl(contractId: string, expiresIn: number = PRESIGNED_URL_EXPIRATION_SECONDS): Promise<string> {
   try {
     const client = getS3Client();
     const fileName = `signature-${contractId}.png`;

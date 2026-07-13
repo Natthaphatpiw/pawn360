@@ -1233,13 +1233,13 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
   error: string | null;
 }) {
   const [stepKey, setStepKey] = useState<'welcome' | 'referral' | 'details' | 'preferences' | 'limits' | 'ekyc' | 'success'>('welcome');
-  const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward');
+  const [, setStepDirection] = useState<'forward' | 'backward'>('forward');
   const [poppingBubbleKey, setPoppingBubbleKey] = useState<string | null>(null);
   const [totalLimitInput, setTotalLimitInput] = useState('');
   const [divideEqually, setDivideEqually] = useState(true);
   const [preferenceState, setPreferenceState] = useState<RegistrationPreferenceState>(() => buildRegistrationPreferenceState());
   const [hasReferralCode, setHasReferralCode] = useState<boolean | null>(null);
-  const [completedInvestor, setCompletedInvestor] = useState<InvestorData | null>(null);
+  const [completedInvestor] = useState<InvestorData | null>(null);
   const [addPersonalBankAccount, setAddPersonalBankAccount] = useState(false);
 
   const referralPreview = classifyReferralCode(formData.referralCode);
@@ -1333,21 +1333,6 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
       !!formData.bankInfo.accountName
     );
   const isLimitsStepValid = computedPayload.totalLimit > 0 && computedPayload.categories !== null;
-
-  const completeRegistration = async () => {
-    if (!computedPayload.categories || computedPayload.totalLimit <= 0) return;
-    const investor = await handleSubmit({
-      formData: activeFormData,
-      registrationSetup: {
-        maxInvestmentAmount: computedPayload.totalLimit,
-        preferences: computedPayload.categories,
-      },
-    });
-    if (investor) {
-      setCompletedInvestor(investor);
-      goToStep('success', 'forward');
-    }
-  };
 
   const buildRegistrationSubmission = (): RegistrationSubmission | null => {
     if (!computedPayload.categories || computedPayload.totalLimit <= 0) return null;
