@@ -12,7 +12,10 @@ const GEMINI_KEYS = collectEnvKeys([
 
 const geminiClients = GEMINI_KEYS.map((apiKey) => new GoogleGenerativeAI(apiKey));
 
-const GEMINI_MODEL = 'gemini-3-flash-preview';
+// Primary is a preview model — it 503s ("high demand") under load, so we keep
+// a stable fallback model and, as a last resort, Claude vision scoring.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash';
 const MAX_IMAGE_COUNT = 6;
 const MAX_TOTAL_IMAGE_MB = 10;
 const MIN_AI_CONDITION_SCORE = 0.3;
@@ -31,22 +34,57 @@ const isGeminiRateLimitError = (error: any): boolean => {
   );
 };
 
-async function runWithGeminiFallback<T>(task: (client: GoogleGenerativeAI) => Promise<T>): Promise<T> {
+// 503 / "high demand" is model-capacity exhaustion, not key quota — rotating
+// keys alone can't fix it, so it gets its own detector and handling.
+const isGeminiOverloadedError = (error: any): boolean => {
+  const status = error?.status ?? error?.response?.status;
+  if (status === 503) return true;
+  const message = `${error?.message || ''}`.toLowerCase();
+  return (
+    message.includes('503') ||
+    message.includes('service unavailable') ||
+    message.includes('overloaded') ||
+    message.includes('high demand') ||
+    message.includes('try again later')
+  );
+};
+
+const sleepMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Tries (model × key) combinations: rate-limit → next key immediately;
+// overload (503) → short backoff, next key, and eventually the stable
+// fallback model; anything else → throw.
+async function runGeminiWithResilience<T>(
+  task: (client: GoogleGenerativeAI, modelName: string) => Promise<T>
+): Promise<T> {
   if (!hasGeminiKeys()) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
+  const models =
+    GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL
+      ? [GEMINI_MODEL, GEMINI_FALLBACK_MODEL]
+      : [GEMINI_MODEL];
   let lastError: any;
-  for (let i = 0; i < geminiClients.length; i++) {
-    const client = geminiClients[i];
-    try {
-      return await task(client);
-    } catch (error) {
-      lastError = error;
-      if (isGeminiRateLimitError(error) && i < geminiClients.length - 1) {
-        console.warn(`⚠️ Gemini rate limit hit. Switching to fallback key ${i + 2}.`);
-        continue;
+  let overloadCount = 0;
+  for (const modelName of models) {
+    for (let i = 0; i < geminiClients.length; i++) {
+      try {
+        return await task(geminiClients[i], modelName);
+      } catch (error) {
+        lastError = error;
+        if (isGeminiRateLimitError(error)) {
+          console.warn(`⚠️ Gemini rate limit (key ${i + 1}, ${modelName}) — trying next key.`);
+          continue;
+        }
+        if (isGeminiOverloadedError(error)) {
+          overloadCount += 1;
+          const backoff = Math.min(750 * overloadCount, 2000);
+          console.warn(`⚠️ Gemini overloaded (${modelName}) — backing off ${backoff}ms then trying next key/model.`);
+          await sleepMs(backoff);
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
   }
   throw lastError;
@@ -182,6 +220,49 @@ ${productLine}
 "การประเมินนี้อิงจากภาพถ่ายที่ได้รับเท่านั้น ผลลัพธ์อาจคลาดเคลื่อนและควรมีการตรวจสอบด้วยตนเอง รวมถึงการทดสอบฟังก์ชันการทำงานที่ไม่เห็นจากภาพถ่าย"
 `;
 };
+
+// Last-resort condition scorer: same rubric prompt, run on Claude vision via
+// structured tool-use. Only used when every Gemini (model × key) attempt fails.
+const CONDITION_RESULT_SCHEMA = {
+  type: 'object',
+  properties: {
+    score: { type: 'number' },
+    totalScore: { type: 'number' },
+    grade: { type: 'string' },
+    reason: { type: 'string' },
+    assessable: { type: 'boolean' },
+    assessmentStatus: { type: 'string' },
+    assessmentIssue: { type: 'string' },
+    detailedBreakdown: {
+      type: 'object',
+      properties: {
+        screen: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
+        body: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
+        buttons: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
+        camera: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
+        overall: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
+      },
+    },
+    recommendation: { type: 'string' },
+    imageQuality: { type: 'string' },
+  },
+  required: ['totalScore', 'reason'],
+};
+
+async function scoreConditionWithClaudeVision(
+  images: string[],
+  options: { itemType: string; brand?: string; model?: string; appleCategory?: string }
+): Promise<ConditionResult | null> {
+  return anthropicStructured<ConditionResult>({
+    userText: buildConditionPrompt(options),
+    images: images.slice(0, MAX_IMAGE_COUNT),
+    model: getAnthropicVisionModel(),
+    toolName: 'condition_assessment',
+    toolDescription: 'Return the device condition assessment in the exact JSON structure described.',
+    maxTokens: 1500,
+    schema: CONDITION_RESULT_SCHEMA,
+  });
+}
 
 const toGeminiImagePart = (value: string) => {
   if (typeof value === 'string' && value.startsWith('data:')) {
@@ -331,7 +412,9 @@ async function analyzeConditionWithGemini(
     appleCategory?: string;
   }
 ): Promise<ConditionResult> {
-  if (!hasGeminiKeys()) {
+  const canUseGemini = hasGeminiKeys();
+  const canUseClaude = hasAnthropicKeys();
+  if (!canUseGemini && !canUseClaude) {
     throw new Error('GEMINI_API_KEY is not configured');
   }
 
@@ -341,21 +424,38 @@ async function analyzeConditionWithGemini(
     parts.push(toGeminiImagePart(images[i]));
   }
 
-  const content = await runWithGeminiFallback(async (client) => {
-    const model = client.getGenerativeModel({
-      model: GEMINI_MODEL,
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
-    });
-    const result = await model.generateContent(parts);
-    const response = await result.response;
-    return response.text();
-  });
-  const parsed = parseJsonFromText<ConditionResult>(content);
+  let parsed: ConditionResult | null = null;
+  if (canUseGemini) {
+    try {
+      const content = await runGeminiWithResilience(async (client, modelName) => {
+        const model = client.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: 'application/json',
+          },
+        });
+        const result = await model.generateContent(parts);
+        const response = await result.response;
+        return response.text();
+      });
+      parsed = parseJsonFromText<ConditionResult>(content);
+      if (!parsed) {
+        throw new Error('Failed to parse Gemini response');
+      }
+    } catch (error) {
+      if (!canUseClaude) throw error;
+      console.warn('🔁 Gemini condition scoring failed — falling back to Claude vision:', error);
+      parsed = null;
+    }
+  }
 
   if (!parsed) {
-    throw new Error('Failed to parse Gemini response');
+    console.log('🔍 Scoring condition with Claude vision (same rubric)...');
+    parsed = await scoreConditionWithClaudeVision(images, options);
+  }
+
+  if (!parsed) {
+    throw new Error('Condition scoring failed on both Gemini and Claude');
   }
 
   const totalScore = Math.max(0, Math.min(100, Number(parsed.totalScore) || 50));
