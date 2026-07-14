@@ -4702,6 +4702,35 @@
       "score": 34000,
       "year": 2025,
       "tier": "ultra"
+    },
+    {
+      "id": "i7-13800h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i7-13800H",
+      "aliases": [
+        "i7-13800h",
+        "core i7 13800h",
+        "intel core i7-13800h",
+        "13800h"
+      ],
+      "score": 24500,
+      "year": 2023,
+      "tier": "high"
+    },
+    {
+      "id": "i5-13600h",
+      "kind": "cpu",
+      "brand": "intel",
+      "name": "Intel Core i5-13600H",
+      "aliases": [
+        "i5-13600h",
+        "core i5 13600h",
+        "13600h"
+      ],
+      "score": 21500,
+      "year": 2023,
+      "tier": "high"
     }
   ]
 }

@@ -298,13 +298,29 @@ export class JobQueue<Req, Res> {
     return 'waituntil';
   }
 
+  // Resolves the public callback base URL for QStash. Loopback candidates are
+  // skipped (QStash rejects them with "resolves to a loopback address"), and
+  // on Vercel we fall back to the platform-provided production/deployment URL
+  // automatically, so a misconfigured NEXT_PUBLIC_BASE_URL can't break dispatch.
   private getBaseUrl(): string | null {
-    const base =
-      process.env.JOB_CALLBACK_BASE_URL ||
-      process.env.ESTIMATE_JOB_CALLBACK_BASE_URL ||
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      '';
-    return /^https?:\/\//.test(base) ? base.replace(/\/$/, '') : null;
+    const candidates = [
+      process.env.JOB_CALLBACK_BASE_URL,
+      process.env.ESTIMATE_JOB_CALLBACK_BASE_URL,
+      process.env.NEXT_PUBLIC_BASE_URL,
+      process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined,
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+    ];
+    for (const raw of candidates) {
+      if (!raw) continue;
+      const base = raw.trim().replace(/\/$/, '');
+      if (!/^https?:\/\//.test(base)) continue;
+      if (/\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)([:/]|$)/i.test(base)) {
+        console.warn(`⚠️ Job queue [${this.config.namespace}]: skipping loopback callback URL ${base}`);
+        continue;
+      }
+      return base;
+    }
+    return null;
   }
 
   getWorkerSecret(): string | undefined {
