@@ -289,8 +289,14 @@ function classifyTier(
 
   const canBeExact = cpuMatch !== false && ramMatch !== false && storageMatch !== false && gpuMatch !== false;
 
+  // A spec-blind target (no usable CPU score, no RAM, no storage) can't verify
+  // any "exact" claim — cap such listings at family so a junk-spec input can
+  // never assemble a fake high-confidence L1 out of generic listings.
+  const targetBlind =
+    (!target.cpuScore || target.cpuScoreSource === 'unknown') && !target.ramGb && !target.storageGb;
+
   let computedFloor: MatchTier = 'exact';
-  if (!canBeExact) computedFloor = 'family';
+  if (!canBeExact || targetBlind) computedFloor = 'family';
 
   // Demote-only: final tier is the weaker of the LLM label and our verification.
   return TIER_ORDER[Math.max(tierRank(llmTier), tierRank(computedFloor))];

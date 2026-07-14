@@ -6,7 +6,7 @@
 // between configs. See NOTEBOOK_PRICING.md.
 
 import benchmarksJson from '@/lib/data/notebook-benchmarks.json';
-import { anthropicStructured, hasAnthropicKeys } from '@/lib/services/anthropic-llm';
+import { anthropicStructured, getAnthropicVisionModel, hasAnthropicKeys } from '@/lib/services/anthropic-llm';
 
 export type StorageType = 'nvme' | 'sata' | 'hdd';
 export type PanelType = 'tn' | 'ips' | 'oled';
@@ -417,6 +417,81 @@ export interface NotebookSpecInput {
   screenSize?: string;
   note?: string;
   defects?: string;
+  // Uploaded item photos (data: or https URLs). Used to read specs off
+  // "About" screens / spec stickers when the typed fields are missing/junk.
+  images?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Junk-input cleaning + vision rescue
+// ---------------------------------------------------------------------------
+
+// Values pawners type when they don't know a field ("ไม่รู้") — these must
+// never reach search queries or the canonicalizer as if they were real specs
+// (a "Dell ไม่รู้" target harvested generic cheap Dell listings as "exact").
+const JUNK_INPUT_PATTERN = /^(ไม่รู้|ไม่ทราบ|ไม่แน่ใจ|ไม่รู้จัก|จำไม่ได้|ไม่มีข้อมูล|unknown|idk|n\/?a|none|-+|\.+|\?+)$/i;
+
+export function cleanJunkValue(value?: string | null): string {
+  const trimmed = (value || '').trim();
+  if (!trimmed || JUNK_INPUT_PATTERN.test(trimmed)) return '';
+  return trimmed;
+}
+
+// "ไม่มี" for the GPU field is information (no discrete GPU), not junk.
+function normalizeGpuInput(value?: string | null): string {
+  const trimmed = (value || '').trim();
+  if (/^(ไม่มี|no|none|onboard|ออนบอร์ด|การ์ดจอในตัว)$/i.test(trimmed)) return 'integrated';
+  return cleanJunkValue(trimmed);
+}
+
+export interface NotebookVisionSpec {
+  brand: string | null;
+  model: string | null;
+  cpu: string | null;
+  ramGb: number | null;
+  storageGb: number | null;
+  storageType: string | null;
+  gpu: string | null;
+}
+
+const VISION_SPEC_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    brand: { type: ['string', 'null'] },
+    model: { type: ['string', 'null'] },
+    cpu: { type: ['string', 'null'] },
+    ramGb: { type: ['number', 'null'] },
+    storageGb: { type: ['number', 'null'] },
+    storageType: { type: ['string', 'null'] },
+    gpu: { type: ['string', 'null'] },
+  },
+  required: ['brand', 'model', 'cpu', 'ramGb', 'storageGb', 'storageType', 'gpu'],
+};
+
+const MAX_VISION_SPEC_IMAGES = 4;
+
+// Reads specs off the uploaded photos: Windows "About"/system screens, BIOS
+// pages, spec stickers, chassis labels. Nulls for anything not actually
+// visible — never guesses from the laptop's appearance alone.
+export async function extractNotebookSpecFromImages(images: string[]): Promise<NotebookVisionSpec | null> {
+  return anthropicStructured<NotebookVisionSpec>({
+    userText: `These are photos of a laptop being pawned. Extract ONLY specs you can actually read in the images (system "About" screens, BIOS screens, spec stickers, chassis labels, retail boxes):
+- brand (e.g. Dell, Lenovo, ASUS)
+- model: the model/series shown (e.g. "Precision 5680", "IdeaPad Gaming 3 15ACH6") — NOT a random Windows device name unless it clearly states the model
+- cpu (e.g. "Intel Core i7-13800H", "AMD Ryzen 5 5600H")
+- ramGb (number, in GB)
+- storageGb (number, in GB; 1TB = 1024)
+- storageType ("nvme" | "sata" | "hdd") only if explicitly indicated
+- gpu (discrete GPU model if shown)
+Use null for anything not visible. Do NOT guess.`,
+    images: images.slice(0, MAX_VISION_SPEC_IMAGES),
+    model: getAnthropicVisionModel(),
+    toolName: 'notebook_vision_spec',
+    toolDescription: 'Return the specs readable in the photos.',
+    maxTokens: 500,
+    schema: VISION_SPEC_SCHEMA,
+  });
 }
 
 interface LlmCanonicalSpec {
@@ -458,28 +533,70 @@ const LLM_SPEC_SCHEMA = {
 } as const;
 
 export async function extractNotebookSpec(input: NotebookSpecInput, productName?: string): Promise<NotebookSpec> {
-  const storageRaw = input.storage || input.capacity || '';
-  const haystack = [input.brand, input.model, input.cpu, input.gpu, input.note].filter(Boolean).join(' ');
+  // 1) Strip junk values ("ไม่รู้", "-", "n/a") so they never masquerade as specs.
+  const cleaned = {
+    brand: cleanJunkValue(input.brand),
+    model: cleanJunkValue(input.model),
+    cpu: cleanJunkValue(input.cpu),
+    ram: cleanJunkValue(input.ram),
+    storage: cleanJunkValue(input.storage),
+    capacity: cleanJunkValue(input.capacity),
+    gpu: normalizeGpuInput(input.gpu),
+    screenSize: cleanJunkValue(input.screenSize),
+    note: (input.note || '').trim(),
+  };
+  const inputWasJunk = !cleaned.model || !cleaned.cpu;
+
+  // 2) Vision rescue: read missing specs off the uploaded photos (About
+  //    screens / spec stickers) instead of pricing a spec-less "Dell Notebook".
+  const needVision =
+    (input.images?.length ?? 0) > 0 &&
+    (!cleaned.model || !cleaned.cpu || !cleaned.ram || !cleaned.storage);
+  if (needVision && hasAnthropicKeys()) {
+    try {
+      const vision = await extractNotebookSpecFromImages(input.images!);
+      if (vision) {
+        console.log('💻 Vision spec extraction:', vision);
+        if (!cleaned.brand && vision.brand) cleaned.brand = vision.brand.trim();
+        if (!cleaned.model && vision.model) cleaned.model = vision.model.trim();
+        if (!cleaned.cpu && vision.cpu) cleaned.cpu = vision.cpu.trim();
+        if (!cleaned.ram && vision.ramGb && vision.ramGb > 0 && vision.ramGb <= 256) {
+          cleaned.ram = `${vision.ramGb}GB`;
+        }
+        if (!cleaned.storage && vision.storageGb && vision.storageGb >= 16 && vision.storageGb <= 16384) {
+          const type = ['nvme', 'sata', 'hdd'].includes(vision.storageType || '') ? ` ${vision.storageType!.toUpperCase()}` : '';
+          cleaned.storage = `${vision.storageGb}GB${type}`;
+        }
+        if (!cleaned.gpu && vision.gpu) cleaned.gpu = vision.gpu.trim();
+      }
+    } catch (error) {
+      console.warn('⚠️ Vision spec extraction failed:', error);
+    }
+  }
+
+  const brandFinal = cleaned.brand || input.brand;
+  const storageRaw = cleaned.storage || cleaned.capacity || '';
+  const haystack = [brandFinal, cleaned.model, cleaned.cpu, cleaned.gpu, cleaned.note].filter(Boolean).join(' ');
 
   // Heuristic baseline (always computed; also the no-LLM fallback).
-  const heuristicRam = parseRamGb(input.ram);
+  const heuristicRam = parseRamGb(cleaned.ram);
   const heuristicStorage = parseStorage(storageRaw);
-  const heuristicScreen = parseScreen(input.screenSize || input.model || '');
+  const heuristicScreen = parseScreen(cleaned.screenSize || cleaned.model || '');
 
   let llm: LlmCanonicalSpec | null = null;
   if (hasAnthropicKeys()) {
     try {
       llm = await anthropicStructured<LlmCanonicalSpec>({
         userText: `Canonicalize this laptop's specs for a Thai used-laptop price-estimation system.
-Input (free text typed by a pawner):
-- Brand: ${input.brand}
-- Model: ${input.model}
-- CPU: ${input.cpu || '-'}
-- RAM: ${input.ram || '-'}
+Input (free text typed by a pawner; photo-extracted values may be merged in):
+- Brand: ${brandFinal}
+- Model: ${cleaned.model || '-'}
+- CPU: ${cleaned.cpu || '-'}
+- RAM: ${cleaned.ram || '-'}
 - Storage: ${storageRaw || '-'}
-- GPU: ${input.gpu || '-'}
-- Screen: ${input.screenSize || '-'}
-- Notes: ${input.note || '-'}
+- GPU: ${cleaned.gpu || '-'}
+- Screen: ${cleaned.screenSize || '-'}
+- Notes: ${cleaned.note || '-'}
 
 Rules:
 - "family" is the marketing family + size, WITHOUT SKU/part codes (e.g. "Lenovo IdeaPad 3 15ALC6 82KU" -> family "IdeaPad 3 15", variant "15ALC6 82KU").
@@ -497,8 +614,8 @@ Rules:
     }
   }
 
-  const cpu = resolveCpu(llm?.cpuModel || input.cpu);
-  const gpu = resolveGpu(llm?.gpuModel || input.gpu);
+  const cpu = resolveCpu(llm?.cpuModel || cleaned.cpu);
+  const gpu = resolveGpu(llm?.gpuModel || cleaned.gpu);
 
   // Never trust LLM enum values blindly — an out-of-vocabulary string (e.g.
   // storageType "ssd") would later hit factor tables as undefined and poison
@@ -523,13 +640,29 @@ Rules:
   const gpuClass = gpu.gpuClass;
   const segment = asSegment(llm?.segment) || inferSegment(haystack, gpuClass);
 
-  const family = (llm?.family || input.model || '').trim() || input.model;
+  const family = (llm?.family || cleaned.model || '').trim() || cleaned.model || brandFinal;
+
+  // 3) Compose a search-worthy product name from the canonical fields. When
+  //    the typed input was junk, the caller's productName was derived from
+  //    that junk ("Dell Notebook") — always prefer our composition then.
+  const composedName = [
+    // LLMs often fold the brand into the family ("Dell Precision 5680") —
+    // don't produce "Dell Dell Precision 5680".
+    family.toLowerCase().includes(brandFinal.toLowerCase()) ? null : brandFinal,
+    family,
+    llm?.variant || null,
+    cpu.model || null,
+    ramGb ? `${ramGb}GB` : null,
+    storageGb ? (storageGb >= 1024 ? `${Math.round(storageGb / 1024)}TB` : `${storageGb}GB`) : null,
+  ].filter(Boolean).join(' ');
+
+  const finalProductName = inputWasJunk || !productName ? composedName : productName;
 
   return {
-    brand: input.brand,
+    brand: brandFinal,
     family,
     variant: llm?.variant || null,
-    productName: productName || `${input.brand} ${input.model}`.trim(),
+    productName: finalProductName || `${brandFinal} ${cleaned.model || input.model}`.trim(),
     cpuModel: cpu.model || null,
     cpuScore: cpu.score,
     cpuScoreSource: cpu.source,

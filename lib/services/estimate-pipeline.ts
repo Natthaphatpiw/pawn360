@@ -93,7 +93,7 @@ const PRICE_SNAP_THRESHOLD = 500;
 // listing-median flow; bumping the pipeline version invalidates cached
 // notebook estimates without touching other item types.
 const NOTEBOOK_ITEM_TYPE = 'โน้ตบุค';
-const NOTEBOOK_PIPELINE_VERSION = 'v2';
+const NOTEBOOK_PIPELINE_VERSION = 'v4'; // v4: vision spec extraction + junk-input guards + spec-driven SerpAPI
 const NOTEBOOK_SEARCH_MIN_ITEMS = 4;
 const NOTEBOOK_SEARCH_MAX_ITEMS = 14;
 const NOTEBOOK_SEARCH_MAX_OUTPUT_TOKENS = 2400;
@@ -1437,6 +1437,7 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
           screenSize: body.screenSize,
           note: body.note,
           defects: body.defects,
+          images: body.images,
         },
         normalizedData.productName
       );
@@ -1451,9 +1452,21 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
         segment: spec.segment,
       });
 
+      // SerpAPI must search/filter with the CANONICAL spec (incl. anything the
+      // vision extraction read off the photos) — the generic normalized name
+      // can be junk like "Dell Notebook" when the pawner typed "ไม่รู้".
+      const serpapiInput: EstimateRequest = {
+        ...body,
+        brand: spec.brand,
+        model: [spec.family, spec.variant].filter(Boolean).join(' ') || body.model,
+        cpu: spec.cpuModel || body.cpu,
+        ram: spec.ramGb ? `${spec.ramGb}GB` : body.ram,
+        storage: formatNotebookStorage(spec) || body.storage,
+      };
+
       const [webListings, serpapiResults, observations] = await Promise.all([
         fetchNotebookListings(spec),
-        fetchSerpapiShoppingResults(body, normalizedData.productName),
+        fetchSerpapiShoppingResults(serpapiInput, spec.productName),
         fetchRecentNotebookObservations(spec.brand, spec.family),
       ]);
       const serpListings = mapSerpapiItemsToNotebookListings(serpapiResults);
