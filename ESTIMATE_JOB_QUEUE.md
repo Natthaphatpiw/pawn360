@@ -1,72 +1,73 @@
-# ระบบคิวประเมินราคา (Estimate Job Queue)
+# ระบบคิวงานหนัก (Async Job Queue)
 
-การประเมินราคาสด (โดยเฉพาะโน้ตบุ๊ก) ใช้เวลา ~1–2 นาที (web search + LLM หลายตัว)
-การถือ HTTP request เดียวค้างไว้นานขนาดนั้นเสี่ยงโดน timeout บน Vercel และ mobile network
-ระบบคิวนี้เปลี่ยน flow เป็น **enqueue → ตอบ jobId ทันที → client poll จนเสร็จ**
-โดย UX ฝั่งผู้ใช้เหมือนเดิมทุกประการ (ป๊อปอัพหมุนรอ + ยกเลิกได้)
+งาน AI ที่กินเวลานานเกิน budget ของ serverless request เดียว ใช้ระบบคิวร่วมกัน 2 งาน:
 
-## สถาปัตยกรรม
+| งาน | endpoint คิว | pipeline | เวลาโดยประมาณ |
+|---|---|---|---|
+| **ประเมินราคา** | `/api/estimate/jobs` | [`estimate-pipeline.ts`](lib/services/estimate-pipeline.ts) | ~1–2 นาที (web search + LLM) |
+| **ประเมินสภาพสินค้า** | `/api/analyze-condition/jobs` | [`analyze-condition-pipeline.ts`](lib/services/analyze-condition-pipeline.ts) | ~30–60 วิ (precheck + vision) |
+
+ทั้งคู่ตอบทันที (jobId) แล้ว client poll จนเสร็จ — UX ฝั่งผู้ใช้เหมือนเดิม (ป๊อปอัพหมุนรอ + ยกเลิกได้)
+แก้ปัญหา Vercel timeout (analyze-condition เดิม `maxDuration=60` แต่ precheck+scoring+fallback เกิน 60 วิ → 504)
+
+## เครื่องยนต์ร่วม
+
+- [`lib/services/job-queue.ts`](lib/services/job-queue.ts) — `JobQueue<Req,Res>` generic (Redis-backed) create/get/cancel/process + dispatcher
+- [`lib/services/estimate-jobs.ts`](lib/services/estimate-jobs.ts) / [`analyze-condition-jobs.ts`](lib/services/analyze-condition-jobs.ts) — instance บาง ๆ ของ `JobQueue` ต่อ pipeline
+- [`lib/job-poll-client.ts`](lib/job-poll-client.ts) — `runJob()` ฝั่ง client (enqueue+poll+sync fallback) ใช้ร่วมกัน
+- job อยู่ใน Upstash Redis (`KV_REST_API_URL`/`KV_REST_API_TOKEN`) key `<namespace>:<uuid>` TTL 2 ชม. — ไม่มี migration/cron
 
 ```
-UI (estimate/page.tsx)
-  └─ runEstimateJob()                     lib/estimate-job-client.ts
-       ├─ POST /api/estimate/jobs         → 202 { jobId }   (ตอบใน ~ms)
-       ├─ GET  /api/estimate/jobs/[id]    poll ครั้งแรกที่ 2s แล้วทุก 5s
-       │        status: QUEUED | PROCESSING | COMPLETED | FAILED | CANCELLED
-       ├─ POST /api/estimate/jobs/[id]/cancel   (เมื่อผู้ใช้กดยกเลิก)
-       └─ fallback: ถ้าคิวไม่พร้อม (503) → POST /api/estimate แบบ sync เดิม
-
-งานจริงรันโดย processEstimateJob()  →  runEstimatePipeline()
-                                        (lib/services/estimate-pipeline.ts —
-                                         pipeline เดิมทั้งก้อน ย้ายออกจาก route)
+UI → runJob()                         lib/job-poll-client.ts
+      ├─ POST .../jobs                → 202 { jobId }   (~ms)
+      ├─ GET  .../jobs/[id]           poll 2s แล้วทุก 5s → QUEUED|PROCESSING|COMPLETED|FAILED|CANCELLED
+      ├─ POST .../jobs/[id]/cancel    (ผู้ใช้กดยกเลิก)
+      └─ fallback: คิวไม่พร้อม (503)  → POST endpoint sync เดิม
+งานจริง: JobQueue.process() → pipeline.run() → เก็บผลกลับ job (Redis)
 ```
 
-- **Job store**: Upstash Redis (env `KV_REST_API_URL`/`KV_REST_API_TOKEN` ที่มีอยู่แล้ว)
-  key `estimate:job:v1:<uuid>` TTL 2 ชม. — ไม่ต้องมี migration/cron เก็บกวาด
-- **Cache hit เร็วเหมือนเดิม**: pipeline เช็ค Redis cache ภายใน งาน cache-hit จบใน ~1–2 วิ
-  client poll ครั้งแรกที่ 2 วิจึงได้ผลแทบทันที
-- **ยกเลิก**: mark `CANCELLED` — งาน LLM ที่กำลังวิ่งจะวิ่งจนจบแต่ผลถูกทิ้ง
-  (cache ภายในถูก warm ไว้ ทำให้กดประเมินซ้ำได้ผลเร็ว)
-- **งานค้าง (function ตายกลางทาง)**: `PROCESSING` เกิน 6 นาที → ผู้ poll เห็นเป็น
-  `FAILED (job_timeout)` และ (โหมด QStash) retry สามารถ claim งานซ้ำได้
+- **Cache hit เร็วเหมือนเดิม**: pipeline เช็ค cache ภายใน งาน cache-hit จบใน ~1–2 วิ (poll แรกที่ 2 วิ)
+- **ยกเลิก**: mark `CANCELLED` — งาน AI ที่วิ่งอยู่จะวิ่งจนจบแต่ผลถูกทิ้ง (cache ภายในถูก warm)
+- **งานค้าง (function ตาย)**: งานที่วิ่งอยู่จะ "เต้นหัวใจ" (heartbeat) ทุก 15 วิ — ถ้า crash จะหยุดเต้น แล้ว **โหมด QStash retry claim งานกลับมาทำใหม่ได้ภายใน ~60 วิ**; ถ้าไม่มี retry มาเลย (โหมด waituntil) poller จะเห็นเป็น `FAILED (job_timeout)` หลังหยุดเต้น ~3 นาที (งานที่วิ่งช้าแต่ยังไม่ตายจะเต้นต่อ ไม่ถูกตัดทิ้ง)
 
-## Dispatcher 2 โหมด (สลับด้วย env)
+## Dispatcher 2 โหมด (ใช้ร่วมทั้งสองคิว)
 
 | โหมด | วิธีทำงาน | เหมาะกับ |
 |---|---|---|
-| `waituntil` (ค่าเริ่มต้น) | ตอบ 202 แล้วประมวลผลต่อใน background ของ function เดิมผ่าน `after()` ของ Next (`maxDuration = 300`) | เริ่มใช้ได้ทันที ไม่ต้องตั้งอะไรเพิ่ม |
-| `qstash` | publish ไป **Upstash QStash** → QStash ยิง `POST /api/estimate/jobs/process` พร้อม retry อัตโนมัติ (รอด crash/redeploy กลางคัน) | production ที่ต้องการ delivery guarantee |
+| `waituntil` (ค่าเริ่มต้น) | ตอบ 202 แล้วประมวลผลต่อใน background ผ่าน `after()` (`maxDuration=300`) | ใช้ได้ทันที ไม่ต้องตั้งอะไร |
+| `qstash` | publish ไป Upstash QStash → ยิง `.../jobs/process` พร้อม retry (รอด crash/redeploy) | production |
 
-### Env ทั้งหมด
+### Env (ตั้งใน Vercel dashboard)
 
 ```bash
-# โหมด (ไม่ตั้ง = waituntil)
-ESTIMATE_JOB_DISPATCHER=qstash
-
-# จำเป็นเมื่อใช้ qstash:
-QSTASH_TOKEN=...                          # จาก Upstash console (บัญชีเดียวกับ Redis)
-ESTIMATE_JOB_WORKER_SECRET=<random-32ch>  # กุญแจกัน endpoint /process ถูกยิงมั่ว
-# URL ปลายทางที่ QStash จะเรียกกลับ (มีอยู่แล้ว): NEXT_PUBLIC_BASE_URL
-# หรือ override เฉพาะทางด้วย ESTIMATE_JOB_CALLBACK_BASE_URL
+# เปิดโหมด QStash (ไม่ตั้ง = waituntil ใช้ได้เลย) — ใช้ค่าเดียวคุมทั้งสองคิว
+JOB_DISPATCHER=qstash
+QSTASH_TOKEN=...                     # จาก Upstash (กด Connect to Project จะ inject ให้)
+JOB_WORKER_SECRET=<openssl rand -hex 32>   # กุญแจกัน .../jobs/process ถูกยิงมั่ว
+# base URL ที่ QStash เรียกกลับ: ใช้ NEXT_PUBLIC_BASE_URL (มีอยู่แล้ว) หรือ JOB_CALLBACK_BASE_URL
 ```
 
-QStash ฟรี 500 ข้อความ/วัน — พอสำหรับปริมาณประเมินช่วงแรกสบายๆ
-ถ้า publish ล้มเหลว ระบบ fallback เป็น `waituntil` อัตโนมัติ (งานไม่หาย)
+**back-compat**: ถ้าเคยตั้ง `ESTIMATE_JOB_DISPATCHER` / `ESTIMATE_JOB_WORKER_SECRET` ไว้ ระบบยังอ่านเป็น fallback ของคิว estimate — แต่ค่าใหม่ `JOB_*` คุมได้ทั้งสองคิวในตัวเดียว แนะนำใช้ `JOB_*`
+
+QStash ฟรี 500 ข้อความ/วัน; publish ล้มเหลว → fallback `waituntil` อัตโนมัติ (งานไม่หาย); localhost ใช้ QStash ไม่ได้ (ต้อง URL สาธารณะ) → dev fallback เป็น waituntil เอง
+
+## โมเดล AI ของแต่ละ pipeline
+
+- **ประเมินสภาพ** ([`analyze-condition-pipeline.ts`](lib/services/analyze-condition-pipeline.ts)):
+  - precheck รูป (ตรงประเภท/สินค้าเดียวกัน) = Claude vision
+  - ให้คะแนนสภาพ = **OpenAI `gpt-5.6-luna`** (Responses API, `getOpenAIVisionModel()` — override ด้วย `OPENAI_VISION_MODEL`) → fallback **Claude vision** ถ้า OpenAI ล้ม
+  - **เลิกใช้ Gemini แล้ว** (เดิม `gemini-3-flash-preview` 503 บ่อย + key ตัวแรกใช้ไม่ได้)
+  - reasoning effort คุมด้วย `OPENAI_VISION_REASONING_EFFORT` (default `low` — เน้นเร็ว)
+- **ประเมินราคา**: ตามเดิม (`PRICE_SEARCH_PROVIDER`, notebook ladder ฯลฯ)
 
 ## ตัวเลือกอื่นที่สำรวจแล้ว (เผื่ออนาคต)
 
-- **Vercel Queues** (`@vercel/queue`) — เข้า public beta ก.พ. 2026 ทุก plan;
-  topic/consumer + retry ในตัว เป็นทางเลือก native เมื่อ GA — dispatcher ของเรา
-  เป็น strategy pattern เพิ่มโหมดที่สามได้ไม่กระทบส่วนอื่น
-- **Inngest / Trigger.dev** — แพลตฟอร์ม workflow เต็มรูป (step retry, observability,
-  งานยาวหลายชั่วโมง) — เกินความจำเป็นของงานเดียว 2 นาที แต่ควรพิจารณาเมื่อมี
-  background workflow หลายตัว (เช่น ticket queue, KYC follow-up) รวมกัน
+- **Vercel Queues** (`@vercel/queue`) — public beta ก.พ. 2026; ทางเลือก native เมื่อ GA (เพิ่ม dispatcher โหมดที่ 3 ได้ไม่กระทบส่วนอื่น)
+- **Inngest / Trigger.dev** — workflow เต็มรูป (step retry, งานยาวหลายชั่วโมง) — เกินความจำเป็นของงาน ~1–2 นาที
 - **BullMQ / pg-boss** — ต้องมี worker process ค้างยาว ไม่เข้ากับ Vercel serverless
 
-## หมายเหตุ deployment
+## deployment checklist
 
-- Route ที่ประกาศ `maxDuration = 300`: `/api/estimate`, `/api/estimate/jobs`,
-  `/api/estimate/jobs/process` — Hobby plan จำกัด max duration ต่ำกว่านี้
-  (Fluid Compute default ~300s บน Pro) ตรวจ plan ก่อน deploy
-- ต้องตั้ง env ทุกตัวข้างต้นใน **Vercel dashboard** ด้วย (ไม่ใช่แค่ .env local)
-- Endpoint `/api/estimate/jobs/process` ถูกปิด (503) เมื่อไม่ตั้ง `ESTIMATE_JOB_WORKER_SECRET`
+- route ที่ `maxDuration=300`: `/api/estimate(/jobs, /jobs/process)`, `/api/analyze-condition(/jobs, /jobs/process)` — ต้องเปิด Fluid Compute
+- ตั้ง env ทุกตัวใน Vercel dashboard (ไม่ใช่แค่ .env)
+- `.../jobs/process` ปิด (503) เมื่อไม่ตั้ง `JOB_WORKER_SECRET`

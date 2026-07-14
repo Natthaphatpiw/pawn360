@@ -4,6 +4,7 @@ import { Suspense, useState, useRef, useEffect } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { runEstimateJob } from '@/lib/estimate-job-client';
+import { runAnalyzeConditionJob } from '@/lib/analyze-condition-job-client';
 import Image from 'next/image';
 import { ChevronUp, ChevronDown, Check } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -1461,15 +1462,16 @@ function EstimatePageInner() {
       updateProcessingStatus(35, 'ตรวจสอบรูปภาพ', 'กำลังตรวจสอบประเภทสินค้าและความสอดคล้องของรูปภาพ');
 
       console.log('🔍 Analyzing condition...');
-      const conditionResponse = await axios.post('/api/analyze-condition', {
+      // Async job queue: enqueue then poll (same spinner/cancel UX).
+      const conditionData = await runAnalyzeConditionJob({
         images: base64Images,
         itemType: formData.itemType,
         brand: formData.brand,
         model: formData.model,
         appleCategory: formData.appleCategory,
-      }, { signal });
+      }, signal);
 
-      setConditionResult(conditionResponse.data);
+      setConditionResult(conditionData);
       setIsAnalyzing(false);
       console.log('✅ Condition analysis completed');
       ensureNotCanceled(signal);
@@ -1487,8 +1489,8 @@ function EstimatePageInner() {
       updateProcessingStatus(80, 'ประเมินราคา', 'กำลังคำนวณราคาประเมิน');
 
       const pawnerConditionPercent = Math.min(100, Math.max(0, derivedConditionScore));
-      const aiConditionPercent = Number.isFinite(conditionResponse.data.score)
-        ? Math.min(100, Math.max(0, conditionResponse.data.score <= 1 ? conditionResponse.data.score * 100 : conditionResponse.data.score))
+      const aiConditionPercent = Number.isFinite(conditionData.score)
+        ? Math.min(100, Math.max(0, conditionData.score <= 1 ? conditionData.score * 100 : conditionData.score))
         : 0;
       const finalConditionPercent = Math.min(
         100,
@@ -1519,7 +1521,7 @@ function EstimatePageInner() {
           : formData.accessories,
         condition: finalConditionScore,
         pawnerCondition: pawnerConditionPercent,
-        aiCondition: conditionResponse.data.score,
+        aiCondition: conditionData.score,
         defects: formData.defects,
         note: [formData.note, appleExtraLines].filter(Boolean).join('\n'),
         images: uploadedUrls,

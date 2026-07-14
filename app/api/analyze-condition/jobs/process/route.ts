@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEstimateJobWorkerSecret, processEstimateJob } from '@/lib/services/estimate-jobs';
+import {
+  getConditionJobWorkerSecret,
+  processConditionJob,
+} from '@/lib/services/analyze-condition-jobs';
 
 // QStash worker endpoint (JOB_DISPATCHER=qstash). QStash forwards our shared
-// secret via Upstash-Forward-X-Job-Worker-Secret, which arrives here as the
-// x-job-worker-secret header. Not used in the default 'waituntil' mode (the
-// enqueue route processes jobs in-process).
+// secret via Upstash-Forward-X-Job-Worker-Secret → x-job-worker-secret header.
+// Not used in the default 'waituntil' mode.
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = getEstimateJobWorkerSecret();
+  const secret = getConditionJobWorkerSecret();
   if (!secret) {
     return NextResponse.json({ error: 'Worker endpoint disabled' }, { status: 503 });
   }
@@ -27,10 +29,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Missing jobId' }, { status: 400 });
   }
 
-  // Always 200 after an attempt: business failures are recorded on the job
-  // (FAILED) and must not trigger a QStash redelivery loop. QStash retries
-  // still fire on crashes/timeouts (no response), where the stale-claim logic
-  // lets the retry re-claim the job.
-  await processEstimateJob(jobId);
+  await processConditionJob(jobId);
   return NextResponse.json({ ok: true, jobId });
 }
