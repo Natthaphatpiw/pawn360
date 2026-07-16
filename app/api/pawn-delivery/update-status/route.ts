@@ -17,11 +17,6 @@ const pawnerLineClient = createLineClient(
   process.env.LINE_CHANNEL_SECRET
 );
 
-const getPawnerStatusUrl = (contractId: string) => {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
-  return `https://liff.line.me/${liffId}?contractId=${encodeURIComponent(contractId)}`;
-};
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -218,11 +213,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'ARRIVED' && contract.item_delivery_status !== 'RECEIVED_AT_DROP_POINT' && pawner?.line_id && pawnerLineClient) {
-      const statusUrl = getPawnerStatusUrl(contract.contract_id);
       try {
         await pawnerLineClient.pushMessage(pawner.line_id, {
           type: 'text',
-          text: `สินค้าถึง Drop Point แล้ว\nกำลังอยู่ในขั้นตอนตรวจสอบสินค้า\n\nเช็คสถานะได้ที่นี่:\n${statusUrl}`,
+          text: 'สินค้าถึง Drop Point แล้ว\nกำลังอยู่ในขั้นตอนตรวจสอบสินค้า',
         });
       } catch (msgError) {
         console.error('Error sending arrival message to pawner:', msgError);

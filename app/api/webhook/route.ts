@@ -20,6 +20,32 @@ function getInvestorLineClient() {
   return new Client({ channelAccessToken: token, channelSecret: secret || '' });
 }
 
+function formatDropPointDestination(value: unknown) {
+  const relation = Array.isArray(value) ? value[0] : value;
+  if (!relation || typeof relation !== 'object') {
+    return 'กรุณาติดต่อเจ้าหน้าที่เพื่อยืนยันจุดส่งสินค้า';
+  }
+
+  const dropPoint = relation as Record<string, unknown>;
+  const normalize = (field: unknown) => typeof field === 'string' ? field.trim() : '';
+  const name = normalize(dropPoint.drop_point_name);
+  const address = [
+    dropPoint.addr_house_no,
+    dropPoint.addr_village,
+    dropPoint.addr_street,
+    dropPoint.addr_sub_district,
+    dropPoint.addr_district,
+    dropPoint.addr_province,
+    dropPoint.addr_postcode,
+  ]
+    .map(normalize)
+    .filter(Boolean)
+    .join(' ');
+
+  return [name, address].filter(Boolean).join('\n')
+    || 'กรุณาติดต่อเจ้าหน้าที่เพื่อยืนยันจุดส่งสินค้า';
+}
+
 export async function GET() {
   return NextResponse.json({
     message: 'Webhook endpoint is working',
@@ -551,13 +577,14 @@ async function handlePostbackEvent(event: WebhookEvent) {
             contract.item_delivery_status === 'DELIVERED' ||
             contract.item_delivery_status === 'VERIFIED') {
           console.log(`Contract ${contractId} already confirmed (status: ${contract.item_delivery_status}), skipping`);
+          const dropPointDestination = formatDropPointDestination(contract.drop_points);
           // Send a polite reminder message instead
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken && contract.pawners?.line_id) {
             const client = new Client({ channelAccessToken });
             await client.pushMessage(contract.pawners.line_id, {
               type: 'text',
-              text: `คุณได้ยืนยันการขอสินเชื่อไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
+              text: `คุณได้ยืนยันการขอสินเชื่อไปแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${dropPointDestination}\n\nภายในเวลาทำการของวันถัดไป`
             });
           }
           return;
@@ -575,10 +602,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
         // Send confirmation to pawner
         const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
         if (channelAccessToken && contract.pawners?.line_id) {
+          const dropPointDestination = formatDropPointDestination(contract.drop_points);
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `ยืนยันการขอสินเชื่อเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${contract.drop_points?.drop_point_name}\n${contract.drop_points?.address}\n\nภายในเวลาทำการของวันถัดไป`
+            text: `ยืนยันการขอสินเชื่อเรียบร้อยแล้ว\n\nกรุณานำสินค้าไปส่งที่:\n${dropPointDestination}\n\nภายในเวลาทำการของวันถัดไป`
           });
         }
 
