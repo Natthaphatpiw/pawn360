@@ -901,28 +901,11 @@ export async function sendConfirmationSuccessMessage(lineId: string, contractDat
             },
             {
               type: 'text',
-              text: 'ขอบคุณที่ใช้บริการ! คุณสามารถติดตามสถานะสัญญาและจัดการการขอสินเชื่อได้ผ่านระบบของเรา',
+              text: 'ขอบคุณที่ใช้บริการ ระบบได้รับข้อมูลสัญญาของคุณเรียบร้อยแล้ว',
               size: 'sm',
               color: '#666666',
               wrap: true,
               margin: 'lg'
-            }
-          ]
-        },
-        footer: {
-          type: 'box',
-          layout: 'vertical',
-          spacing: 'sm',
-          contents: [
-            {
-              type: 'button',
-              action: {
-                type: 'uri',
-                label: 'ดูสัญญาและจัดการ',
-                uri: `https://pawnly.io/contracts`
-              },
-              style: 'primary',
-              color: '#c2410c'
             }
           ]
         }

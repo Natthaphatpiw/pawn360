@@ -22,11 +22,6 @@ const dropPointLineClient = createLineClient(
   process.env.LINE_CHANNEL_SECRET_DROPPOINT
 );
 
-const getPawnerStatusUrl = (contractId: string) => {
-  const liffId = process.env.NEXT_PUBLIC_LIFF_ID_PAWNER_DELIVERY || '2008216710-690r5uXQ';
-  return `https://liff.line.me/${liffId}?contractId=${encodeURIComponent(contractId)}`;
-};
-
 const getDropPointUrl = (deliveryRequestId: string) => {
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_PICKUP || '2008651088-cx00A4cZ';
   return `https://liff.line.me/${liffId}?deliveryRequestId=${encodeURIComponent(deliveryRequestId)}`;
@@ -154,12 +149,11 @@ const buildDropPointPickupCard = (payload: {
 const buildPawnerStatusCard = (payload: {
   contractNumber: string;
   itemName: string;
-  statusUrl: string;
 }) => {
-  const { contractNumber, itemName, statusUrl } = payload;
+  const { contractNumber, itemName } = payload;
   return {
     type: 'flex',
-    altText: 'ติดตามสถานะการเข้ารับสินค้า',
+    altText: 'แจ้งการเข้ารับสินค้า',
     contents: {
       type: 'bubble',
       header: {
@@ -221,23 +215,6 @@ const buildPawnerStatusCard = (payload: {
               { type: 'text', text: 'สินค้า:', size: 'sm', color: '#666666', flex: 2 },
               { type: 'text', text: itemName || '-', size: 'sm', color: '#333333', weight: 'bold', flex: 5, wrap: true },
             ],
-          },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'sm',
-        contents: [
-          {
-            type: 'button',
-            action: {
-              type: 'uri',
-              label: 'ดูสถานะการเข้ารับ',
-              uri: statusUrl,
-            },
-            style: 'primary',
-            color: '#C0562F',
           },
         ],
       },
@@ -518,11 +495,9 @@ export async function POST(request: NextRequest) {
 
       if (pawnerLineClient) {
         try {
-          const statusUrl = getPawnerStatusUrl(contract.contract_id);
           const card = buildPawnerStatusCard({
             contractNumber: contract.contract_number,
             itemName,
-            statusUrl,
           });
           await pawnerLineClient.pushMessage(lineId, card);
         } catch (msgError) {
