@@ -85,14 +85,14 @@ The entire web tier, networking, DNS, TLS, edge caching, and edge security are p
 ### 4.2 Compute model (Vercel Functions)
 
 - Every backend handler is a Next.js Route Handler compiled into a Vercel Function. Functions are stateless, autoscaling, and billed per invocation and duration.
-- Runtime: Node.js (the default for this application). One route pins `export const runtime = 'nodejs'` explicitly (the investor inbound webhook); the rest inherit the Node.js default. The application is not on the Edge runtime because it depends on Node-only libraries (MongoDB driver, AWS SDK, Puppeteer/Chromium, bcrypt).
+- Runtime: Node.js (the default for this application). One route pins `export const runtime = 'nodejs'` explicitly (the investor inbound webhook); the rest inherit the Node.js default. The application is not on the Edge runtime because it depends on Node-only libraries (MongoDB driver, Puppeteer/Chromium, bcrypt).
 - Execution time: latency-sensitive defaults apply, with `export const maxDuration = 60` set on the heavyweight handlers that perform headless-Chromium document rendering or multi-image vision and live web search:
   - the condition-analysis route (vision precheck + Gemini scoring)
   - the loan-ticket rendering route
   - the contract-image rendering route
 - Document and image rendering uses `puppeteer` with `@sparticuz/chromium`, a Chromium build packaged for the AWS Lambda/Vercel Function filesystem and memory constraints.
-- Region: Vercel Functions execute in a configured region. For this workload the data-adjacency target is Southeast Asia (Singapore, `sin1`) to minimize latency to Supabase, MongoDB Atlas, and SEA users; the S3 bucket is in Sydney (`ap-southeast-2`). Region selection should be validated against the actual Supabase and MongoDB Atlas regions to avoid cross-region round-trips on hot paths.
-- Cold starts: as with any serverless platform, infrequently invoked functions incur cold-start latency. Module-level singletons (the cached MongoDB client, the lazily constructed S3 client, the Redis client) are reused across warm invocations to amortize connection setup.
+- Region: Vercel Functions execute in a configured region. For this workload the data-adjacency target is Southeast Asia (Singapore, `sin1`) to minimize latency to Supabase, MongoDB Atlas, the connected Vercel Blob store, and SEA users. Region selection should be validated against the actual service regions to avoid cross-region round-trips on hot paths.
+- Cold starts: as with any serverless platform, infrequently invoked functions incur cold-start latency. Module-level database and Redis clients are reused across warm invocations to amortize connection setup; Vercel Blob uses stateless HTTP SDK calls.
 
 ### 4.3 Scheduled jobs (Vercel Cron)
 
@@ -109,7 +109,7 @@ Operational note: Vercel Cron invokes the configured path using an HTTP GET requ
 
 - Vercel KV (Upstash Redis): the estimate cache and per-image content-hash cache use Upstash Redis through the Vercel KV integration. The application reads the Vercel-KV-style credentials `KV_REST_API_URL`, `KV_REST_API_TOKEN`, and `KV_REST_API_READ_ONLY_TOKEN`. If these are absent, caching is silently skipped and the pipeline runs uncached.
 
-The primary databases (MongoDB Atlas, Supabase) and object storage (AWS S3) are external managed services reached over the network from Vercel Functions; they are not Vercel-hosted (see Section 6 and Section 7).
+The primary databases (MongoDB Atlas and Supabase) remain external managed services. Object storage is provided by a private Vercel Blob store connected to the project (see Section 6 and Section 7).
 
 ### 4.5 Domains, DNS, and TLS
 
@@ -164,7 +164,7 @@ The `/api/*` surface is grouped by domain: estimate, condition analysis, manual 
 - `lib/line/` — per-actor LINE clients, Flex message templates, admin push.
 - `lib/security/` — PIN authentication and session tokens, LINE and webhook signature verification.
 - `lib/services/` — pricing (`price-representative`), investor tiers, penalty engine, slip verification, geo distance, and the shared Anthropic client (`anthropic-llm`).
-- `lib/aws/s3.ts` — S3 upload and presigned URL generation.
+- `lib/storage/blob.ts` — private Vercel Blob uploads and time-limited signed URL generation.
 - `lib/utils/` — financial calculations, QR codes, item private notes.
 
 ---
@@ -183,7 +183,7 @@ All third-party systems are reached over the network from Vercel Functions. Inbo
 | SerpAPI | Outbound | Google Shopping Light price candidates | HTTPS `serpapi.com` | API key |
 | UPPASS | Outbound + inbound webhook | eKYC for borrowers and investors | HTTPS `app.uppass.io` | Bearer API key; inbound HMAC (`x-uppass-signature`) |
 | SlipOK | Outbound | Bank-slip verification (primary path when configured) | HTTPS `api.slipok.com` | `x-authorization` header |
-| AWS S3 | Outbound | Object storage for images, contracts, tickets, QR codes | AWS SDK, `piwp360` bucket, `ap-southeast-2` | IAM access key/secret; presigned URLs for read |
+| Vercel Blob | Outbound | Private object storage for images, contracts, tickets, QR codes | `@vercel/blob` | Project read/write token; operation- and pathname-scoped signed URLs for read |
 | MongoDB Atlas | Outbound | Primary OLTP store | MongoDB wire protocol (TLS) | SRV connection string |
 | Supabase (PostgreSQL) | Outbound | Investor/finance/logistics store | HTTPS PostgREST / supabase-js | Service-role JWT |
 | Upstash Redis (Vercel KV) | Outbound | Estimate and image-hash cache | HTTPS REST | KV REST token |
@@ -226,9 +226,9 @@ The split is not a clean "customer = MongoDB / investor = Supabase" line. Borrow
 
 The estimate pipeline caches whole responses under `estimate:global:v1:<hash>` and image content hashes under `estimate:image-hash:v1:<hash>`. Keys are versioned; the cache key payload is derived from normalized request fields and sorted image content hashes (not URLs). Default TTL is thirty days, configurable by environment.
 
-### 7.5 Object storage (AWS S3)
+### 7.5 Object storage (Vercel Blob)
 
-Bucket `piwp360`, prefix `cont360/`, region `ap-southeast-2`. Stores item images, verification photos, contract HTML/PDF, loan-ticket assets, and QR codes. Objects are private; read access is granted through presigned URLs. Uploads occur via `POST /api/upload` (multipart, image/PDF allowlist, 10 MB limit) and direct server-side puts. Stored URLs are persisted on the relevant database records.
+The connected private Blob store keeps item images, verification photos, contract HTML/PDF, loan-ticket assets, slips, and QR codes. Existing logical prefixes such as `cont360/`, `pawn-items/`, `contracts/`, and `slips/` are preserved. Uploads occur via `POST /api/upload` (multipart, image/PDF allowlist, 10 MB application limit) and direct server-side puts. Reads use time-limited URLs scoped to one pathname and the `get` operation; the bank QR is streamed through a dedicated server route.
 
 ### 7.6 Data classification
 
@@ -332,7 +332,7 @@ Signature verification is enforced per integration and is intentionally document
 ### 10.3 Data-tier protection
 
 - All Supabase access uses the service-role key server-side. The anonymous key is not used by any code path; Row-Level Security is enabled on all tables as a backstop. Because service role bypasses RLS, the real authorization boundary is the API layer (PIN tokens and signature checks), with RLS as a secondary control against credential leakage.
-- S3 objects are private and exposed only through time-limited presigned URLs.
+- Blob objects are private and exposed through time-limited, pathname-scoped signed URLs or a dedicated server-side read route.
 
 ### 10.4 Secrets management
 
@@ -350,7 +350,7 @@ The platform processes Thai PDPA-relevant personal and financial data (national 
 - Resilience to provider rate limits is built into the LLM clients via multi-key rotation and graceful degradation (the pricing pipeline falls back to a minimum price; slip verification falls back to UNREADABLE rather than failing hard).
 - The estimate cache reduces both latency and LLM spend; cache keys are content-addressed by normalized inputs and image hashes.
 - Idempotency: the customer webhook maintains an in-memory event-deduplication cache; the ticket queue bounds retries (failed after three attempts).
-- Connection management: the MongoDB client, S3 client, and Redis client are module-level singletons reused across warm invocations to limit connection churn against managed databases.
+- Connection management: the MongoDB and Redis clients are module-level singletons reused across warm invocations; Vercel Blob access is stateless over HTTPS.
 - Cost and latency on the AI path are managed by model tiering (Sonnet for text reasoning, Haiku for high-volume vision) and by the cache.
 
 ---
@@ -386,7 +386,7 @@ Replace, or progressively displace, the third-party condition-scoring pipeline (
 
 The platform already generates the exact supervision signal required:
 
-- Inputs: item photographs uploaded during the estimate and condition flows (stored in S3).
+- Inputs: item photographs uploaded during the estimate and condition flows (stored in Vercel Blob).
 - Weak labels: the current AI condition scores and rubric sub-scores produced by the existing pipeline.
 - Strong labels (ground truth): drop-point physical verification records. When a drop point inspects an item it records the six boolean attribute checks, an operator-assessed condition, and verification photographs. These human-verified, in-hand assessments are the gold standard against which the model is trained and evaluated.
 - Outcome labels: downstream contract outcomes (redeemed versus defaulted/sold, realized resale value) provide an economic signal for calibrating condition to value.
@@ -412,7 +412,7 @@ A staged approach uses track 1 in production for scoring and track 2 for auditin
 
 GPU training and inference do not run on Vercel (Vercel Functions provide no GPUs). The recommended topology keeps Vercel as the product and orchestration front end and places ML compute on a dedicated GPU platform:
 
-- Data pipeline: extract images and labels from S3 and Supabase into a versioned dataset (for example DVC or LakeFS), with PDPA-aware redaction (mask serial numbers and any bystander/PII content) and a documented dataset sheet.
+- Data pipeline: extract images and labels from Vercel Blob and Supabase into a versioned dataset (for example DVC or LakeFS), with PDPA-aware redaction (mask serial numbers and any bystander/PII content) and a documented dataset sheet.
 - Labeling and curation: an operator review tool for confirming and correcting labels; active-learning queues prioritized by model-operator disagreement.
 - Training: a managed GPU environment (for example Modal, RunPod, Lambda, or AWS SageMaker), with experiment tracking (Weights and Biases or MLflow), reproducible training configs, and scheduled retraining.
 - Model registry: versioned artifacts with model cards (intended use, metrics, limitations, fairness across item categories).
@@ -441,7 +441,7 @@ In the target state, Vercel continues to host the entire product surface (LIFF a
 
 - Platform/runtime: `VERCEL_URL`, `NEXT_PUBLIC_BASE_URL`, `NEXT_PUBLIC_DOMAIN`, `CRON_SECRET`.
 - Datastores: `MONGODB_URI`, `MONGODB_DB`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN`.
-- Object storage: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET`, `AWS_S3_FOLDER`.
+- Object storage: `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID`, `BLOB_WEBHOOK_PUBLIC_KEY`.
 - LINE (customer): `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `CHANNEL_ACCESS_TOKEN`, `CHANNEL_SECRET`, `NEXT_PUBLIC_LIFF_ID*`, `RICH_MENU_ID_MEMBER`.
 - LINE (admin): `LINE_ADMIN_CHANNEL_ACCESS_TOKEN`, `LINE_ADMIN_CHANNEL_SECRET`, `LINE_ADMIN_TARGET_IDS`.
 - LINE (store): `LINE_STORE_CHANNEL_ACCESS_TOKEN`, `LINE_STORE_CHANNEL_SECRET`.

@@ -304,7 +304,7 @@ export default function PrincipalIncreasePage() {
     setError(null);
 
     try {
-      // Upload signature to S3
+      // Upload signature to Vercel Blob
       const signatureBlob = await fetch(signature).then(r => r.blob());
       const formData = new FormData();
       formData.append('file', signatureBlob, 'signature.png');

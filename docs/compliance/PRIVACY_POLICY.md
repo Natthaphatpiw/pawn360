@@ -37,8 +37,8 @@ We collect the categories of personal data below. **Data subjects** are borrower
 | Name, phone number, address | General personal data | Supabase / MongoDB |
 | National ID number + ID-card image | General but **elevated-risk** (subject of open PDPC consultation; treated with heightened care) | Number in Supabase; ID-card **images held by UPPASS** (our eKYC vendor), not on Astly storage |
 | eKYC face-match / liveness data (biometric) | **SENSITIVE - biometric, Sec 26** (requires explicit consent) | Held by **UPPASS** vendor only; **not stored on Astly** systems (data minimization) |
-| Bank-transfer slips, bank account, loan / financial records | General (financial) | Slips in AWS S3; records in Supabase / MongoDB |
-| Item photographs | General (may incidentally contain identifiers) | AWS S3 |
+| Bank-transfer slips, bank account, loan / financial records | General (financial) | Slips in Vercel Blob; records in Supabase / MongoDB |
+| Item photographs | General (may incidentally contain identifiers) | Vercel Blob |
 | Contracts, transactions, custody records, notifications | General | MongoDB / Supabase |
 | PIN hash + session token | Authentication data (PIN is **one-way hashed**, never stored in clear text) | Supabase (`user_security`) |
 | Derived cache (normalized inputs, image content hashes) | Derived, low sensitivity | Upstash |
@@ -79,7 +79,7 @@ We do not sell your personal data. We share it only with service providers (proc
 | Vercel | Application hosting, compute and logs | US-default (configurable) |
 | Supabase | Primary database | AWS region (to confirm) |
 | MongoDB Atlas | Operational database | AWS region (to confirm) |
-| AWS S3 | Object storage (item photos, bank slips, contracts) | ap-southeast-2 (Sydney) |
+| Vercel Blob | Object storage (item photos, bank slips, contracts) | Configured Blob store region (confirm) |
 | Upstash | Cache | AWS region |
 | Payment PSP (planned) | Funds collection and routing | TH / SE Asia |
 
@@ -105,7 +105,7 @@ We keep personal data only for as long as we need it for the purposes above, or 
 |---|---|
 | KYC records and loan / financial records | Retained **at least 5 years** to meet the AML (AMLA) obligation, then deleted or anonymized |
 | Biometric / liveness (at vendor) | Held by the eKYC vendor for the **shortest viable window** |
-| S3 media (item photos, slips, contracts) | Managed under an object-storage **lifecycle policy** |
+| Blob media (item photos, slips, contracts) | Managed under a scheduled object-storage **retention/deletion policy** |
 | Derived cache | Time-to-live of approximately **30 days** |
 | Marketing data | Deleted on **withdrawal of consent** |
 
@@ -118,7 +118,7 @@ We apply technical and organizational safeguards appropriate to the risk. In sum
 - **In transit:** TLS 1.3 at the edge, and TLS to every datastore and API.
 - **At rest:** AES-256 encryption across all data stores.
 - **Authentication:** PINs are hashed with bcrypt (cost 10); sessions use opaque, short-lived tokens.
-- **Access:** databases are not publicly reachable and are accessed only through server-side privileged access; object storage is private and served via time-limited presigned URLs.
+- **Access:** databases are not publicly reachable and are accessed only through server-side privileged access; object storage is private and served via time-limited signed URLs.
 - **Data minimization:** the highest-risk biometric data is minimized by holding it at the eKYC vendor rather than on Astly systems.
 
 Fuller detail is in `../../DATA_SECURITY.md`.

@@ -149,7 +149,7 @@ ALTER TABLE pawners ADD COLUMN IF NOT EXISTS signature_url TEXT;
 COMMENT ON COLUMN pawners.ekyc_url IS 'UpPass eKYC URL for user to complete verification';
 COMMENT ON COLUMN investors.ekyc_url IS 'UpPass eKYC URL for user to complete verification';
 COMMENT ON COLUMN items.line_id IS 'LINE user ID for draft items before registration';
-COMMENT ON COLUMN contracts.contract_file_url IS 'AWS S3 URL of generated pawn ticket image (auto-generated when status=CONFIRMED)';
+COMMENT ON COLUMN contracts.contract_file_url IS 'Vercel Blob signed URL of generated pawn ticket image (auto-generated when status=CONFIRMED)';
 COMMENT ON COLUMN pawners.signature_url IS 'URL of pawner signature image';
 
 -- =====================================================

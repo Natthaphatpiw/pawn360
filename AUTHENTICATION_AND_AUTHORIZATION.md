@@ -33,7 +33,7 @@ Astly uses a custom, lightweight authentication and authorization design rather 
 | Step-up authentication | Six-digit PIN (bcrypt) + opaque server session token | Re-authenticates the user for sensitive, money-moving mutations |
 | Authorization | `requirePinToken` server gate + per-route application checks + actor segmentation | Decides what an authenticated actor may do |
 | Machine-to-machine | HMAC webhook signatures + cron bearer secret | Authenticates inbound callbacks from LINE, the Shop System, UPPASS, and scheduled jobs |
-| Data tier | Supabase service-role, MongoDB connection credential, S3 IAM + presigned URLs | Authorizes backend access to data stores |
+| Data tier | Supabase service-role, MongoDB connection credential, Vercel Blob read/write token + signed URLs | Authorizes backend access to data stores |
 
 Key design facts: there is no password database (identity is delegated to LINE); sensitive actions require a PIN re-auth with a deliberately short 2-minute token; and all database access is server-side with privileged credentials, which makes the API layer - not database row-level security - the true authorization boundary. The honest implications of that design are detailed in Sections 8 and 9.
 
@@ -128,7 +128,7 @@ Beyond the PIN gate, route handlers enforce identity- and ownership-based author
 
 - Supabase: all access uses the service-role key from server-side functions (`lib/supabase/client.ts` exports only `supabaseAdmin()`); there is no anonymous client (it was removed and is referenced nowhere; 73 files import only `supabaseAdmin`). Because the service role bypasses Row-Level Security, RLS is not the enforcing boundary for application traffic - the per-route application code is. RLS, if enabled in the Supabase project, is a defense-in-depth backstop against use of the public anonymous key (which the app does not use). Note: the in-repo SQL migrations do not contain `ENABLE ROW LEVEL SECURITY` / `CREATE POLICY` statements, so the RLS posture lives in the Supabase dashboard and should be confirmed and version-controlled.
 - MongoDB: authorized solely by the credentials in `MONGODB_URI`; a single cached connection is shared across requests; there is no per-row/per-tenant authorization - application code is the only guard.
-- AWS S3: authorized by a static IAM access key; objects are private and served via presigned URLs. (The default presigned-URL lifetime in code is 7 days - a long window flagged in Section 8.)
+- Vercel Blob: authorized by the project read/write token; objects are private and served via operation- and pathname-scoped signed URLs. (The default signed-URL lifetime in code is 7 days - a long window flagged in Section 8.)
 
 The consistent theme: a small number of high-privilege backend credentials sit behind the trusted compute tier, and the correctness of per-route application checks is what enforces tenant isolation. This is a common and workable serverless pattern, but it concentrates responsibility in the application layer - which is why the hardening backlog emphasizes consistent server-side checks and tests.
 
@@ -192,7 +192,7 @@ Presented transparently. The architecture is sound; the items below are concrete
 | A8 | PIN lockout is fully bypassable via `/reset` using low-entropy identifiers (phone + national ID / drop-point code), with no rate limit or captcha on reset | Medium | Rate-limit reset, add additional factors, and consider OTP for recovery |
 | A9 | Open `/api/pin/status` enables enumeration of registered `(role, lineId)` users and their lock state; probing also materializes `user_security` rows | Medium | Rate-limit / authenticate status; avoid creating rows on probe |
 | A10 | PIN session token stored in plaintext in the DB column; `requirePinToken` uses non-constant-time `!==`; LINE HMAC comparisons not constant-time | Low-Medium | Hash stored tokens; use `crypto.timingSafeEqual` for all secret comparisons |
-| A11 | Default S3 presigned-URL lifetime is 7 days; URLs are not bound to a user identity | Medium | Shorten TTLs (minutes-hours) for sensitive media; scope access |
+| A11 | Default Blob signed-URL lifetime is 7 days; URLs are not bound to a user identity | Medium | Shorten TTLs (minutes-hours) for sensitive media; scope access |
 | A12 | Dev mock bypass is gated only by a `NEXT_PUBLIC_*` build-time flag (and a `?mock=1` query on drop-point pages) | Medium | Ensure mock flags are never set in production builds; add a runtime guard |
 | A13 | RLS not present in repo migrations; service-role-only access makes the API layer the sole authorization boundary | Medium | Version-control RLS policies as a backstop; add authz tests across all 73 Supabase routes |
 | A14 | Single high-privilege credential set per store, shared across all actors; no per-actor/per-request scoping | Medium | Scope credentials; rotate on a schedule; consider least-privilege per role |
@@ -208,10 +208,10 @@ Presented transparently. The architecture is sound; the items below are concrete
 | AA3 | Authorization concentrated in app layer (RLS not enforcing) | Medium-High | Hardening A13; authz test coverage |
 | AA4 | Recovery/lockout bypass via low-entropy identifiers | Medium | Hardening A8 |
 | AA5 | Unauthenticated cron/queue endpoint | Medium-High | Hardening A5 |
-| AA6 | Long-lived, identity-agnostic presigned URLs | Medium | Hardening A11 |
+| AA6 | Long-lived, identity-agnostic signed Blob URLs | Medium | Hardening A11 |
 | AA7 | Mock-auth backdoor if misconfigured in prod | Medium | Hardening A12 |
 
-DD checklist (data-room items): confirm production env has no `NEXT_PUBLIC_LIFF_MOCK`/`NEXT_PUBLIC_DROPPOINT_MOCK`; confirm `CRON_SECRET`, `WEBHOOK_SECRET`, and all LINE/UPPASS secrets are set (no fallbacks in effect); confirm Supabase RLS posture (and bring policies under version control); review the webhook-signature hardening status; confirm S3 presigned-URL TTLs; and review the per-route authorization test coverage.
+DD checklist (data-room items): confirm production env has no `NEXT_PUBLIC_LIFF_MOCK`/`NEXT_PUBLIC_DROPPOINT_MOCK`; confirm `CRON_SECRET`, `WEBHOOK_SECRET`, and all LINE/UPPASS secrets are set (no fallbacks in effect); confirm Supabase RLS posture (and bring policies under version control); review the webhook-signature hardening status; confirm Blob signed-URL TTLs; and review the per-route authorization test coverage.
 
 Framing for reviewers: the authentication and authorization design is coherent and uses appropriate primitives (delegated identity, bcrypt, short-lived opaque tokens, HMAC signatures, service-role isolation). The findings above are typical of a fast-moving pre-Series product and are individually low-effort to remediate; none requires re-architecture. Prioritizing A1-A5 (webhook enforcement, identity verification, and cron auth) closes the highest-impact gaps.
 
@@ -224,8 +224,8 @@ PIN-gated mutation routes (10): `contracts/create`, `contracts/request-action`, 
 Webhooks (8): `webhook`, `line/webhook`, `webhook-store`, `webhook-droppoint`, `webhooks/line-invest`, `webhooks/shop-notification`, `ekyc/webhook`, `webhooks/uppass-invest`.
 Crons (2): `contracts/process-ticket-queue`, `redemptions/auto-confirm-received`.
 
-Auth-relevant environment variables: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `MONGODB_URI`, `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, the per-actor LINE channel secrets/tokens, `UPPASS_WEBHOOK_SECRET`(`_INVEST`), `WEBHOOK_SECRET`, `CRON_SECRET`, and the mock flags `NEXT_PUBLIC_LIFF_MOCK` / `NEXT_PUBLIC_DROPPOINT_MOCK`.
+Auth-relevant environment variables: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `MONGODB_URI`, `BLOB_READ_WRITE_TOKEN`, the per-actor LINE channel secrets/tokens, `UPPASS_WEBHOOK_SECRET`(`_INVEST`), `WEBHOOK_SECRET`, `CRON_SECRET`, and the mock flags `NEXT_PUBLIC_LIFF_MOCK` / `NEXT_PUBLIC_DROPPOINT_MOCK`.
 
-Key source files: `lib/security/pin.ts`, `lib/security/pin-session.ts`, `lib/security/line.ts`, `lib/security/webhook.ts`, `lib/liff/liff-provider.tsx`, `lib/supabase/client.ts`, `lib/aws/s3.ts`, `lib/db/mongodb.ts`, `components/PinModal.tsx`, and the route handlers under `app/api/`.
+Key source files: `lib/security/pin.ts`, `lib/security/pin-session.ts`, `lib/security/line.ts`, `lib/security/webhook.ts`, `lib/liff/liff-provider.tsx`, `lib/supabase/client.ts`, `lib/storage/blob.ts`, `lib/db/mongodb.ts`, `components/PinModal.tsx`, and the route handlers under `app/api/`.
 
 All findings are verified against the code as of writing and should be re-checked after any auth-related change.

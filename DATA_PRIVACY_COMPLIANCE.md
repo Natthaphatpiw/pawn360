@@ -54,7 +54,7 @@ Companion documents: [`DATA_SECURITY.md`](DATA_SECURITY.md), [`AUTHENTICATION_AN
 | Vercel | Hosting / compute / logs | US-default (configurable) |
 | Supabase | Primary database | AWS region (confirm) |
 | MongoDB Atlas | Operational database | AWS region (confirm) |
-| AWS S3 | Object storage (photos, slips, contracts) | ap-southeast-2 (Sydney) |
+| Vercel Blob | Object storage (photos, slips, contracts) | Configured Blob store region (confirm) |
 | Upstash | Cache | AWS region |
 | Payment PSP (planned) | Funds collection/routing | TH/SE Asia |
 
@@ -71,8 +71,8 @@ PDPA distinguishes general personal data (Sec 24) from sensitive personal data (
 | Name, phone, address | General personal data | Supabase / MongoDB |
 | National ID number, ID-card image | General personal data (the Sec 26 sensitive list does not enumerate the ID number) - but elevated-risk and the subject of an open PDPC consultation; treat with heightened care (confirm) | Number in Supabase; ID images held by UPPASS |
 | eKYC face match / liveness (biometric) | SENSITIVE personal data (Sec 26 biometric) - requires EXPLICIT consent | Held by UPPASS (vendor) |
-| Bank-transfer slips, bank account, loan/financial records | General personal data (financial) | Slips in S3; records in Supabase / MongoDB |
-| Item photographs | General personal data (may incidentally contain identifiers) | AWS S3 |
+| Bank-transfer slips, bank account, loan/financial records | General personal data (financial) | Slips in Vercel Blob; records in Supabase / MongoDB |
+| Item photographs | General personal data (may incidentally contain identifiers) | Vercel Blob |
 | Contracts, transactions, custody, notifications | General personal data | MongoDB / Supabase |
 | PIN hash, session token | Authentication data (not the PIN itself - one-way hashed) | Supabase `user_security` |
 | Cache (normalized inputs, image hashes) | Derived; low sensitivity | Upstash |
@@ -106,7 +106,7 @@ Astly's processing follows the PDPA lifecycle; below is the flow and the control
 
 1. Collection (Sec 19, 23, 24, 26): a user authenticates via LINE; provides identity/contact and consents; uploads item photos; completes eKYC with UPPASS (biometric - explicit consent); uploads bank slips for payments. Obligation: a collection notice/privacy notice (Sec 23) must be presented at or before collection, and the correct lawful basis (consent for biometric) applied.
 2. Use / processing (Sec 27): identity verified; item valued by the AI pricing/condition pipeline; contracts formed; payments verified; redemptions and settlements processed. Use must stay within the notified purposes (purpose limitation, Sec 21).
-3. Storage (Sec 37): data stored encrypted across Supabase, MongoDB, S3, Upstash (Section 6), with access restricted to server-side privileged credentials.
+3. Storage (Sec 37): data stored encrypted across Supabase, MongoDB, Vercel Blob, and Upstash (Section 6), with access restricted to server-side privileged credentials.
 4. Disclosure / transfer (Sec 27, 28): personal data is disclosed to processors (eKYC, AI, PSP, cloud) - several of them outside Thailand, engaging cross-border-transfer rules (Section 8) and requiring DPAs (Section 9).
 5. Retention / deletion (Sec 37(3), 33): data retained per a defined schedule reconciled with the AML 5-year obligation, then deleted/anonymized; an end-of-retention deletion system is required (Section 11).
 
@@ -119,12 +119,12 @@ Is the data flow PDPA-aligned? The architecture supports a compliant flow - lawf
 Sec 37(1) requires appropriate security measures meeting the PDPC minimum standard. Astly's storage standards (full detail in `DATA_SECURITY.md`):
 
 - Encryption in transit: TLS on every hop (TLS 1.3 at the edge; TLS to every datastore and API).
-- Encryption at rest: AES-256 across all stores (Supabase, MongoDB Atlas - with optional BYOK, AWS S3 SSE-S3/optional SSE-KMS, Upstash, Vercel); secrets encrypted in Vercel.
+- Encryption at rest: AES-256 across the managed stores (including Vercel Blob; MongoDB Atlas offers optional BYOK); secrets encrypted in Vercel.
 - Authentication secrets: PINs one-way hashed (bcrypt cost 10); session tokens opaque and short-lived.
-- Access restriction: databases are not publicly reachable; access is server-side with privileged credentials; object storage is private with time-limited presigned URLs.
+- Access restriction: databases are not publicly reachable; access is server-side with privileged credentials; object storage is private with time-limited signed URLs.
 - Data minimization: the highest-risk biometric data is held by the eKYC vendor, not on Astly storage.
 
-Recommended to meet the PDPC minimum-security-standard notification explicitly: documented access-control policy, audit logging of access to personal data, field-level encryption/tokenization for national ID and bank-account numbers, tightened presigned-URL TTLs, and a periodic security review (these appear in the `DATA_SECURITY.md` hardening backlog).
+Recommended to meet the PDPC minimum-security-standard notification explicitly: documented access-control policy, audit logging of access to personal data, field-level encryption/tokenization for national ID and bank-account numbers, tightened Blob signed-URL TTLs, and a periodic security review (these appear in the `DATA_SECURITY.md` hardening backlog).
 
 ---
 
@@ -152,7 +152,7 @@ Summary: access is controlled by credential isolation (server-side only), applic
 
 ## 8. Cross-Border Data Transfer (Sec 28-29)
 
-Several processors are hosted outside Thailand (Anthropic, Google, OpenAI, Vercel, AWS, MongoDB Atlas, Upstash - largely US, with S3 in Sydney), engaging the cross-border rules.
+Several processors are hosted outside Thailand (Anthropic, Google, OpenAI, Vercel, MongoDB Atlas, and Upstash), engaging the cross-border rules. The configured region of the connected Blob store must be included in the production data-location register.
 
 - Sec 28 permits transfer to a foreign country only if it has adequate protection per PDPC criteria, except where one of the derogations applies: legal compliance; consent after being informed of inadequacy; contract necessity; contract in the data subject's interest; vital interest; or substantial public interest.
 - Sec 29 allows intra-group transfers under PDPC-certified binding-corporate-rules-style policies or suitable safeguards.
@@ -192,7 +192,7 @@ Astly must honor the full set of PDPA data-subject rights, generally within 30 d
 | Rectification | Sec 35-36 | Keep data accurate; correct on request |
 | Withdraw consent | Sec 19 | Allow withdrawal as easily as giving; then erase absent another basis |
 
-Implementation requirement: a documented data-subject-rights (DSR) intake and fulfilment workflow - including propagation of erasure/correction to S3 objects and to processors (notably the eKYC vendor) and the 30-day response clock - should be built and is a gap (Section 14). Note that legal-retention obligations (AML, Section 11) can lawfully override erasure for specific records.
+Implementation requirement: a documented data-subject-rights (DSR) intake and fulfilment workflow - including propagation of erasure/correction to Blob objects and to processors (notably the eKYC vendor) and the 30-day response clock - should be built and is a gap (Section 14). Note that legal-retention obligations (AML, Section 11) can lawfully override erasure for specific records.
 
 ---
 
@@ -204,11 +204,11 @@ PDPA requires data minimization and an end-of-retention deletion system; this mu
 |---|---|---|
 | KYC identity + records, loan/transaction/financial records | AMLA: at least 5 years from end of relationship/transaction | Retain 5 years, then delete/anonymize |
 | eKYC biometric (held by vendor) | PDPA minimization (sensitive) | Retain only as needed for verification; vendor deletion per DPA; shortest viable window |
-| Bank slips, item photos (S3) | Operational + dispute window | Define an S3 lifecycle policy; delete/anonymize after the window |
+| Bank slips, item photos (Vercel Blob) | Operational + dispute window | Define scheduled deletion; delete/anonymize after the window |
 | Cache (Upstash) | Operational | TTL-bounded (already ~30 days) |
 | Marketing data | Consent | Delete on withdrawal |
 
-Status: a documented retention schedule and an automated deletion/anonymization mechanism (S3 lifecycle rules, scheduled purges, DSR-driven deletion) should be implemented (gap, Section 14).
+Status: a documented retention schedule and an automated deletion/anonymization mechanism (scheduled Blob purges and DSR-driven deletion) should be implemented (gap, Section 14).
 
 ---
 
@@ -249,7 +249,7 @@ A transparent status of PDPA readiness. "In place" reflects the implemented syst
 | DPAs with all processors (Sec 40) | Required | Execute and file each |
 | Cross-border transfer basis (Sec 28-29) | Required | Document basis + safeguards; co-locate DBs in region |
 | Data-subject-rights workflow (Sec 30-36) | Required | Build DSR intake + 30-day fulfilment |
-| Retention schedule + deletion system (Sec 37(3)) | Required | Define + automate (S3 lifecycle, purges) |
+| Retention schedule + deletion system (Sec 37(3)) | Required | Define + automate (Blob purges) |
 | Breach-notification runbook (Sec 37(4)) | Required | 72-hour PDPC + high-risk subject process |
 | Internal people-access policy + logging | Partial | Formalize least-privilege + audit logs |
 | Field-level encryption for national ID / bank account | Recommended | Defense in depth (DATA_SECURITY H3) |
@@ -274,7 +274,7 @@ Overall posture: technically strong foundations (encryption, access control, min
 | P2 | DPAs not executed with all processors | High | Execute/file DPAs (Sec 40) |
 | P3 | Cross-border transfer basis not documented for US processors | High | Document Sec 28 basis + safeguards; co-locate DBs in region |
 | P4 | No RoPA / no appointed DPO | Medium-High | Create RoPA; appoint DPO (Sec 39, 41) |
-| P5 | No DSR fulfilment workflow / 30-day clock | Medium | Build DSR intake + propagation to S3/processors |
+| P5 | No DSR fulfilment workflow / 30-day clock | Medium | Build DSR intake + propagation to Blob/processors |
 | P6 | No documented retention schedule / deletion system | Medium | Define + automate; reconcile with AMLA 5-year |
 | P7 | No breach-notification runbook (72-hour) | Medium-High | Build incident + notification process |
 | P8 | Privacy notice not PDPA-grade | Medium | Publish Sec 23 notice |

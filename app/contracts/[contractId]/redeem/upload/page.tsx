@@ -100,7 +100,7 @@ export default function RedemptionUploadPage() {
     setUploading(true);
 
     try {
-      // Upload slip to S3
+      // Upload slip to Vercel Blob
       const formData = new FormData();
       formData.append('file', slipFile);
       formData.append('folder', 'redemption-slips');

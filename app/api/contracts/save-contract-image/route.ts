@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
-import { getS3Client } from '@/lib/aws/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { putPrivateBlob } from '@/lib/storage/blob';
 import { ObjectId } from 'mongodb';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 
-const BUCKET_NAME = 'piwp360';
 const CONTRACTS_FOLDER = 'contracts/';
 
 // Configure route for larger payloads
@@ -98,7 +96,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Item found, proceeding with S3 upload');
+    console.log('Item found, proceeding with Vercel Blob upload');
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -107,22 +105,13 @@ export async function POST(request: NextRequest) {
 
     console.log('Generated filenames:', { contractFilename, photoFilename });
 
-    // Check AWS credentials
-    console.log('Checking AWS credentials...');
-    console.log('AWS_ACCESS_KEY_ID:', process.env.AWS_ACCESS_KEY_ID ? '***' + process.env.AWS_ACCESS_KEY_ID.slice(-4) : 'NOT SET');
-    console.log('AWS_SECRET_ACCESS_KEY:', process.env.AWS_SECRET_ACCESS_KEY ? '***SET***' : 'NOT SET');
-    console.log('AWS_REGION:', process.env.AWS_REGION || 'ap-southeast-2 (default)');
-
-    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-      console.error('AWS credentials not set in environment variables');
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('BLOB_READ_WRITE_TOKEN is not set');
       return NextResponse.json(
-        { error: 'ระบบยังไม่ได้ตั้งค่า AWS credentials ใน Vercel กรุณาติดต่อผู้ดูแลระบบเพื่อตั้งค่า AWS_ACCESS_KEY_ID และ AWS_SECRET_ACCESS_KEY' },
+        { error: 'ระบบยังไม่ได้ตั้งค่า Vercel Blob กรุณาติดต่อผู้ดูแลระบบ' },
         { status: 500 }
       );
     }
-
-    const s3Client = getS3Client();
-    console.log('S3 client initialized, bucket:', BUCKET_NAME);
 
     let contractUploadResult = null;
     let photoUploadResult = null;
@@ -131,7 +120,7 @@ export async function POST(request: NextRequest) {
     if (contractHTML) {
       console.log('Generating contract document...');
       try {
-        let documentBuffer: Buffer | Uint8Array;
+        let documentBuffer: Buffer;
         let filename: string;
         let contentType: string;
 
@@ -165,7 +154,7 @@ export async function POST(request: NextRequest) {
 
           await browser.close();
 
-          documentBuffer = pdfBuffer;
+          documentBuffer = Buffer.from(pdfBuffer);
           filename = `contract-${itemId}-${timestamp}.pdf`;
           contentType = 'application/pdf';
           console.log('PDF generated successfully, size:', pdfBuffer.length);
@@ -182,15 +171,11 @@ export async function POST(request: NextRequest) {
           console.log('Falling back to HTML file, size:', htmlBuffer.length);
         }
 
-        // Upload document to S3
-        const uploadParams = {
-          Bucket: BUCKET_NAME,
-          Key: `${CONTRACTS_FOLDER}${filename}`,
-          Body: documentBuffer,
-          ContentType: contentType
-        };
-
-        await s3Client.send(new PutObjectCommand(uploadParams));
+        await putPrivateBlob(
+          `${CONTRACTS_FOLDER}${filename}`,
+          documentBuffer,
+          contentType,
+        );
         contractUploadResult = filename;
         console.log('Contract document uploaded successfully as', contentType);
 
@@ -201,7 +186,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Upload verification photo to S3 if provided
+    // Upload verification photo to Vercel Blob if provided
     if (verificationPhoto) {
       console.log('Uploading verification photo...');
       try {
@@ -227,14 +212,11 @@ export async function POST(request: NextRequest) {
           throw new Error('Empty photo buffer');
         }
 
-        const photoUploadParams = {
-          Bucket: BUCKET_NAME,
-          Key: `${CONTRACTS_FOLDER}${photoFilename}`,
-          Body: photoBuffer,
-          ContentType: 'image/jpeg'
-        };
-
-        await s3Client.send(new PutObjectCommand(photoUploadParams));
+        await putPrivateBlob(
+          `${CONTRACTS_FOLDER}${photoFilename}`,
+          photoBuffer,
+          'image/jpeg',
+        );
         photoUploadResult = photoFilename;
         console.log('Verification photo uploaded successfully');
       } catch (error) {

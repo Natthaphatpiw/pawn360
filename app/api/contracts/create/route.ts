@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { uploadSignatureToS3 } from '@/lib/aws/s3';
+import { uploadSignatureToBlob } from '@/lib/storage/blob';
 import { Client, FlexMessage } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
 import { getInvestorRateForTier, resolveInvestorTier } from '@/lib/services/investor-tier';
@@ -70,15 +70,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Generate contract number and upload signature to S3
+    // 2. Generate contract number and upload signature to Vercel Blob
     const contractNumber = `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
     let signedContractUrl = null;
 
     try {
-      signedContractUrl = await uploadSignatureToS3(contractNumber, signature);
-      console.log('Signature uploaded to S3:', signedContractUrl);
-    } catch (s3Error) {
-      console.error('Failed to upload signature to S3:', s3Error);
+      signedContractUrl = await uploadSignatureToBlob(contractNumber, signature);
+      console.log('Signature uploaded to Vercel Blob');
+    } catch (blobError) {
+      console.error('Failed to upload signature to Vercel Blob:', blobError);
       // Continue without signature URL for now
     }
 

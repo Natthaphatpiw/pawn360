@@ -35,7 +35,7 @@ Uses OpenAI GPT-4o-mini with three-agent system:
 
 ### 5. QR Code Generation
 - Creates pawn requests with QR codes
-- Stores QR codes in AWS S3
+- Stores QR codes in a private Vercel Blob store
 - Sends QR codes to LINE chat
 
 ## Database Models Updated
@@ -74,9 +74,9 @@ AI-powered price estimation
 - Output: Estimated price, condition score, confidence
 
 ### `/api/upload/image` (POST)
-Image upload to AWS S3
+Image upload to Vercel Blob
 - Input: Image file
-- Output: S3 URL
+- Output: time-limited signed Blob URL
 
 ### `/api/stores` (GET)
 Fetch available stores
@@ -92,10 +92,10 @@ Create pawn requests with QR codes
 # OpenAI
 OPENAI_API_KEY=your_openai_api_key
 
-# AWS S3
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=ap-southeast-2
+# Vercel Blob (private store)
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_token_here
+BLOB_STORE_ID=store_your_store_id_here
+BLOB_WEBHOOK_PUBLIC_KEY=your_blob_webhook_public_key_here
 
 # MongoDB
 MONGODB_URI=mongodb+srv://...
@@ -140,4 +140,4 @@ app/
 2. Deploy to production
 3. Test LINE LIFF integration
 4. Add stores to database
-5. Configure AWS S3 bucket permissions
+5. Connect a private Vercel Blob store and configure its environment variables

@@ -125,7 +125,7 @@ https://pawn360.vercel.app/api/webhook-droppoint
    - ดึง contracts ที่รออยู่ใน queue
    - ส่ง LINE message พร้อม link ไปยัง Pawner และ Investor
    - Pawner/Investor คลิก link เพื่อดูและบันทึกตั๋วจำนำ
-   - เมื่อบันทึก รูปจะถูกอัปโหลดไป AWS S3 อัตโนมัติ
+   - เมื่อบันทึก รูปจะถูกอัปโหลดไป Vercel Blob อัตโนมัติ
 
 ### API Endpoints
 - **Process Queue**: `POST /api/contracts/process-ticket-queue`
@@ -154,12 +154,10 @@ LINE_CHANNEL_SECRET_DROPPOINT=your-secret-here
 # LIFF IDs
 NEXT_PUBLIC_LIFF_ID_INVESTOR_OFFERS=2008641671-nPVX9OM2
 
-# AWS S3
-AWS_ACCESS_KEY_ID=your-aws-access-key-id-here
-AWS_SECRET_ACCESS_KEY=your-aws-secret-access-key-here
-AWS_REGION=ap-southeast-2
-AWS_S3_BUCKET=piwp360
-AWS_S3_FOLDER=cont360/
+# Vercel Blob (private store)
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_token_here
+BLOB_STORE_ID=store_your_store_id_here
+BLOB_WEBHOOK_PUBLIC_KEY=your_blob_webhook_public_key_here
 
 # Base URL
 NEXT_PUBLIC_BASE_URL=https://pawn360.vercel.app

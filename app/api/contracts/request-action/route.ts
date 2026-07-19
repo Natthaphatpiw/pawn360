@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { Client, ClientConfig } from '@line/bot-sdk';
 import { ObjectId } from 'mongodb';
-import { getS3Client } from '@/lib/aws/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { putPrivateBlob } from '@/lib/storage/blob';
 import { requirePinToken } from '@/lib/security/pin';
 
 // Lazy initialization of LINE client
@@ -28,22 +27,12 @@ function getStoreClient(): Client {
   return storeClient;
 }
 
-// Function to upload slip to S3
-async function uploadSlipToS3(slipBuffer: Buffer, contractId: string, actionType: string): Promise<string | null> {
+async function uploadSlipToBlob(slipBuffer: Buffer, contractId: string, actionType: string): Promise<string | null> {
   try {
     const timestamp = Date.now();
     const filename = `slip-${contractId}-${actionType}-${timestamp}.jpg`;
-    const s3Client = getS3Client();
-
-    const uploadParams = {
-      Bucket: 'piwp360',
-      Key: `slips/${filename}`,
-      Body: slipBuffer,
-      ContentType: 'image/jpeg'
-    };
-
-    await s3Client.send(new PutObjectCommand(uploadParams));
-    return `https://piwp360.s3.ap-southeast-2.amazonaws.com/slips/${filename}`;
+    const blob = await putPrivateBlob(`slips/${filename}`, slipBuffer, 'image/jpeg');
+    return blob.signedUrl;
   } catch (error) {
     console.error('Failed to upload slip:', error);
     return null;
@@ -408,11 +397,11 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Upload slip to S3 if provided
+    // Upload slip to Vercel Blob if provided
     let slipUrl = null;
     if (slipFile) {
       const slipBuffer = Buffer.from(await slipFile.arrayBuffer());
-      slipUrl = await uploadSlipToS3(slipBuffer, contractId, actionType);
+      slipUrl = await uploadSlipToBlob(slipBuffer, contractId, actionType);
     }
 
     // Create transaction record

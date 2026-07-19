@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { refreshImageUrls } from '@/lib/aws/s3';
+import { refreshBlobUrls } from '@/lib/storage/blob';
 
 const ALLOWED_DETAIL_STATUSES = new Set(['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT', 'COMPLETED']);
 
@@ -123,11 +123,11 @@ export async function GET(
       const itemPayload = Array.isArray(contractPayload.items)
         ? await Promise.all(contractPayload.items.map(async (item: any) => ({
             ...item,
-            image_urls: await refreshImageUrls(item?.image_urls),
+            image_urls: await refreshBlobUrls(item?.image_urls),
           })))
         : {
             ...contractPayload.items,
-            image_urls: await refreshImageUrls(contractPayload.items?.image_urls),
+            image_urls: await refreshBlobUrls(contractPayload.items?.image_urls),
           };
 
       contractPayload = {
@@ -136,7 +136,7 @@ export async function GET(
       };
     }
 
-    const refreshedReturnPhotos = await refreshImageUrls(
+    const refreshedReturnPhotos = await refreshBlobUrls(
       Array.isArray(redemption.drop_point_return_photos) ? redemption.drop_point_return_photos : []
     );
 

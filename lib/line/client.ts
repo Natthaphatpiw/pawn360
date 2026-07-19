@@ -241,7 +241,7 @@ export async function sendNegotiationMessage(
 // Send Push Message with QR Code
 export async function sendQRCodeImage(userId: string, itemId: string, s3Url: string) {
   try {
-    // ส่ง Flex Message พร้อมรูป QR Code จาก S3
+    // ส่ง Flex Message พร้อมรูป QR Code จาก Vercel Blob
     const client = getLineClient();
     await client.pushMessage(userId, {
       type: 'flex',

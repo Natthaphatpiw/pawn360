@@ -16,7 +16,7 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) (applica
 4. Scaling Model
 5. Primary Database - Supabase PostgreSQL (Pro)
 6. Operational Database - MongoDB Atlas
-7. Object Storage - AWS S3
+7. Object Storage - Vercel Blob
 8. Cache - Upstash Redis (via Vercel KV / Marketplace)
 9. Third-Party API and Identity Providers (and AI data-handling posture)
 10. Regions and Data Residency
@@ -38,7 +38,7 @@ Astly is a fully serverless, managed-cloud platform. The team operates no virtua
 | Web hosting, edge, compute | Vercel | Pro | Edge network (CDN, TLS, WAF, DDoS), serverless Functions, cron, CI/CD | AWS (Vercel-managed, ~20 regions) |
 | Primary relational DB | Supabase (PostgreSQL) | Pro | Investor / finance / logistics system of record, RLS, Auth-capable | AWS |
 | Operational document DB | MongoDB Atlas | Dedicated (ACCOUNT-SPECIFIC - confirm M10+) | Customer-facing operational store | AWS |
-| Object storage | AWS S3 | Standard | Item photos, bank slips, contracts, tickets, QR | AWS ap-southeast-2 (Sydney) |
+| Object storage | Vercel Blob | Private store | Item photos, bank slips, contracts, tickets, QR | Configured Blob store region (confirm) |
 | Cache | Upstash Redis (via Vercel KV / Marketplace) | Pay-as-you-go / Fixed (confirm) | Estimate and image-hash cache | AWS |
 | Messaging / channel | LINE (Messaging API + LIFF) | Official Accounts | Customer/investor/drop-point/store channels and mini-app auth | LINE Corp |
 | AI - text | Anthropic Claude | Commercial API | Pricing normalization, search filtering, web-search pricing | Anthropic |
@@ -74,7 +74,7 @@ All backend handlers are Next.js Route Handlers compiled to Vercel Functions on 
 - Execution duration: Pro default 300 s, maximum 800 s (generally available), extended maximum 1800 s (30 min, beta, per-function configuration). The application sets `maxDuration = 60` on its three heaviest handlers (condition analysis, loan-ticket rendering, contract-image rendering) which perform headless-Chromium document rendering or multi-image vision plus live web search.
 - Memory / CPU: Pro can configure up to 4 GB memory / 2 vCPU (default 2 GB / 1 vCPU).
 - Concurrency / auto-scaling: functions auto-scale up to 30,000 concurrent executions on Pro, with no provisioning required.
-- Payload limit: request/response body max 4.5 MB (the app independently caps uploads at 10 MB and routes large media through S3, not function bodies).
+- Payload limit: request/response body max 4.5 MB. The app currently permits up to 10 MB in its server-upload handlers, so uploads above the platform limit must move to Vercel Blob client uploads.
 - Runtime selection: the app uses Node.js (not the Edge runtime) because it depends on the MongoDB driver, AWS SDK, Puppeteer/Chromium, and bcrypt, which are Node-only.
 
 ### 2.3 Build and deployment pipeline (CI/CD)
@@ -117,7 +117,7 @@ There is no Cloudflare or external WAF; Vercel's platform provides this layer (s
   - Edge routing is anycast: each client is served by the nearest point of presence.
   - Function fan-out is automatic horizontal autoscaling (up to 30,000 concurrent on Pro); Vercel allocates instances on demand and prefers idle instances before spinning up new ones (Fluid compute).
   - Failover: Vercel uses AWS Global Accelerator plus anycast to reroute traffic away from a failed region to the nearest healthy edge automatically; Fluid compute additionally provides cross-availability-zone failover within a region. (Source: vercel.com/docs/security/compliance.)
-- Outbound egress: functions reach managed services (Supabase, MongoDB Atlas, S3, Upstash, and all third-party APIs) over the public internet using TLS. The platform does not currently use Vercel Secure Compute / Static IPs (an Enterprise capability, or a USD 100/month/project Pro add-on) - meaning outbound calls do not originate from a fixed, allow-listable IP range. If any downstream provider requires IP allow-listing, that add-on (or Enterprise) would be required (Section 15).
+- Outbound egress: functions reach managed services (Supabase, MongoDB Atlas, Vercel Blob, Upstash, and all third-party APIs) using TLS. The platform does not currently use Vercel Secure Compute / Static IPs (an Enterprise capability, or a USD 100/month/project Pro add-on) - meaning outbound calls do not originate from a fixed, allow-listable IP range. If any downstream provider requires IP allow-listing, that add-on (or Enterprise) would be required (Section 15).
 
 ---
 
@@ -186,14 +186,14 @@ MongoDB Atlas hosts the customer-facing operational store (customers, items with
 
 ---
 
-## 7. Object Storage - AWS S3
+## 7. Object Storage - Vercel Blob
 
-S3 stores item photos, verification photos, bank slips, contract HTML/PDF, loan-ticket assets, and QR codes. Objects are private and served via time-limited presigned URLs; uploads pass through a function (multipart, image/PDF allowlist, 10 MB cap) or direct server-side puts.
+Vercel Blob stores item photos, verification photos, bank slips, contract HTML/PDF, loan-ticket assets, and QR codes. The connected store is private; objects are served via time-limited signed URLs or dedicated server-side reads. Uploads pass through a function (multipart, image/PDF allowlist, 10 MB application cap) or direct server-side puts.
 
 - Bucket and region: `piwp360` in ap-southeast-2 (Sydney).
-- Durability and availability: S3 Standard is designed for 11 nines (99.999999999%) durability with redundancy across at least three Availability Zones; the contractual availability SLA is 99.9% monthly uptime (service credits from 10% up to 100% as uptime degrades). The design target (99.99%) differs from the SLA floor (99.9%); the 99.9% figure is the contractual guarantee.
-- Encryption: all new objects are encrypted at rest by default with SSE-S3 (AES-256). SSE-KMS (customer-controlled, CloudTrail-audited keys) and SSE-C are available; in transit via HTTPS/TLS. Whether SSE-KMS is configured is ACCOUNT-SPECIFIC - confirm.
-- Access control: governed by IAM and bucket policies with account-level Block Public Access; presigned URLs (SigV4, maximum 7-day validity, or shorter when signed with temporary credentials) are the access mechanism. The application controls the presigned-URL TTL in code; Versioning and Object Lock (WORM) availability for tamper/deletion protection should be confirmed.
+- Durability and availability: Vercel documents 11-nines durability and 99.99% availability for Blob, backed by its underlying object-storage infrastructure.
+- Encryption: Blob files are encrypted at rest with AES-256 and in transit via HTTPS/TLS; encryption keys are platform managed.
+- Access control: the store is private and accessed by the project read/write token. Read URLs are scoped to a single pathname and operation with a maximum seven-day validity; the application controls the TTL in code.
 
 ---
 
@@ -234,15 +234,15 @@ The stack currently spans more than one geography, which is relevant to both lat
 | Vercel Functions | Single configured region (default iad1 unless changed; ideal for this user base is Singapore sin1) | ACCOUNT-SPECIFIC - confirm |
 | Supabase (PostgreSQL) | One AWS region, fixed at creation | ACCOUNT-SPECIFIC - confirm |
 | MongoDB Atlas | AWS ap-southeast-1 (Singapore) expected | ACCOUNT-SPECIFIC - confirm |
-| AWS S3 | ap-southeast-2 (Sydney) | Confirmed in code |
+| Vercel Blob | Configured store region | Confirm in the Vercel project |
 | Upstash Redis | Provider region (Regional or Global) | ACCOUNT-SPECIFIC - confirm |
 
 Observations:
-- S3 in Sydney while the relational/document databases are expected in Singapore is a cross-region split; for hot paths that read or write media this adds round-trip latency and spreads data across jurisdictions.
+- Blob store location must be compared with the expected Singapore database regions; a cross-region split on hot media paths adds round-trip latency and affects the jurisdiction map.
 - The Vercel function region should be co-located with the databases (Singapore) to minimize per-query latency; if it is still the default US region, that is a latency optimization opportunity.
 - Thailand has no in-country region on these providers; SE-Asia residency typically means Singapore. PDPA does not mandate in-country storage but does require lawful cross-border transfer safeguards (DPAs/SCCs), which exist with these providers but must be executed.
 
-Recommendation for diligence: produce a single confirmed region map (Vercel function region, Supabase region, Atlas region, S3 region, Upstash region) and align the compute region with the primary databases.
+Recommendation for diligence: produce a single confirmed region map (Vercel function region, Supabase region, Atlas region, Blob region, Upstash region) and align the compute region with the primary databases.
 
 ---
 
@@ -252,7 +252,7 @@ Recommendation for diligence: produce a single confirmed region map (Vercel func
 |---|---|---|---|---|
 | Supabase (Postgres) | Daily automated backups (Pro) | 7 days | PITR ~2 min RPO only if the paid add-on is enabled (confirm) | No automatic HA failover on Pro; recovery via restore. RTO bounded by restore time. Read-replica add-on can improve resilience but is not automatic failover |
 | MongoDB Atlas | Continuous Cloud Backup (oplog) on dedicated tiers | 1-7 days window | ~1-second restore granularity, sub-minute RPO (if dedicated + enabled) | Replica-set automatic failover within the cluster (if M10+); multi-region optional |
-| AWS S3 | Built-in 3-AZ redundancy; optional Versioning/Object Lock | n/a (object durability 11 nines) | n/a | Region-level durability; cross-region replication optional |
+| Vercel Blob | Managed redundancy | n/a (object durability 11 nines) | n/a | Provider-managed object durability; maintain independent exports for provider-level recovery |
 | Upstash Redis | Replicated to block storage | n/a (cache) | Rebuildable from source on loss | Cache miss falls through to live computation; non-critical |
 | Application code / config | Git history + Vercel immutable deployments | Indefinite | n/a | Instant Rollback (note: does not revert cron definitions) |
 
@@ -267,7 +267,7 @@ Application-level controls (detailed in [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHIT
 - Sensitive mutations are gated by a six-digit PIN: bcrypt-hashed (cost 10) in Supabase, with a short-lived (two-minute) opaque server-side session token; escalating lockout.
 - Inbound machine-to-machine traffic is authenticated by HMAC signatures (LINE base64 HMAC; Shop System HMAC-hex over a notification id and timestamp with a five-minute replay window). Note: signature handling is currently inconsistent across actors (some endpoints log-and-continue or skip verification) - a hardening item flagged in the application architecture document.
 - Secrets are Vercel environment variables, encrypted at rest, scoped per environment; only `NEXT_PUBLIC_*` reaches the browser; AI provider keys are rotated (four per provider).
-- Object storage is private with time-limited presigned URLs.
+- Object storage is private with time-limited, pathname-scoped signed URLs.
 
 Provider certification matrix (platform-level; report access and HIPAA can be tier-gated):
 
@@ -276,7 +276,7 @@ Provider certification matrix (platform-level; report access and HIPAA can be ti
 | Vercel | Yes | Yes (2022) | v4.0 (SAQ-D/A) | Add-on (USD 350/mo on Pro) | Yes | Enterprise only |
 | Supabase | Yes (report: Team/Enterprise only) | - | - | Team/Enterprise add-on | Yes | Enterprise only |
 | MongoDB Atlas | Yes | Yes | Yes | Yes (BAA) | Yes | Per Atlas terms |
-| AWS S3 | Yes (AWS) | Yes (AWS) | Yes (AWS) | Yes (AWS BAA) | Yes (AWS) | 99.9% |
+| Vercel Blob | Yes (Vercel) | Yes (Vercel) | Yes (Vercel) | Confirm plan/BAA scope | Yes (Vercel) | Platform terms apply |
 | Upstash | Add-on (Prod Pack) | - | - | Enterprise | Yes | Per plan |
 
 PDPA (Thailand) note: the platform processes personal data (identity, contact, eKYC, financial). A consent banner exists. Data minimization, retention schedules, cross-border transfer safeguards (DPAs/SCCs with each processor), and a records-of-processing inventory should be in place and producible. The most sensitive flows (national ID to UPPASS; bank slips and item photos to AI providers) warrant explicit executed processor terms.
@@ -302,7 +302,7 @@ Fixed monthly minimums (representative; verify live):
 - Supabase Pro: USD 25/month base (includes USD 10 compute credit = one Micro instance); add-ons (larger compute, PITR ~USD 100/mo, read replicas, IPv4) are extra and account-specific.
 - Upstash Redis: pay-as-you-go (per request) or a fixed plan.
 - MongoDB Atlas: dedicated cluster hourly cost by tier (e.g. an M10 is a low-tens-of-USD/month order of magnitude; confirm tier).
-- AWS S3: storage + request + egress, typically low at current media volumes.
+- Vercel Blob: storage, operations, Blob Data Transfer, and Function transfer for private reads; typically low at current media volumes.
 
 Primary variable drivers as the business scales:
 - AI inference (Anthropic, Gemini, OpenAI) per estimate and per condition analysis - the largest variable cost, mitigated by the Redis cache and by model tiering (Sonnet for text, Haiku for high-volume vision).
@@ -326,7 +326,7 @@ A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/d
 | R4 | AI provider no-training / retention posture unconfirmed | High | Item photos and bank slips are sent to Anthropic/Google; defaults vary; Gemini free tier can train | Confirm ZDR (Anthropic/OpenAI), paid-tier/Vertex (Gemini), and executed DPAs; never use Gemini free tier |
 | R5 | eKYC and slip data processor terms | High | National ID (UPPASS) and bank slips (SlipOK) are highly sensitive PII | Execute DPAs with explicit retention/deletion and breach terms |
 | R6 | Webhook signature verification inconsistent | Medium | Some inbound webhooks log-and-continue or skip signature checks | Enforce strict verification (reject on mismatch) on all actor webhooks |
-| R7 | Cross-region data split | Medium | S3 (Sydney) vs databases (Singapore) vs function region | Confirm region map; co-locate compute with databases; consolidate region where feasible |
+| R7 | Cross-region data split | Medium | Blob store vs databases vs function region | Confirm region map; co-locate compute with databases; consolidate region where feasible |
 | R8 | Single-region databases | Medium | Supabase is single-region by design; Atlas topology unconfirmed | Read replicas (Supabase) / multi-region (Atlas) if RTO requires |
 | R9 | No outbound static IP | Low/Medium | Functions egress from rotating IPs; cannot be allow-listed by downstream providers | Vercel Secure Compute / Static IP add-on or Enterprise if any provider requires it |
 | R10 | SOC 2 report not obtainable on Supabase Pro | Low | The report is Team/Enterprise gated | Upgrade tier if the data room requires the Supabase SOC 2 report |
@@ -338,7 +338,7 @@ A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/d
 - Vercel: team plan confirmation; configured function region; whether SAML SSO, Static IP, or HIPAA BAA add-ons are active; current monthly usage and spend-management threshold.
 - Supabase: project region; compute size; spend-cap state; whether PITR and read replicas are enabled; Postgres major version (`SELECT version();`); SOC 2 report access (tier).
 - MongoDB Atlas: cluster tier (confirm M10+); region pin; replica-set topology and any multi-region config; PITR window value; BYOK/KMS configuration; Backup Compliance Policy.
-- AWS S3: Block Public Access state; Versioning/Object Lock; SSE-S3 vs SSE-KMS; the presigned-URL TTL set in code; IAM policy least-privilege review.
+- Vercel Blob: confirm private-store mode, connected-project scope, token rotation, signed-URL TTLs, region, and independent backup/export posture.
 - Upstash: plan, region, Regional vs Global; SOC 2 (Prod Pack) / HIPAA add-on state; TLS and IP allow-list.
 - AI/identity providers: executed DPAs; Anthropic ZDR and/or BAA; OpenAI ZDR; Gemini paid-tier/Vertex confirmation; UPPASS and SlipOK retention/deletion and breach-notification terms.
 - DR: documented and tested restore/failover runbooks for Supabase and MongoDB Atlas, with measured RTO.
@@ -353,7 +353,7 @@ A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/d
 | Vercel Functions / Edge | Pro | AWS (~20 regions) | Yes (to 30,000 concurrent) | Cross-AZ + cross-region routing (automatic) | Platform DR only (not customer data) | None (Enterprise only) | AES-256 / TLS 1.3 |
 | Supabase Postgres | Pro | AWS (single region) | Compute-bound (manual size) | No automatic failover on Pro | Daily (7d); PITR add-on | None (Enterprise only) | AES-256 / TLS |
 | MongoDB Atlas | Dedicated M10+ (confirm) | AWS | Manual tier; replica set | Yes (replica-set failover) | Continuous Cloud Backup (1-7d, PITR) | Per Atlas terms | AES-256 (+BYOK) / TLS |
-| AWS S3 | Standard | AWS ap-southeast-2 | Fully managed | 3-AZ redundancy | 11-nines durability; Versioning optional | 99.9% | SSE-S3/KMS / TLS |
+| Vercel Blob | Private store | Configured Blob region | Fully managed | Provider-managed redundancy | 11-nines durability | 99.99% documented availability | AES-256 / TLS |
 | Upstash Redis | PAYG/Fixed (confirm) | AWS | Serverless | Multi-replica; Global optional | Replicated block storage | Per plan | At rest available / TLS |
 
 Sources (primary): vercel.com/docs/plans/pro, /docs/limits, /docs/functions/limitations, /docs/fluid-compute, /docs/cron-jobs, /docs/vercel-firewall, /docs/security/compliance, /legal/sla; supabase.com/pricing, /docs/guides/platform/compute-and-disk, /backups, /read-replicas, /regions, /docs/guides/security, /sla; mongodb.com/cloud/atlas/security and Atlas backup/compliance docs; aws.amazon.com/s3 (faqs, sla, storage-classes); upstash.com pricing/docs; and the published API data-retention pages of Anthropic, OpenAI, and Google. All figures are as of mid-2026 and must be re-verified against the live pages at diligence time.

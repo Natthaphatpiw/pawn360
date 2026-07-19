@@ -10,7 +10,7 @@ Pawnline is a Next.js App Router application for LINE LIFF pawn, investor, store
 - `npm run start`: serve the built app locally.
 - `npm run lint`: run ESLint using Next.js core-web-vitals and TypeScript rules.
 - `npm run setup-richmenu`, `npm run setup-richmenu-prod`, `npm run setup-richmenu-6`: configure LINE rich menus.
-- `npm run test-s3`: validate S3 configuration; use only with the required environment variables.
+- `npm run test-blob`: validate Vercel Blob configuration; use only with the required environment variables.
 
 ## Coding Style & Naming Conventions
 Use TypeScript and React functional components. Match nearby file style, generally 2-space indentation in TSX and concise named helpers. Components use `PascalCase`, hooks/utilities use `camelCase`, and route folders should stay lowercase or kebab-case. Use the `@/*` path alias for root imports. Keep `"use client"` limited to components that need browser APIs, React state, effects, LIFF, or direct interaction. Put API clients and sensitive logic in `lib/`, not page components.
@@ -22,4 +22,4 @@ There is currently no dedicated Jest, Vitest, or Playwright test suite. For ever
 Recent commits use short, imperative summaries, for example `Update contract status for investor.` or `Droppoint bug fixed`. Keep commits focused on one behavior or workflow. Pull requests should include a summary, affected routes or scripts, required config changes, screenshots for UI changes, and validation notes listing lint, build, and manual checks.
 
 ## Security & Configuration Tips
-Store secrets in `.env.local`; never commit `.env`, credentials, LINE tokens, MongoDB URIs, S3 keys, or webhook secrets. Update `.env.example` when introducing new required variables. For webhook, LIFF, rich menu, and deployment changes, cross-check the existing setup guides before editing production configuration.
+Store secrets in `.env.local`; never commit `.env`, credentials, LINE tokens, MongoDB URIs, Blob tokens, or webhook secrets. Update `.env.example` when introducing new required variables. For webhook, LIFF, rich menu, and deployment changes, cross-check the existing setup guides before editing production configuration.

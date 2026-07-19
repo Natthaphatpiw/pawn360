@@ -3,7 +3,7 @@ import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcrypt';
 import { sendNegotiationMessage } from '@/lib/line/client';
-import { uploadQRCodeToS3, getQRCodePresignedUrl } from '@/lib/aws/s3';
+import { uploadQRCodeToBlob } from '@/lib/storage/blob';
 import { generateQRCode, generateQRCodeData } from '@/lib/utils/qrcode';
 
 export async function POST(request: NextRequest) {
@@ -83,16 +83,14 @@ export async function POST(request: NextRequest) {
     const base64Data = qrCodeDataURL.replace(/^data:image\/png;base64,/, '');
     const qrBuffer = Buffer.from(base64Data, 'base64');
 
-    // Upload to S3
-    await uploadQRCodeToS3(itemId, qrBuffer);
-    const presignedUrl = await getQRCodePresignedUrl(itemId, 7 * 24 * 3600);
+    const signedUrl = await uploadQRCodeToBlob(itemId, qrBuffer);
 
     // อัปเดต QR Code ใน pawnRequest
     await customersCollection.updateOne(
       { lineId: item.lineId, 'pawnRequests.itemId': new ObjectId(itemId) },
       {
         $set: {
-          'pawnRequests.$.qrCode': presignedUrl,
+          'pawnRequests.$.qrCode': signedUrl,
         },
       }
     );
@@ -112,7 +110,7 @@ export async function POST(request: NextRequest) {
       rateNum,
       interest,
       totalAmount,
-      presignedUrl
+      signedUrl
     );
 
     return NextResponse.json({

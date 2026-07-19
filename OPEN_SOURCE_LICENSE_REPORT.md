@@ -64,7 +64,7 @@ Permissive licenses account for the overwhelming majority; the only copyleft ent
 
 ## 3. Direct Dependencies - License Table
 
-All 38 direct dependencies (production + development) and their installed license. Every one is permissive OSI open source except the LINE LIFF SDK (vendor license).
+All 36 direct dependencies (production + development) and their installed license. Every one is permissive OSI open source except the LINE LIFF SDK (vendor license).
 
 | Package | License | Commercial use |
 |---|---|---|
@@ -77,9 +77,7 @@ All 38 direct dependencies (production + development) and their installed licens
 | @supabase/supabase-js | MIT | Yes |
 | mongodb | Apache-2.0 | Yes |
 | @upstash/redis | MIT | Yes |
-| @aws-sdk/client-s3 | Apache-2.0 | Yes |
-| @aws-sdk/s3-request-presigner | Apache-2.0 | Yes |
-| aws-sdk (v2, legacy) | Apache-2.0 | Yes |
+| @vercel/blob | Apache-2.0 | Yes |
 | @google/generative-ai | Apache-2.0 | Yes |
 | openai | Apache-2.0 | Yes |
 | @line/bot-sdk | Apache-2.0 | Yes |
@@ -195,10 +193,9 @@ These are not current dependencies but are the most likely future license-due-di
 | L1 | No third-party attribution/notices file shipped | Low-Medium | Generate `THIRD-PARTY-NOTICES` and include license texts |
 | L2 | No automated license gate in CI | Medium | Add a scanner that fails on GPL/AGPL/SSPL/unknown |
 | L3 | LINE LIFF governed by a vendor agreement (non-OSI) | Low-Medium | Review the LINE Developers Agreement for restrictions |
-| L4 | Legacy `aws-sdk` v2 present (Apache-2.0) but unused | Low | Remove dead dependency (also a TECH_STACK hygiene item) |
-| L5 | `openai` pinned to `latest` - resolved license can drift with version | Low | Pin the version; the lockfile records the exact resolved license |
-| L6 | Future in-house model base-weights license unverified | Medium (future) | Verify commercial-use license of any pretrained weights |
-| L7 | LGPL/MPL components must remain unmodified to retain the simple compliance posture | Low | Document "used unmodified"; revisit if ever forked |
+| L4 | `openai` pinned to `latest` - resolved license can drift with version | Low | Pin the version; the lockfile records the exact resolved license |
+| L5 | Future in-house model base-weights license unverified | Medium (future) | Verify commercial-use license of any pretrained weights |
+| L6 | LGPL/MPL components must remain unmodified to retain the simple compliance posture | Low | Document "used unmodified"; revisit if ever forked |
 
 DD checklist (data-room items): the generated third-party notices file; a current license-scan report (license-checker/FOSSA output) from the committed lockfile; confirmation of the CI license gate; the LINE Developers Agreement review; and, for the future model, the base-weights and dataset license/provenance record.
 
@@ -206,7 +203,7 @@ DD checklist (data-room items): the generated third-party notices file; a curren
 
 ## 11. Appendix - Full Direct-Dependency Detail and Caveats
 
-Installed versions and licenses are as resolved by the committed `package-lock.json` at scan time (mid-2026). Notable resolved facts: `react`/`react-dom` 19.1.0 (MIT); `next` 16.0.7 (MIT); `aws-sdk` resolved to 2.1693.0 (Apache-2.0); `openai` resolved to 6.16.0 (Apache-2.0); `typescript` 5.9.3 (Apache-2.0). The LINE LIFF family (`@line/liff` 2.27.2 and 46 `@liff/*` modules) resolves to the LINE Developers Agreement.
+Installed versions and licenses are as resolved by the committed `package-lock.json` at scan time (mid-2026). Notable resolved facts: `react`/`react-dom` 19.1.0 (MIT); `next` 16.2.4 (MIT); `@vercel/blob` 2.6.1 (Apache-2.0); `openai` 6.16.0 (Apache-2.0); `typescript` 5.9.3 (Apache-2.0). The LINE LIFF family (`@line/liff` 2.27.2 and 46 `@liff/*` modules) resolves to the LINE Developers Agreement.
 
 Caveats:
 - The scan reads each package's declared `license` field; a declared field can occasionally differ from the actual LICENSE file - a dedicated scanner (FOSSA/Syft) cross-checks file contents and is recommended for the formal report.

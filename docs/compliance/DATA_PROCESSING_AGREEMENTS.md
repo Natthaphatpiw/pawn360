@@ -34,7 +34,7 @@ The following table registers every third party to which Astly discloses, or pla
 | **Vercel** | Request data + application logs | Hosting / compute / logs | US-default (configurable) | Yes | [status: not started / in review / executed] |
 | **Supabase** | Primary personal-data records | Primary database | AWS region (confirm) | Yes (confirm) | [status: not started / in review / executed] |
 | **MongoDB Atlas** | Operational personal-data records | Operational database | AWS region (confirm) | Yes (confirm) | [status: not started / in review / executed] |
-| **AWS S3** | Item photos, bank slips, contracts | Object storage | ap-southeast-2 (Sydney) | Yes | [status: not started / in review / executed] |
+| **Vercel Blob** | Item photos, bank slips, contracts | Object storage | Configured Blob store region (confirm) | Yes | [status: not started / in review / executed] |
 | **Upstash** | Normalized inputs + image hashes (derived) | Cache (estimate pipeline) | AWS region (confirm) | Yes (confirm) | [status: not started / in review / executed] |
 | **Payment PSP (planned)** | Payment / bank data | Funds collection / routing | TH / SE Asia (confirm) | To confirm | [status: not started / in review / executed] |
 
@@ -92,7 +92,7 @@ UPPASS processes **sensitive biometric data** (face-match, liveness) and governm
 
 ## 6. Cross-border transfer safeguards (Sec 28-29)
 
-Multiple processors are **US-hosted** — Anthropic, Google, OpenAI, Vercel, AWS, MongoDB Atlas, and Upstash — and **AWS S3** stores item photos, bank slips, and contracts in **ap-southeast-2 (Sydney)**. There is currently **no PDPC adequacy finding** for the United States (or, pending confirmation, for the S3 Sydney region), so transfers cannot rest on adequacy under Section 28.
+Multiple processors are **US-hosted** — Anthropic, Google, OpenAI, Vercel, MongoDB Atlas, and Upstash — while Vercel Blob stores item photos, bank slips, and contracts in the configured store region. There is currently **no PDPC adequacy finding** for the United States; the Blob region and transfer safeguards must be confirmed, so transfers cannot rest on adequacy under Section 28 without that analysis.
 
 Astly's practical transfer bases (to confirm with Thai data-protection counsel):
 
@@ -132,7 +132,7 @@ Executing and filing a DPA with **every** processor is a **priority operational 
 | Vercel | Yes | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | Supabase | Yes (primary data — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | MongoDB Atlas | Yes (primary data — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
-| AWS S3 | Yes (photos/slips/contracts — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
+| Vercel Blob | Yes (photos/slips/contracts — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | Upstash | Yes | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | Payment PSP (planned) | Yes (payment/bank data — on engagement) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 

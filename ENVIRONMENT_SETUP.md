@@ -15,10 +15,10 @@ GEMINI_API_KEY_2=your_gemini_api_key_backup_2
 GEMINI_API_KEY_3=your_gemini_api_key_backup_3
 GEMINI_API_KEY_4=your_gemini_api_key_backup_4
 
-# AWS S3 Configuration
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=ap-southeast-2
+# Vercel Blob Configuration (private store)
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_token_here
+BLOB_STORE_ID=store_your_store_id_here
+BLOB_WEBHOOK_PUBLIC_KEY=your_blob_webhook_public_key_here
 
 # MongoDB Configuration
 MONGODB_URI=<REDACTED>

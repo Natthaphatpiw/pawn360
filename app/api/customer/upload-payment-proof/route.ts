@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
-import { getS3Client } from '@/lib/aws/s3';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { putPrivateBlob } from '@/lib/storage/blob';
 import { getLineClient } from '@/lib/line/client';
 
 /**
@@ -20,25 +19,16 @@ async function downloadLineImage(messageId: string): Promise<Buffer> {
 }
 
 /**
- * Uploads payment slip to S3
+ * Uploads a payment slip to Vercel Blob.
  */
-async function uploadSlipToS3(
+async function uploadSlipToBlob(
   slipBuffer: Buffer,
   notificationId: string
 ): Promise<string> {
-  const s3Client = getS3Client();
   const timestamp = Date.now();
   const filename = `slip-${notificationId}-${timestamp}.jpg`;
-
-  const uploadParams = {
-    Bucket: 'piwp360',
-    Key: `slips/${filename}`,
-    Body: slipBuffer,
-    ContentType: 'image/jpeg'
-  };
-
-  await s3Client.send(new PutObjectCommand(uploadParams));
-  return `https://piwp360.s3.ap-southeast-2.amazonaws.com/slips/${filename}`;
+  const blob = await putPrivateBlob(`slips/${filename}`, slipBuffer, 'image/jpeg');
+  return blob.signedUrl;
 }
 
 export async function POST(request: NextRequest) {
@@ -110,8 +100,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Upload to S3
-    const slipUrl = await uploadSlipToS3(imageBuffer, notificationId);
+    // 4. Upload to Vercel Blob
+    const slipUrl = await uploadSlipToBlob(imageBuffer, notificationId);
 
     // 5. Update notification
     await notificationsCollection.updateOne(

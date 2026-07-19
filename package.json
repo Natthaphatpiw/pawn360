@@ -10,11 +10,9 @@
     "setup-richmenu": "tsx scripts/setup-richmenu.ts",
     "setup-richmenu-prod": "tsx scripts/create-richmenu-production.ts",
     "setup-richmenu-6": "tsx scripts/create-richmenu-6-buttons.ts",
-    "test-s3": "tsx scripts/test-s3.ts"
+    "test-blob": "tsx scripts/test-blob.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.952.0",
-    "@aws-sdk/s3-request-presigner": "^3.901.0",
     "@google/generative-ai": "^0.24.1",
     "@line/bot-sdk": "^10.3.0",
     "@line/liff": "^2.27.2",
@@ -23,7 +21,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/html2canvas": "^0.5.35",
     "@upstash/redis": "^1.36.3",
-    "aws-sdk": "^1.18.0",
+    "@vercel/blob": "^2.6.1",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
     "browser-image-compression": "^2.0.2",

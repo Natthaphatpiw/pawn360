@@ -205,8 +205,8 @@ export interface Contract {
   };
   // เอกสารสัญญาและการยืนยันตัวตน
   documents?: {
-    contractHtmlUrl?: string; // URL to contract HTML in S3
-    verificationPhotoUrl?: string; // URL to verification photo in S3
+    contractHtmlUrl?: string; // URL to contract HTML in Vercel Blob
+    verificationPhotoUrl?: string; // URL to verification photo in Vercel Blob
   };
   createdAt: Date;
   updatedAt: Date;
