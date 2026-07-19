@@ -92,10 +92,10 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Personal-data categories | Item photographs (general); derived cache (normalised inputs, image content hashes) |
 | Purpose | Value the collateral and score its condition to derive a loan offer |
 | Lawful basis | Contract necessity (Sec 24(3)); legitimate interest in accurate valuation (Sec 24(5)) |
-| Recipients / processors | AWS S3 (image storage); Anthropic (Claude - image precheck, condition/valuation vision, slip fallback); Google (Gemini - condition scoring); Upstash (cache) |
-| Cross-border + safeguard | S3 in ap-southeast-2 (Sydney); Anthropic/Google in US - DPA with **no-training** and (for Anthropic) **zero-data-retention** terms; Sec 28-29 |
-| Retention | S3 media lifecycle window (see Section 4); cache TTL ~30 days |
-| Storage location | AWS S3 (Sydney); transient AI-provider processing (no retention where ZDR/no-training applies); Upstash cache |
+| Recipients / processors | Vercel Blob (image storage); Anthropic (Claude - image precheck, condition/valuation vision, slip fallback); Google (Gemini - condition scoring); Upstash (cache) |
+| Cross-border + safeguard | Blob region (confirm); Anthropic/Google in US - DPA with **no-training** and (for Anthropic) **zero-data-retention** terms; Sec 28-29 |
+| Retention | Blob media retention window (see Section 4); cache TTL ~30 days |
+| Storage location | Vercel Blob (configured region); transient AI-provider processing (no retention where ZDR/no-training applies); Upstash cache |
 
 ### (e) Contract formation & custody
 
@@ -105,10 +105,10 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Personal-data categories | Contracts, transaction records, custody records, loan/financial records; signatures |
 | Purpose | Form the loan agreement, record collateral custody, and administer the loan |
 | Lawful basis | Contract necessity (Sec 24(3)); legal compliance for record-keeping (Sec 24(6)) |
-| Recipients / processors | MongoDB Atlas, Supabase; AWS S3 (contract HTML/PDF) |
-| Cross-border + safeguard | DB region (confirm); S3 Sydney - DPA required; Sec 28-29 |
+| Recipients / processors | MongoDB Atlas, Supabase; Vercel Blob (contract HTML/PDF) |
+| Cross-border + safeguard | DB and Blob regions (confirm); DPA required; Sec 28-29 |
 | Retention | Loan/financial records **>= 5 years** (AMLA) then delete/anonymise |
-| Storage location | MongoDB/Supabase (records); AWS S3 (contract documents) |
+| Storage location | MongoDB/Supabase (records); Vercel Blob (contract documents) |
 
 ### (f) Payment & bank-slip verification
 
@@ -118,10 +118,10 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Personal-data categories | Bank slips (image), bank-account details, loan/financial records (general - financial) |
 | Purpose | Verify that a payment (disbursement, interest, redemption) was actually made |
 | Lawful basis | Contract necessity (Sec 24(3)); legitimate interest in fraud prevention (Sec 24(5)) |
-| Recipients / processors | AWS S3 (slip storage); SlipOK (slip-verification API, when configured); Anthropic (Claude vision fallback); Supabase/MongoDB (records) |
-| Cross-border + safeguard | S3 Sydney; Anthropic US (no-training + ZDR); SlipOK region (confirm) - DPA required; Sec 28-29 |
-| Retention | Financial records **>= 5 years** (AMLA); slip images per S3 lifecycle window |
-| Storage location | Slips in AWS S3; financial records in Supabase/MongoDB |
+| Recipients / processors | Vercel Blob (slip storage); SlipOK (slip-verification API, when configured); Anthropic (Claude vision fallback); Supabase/MongoDB (records) |
+| Cross-border + safeguard | Blob region (confirm); Anthropic US (no-training + ZDR); SlipOK region (confirm) - DPA required; Sec 28-29 |
+| Retention | Financial records **>= 5 years** (AMLA); slip images per Blob retention window |
+| Storage location | Slips in Vercel Blob; financial records in Supabase/MongoDB |
 
 ### (g) Redemption / extension / principal-change processing
 
@@ -131,10 +131,10 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Personal-data categories | Loan/financial records, transaction records, notifications, payment slips |
 | Purpose | Process redemption, extension and principal-increase/reduction requests and their approvals |
 | Lawful basis | Contract necessity (Sec 24(3)); legal compliance for record-keeping (Sec 24(6)) |
-| Recipients / processors | MongoDB Atlas (customer-facing flow), Supabase (investor/finance flow); AWS S3 (slips) |
-| Cross-border + safeguard | DB region (confirm); S3 Sydney - DPA required; Sec 28-29 |
+| Recipients / processors | MongoDB Atlas (customer-facing flow), Supabase (investor/finance flow); Vercel Blob (slips) |
+| Cross-border + safeguard | DB and Blob regions (confirm); DPA required; Sec 28-29 |
 | Retention | Financial records **>= 5 years** (AMLA) then delete/anonymise |
-| Storage location | MongoDB (customer view) and Supabase (investor/finance view) in parallel; slips in S3 |
+| Storage location | MongoDB (customer view) and Supabase (investor/finance view) in parallel; slips in Vercel Blob |
 
 ### (h) AML monitoring & fraud prevention
 
@@ -157,10 +157,10 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Personal-data categories | Name, phone, contract/custody records, verification photographs, delivery records; drop-point operator identity + location |
 | Purpose | Route the collateral to a branch, verify intake, store, and return on repayment |
 | Lawful basis | Contract necessity (Sec 24(3)); legitimate interest in secure logistics (Sec 24(5)) |
-| Recipients / processors | Supabase; AWS S3 (verification/return photos); drop-point operators (as recipients performing intake/return) |
-| Cross-border + safeguard | Supabase region (confirm); S3 Sydney - DPA required; Sec 28-29 |
+| Recipients / processors | Supabase; Vercel Blob (verification/return photos); drop-point operators (as recipients performing intake/return) |
+| Cross-border + safeguard | Supabase and Blob regions (confirm); DPA required; Sec 28-29 |
 | Retention | Custody/logistics records aligned to loan-record retention (see Section 4) |
-| Storage location | Supabase (`drop_points`, `contracts`, delivery tables); AWS S3 (photos) |
+| Storage location | Supabase (`drop_points`, `contracts`, delivery tables); Vercel Blob (photos) |
 
 ### (j) Notifications / communications
 
@@ -198,9 +198,9 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | National ID number | General (elevated-risk) | Supabase | Supabase |
 | ID-card image | General (elevated-risk) | UPPASS | UPPASS |
 | eKYC face-match / liveness | **SENSITIVE - biometric (Sec 26)** | UPPASS vendor | UPPASS |
-| Bank slips | General (financial) | AWS S3 | AWS, SlipOK, Anthropic (fallback) |
+| Bank slips | General (financial) | Vercel Blob | Vercel, SlipOK, Anthropic (fallback) |
 | Bank account, loan / financial records | General (financial) | Supabase / MongoDB | Supabase, MongoDB Atlas |
-| Item photographs | General | AWS S3 | AWS, Anthropic, Google (Gemini) |
+| Item photographs | General | Vercel Blob | Vercel, Anthropic, Google (Gemini) |
 | Contracts, transactions, custody records, notifications | General | MongoDB / Supabase | MongoDB Atlas, Supabase |
 | PIN hash + session token | Authentication data (PIN one-way hashed) | Supabase `user_security` | Supabase |
 | Cache (normalised inputs, image hashes) | Derived, low sensitivity | Upstash | Upstash |
@@ -220,13 +220,13 @@ Cross-reference `DATA_PROCESSING_AGREEMENTS.md` for executed-DPA status and clau
 | Vercel | Hosting / compute / logs | US-default (configurable) | DPA required |
 | Supabase | Primary database | AWS region (confirm) | DPA required |
 | MongoDB Atlas | Operational database | AWS region (confirm) | DPA required |
-| AWS S3 | Object storage | ap-southeast-2 (Sydney) | DPA required |
+| Vercel Blob | Object storage | Configured Blob store region (confirm) | DPA required |
 | Upstash | Cache | AWS region | DPA required |
 | Payment PSP (planned) | Funds routing | TH / SE Asia | DPA required |
 
 ### Cross-border transfer basis (Sec 28-29)
 
-Several processors host or process data outside Thailand: US processors (Anthropic, Google, OpenAI, Vercel, AWS, MongoDB Atlas, Upstash) and AWS S3 in Sydney. There is **no PDPC adequacy finding** for the United States. Astly relies on:
+Several processors host or process data outside Thailand: US processors (Anthropic, Google, OpenAI, Vercel, MongoDB Atlas, Upstash), plus the configured Blob store region. There is **no PDPC adequacy finding** for the United States. Astly relies on:
 
 - **Contract-necessity derogation** (Sec 28) where the transfer is necessary to perform the contract with the data subject; and/or
 - **Informed consent** to the cross-border transfer where necessity does not apply; and
@@ -283,7 +283,7 @@ Sec 37 requires appropriate technical and organisational safeguards. Cross-refer
 | Credential hashing | PIN hashed with bcrypt (cost 10); no plaintext PIN stored |
 | Session handling | Opaque, short-lived session tokens (not long-lived cookies/JWTs) |
 | Database exposure | No public database access; server-side privileged access only |
-| Object storage | AWS S3 buckets private; access via presigned URLs only |
+| Object storage | Vercel Blob store private; access via signed URLs or server-side reads only |
 | Sensitive-data minimisation | Biometric data minimised and held at the eKYC vendor; Astly retains only pass/fail status |
 | Processor controls | Written DPAs with no-training / ZDR / deletion terms (Section 5) |
 

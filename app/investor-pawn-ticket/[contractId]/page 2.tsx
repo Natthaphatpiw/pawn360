@@ -50,7 +50,7 @@
 //       // Convert to base64 for upload and fallback download
 //       const imageBase64 = canvas.toDataURL('image/png');
 
-//       // Upload to S3
+//       // Upload to Vercel Blob
 //       try {
 //         const uploadResponse = await axios.post('/api/contracts/upload-pawn-ticket', {
 //           contractId,
@@ -58,10 +58,10 @@
 //         });
 
 //         if (uploadResponse.data.success) {
-//           console.log('Investment contract uploaded to S3:', uploadResponse.data.url);
+//           console.log('Investment contract uploaded to Vercel Blob:', uploadResponse.data.url);
 //         }
 //       } catch (uploadError) {
-//         console.error('Error uploading to S3:', uploadError);
+//         console.error('Error uploading to Vercel Blob:', uploadError);
 //         // Continue with download even if upload fails
 //       }
 

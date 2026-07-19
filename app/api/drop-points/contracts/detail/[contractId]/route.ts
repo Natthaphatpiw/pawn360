@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { refreshImageUrls } from '@/lib/aws/s3';
+import { refreshBlobUrls } from '@/lib/storage/blob';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 export async function GET(
@@ -127,7 +127,7 @@ export async function GET(
             ...item,
             notes: notesPayload.publicNotes,
             device_passcode: notesPayload.devicePasscode,
-            image_urls: await refreshImageUrls(item?.image_urls),
+            image_urls: await refreshBlobUrls(item?.image_urls),
           };
         })
       );
@@ -137,7 +137,7 @@ export async function GET(
         ...items,
         notes: notesPayload.publicNotes,
         device_passcode: notesPayload.devicePasscode,
-        image_urls: await refreshImageUrls(items?.image_urls),
+        image_urls: await refreshBlobUrls(items?.image_urls),
       };
     }
 

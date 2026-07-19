@@ -34,7 +34,7 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md), [`INFRA
 
 Astly is engineered to scale on a serverless, fully managed cloud foundation. The deliberate consequence of this design is that the platform scales horizontally and automatically with demand, with no servers, clusters, or load balancers to provision, and with cost that tracks usage rather than peak capacity.
 
-The scaling thesis in one paragraph: the stateless compute tier (Vercel Functions) auto-scales to tens of thousands of concurrent executions with zero operator action; the content and edge tier is a global anycast CDN with automatic failover; the stateful tiers (Supabase PostgreSQL, MongoDB Atlas, AWS S3, Upstash Redis) are independently and vertically scalable managed services; and the most expensive workload - AI inference - is shielded by a content-addressed cache, model tiering, multi-key rate-limit resilience, and a provider abstraction that allows a future in-house model to be substituted without touching business logic. The system's primary scaling lever is therefore database compute sizing (connection capacity), and its primary cost lever is AI inference per transaction - both well understood and individually adjustable.
+The scaling thesis in one paragraph: the stateless compute tier (Vercel Functions) auto-scales to tens of thousands of concurrent executions with zero operator action; the content and edge tier is a global anycast CDN with automatic failover; the stateful tiers (Supabase PostgreSQL, MongoDB Atlas, Vercel Blob, Upstash Redis) are independently scalable managed services; and the most expensive workload - AI inference - is shielded by a content-addressed cache, model tiering, multi-key rate-limit resilience, and a provider abstraction that allows a future in-house model to be substituted without touching business logic. The system's primary scaling lever is therefore database compute sizing (connection capacity), and its primary cost lever is AI inference per transaction - both well understood and individually adjustable.
 
 Deployment maturity in one paragraph: every change ships through a Git-integrated pipeline that produces immutable, atomically promoted deployments with per-pull-request preview environments, instant one-click rollback, per-environment secret isolation, and declaratively scheduled background jobs. There are no manual server operations, no mutable production hosts, and no snowflake configuration. Production promotion is zero-downtime by construction.
 
@@ -64,7 +64,7 @@ This document quantifies the above, identifies the precise points that bottlenec
 | Primary DB | Supabase PostgreSQL (Pro); default Micro compute = 60 direct / 200 pooled connections (confirm live size) |
 | Operational DB | MongoDB Atlas (confirm dedicated M10+); client cached across warm invocations |
 | Cache | Upstash Redis; estimate responses + image-hash, 30-day TTL, content-hash keyed |
-| Object storage | AWS S3 (effectively unbounded), presigned-URL access |
+| Object storage | Vercel Blob (managed object storage), private signed-URL access |
 | AI providers | Anthropic (text + vision), Google Gemini (vision), OpenAI (optional), each with 4-key rotation |
 
 Known performance characteristics (honest baseline):
@@ -85,7 +85,7 @@ Vercel's anycast Edge Network terminates all traffic at the nearest point of pre
 
 - Horizontal autoscaling to 30,000 concurrent executions on Pro, with no provisioning. Fluid compute additionally serves multiple concurrent invocations per instance for I/O-bound handlers (the dominant pattern here, since most handlers await a database or an AI provider), which improves throughput-per-instance and reduces cold starts and cost.
 - No capacity planning is required for compute itself; the constraint moves downstream to whatever the function calls (database connections, AI rate limits).
-- Cold-start exposure is minimized by Fluid pre-warming and bytecode caching and by reusing module-level singletons (database, S3, and Redis clients) across warm invocations.
+- Cold-start exposure is minimized by Fluid pre-warming and bytecode caching and by reusing module-level database and Redis clients across warm invocations; Blob access uses stateless HTTPS calls.
 
 ### 4.3 Data tier
 
@@ -108,7 +108,7 @@ Serverless and per-request priced, so it scales with demand without provisioning
 
 ### 4.6 Object storage and integrations
 
-- AWS S3 scales effectively without bound for storage and request volume; media never transits function bodies at scale (presigned uploads). This tier is not a scaling concern.
+- Vercel Blob is managed object storage and is not a near-term capacity constraint. Current server uploads do transit Function request bodies; large-file growth should switch those paths to Blob client uploads.
 - Third-party integration quotas (LINE messaging, SerpAPI, UPPASS eKYC, SlipOK) scale per their commercial agreements; these are budget/quota items to negotiate as volume grows rather than architectural limits.
 
 ---
@@ -122,11 +122,11 @@ Honest "what breaks first" assessment, in the order it is likely to bind:
 | 1 | Supabase database connections | Serverless can fan out wider than Postgres accepts; pooled cap is tied to compute size (200 on Micro) | Scale compute tier (200 -> 12,000 pooled across sizes); rely on Supavisor transaction pooling; add read replicas for read-heavy load |
 | 2 | AI provider rate limits and cost | Estimate/condition flows are AI-bound; per-minute token/request caps and per-call cost grow linearly with volume | Multi-key rotation; cache; model tiering; negotiate higher provider limits; deploy in-house model |
 | 3 | Cold-estimate latency (15-35s) | Live third-party web-search pricing is inherently slow | Cache; async/progressive UX; in-house pricing/condition model; pre-computation for popular items |
-| 4 | Single-region database latency/availability | Supabase is single-region; cross-region split with S3 (Sydney) adds latency | Co-locate function + DB region; read replicas; Atlas multi-region if RTO requires |
+| 4 | Single-region database latency/availability | Supabase is single-region; any cross-region split with the Blob store adds latency | Co-locate function + DB + Blob regions; read replicas; Atlas multi-region if RTO requires |
 | 5 | Cron throughput | Two 5-minute crons drain queues; best-effort delivery, no auto-retry | Idempotent handlers; raise frequency or shard queue; move to a dedicated queue/worker if volume demands |
-| 6 | Function payload limit (4.5 MB) | Large media cannot transit function bodies | Already routed through S3 presigned uploads (10 MB app cap) |
+| 6 | Function payload limit (4.5 MB) | Large media cannot transit function bodies | Move uploads above the limit to Vercel Blob client uploads; align the current 10 MB app cap |
 
-Compute concurrency (30,000) and S3 are effectively non-binding at any realistic near-term scale. The genuine scaling work is database sizing and AI capacity/cost - both adjustable on demand.
+Compute concurrency (30,000) and Blob capacity are effectively non-binding at any realistic near-term scale. The genuine scaling work is database sizing, Function upload limits, and AI capacity/cost - all adjustable with known patterns.
 
 ---
 
@@ -231,7 +231,7 @@ Recommended hardening for scale (Section 16): add an automated CI test gate befo
 - Three environment scopes: Production, Preview, and Development. Each has its own isolated set of environment variables.
 - Secrets management: all credentials are Vercel environment variables, encrypted at rest, never committed to source. Only `NEXT_PUBLIC_*` values are bundled to the browser; everything else is server-only. AI provider keys are provisioned in sets of four per provider to support rotation under rate limits.
 - Configuration as control surface: feature flags and behavior switches (manual-estimate toggle, SerpAPI enable, AI provider and model selection, exchange rate, cache TTLs, LIFF identifiers) are environment-driven, so capacity and behavior can be changed without a code release - including instant provider failover by flipping `PRICE_SEARCH_PROVIDER` or model variables.
-- Least privilege: database access uses scoped credentials; S3 uses an IAM principal limited to the bucket; provider keys are per-service. A periodic credential-rotation and least-privilege review is recommended as a process control.
+- Least privilege: database access uses scoped credentials; Blob uses a project-connected store token plus pathname/operation-scoped signed URLs; provider keys are per-service. A periodic credential-rotation and least-privilege review is recommended as a process control.
 
 ---
 
@@ -334,7 +334,7 @@ Key provider limits referenced (full detail and sources in `INFRASTRUCTURE.md`):
 - Vercel Pro: function concurrency 30,000; duration 300s default / 800s max; memory up to 4 GB / 2 vCPU; 12 concurrent builds; 100 cron jobs/project at per-minute granularity; payload 4.5 MB.
 - Supabase Pro: connection caps by compute size (Micro 60/200 up to 16XL 500/12,000); 8 GB disk included with autoscaling; daily backups 7 days; PITR and read replicas as add-ons; single region per project.
 - MongoDB Atlas: tier-based scaling (M10+ dedicated), replica-set auto-failover, continuous backup with PITR.
-- AWS S3: effectively unbounded; 11-nines durability; 99.9% SLA.
+- Vercel Blob: managed object storage; 11-nines durability and 99.99% documented availability.
 - Upstash Redis: serverless, per-request scaling.
 
 All figures are planning references as of mid-2026 and should be re-verified against the live provider pricing/limits pages at diligence time.

@@ -34,7 +34,7 @@ Proposed objectives (to ratify, and contingent on the "confirm" items in Section
 | Asset class | Target RPO | Target RTO | Basis |
 |---|---|---|---|
 | Financial / operational databases (Supabase, MongoDB) | <= 5 minutes (with PITR) | <= 4 hours | PITR + restore runbook; without PITR on Supabase, RPO degrades to <= 24 h |
-| Object storage (S3: photos, slips, contracts) | ~0 (durable, 3-AZ) | minutes | Built-in durability + Versioning |
+| Object storage (Vercel Blob: photos, slips, contracts) | ~0 (durable managed storage) | minutes | Built-in durability + independent export |
 | Application / compute | 0 (stateless) | minutes | Immutable deployments + instant rollback |
 | Cache (Upstash) | n/a (rebuildable) | seconds-minutes | Recomputed on miss |
 | Secrets / configuration | 0 (versioned) | minutes | Vercel env + Git |
@@ -54,18 +54,18 @@ Astly is a serverless, multi-provider stack whose providers all run on Amazon We
 | Edge / compute / CI-CD | Vercel | AWS (~20 regions) |
 | Primary relational DB | Supabase (PostgreSQL) | AWS |
 | Operational document DB | MongoDB Atlas | AWS |
-| Object storage | AWS S3 (ap-southeast-2, Sydney) | AWS |
+| Object storage | Vercel Blob (configured region) | Vercel |
 | Cache | Upstash Redis | AWS |
 
-So the primary cloud substrate is effectively AWS, accessed through four independent managed-service control planes (Vercel, Supabase, Atlas, Upstash, plus S3 directly). This is a strength for DR: a failure in one managed provider's control plane does not necessarily take down the others, and each has its own redundancy.
+The primary services are accessed through independent managed-service control planes (Vercel, Supabase, Atlas, and Upstash). This is a strength for DR: a failure in one provider's control plane does not necessarily take down the others, and each has its own redundancy.
 
 ### 2.2 Secondary / DR cloud (current state and plan)
 
 There is currently no active secondary cloud or hot standby; resilience today is in-provider (multi-AZ within a region, and Vercel's automatic cross-region edge routing). The DR strategy is therefore built in three escalating layers rather than a full second cloud (which is rarely cost-justified for a serverless stack at this stage):
 
 1. In-region redundancy (today): every managed store is multi-AZ; Vercel auto-reroutes at the edge across AZs/regions.
-2. Multi-region redundancy (plan): Supabase read replica(s) and MongoDB Atlas multi-region nodes plus S3 Cross-Region Replication, so a single AWS-region failure is survivable.
-3. Provider-independent offsite backups (plan, recommended): scheduled logical exports (PostgreSQL dump, MongoDB dump, S3 copy) to an independent AWS account and/or a different region (and optionally a different cloud), so that even a provider-account compromise, accidental project deletion, or provider-wide failure is recoverable. This is the closest practical equivalent to a "secondary cloud" and is the single highest-value DR addition.
+2. Multi-region redundancy (plan): Supabase read replica(s), MongoDB Atlas multi-region nodes, and an independently stored copy of Blob media, so a single-region failure is survivable.
+3. Provider-independent offsite backups (plan, recommended): scheduled logical exports (PostgreSQL dump, MongoDB dump, Blob copy) to an independent account and/or a different region or cloud, so that even a provider-account compromise, accidental project deletion, or provider-wide failure is recoverable. This is the closest practical equivalent to a "secondary cloud" and is the single highest-value DR addition.
 
 The honest DR positioning for diligence: primary resilience relies on the managed providers' own multi-AZ durability and on PITR/replicas; a provider-account-level or region-level catastrophe is only fully covered once Layer 3 (offsite, provider-independent backups) and Layer 2 (multi-region) are implemented.
 
@@ -80,18 +80,18 @@ This is the core of the plan: what is backed up, how, how often, retention, and 
 | Supabase (PostgreSQL) | Automated daily snapshot (Pro) | Every 1 day | 7 days (Pro) | up to 24 h (daily only) | Dashboard restore / support | PITR is a PAID ADD-ON, not default |
 | Supabase + PITR (recommended) | Continuous WAL archiving | Continuous (~2-min WAL) | 7 days (add-on) | ~2 minutes | Point-in-time restore | Requires PITR add-on + >= Small compute - CONFIRM if enabled |
 | MongoDB Atlas (dedicated M10+) | Continuous Cloud Backup (oplog) + scheduled snapshots | Continuous (oplog) | Configurable 1-7 day PITR window | sub-minute (~seconds) | PITR restore to new/existing cluster | CONFIRM tier is M10+ and continuous backup enabled |
-| AWS S3 (media, contracts, slips) | Built-in 3-AZ redundancy; Versioning (recommended) | Continuous | Per lifecycle policy (define) | ~0 | Restore prior object version / re-sync | Enable Versioning + Object Lock + Cross-Region Replication - CONFIRM |
+| Vercel Blob (media, contracts, slips) | Managed durability; immutable pathname strategy | Continuous | Per retention policy (define) | ~0 | Re-sync from independent copy | Confirm region and implement scheduled provider-independent export |
 | Upstash Redis (cache) | Replicated to block storage | Continuous | n/a (cache) | n/a | Rebuild from source on miss | Non-authoritative; no backup needed |
 | Application code + config | Git history + Vercel immutable deployments | Every commit / deploy | Indefinite | 0 | Instant Rollback / redeploy | Cron definitions are NOT reverted by Instant Rollback |
 | Secrets | Vercel environment variables (encrypted) | On change | Lifetime of config | 0 | Re-inject from secure store | Keep a sealed secrets backup |
-| Recommended: offsite logical exports | pg_dump (Postgres) + mongodump (Mongo) + S3 copy to an independent account/region | Daily (recommended) | 30-90 days (and 5-year archive for AML records) | <= 24 h | Import into a fresh project/cluster | Provider-independent DR + ransomware/account-compromise resilience |
+| Recommended: offsite logical exports | pg_dump (Postgres) + mongodump (Mongo) + Blob copy to an independent account/region | Daily (recommended) | 30-90 days (and 5-year archive for AML records) | <= 24 h | Import into a fresh project/cluster/store | Provider-independent DR + ransomware/account-compromise resilience |
 
 Backup design summary in plain terms:
 - The financial databases are backed up daily by default; enabling PITR upgrades that to near-continuous (about a 2-minute worst-case loss window) and is strongly recommended for a money-handling system of record.
 - MongoDB Atlas (on a dedicated tier) already provides continuous, point-in-time backups with second-level granularity.
 - Object storage is continuously durable across three availability zones; turning on Versioning makes accidental overwrites/deletes recoverable, and Object Lock protects financial documents from tampering.
 - Code and configuration are "backed up" inherently because every deployment is an immutable, instantly-restorable artifact and all code lives in Git.
-- The recommended addition is a daily, automated export of both databases (and an S3 copy) into a separate AWS account/region, which provides recovery from failures that in-provider backups cannot cover (provider outage, account compromise, accidental project deletion) and supports the AML 5-year retention requirement.
+- The recommended addition is a daily, automated export of both databases and Blob media into a separate provider/account/region, which provides recovery from failures that in-provider backups cannot cover (provider outage, account compromise, accidental project deletion) and supports the AML 5-year retention requirement.
 
 ---
 
@@ -101,7 +101,7 @@ Backup design summary in plain terms:
 |---|---|---|
 | Vercel edge / functions | Anycast edge; automatic cross-AZ failover (Fluid compute) and cross-region edge rerouting (AWS Global Accelerator + anycast) | Yes (automatic) |
 | MongoDB Atlas (M10+) | Replica set (3 data-bearing nodes); optional multi-region | Yes (automatic in-cluster) |
-| AWS S3 | Objects redundant across >= 3 AZs | Yes (built-in) |
+| Vercel Blob | Provider-managed redundant object storage | Yes (built-in) |
 | Supabase (Pro) | Single primary; read replicas are an add-on | NO automatic failover on Pro (Enterprise-only); recovery is via restore/PITR |
 | Upstash Redis | Multi-replica; optional Global (multi-region) | Yes (provider) |
 
@@ -115,7 +115,7 @@ Concise runbooks for the credible disaster scenarios. Each lists detection, resp
 
 ### S1 - Single AWS Availability-Zone failure
 - Detection: provider health alerts; elevated error rates.
-- Response: Vercel, MongoDB Atlas, S3, and Upstash fail over automatically across AZs. Supabase (Pro) may be impacted if its single AZ is affected -> initiate restore/PITR per S4.
+- Response: Vercel services (including Blob), MongoDB Atlas, and Upstash use provider-managed redundancy. Supabase (Pro) may be impacted if its single AZ is affected -> initiate restore/PITR per S4.
 - RPO ~0 / RTO minutes for all tiers except Supabase (which depends on PITR + restore if its AZ is hit).
 
 ### S2 - Full AWS region outage
@@ -130,12 +130,12 @@ Concise runbooks for the credible disaster scenarios. Each lists detection, resp
 
 ### S4 - Data corruption or accidental deletion (logical disaster)
 - Detection: data-integrity checks; user reports; failed reconciliation.
-- Response: restore to a point in time before the corruption - Supabase PITR (if enabled) or daily snapshot; MongoDB Atlas PITR; S3 prior object version (if Versioning on). Reconcile the dual stores after restore (the MongoDB and Supabase records must be brought back into agreement).
+- Response: restore to a point in time before the corruption - Supabase PITR (if enabled) or daily snapshot; MongoDB Atlas PITR; restore Blob media from the independent export. Reconcile the dual stores after restore (the MongoDB and Supabase records must be brought back into agreement).
 - RPO: ~2 min (PITR) to 24 h (daily only); RTO <= 4 h.
 
 ### S5 - Ransomware / malicious deletion / provider-account compromise
 - Detection: anomalous deletions, mass changes, alerting on admin actions.
-- Response: this is the scenario in-provider backups may not cover if the attacker has account access; recover from the immutable offsite exports (Layer 3) in a clean account; S3 Object Lock (WORM) prevents tampering of financial documents; rotate all credentials.
+- Response: this is the scenario in-provider backups may not cover if the attacker has account access; recover from immutable offsite exports (Layer 3) in a clean account and rotate all credentials, including the Blob read/write token.
 - Mitigation dependency: requires offsite, access-isolated backups and Object Lock (currently a recommendation - R-DR-3).
 
 ### S6 - Secret / key compromise
@@ -165,7 +165,7 @@ Concise runbooks for the credible disaster scenarios. Each lists detection, resp
 
 - Supabase: restore from the daily snapshot or PITR via the Supabase dashboard/support into the same or a new project; update `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` if the project changes; verify RLS posture post-restore.
 - MongoDB Atlas: PITR/snapshot restore to a new or existing cluster; update `MONGODB_URI`.
-- S3: restore prior object versions or re-sync from the replicated/offsite copy.
+- Vercel Blob: re-sync objects from the independent/offsite copy and refresh stored references where necessary.
 - Application: redeploy from Git / Instant Rollback; re-verify cron definitions.
 - Cross-store reconciliation: after any database restore, run the reconciliation step to realign the MongoDB (customer) and Supabase (finance) records, since they are dual-written with no replication layer.
 
@@ -201,8 +201,8 @@ The platform's principal risks across reliability, security, compliance, and ope
 |---|---|---|---|---|---|
 | R-DR-1 | Supabase Pro has no automatic failover; primary/AZ failure recovered only by restore | Medium | High | Enable PITR + read replicas now; plan Enterprise for auto-failover; tested restore runbook | INFRA/DR |
 | R-DR-2 | PITR may not be enabled -> up to 24 h data loss on the finance DB | Medium | High | Enable Supabase PITR; confirm Atlas continuous backup | INFRA/DR |
-| R-DR-3 | No provider-independent offsite backups -> account compromise / accidental deletion / provider failure not fully recoverable | Medium | High | Implement daily offsite logical exports to an isolated account/region; enable S3 Versioning + Object Lock | DR |
-| R-DR-4 | Single-region databases; region outage not survivable without replicas | Low-Medium | High | Multi-region read replicas (Supabase) / multi-region nodes (Atlas) + S3 CRR | INFRA/DR |
+| R-DR-3 | No provider-independent offsite backups -> account compromise / accidental deletion / provider failure not fully recoverable | Medium | High | Implement daily database and Blob exports to an isolated account/region | DR |
+| R-DR-4 | Single-region databases; region outage not survivable without replicas | Low-Medium | High | Multi-region read replicas (Supabase) / multi-region nodes (Atlas) + independent Blob copy | INFRA/DR |
 | R-DR-5 | No contractual uptime SLA on Vercel/Supabase Pro tiers | Medium | Medium-High | Internal 99.9% target; Enterprise upgrade path for SLAs | INFRA |
 | R-DR-6 | DR runbooks untested (unmeasured RTO/RPO) | High | Medium | Quarterly restore drills + semi-annual game-day | DR |
 | R-DR-7 | No formal incident-response / breach-notification runbook | Medium | Medium-High | Build IR plan incl. PDPA 72-hour breach process (see PDPA doc) | Sec/PDPA |
@@ -222,21 +222,21 @@ Highest-priority cluster for DR specifically: R-DR-1, R-DR-2, R-DR-3, R-DR-6 (fa
 ## 9. DR Roadmap and Recommendations
 
 Immediate (days, low effort, high assurance):
-1. Confirm and enable Supabase PITR; confirm MongoDB Atlas is dedicated (M10+) with continuous backup; confirm/enable S3 Versioning + Object Lock.
+1. Confirm and enable Supabase PITR; confirm MongoDB Atlas is dedicated (M10+) with continuous backup; confirm the Blob store region and independent export destination.
 2. Confirm the region map and co-locate compute with the databases (reduce blast radius and latency).
 3. Stand up backup-completion monitoring and basic alerting.
 
 Near term (weeks):
-4. Implement daily provider-independent offsite exports (Postgres + Mongo + S3 copy) to an isolated AWS account/region; verify restorability.
+4. Implement daily provider-independent offsite exports (Postgres + Mongo + Blob copy) to an isolated account/region; verify restorability.
 5. Write and store the restore runbooks (this document) and a first incident-response/breach runbook.
 6. Run the first quarterly restore drill and record measured RTO/RPO.
 
 Medium term:
-7. Add multi-region replicas (Supabase read replica, Atlas multi-region) and S3 Cross-Region Replication for region-failure survivability.
+7. Add multi-region replicas (Supabase read replica, Atlas multi-region) and an independent Blob media copy for region/provider-failure survivability.
 8. Evaluate Enterprise tiers (Vercel, Supabase) for contractual SLAs and Supabase automatic failover.
 9. Institutionalize the DR test program (quarterly drills, semi-annual game-days) and infrastructure-as-code so DR environments are reproducible.
 
-Throughline: the platform inherits strong baseline durability from its managed providers (Atlas continuous backup, S3 11-nines, Vercel immutable deploys), and the DR plan's job is to (a) turn on the available safety nets that are not yet confirmed (PITR, Versioning), (b) add a provider-independent offsite backup as the true DR backbone, and (c) prove recovery through scheduled drills - all achievable without re-architecture.
+Throughline: the platform inherits strong baseline durability from its managed providers (Atlas continuous backup, Blob 11-nines durability, Vercel immutable deploys), and the DR plan's job is to (a) turn on the available safety nets that are not yet confirmed (PITR and continuous backup), (b) add a provider-independent offsite backup as the true DR backbone, and (c) prove recovery through scheduled drills - all achievable without re-architecture.
 
 ---
 
@@ -248,10 +248,10 @@ RTO/RPO matrix (targets):
 |---|---|---|---|---|
 | Supabase (with PITR) | Continuous (daily without PITR) | 7 days (+ offsite 30-90 d) | ~2 min (24 h without PITR) | <= 4 h |
 | MongoDB Atlas | Continuous (oplog) | 1-7 day PITR window | sub-minute | <= 4 h |
-| AWS S3 | Continuous + Versioning | Lifecycle-defined | ~0 | minutes |
+| Vercel Blob | Continuous managed durability + independent export | Retention-defined | ~0 | minutes |
 | App / config | Per deploy / commit | Indefinite | 0 | minutes |
 | Cache | n/a | n/a | n/a | seconds |
 
 Backup schedule summary: financial databases daily (continuous with PITR); object storage continuous; code/config on every deploy; recommended offsite exports daily; AML-driven records archived 5 years.
 
-Sources: backup/HA/SLA specifications and citations are in `INFRASTRUCTURE.md` (Vercel, Supabase, MongoDB Atlas, AWS S3, Upstash primary-source links). All account-specific items (PITR enabled, cluster tier, regions, Versioning/Object Lock) must be confirmed against the live accounts; all figures are planning targets to be validated by DR drills.
+Sources: backup/HA/SLA specifications and citations are in `INFRASTRUCTURE.md` (Vercel/Blob, Supabase, MongoDB Atlas, Upstash primary-source links). All account-specific items (PITR enabled, cluster tier, and regions) must be confirmed against the live accounts; all figures are planning targets to be validated by DR drills.

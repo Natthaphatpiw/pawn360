@@ -94,9 +94,9 @@ Nodes (cylinders, muted teal):
 - "MongoDB Atlas - Customer OLTP (customers, items, contracts, notifications, negotiation-requests)"
 - "Supabase PostgreSQL - Investor/Finance/Logistics (RLS enabled; service-role only)"
 - "Upstash Redis / Vercel KV - Estimate and Image-Hash Cache"
-- "AWS S3 (piwp360, ap-southeast-2) - Images, Contracts, Tickets, QR (presigned URLs)"
+- "Vercel Blob (private store) - Images, Contracts, Tickets, QR (signed URLs)"
 
-Connect Zone 3 (API + Domain Services) to each datastore with solid arrows. Labels: "MongoDB wire (TLS)" to Atlas, "supabase-js / service role" to Supabase, "REST" to Redis, "AWS SDK / presigned" to S3. Add a small note on Supabase: "Dual system of record with MongoDB; consistency at write time, no replication."
+Connect Zone 3 (API + Domain Services) to each datastore with solid arrows. Labels: "MongoDB wire (TLS)" to Atlas, "supabase-js / service role" to Supabase, "REST" to Redis, and "@vercel/blob / signed URL" to Blob. Add a small note on Supabase: "Dual system of record with MongoDB; consistency at write time, no replication."
 
 ### Zone 5 - External Integrations (right side, vertical band, labeled "External Third-Party Systems")
 
@@ -126,7 +126,7 @@ Add a callout box (no fill, thin border) labeled "Asynchronous Lifecycle Engine"
 
 Nodes (dashed rounded rectangles, accent color):
 
-- "Data Flywheel: S3 item photos + drop-point ground-truth verifications + outcome labels"
+- "Data Flywheel: Blob item photos + drop-point ground-truth verifications + outcome labels"
 - "Versioned Dataset + PDPA Redaction (DVC/LakeFS)"
 - "GPU Training Plane (Modal/RunPod/SageMaker; W&B/MLflow tracking)"
 - "Model: Vision Encoder + Multi-Task Heads (condition score, rubric sub-scores, defect detection, item-type) [open source]"
@@ -136,7 +136,7 @@ Nodes (dashed rounded rectangles, accent color):
 
 Connections:
 
-- Dashed arrow from "AWS S3" and "Supabase (drop_point_verifications)" down into "Data Flywheel" labeled "training data + ground truth".
+- Dashed arrow from "Vercel Blob" and "Supabase (drop_point_verifications)" down into "Data Flywheel" labeled "training data + ground truth".
 - Dashed arrows through the pipeline: Data Flywheel to Dataset to GPU Training to Model to Model Registry to GPU Inference Endpoint.
 - A dashed arrow from "GPU Inference Endpoint" up to "/api/analyze-condition" in Zone 3 labeled "new vision provider behind existing abstraction (shadow to canary to primary, with LLM fallback)".
 

@@ -43,7 +43,7 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md), [`INFRA
 | Primary DB client | `@supabase/supabase-js` | ^2.86.0 | PostgreSQL via PostgREST, service role |
 | Operational DB driver | `mongodb` | ^6.20.0 | Native MongoDB driver |
 | Cache client | `@upstash/redis` | ^1.36.3 | REST-based Redis |
-| Object storage | `@aws-sdk/client-s3` (+ presigner) | ^3.952.0 | AWS S3 v3 modular SDK |
+| Object storage | `@vercel/blob` | ^2.6.1 | Private Vercel Blob storage + signed URLs |
 | AI - primary | Anthropic Claude | direct REST (no SDK) | Text + vision |
 | AI - vision scoring | `@google/generative-ai` | ^0.24.1 | Gemini |
 | AI - optional | `openai` | `latest` (unpinned) | Alternate web-search provider |
@@ -63,7 +63,7 @@ Headline: a modern, current-generation TypeScript stack (Next.js 16, React 19, T
 
 - Primary language: TypeScript (`typescript` ^5), compiled to ES2017 target with `module: esnext`, `moduleResolution: bundler`, `strict: true`, and `jsx: react-jsx`. Path alias `@/*` maps to the project root.
 - Secondary languages: SQL (PostgreSQL DDL/DML, captured in `DATABASE_CHANGES.sql` / `database.sql`); JSX/TSX for React components; CSS (Tailwind v4 utility layer).
-- Runtime: Node.js on Vercel Functions (Node 20+ on the platform; the local development environment observed is Node 24). No `engines` field is declared in `package.json` (see Section 17). The application uses the Node.js runtime, not the Edge runtime, because of Node-only dependencies (MongoDB driver, AWS SDK, Puppeteer/Chromium, bcrypt).
+- Runtime: Node.js on Vercel Functions (Node 20+ on the platform; the local development environment observed is Node 24). No `engines` field is declared in `package.json` (see Section 17). The application uses the Node.js runtime, not the Edge runtime, because of Node-only dependencies (MongoDB driver, Puppeteer/Chromium, bcrypt).
 - Package management: npm, with a committed `package-lock.json` as the reproducibility source of truth. A single lockfile per app; note the repository's nested-directory layout is documented in the project guide.
 
 ---
@@ -85,7 +85,7 @@ The frontend is delivered as a set of LINE LIFF mini-apps (one route tree per ac
 
 ## 4. Backend and Server Runtime
 
-The backend is implemented as Next.js Route Handlers (~115 API endpoints) running as Vercel Functions on the Node.js runtime. There is no separate backend framework (no Express/Nest/Fastify); the Next.js Route Handler model is the server framework. Cross-cutting server logic lives in `lib/` modules (database access, LINE clients, security, pricing, AI client, AWS). Background processing runs as two Vercel Cron jobs declared in `vercel.json`.
+The backend is implemented as Next.js Route Handlers (~115 API endpoints) running as Vercel Functions on the Node.js runtime. There is no separate backend framework (no Express/Nest/Fastify); the Next.js Route Handler model is the server framework. Cross-cutting server logic lives in `lib/` modules (database access, LINE clients, security, pricing, AI client, Blob storage). Background processing runs as two Vercel Cron jobs declared in `vercel.json`.
 
 ---
 
@@ -96,9 +96,7 @@ The backend is implemented as Next.js Route Handlers (~115 API endpoints) runnin
 | `@supabase/supabase-js` | ^2.86.0 | PostgreSQL access (investor/finance/logistics store) via the service-role key; PostgREST + realtime-capable client |
 | `mongodb` | ^6.20.0 | Native MongoDB driver for the customer-facing operational store; client cached across warm invocations |
 | `@upstash/redis` | ^1.36.3 | REST client for the estimate-response and image-hash cache (Vercel KV / Upstash) |
-| `@aws-sdk/client-s3` | ^3.952.0 | AWS S3 v3 modular client for object storage (images, contracts, tickets, QR) |
-| `@aws-sdk/s3-request-presigner` | ^3.901.0 | Generates time-limited presigned URLs for private object access |
-| `aws-sdk` | ^1.18.0 | Legacy AWS SDK (v2-style) - present in the manifest but the application uses the modular v3 client; a cleanup candidate (Section 17) |
+| `@vercel/blob` | ^2.6.1 | Private object storage for images, contracts, tickets, QR codes, and time-limited signed read URLs |
 
 The platform runs a deliberate dual datastore (PostgreSQL via Supabase + MongoDB Atlas), described in `SYSTEM_ARCHITECTURE.md`. All database access is server-side with privileged credentials.
 
@@ -168,7 +166,7 @@ Authentication and webhook-signature logic is custom and lives in `lib/security/
 | `typescript` | ^5 | Type system and compiler |
 | Turbopack (via `next dev --turbopack`) | bundled with Next 16 | Local development bundler |
 | `next build` | bundled | Production build |
-| `tsx` | ^4.20.6 (dev) | Executes the TypeScript operational scripts (rich-menu setup, S3 test, benchmarks) |
+| `tsx` | ^4.20.6 (dev) | Executes the TypeScript operational scripts (rich-menu setup, Blob test, benchmarks) |
 | `eslint` | ^9 (dev) | Linting (flat config) |
 | `eslint-config-next` | ^16.0.7 (dev) | Next.js ESLint ruleset |
 | `@eslint/eslintrc` | ^3 (dev) | Flat-config compatibility shim |
@@ -204,7 +202,7 @@ The runtime stack is as much about managed services as about libraries. Full inf
 | Hosting / compute / edge | Vercel (Pro) | Edge network, serverless Functions, cron, CI/CD, WAF/DDoS, DNS/TLS |
 | Relational database | Supabase (Pro, PostgreSQL) | Investor/finance/logistics store, RLS |
 | Document database | MongoDB Atlas | Customer-facing operational store |
-| Object storage | AWS S3 (ap-southeast-2) | Images, contracts, tickets, QR (presigned) |
+| Object storage | Vercel Blob (private store) | Images, contracts, tickets, QR (signed URLs) |
 | Cache | Upstash Redis (via Vercel KV) | Estimate + image-hash cache |
 | Messaging / identity | LINE (Messaging API + LIFF) | Channels and mini-app auth |
 | AI - text | Anthropic Claude | Pricing pipeline reasoning |
@@ -219,7 +217,7 @@ The runtime stack is as much about managed services as about libraries. Full inf
 
 ## 14. Full Dependency Manifest
 
-Production dependencies (28):
+Production dependencies (23):
 
 | Package | Version | Category | Role |
 |---|---|---|---|
@@ -232,9 +230,7 @@ Production dependencies (28):
 | `@supabase/supabase-js` | ^2.86.0 | Data | PostgreSQL client |
 | `mongodb` | ^6.20.0 | Data | MongoDB driver |
 | `@upstash/redis` | ^1.36.3 | Data | Redis cache client |
-| `@aws-sdk/client-s3` | ^3.952.0 | Storage | S3 v3 client |
-| `@aws-sdk/s3-request-presigner` | ^3.901.0 | Storage | Presigned URLs |
-| `aws-sdk` | ^1.18.0 | Storage (legacy) | AWS SDK v2-style; cleanup candidate |
+| `@vercel/blob` | ^2.6.1 | Storage | Private Blob uploads, reads, and signed URLs |
 | `@google/generative-ai` | ^0.24.1 | AI | Gemini SDK |
 | `openai` | `latest` | AI | OpenAI SDK (unpinned) |
 | `@line/bot-sdk` | ^10.3.0 | Messaging | LINE Messaging API |
@@ -286,7 +282,7 @@ npm scripts (`package.json`):
 | `setup-richmenu` | `tsx scripts/setup-richmenu.ts` | Provision LINE rich menus |
 | `setup-richmenu-prod` | `tsx scripts/create-richmenu-production.ts` | Production rich-menu setup |
 | `setup-richmenu-6` | `tsx scripts/create-richmenu-6-buttons.ts` | Six-button rich-menu variant |
-| `test-s3` | `tsx scripts/test-s3.ts` | S3 connectivity check |
+| `test-blob` | `tsx scripts/test-blob.ts` | Vercel Blob connectivity check |
 
 Ad-hoc scripts (run directly with `tsx`/`node`, not wired to npm): pricing/benchmark tooling (`benchmark-runner`, `system-benchmark`, `condition-eval`, `price-*`), and helpers (`check-liff-setup`, `fix-richmenu-urls`). These are operational/evaluation utilities, not part of the production build.
 
@@ -313,12 +309,11 @@ Presented transparently; none are architecturally serious, and each has a low-ef
 |---|---|---|---|
 | 1 | `openai` is pinned to `latest` (unpinned) | Medium | Pin to an exact/caret version for reproducible builds and to avoid silent breaking changes; the lockfile mitigates but the manifest should be explicit |
 | 2 | `react-signature-canvas` is a pre-release (`1.1.0-alpha.2`) in a production signing flow | Medium | Evaluate stability; pin exactly; have a fallback signature component |
-| 3 | Legacy `aws-sdk` (`^1.18.0`) present alongside the modular v3 client | Low | Remove the unused legacy SDK to reduce bundle size and supply-chain surface |
-| 4 | No automated test framework in the manifest | Medium | Add Vitest/Jest + Playwright with CI coverage for pricing, calculations, and state machines (also flagged in the scalability plan) |
-| 5 | No `engines` field (Node version not pinned in `package.json`) | Low | Declare `engines.node` to pin the Node major version for reproducibility across Vercel and local |
-| 6 | A few `@types/*` packages are under `dependencies` rather than `devDependencies` | Low | Move type-only packages to `devDependencies` |
-| 7 | ESLint is relaxed (`no-explicit-any` off, unused-vars as warnings) | Low | Tighten rules incrementally; treat the lint step as a CI gate |
-| 8 | Both `axios` and native `fetch` are used for outbound HTTP | Low | Standardize on one client for consistency in retries/timeouts/observability |
+| 3 | No automated test framework in the manifest | Medium | Add Vitest/Jest + Playwright with CI coverage for pricing, calculations, and state machines (also flagged in the scalability plan) |
+| 4 | No `engines` field (Node version not pinned in `package.json`) | Low | Declare `engines.node` to pin the Node major version for reproducibility across Vercel and local |
+| 5 | A few `@types/*` packages are under `dependencies` rather than `devDependencies` | Low | Move type-only packages to `devDependencies` |
+| 6 | ESLint is relaxed (`no-explicit-any` off, unused-vars as warnings) | Low | Tighten rules incrementally; treat the lint step as a CI gate |
+| 7 | Both `axios` and native `fetch` are used for outbound HTTP | Low | Standardize on one client for consistency in retries/timeouts/observability |
 
 Strengths a reviewer should weigh against the above: the stack is current and mainstream (no end-of-life frameworks), the supply chain is moderate and well-known (no obscure or unmaintained core dependencies), the build is reproducible via a committed lockfile, type safety is enforced (`strict: true`), and the AI layer is deliberately abstracted and partly SDK-free.
 

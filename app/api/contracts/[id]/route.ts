@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { refreshImageUrls } from '@/lib/aws/s3';
+import { refreshBlobUrls } from '@/lib/storage/blob';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
 
 const MAX_OFFER_AGE_MS = 4 * 60 * 60 * 1000;
@@ -109,7 +109,7 @@ export async function GET(
           return {
             ...item,
             notes: notesPayload.publicNotes,
-            image_urls: await refreshImageUrls(item?.image_urls),
+            image_urls: await refreshBlobUrls(item?.image_urls),
           };
         })
       );
@@ -118,7 +118,7 @@ export async function GET(
       items = {
         ...items,
         notes: notesPayload.publicNotes,
-        image_urls: await refreshImageUrls(items?.image_urls),
+        image_urls: await refreshBlobUrls(items?.image_urls),
       };
     }
 

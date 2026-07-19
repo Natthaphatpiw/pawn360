@@ -110,7 +110,7 @@ export default function InterestPaymentUploadPage() {
     setUploading(true);
 
     try {
-      // Upload slip to S3
+      // Upload slip to Vercel Blob
       const formData = new FormData();
       formData.append('file', slipFile);
       formData.append('folder', 'payment-slips');

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getQRCodePresignedUrl } from '@/lib/aws/s3';
+import { getQRCodeSignedUrl } from '@/lib/storage/blob';
 
 export async function GET(
   request: NextRequest,
@@ -8,15 +8,15 @@ export async function GET(
   try {
     const { itemId } = await context.params;
 
-    // Generate presigned URL (valid for 1 hour)
-    const presignedUrl = await getQRCodePresignedUrl(itemId, 3600);
+    // Generate a signed Blob URL (valid for 1 hour)
+    const signedUrl = await getQRCodeSignedUrl(itemId, 3600);
 
     return NextResponse.json({
       success: true,
-      url: presignedUrl,
+      url: signedUrl,
     });
   } catch (error) {
-    console.error('Error generating presigned URL:', error);
+    console.error('Error generating signed Blob URL:', error);
     return NextResponse.json(
       { error: 'Failed to generate QR code URL' },
       { status: 500 }

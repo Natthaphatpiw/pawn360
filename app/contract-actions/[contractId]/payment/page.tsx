@@ -286,7 +286,7 @@ export default function PaymentPage({ params }: { params: Promise<{ contractId: 
         <h3 className="font-bold text-black text-center mb-4">QR Code สำหรับการโอนเงิน</h3>
         <div className="flex justify-center">
           <Image
-            src="https://piwp360.s3.ap-southeast-2.amazonaws.com/bank/QRCode.png"
+            src="/api/blob/bank-qr"
             alt="QR Code"
             width={200}
             height={200}

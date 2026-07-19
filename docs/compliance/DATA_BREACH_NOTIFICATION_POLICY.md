@@ -57,7 +57,7 @@ R = Responsible, A = Accountable, C = Consulted, I = Informed.
 ## 4. Detection & reporting
 
 **Detection sources:**
-- **Monitoring & logs** - platform, infrastructure and access logs across Vercel, Supabase, MongoDB Atlas, AWS S3 and Upstash; anomalous access to private databases (server-side privileged access only) or S3 presigned-URL abuse.
+- **Monitoring & logs** - platform, infrastructure and access logs across Vercel/Blob, Supabase, MongoDB Atlas and Upstash; anomalous access to private databases (server-side privileged access only) or Blob signed-URL abuse.
 - **Processor notification** - a processor reports a breach to Astly (see Section 9).
 - **Staff or user report** - a borrower, investor, drop-point operator, or staff member reports suspected exposure via [incident hotline] or [dpo@astly.co].
 
@@ -117,7 +117,7 @@ Where the breach is **likely to result in high risk** to individuals (e.g. expos
 
 ## 8. Containment, remediation & recovery
 
-1. **Immediate containment** - isolate affected systems, revoke/rotate compromised credentials, keys and presigned-URL access, disable affected accounts, block the attack path. TLS-everywhere, private databases and S3-private controls limit blast radius; use them to contain.
+1. **Immediate containment** - isolate affected systems, revoke/rotate compromised credentials and Blob tokens, invalidate access paths where possible, disable affected accounts, and block the attack path. TLS-everywhere, private databases and private-Blob controls limit blast radius; use them to contain.
 2. **Evidence preservation** - snapshot logs and affected systems before remediation; preserve chain of custody for forensics and any regulator/law-enforcement request. Do not destroy evidence while fixing.
 3. **Root-cause analysis** - Security determines how the breach occurred and the full scope of affected data and subjects.
 4. **Remediation & recovery** - apply the fix, restore integrity/availability from known-good backups, and validate that the vulnerability is closed. Follow the restoration, backup and RTO/RPO procedures in `../../DISASTER_RECOVERY_AND_RISK_PLAN.md`.
@@ -136,7 +136,7 @@ Under **PDPA Sec 40**, each processor must maintain appropriate security measure
 | **Vercel** | Application hosting | Compute/log exposure surface. |
 | **Supabase** | Database (investor/finance, drop-point, PIN/`user_security`) | Private DB; server-side privileged access only. |
 | **MongoDB Atlas** | Database (customer lending flow) | Private DB; server-side privileged access only. |
-| **AWS S3** | Object storage (contracts, item/verification photos, slips) | Private buckets, presigned-URL access. |
+| **Vercel Blob** | Object storage (contracts, item/verification photos, slips) | Private store, pathname/operation-scoped signed-URL access. |
 | **Upstash** | Redis estimate cache | Cache of derived data. |
 | **Payment PSP (planned)** | Payment processing | Financial data; add on onboarding. |
 

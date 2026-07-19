@@ -67,7 +67,7 @@ export default function RedemptionReceiptPage() {
     setUploading(true);
 
     try {
-      // Upload images to S3
+      // Upload images to Vercel Blob
       const uploadPromises = receiptFiles.map(async (file) => {
         const formData = new FormData();
         formData.append('file', file);

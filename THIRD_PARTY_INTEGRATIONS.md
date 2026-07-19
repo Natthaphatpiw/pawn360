@@ -37,7 +37,7 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md), [`INFRA
 | LINE Messaging API | Messaging | Live | Outbound push + inbound webhook | SDK / REST | Channel access token; inbound HMAC |
 | LINE LIFF | Identity (channel login) | Live | Client SDK | SDK | LINE Login (OAuth) |
 | SlipOK | Payment-slip verification | Live | Outbound | REST | `x-authorization` |
-| AWS S3 | Object storage | Live | Outbound | AWS SDK | IAM key; presigned URLs |
+| Vercel Blob | Object storage | Live | Outbound | `@vercel/blob` | Project read/write token; signed URLs |
 | Shop System | Adjacent platform | Live | Outbound + inbound callback | REST | HMAC-signed |
 | Escrow / funds custody | Payments / custody | Planned | Outbound + webhook | REST (PSP) or bank arrangement | TBD (provider) |
 | In-house condition model | AI (vision) | Planned | Outbound (private endpoint) | REST | Private network / token |
@@ -228,7 +228,7 @@ The SlipOK + bank-transfer model continues to operate during the build; the PSP 
 
 ## 9. Object Storage and Adjacent Systems
 
-- AWS S3: integrated via the AWS SDK v3; all media (item photos, slips, contracts, tickets, QR) is stored privately and accessed through time-limited presigned URLs. Detail in `INFRASTRUCTURE.md` Section 7.
+- Vercel Blob: integrated through `@vercel/blob`; media (item photos, slips, contracts, tickets, QR) is stored in a private project-connected store and accessed through time-limited, pathname-scoped signed URLs or dedicated server reads. Detail in `INFRASTRUCTURE.md` Section 7.
 - Shop System: a separate, independently deployed application integrated over signed HTTP (HMAC over a notification id and timestamp, 5-minute replay window). It performs negotiation and payment verification and calls back into the platform to advance the asynchronous lifecycle state machine.
 
 ---
@@ -243,7 +243,7 @@ The SlipOK + bank-transfer model continues to operate during the build; the PSP 
 | Rate-limit resilience | Multi-key rotation and graceful degradation on AI providers |
 | Idempotency | Event-dedup on the customer webhook; bounded retries on the ticket queue; planned idempotent payout references |
 | Failure isolation | Defined fallbacks (SlipOK->Claude vision; AI->min price/unreadable; cache miss->recompute) |
-| Data minimization | Hosted eKYC keeps raw identity media with the vendor; media access via presigned URLs |
+| Data minimization | Hosted eKYC keeps raw identity media with the vendor; Blob media access uses time-limited signed URLs |
 
 ---
 
@@ -272,7 +272,7 @@ Integration endpoints and credentials (env vars):
 - Gemini: `GEMINI_API_KEY(_2/_3/_4)`. OpenAI: `OPENAI_API_KEY(_2/_3/_4)`, `PRICE_SEARCH_PROVIDER`, `PRICE_SEARCH_MODEL`. SerpAPI: `SERPAPI_API_KEY`, `SERPAPI_ENABLED`.
 - LINE: per-actor channel tokens/secrets (`LINE_CHANNEL_ACCESS_TOKEN`/`_SECRET`, `_INVEST`, `_DROPPOINT`, `LINE_ADMIN_*`, `LINE_STORE_*`).
 - SlipOK: `SLIPOK_API_URL`, `SLIPOK_API_KEY`, `SLIPOK_BRANCH_ID`, `SLIPOK_PASSWORD`.
-- Shop System: `SHOP_SYSTEM_URL`, `WEBHOOK_SECRET`. S3: `AWS_*`.
+- Shop System: `SHOP_SYSTEM_URL`, `WEBHOOK_SECRET`. Blob: `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID`, `BLOB_WEBHOOK_PUBLIC_KEY`.
 - Escrow (planned): PSP/bank credentials to be added behind a "funds provider" abstraction.
 
 Regulatory and provider sources (public, as of mid-2026; confirm currency at diligence time):

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { sendQRCodeImage } from '@/lib/line/client';
-import { uploadQRCodeToS3, getQRCodePresignedUrl } from '@/lib/aws/s3';
+import { uploadQRCodeToBlob } from '@/lib/storage/blob';
 import { generateQRCode, generateQRCodeData } from '@/lib/utils/qrcode';
 
 export async function POST(request: NextRequest) {
@@ -55,22 +55,20 @@ export async function POST(request: NextRequest) {
     const base64Data = qrCodeDataURL.replace(/^data:image\/png;base64,/, '');
     const qrBuffer = Buffer.from(base64Data, 'base64');
 
-    // Upload to S3
-    await uploadQRCodeToS3(itemId, qrBuffer);
-    const presignedUrl = await getQRCodePresignedUrl(itemId, 7 * 24 * 3600);
+    const signedUrl = await uploadQRCodeToBlob(itemId, qrBuffer);
 
     // อัปเดต QR Code ใน pawnRequest
     await customersCollection.updateOne(
       { lineId, 'pawnRequests.itemId': new ObjectId(itemId) },
       {
         $set: {
-          'pawnRequests.$.qrCode': presignedUrl,
+          'pawnRequests.$.qrCode': signedUrl,
         },
       }
     );
 
     // ส่ง QR Code ใหม่ไปยังลูกค้า
-    await sendQRCodeImage(lineId, itemId, presignedUrl);
+    await sendQRCodeImage(lineId, itemId, signedUrl);
 
     return NextResponse.json({
       success: true,
