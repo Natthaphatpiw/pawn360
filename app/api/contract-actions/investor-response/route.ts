@@ -3,11 +3,19 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { Client } from '@line/bot-sdk';
 
-// Pawner LINE OA client
-const pawnerLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN ? new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-}) : null;
+const getPawnerLineClient = () => {
+  const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!channelAccessToken) return null;
+
+  return new Client({
+    channelAccessToken,
+    channelSecret: process.env.LINE_CHANNEL_SECRET || ''
+  });
+};
+
+const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
+  Array.isArray(value) ? value[0] || null : value || null
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +25,14 @@ export async function POST(request: NextRequest) {
     if (!requestId || !action) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
+    if (action === 'REJECT' && !normalizedReason) {
+      return NextResponse.json(
+        { error: 'กรุณาระบุเหตุผลที่ปฏิเสธคำขอ' },
         { status: 400 }
       );
     }
@@ -46,18 +62,38 @@ export async function POST(request: NextRequest) {
     }
 
     const contract = actionRequest.contract;
-    const pawner = contract?.pawners;
+    const pawner = normalizeRelation<any>(contract?.pawners);
+    const investor = normalizeRelation<any>(contract?.investors);
+
+    if (!investorLineId || investor?.line_id !== investorLineId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
+    }
 
     if (action === 'REJECT') {
+      if (!['PENDING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_APPROVAL'].includes(actionRequest.request_status)) {
+        return NextResponse.json(
+          { error: 'คำขอนี้ไม่ได้อยู่ในสถานะที่สามารถปฏิเสธได้' },
+          { status: 409 }
+        );
+      }
+
       // Update request status
-      await supabase
+      const { error: updateError } = await supabase
         .from('contract_action_requests')
         .update({
           request_status: 'INVESTOR_REJECTED',
-          rejection_reason: reason,
-          rejected_at: new Date().toISOString(),
+          investor_rejection_reason: normalizedReason,
+          investor_rejected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .eq('request_id', requestId);
+
+      if (updateError) {
+        throw updateError;
+      }
 
       // Log rejection
       await logContractAction(
@@ -68,8 +104,8 @@ export async function POST(request: NextRequest) {
         investorLineId,
         {
           actionRequestId: requestId,
-          rejectionReason: reason,
-          description: `Investor rejected principal increase request. Reason: ${reason}`,
+          rejectionReason: normalizedReason,
+          description: `Investor rejected principal increase request. Reason: ${normalizedReason}`,
           metadata: {
             actionType: 'PRINCIPAL_INCREASE',
           },
@@ -77,11 +113,16 @@ export async function POST(request: NextRequest) {
       );
 
       // Notify pawner
-      if (pawner?.line_id && pawnerLineClient) {
+      if (pawner?.line_id) {
         try {
+          const pawnerLineClient = getPawnerLineClient();
+          if (!pawnerLineClient) {
+            throw new Error('Seller LINE OA is not configured');
+          }
+
           await pawnerLineClient.pushMessage(pawner.line_id, {
             type: 'text',
-            text: `คำขอเพิ่มเงินต้นถูกปฏิเสธ\n\nจำนวนที่ขอ: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nเหตุผล: ${reason}\n\nหากมีข้อสงสัย กรุณาติดต่อฝ่ายสนับสนุน`
+            text: `คำขอเพิ่มเงินต้นถูกปฏิเสธ\n\nจำนวนที่ขอ: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nเหตุผล: ${normalizedReason}\n\nหากมีข้อสงสัย กรุณาติดต่อฝ่ายสนับสนุน`
           });
         } catch (err) {
           console.error('Error sending message to pawner:', err);

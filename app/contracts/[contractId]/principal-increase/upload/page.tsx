@@ -158,6 +158,11 @@ export default function PrincipalIncreaseUploadPage() {
 
   const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.total_amount;
   const penaltyAmount = Number(requestDetails?.penalty_amount || requestDetails?.payment_breakdown?.penaltyAmount || 0);
+  const overdueInterestAmount = Number(
+    requestDetails?.overdue_interest_amount
+      || requestDetails?.payment_breakdown?.overdueInterestAmount
+      || 0
+  );
   const baseAmount = Number(requestDetails?.base_amount || requestDetails?.payment_breakdown?.baseAmount || requestDetails?.interest_for_period || 0);
 
   if (showVoided) {
@@ -256,10 +261,18 @@ export default function PrincipalIncreaseUploadPage() {
                 </span>
               </div>
             )}
+            {overdueInterestAmount > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-foreground-subtle text-sm">ดอกเบี้ยเกินกำหนด:</span>
+                <span className="font-medium text-primary">
+                  {overdueInterestAmount.toLocaleString()} บาท
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center mb-2">
               <span className="text-foreground-subtle text-sm">ยอดดอกเบี้ยที่ต้องชำระวันนี้:</span>
               <span className="font-bold text-primary text-lg">
-                {requestDetails.total_amount?.toLocaleString()} บาท
+                {Number(requiredAmount || 0).toLocaleString()} บาท
               </span>
             </div>
             <p className="text-xs text-foreground-subtle">
@@ -331,7 +344,7 @@ export default function PrincipalIncreaseUploadPage() {
             <ul className="text-xs text-foreground space-y-1 list-disc list-inside">
               <li>ถ่ายภาพสลิปให้ชัดเจน เห็นยอดเงินและวันที่</li>
               <li>ตรวจสอบยอดเงินให้ตรงกับที่ระบุ</li>
-              <li>หากยอดไม่ตรง การไถ่ถอนจะถูกระงับ</li>
+              <li>หากยอดไม่ตรง คำขอเพิ่มเงินต้นจะยังไม่ถูกส่งให้พิจารณา</li>
             </ul>
           </div>
         </div>

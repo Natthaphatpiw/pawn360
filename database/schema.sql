@@ -579,11 +579,15 @@ CREATE TABLE contract_action_requests (
     'SLIP_REJECTED_FINAL',        -- AI ปฏิเสธสลิป (รอบสอง - โมฆะ)
     'AWAITING_SIGNATURE',         -- รอเซ็นสัญญาใหม่
     'AWAITING_INVESTOR_APPROVAL', -- รอนักลงทุนอนุมัติ (สำหรับเพิ่มเงินต้น)
+    'PENDING_INVESTOR_APPROVAL',  -- ส่งคำขอให้นักลงทุนแล้ว
     'INVESTOR_APPROVED',          -- นักลงทุนอนุมัติแล้ว
     'INVESTOR_REJECTED',          -- นักลงทุนปฏิเสธ
     'AWAITING_INVESTOR_PAYMENT',  -- รอนักลงทุนโอนเงิน (สำหรับเพิ่มเงินต้น)
     'INVESTOR_SLIP_UPLOADED',     -- นักลงทุนอัพโหลดสลิปแล้ว
     'INVESTOR_SLIP_VERIFIED',     -- ตรวจสอบสลิปนักลงทุนผ่าน
+    'INVESTOR_SLIP_REJECTED',     -- สลิปนักลงทุนไม่ผ่าน
+    'INVESTOR_SLIP_REJECTED_FINAL', -- สลิปนักลงทุนไม่ผ่านรอบสุดท้าย
+    'INVESTOR_TRANSFERRED',       -- นักลงทุนโอนเงินแล้ว
     'AWAITING_PAWNER_CONFIRM',    -- รอผู้จำนำยืนยันรับเงิน
     'COMPLETED',                  -- เสร็จสิ้น
     'CANCELLED',                  -- ยกเลิก
@@ -623,6 +627,7 @@ CREATE TABLE contract_action_requests (
 
   -- Total Amount to Pay/Receive
   total_amount DECIMAL(12,2),                    -- ยอดรวมทั้งหมด
+  overdue_interest_amount DECIMAL(12,2) DEFAULT 0, -- ดอกเบี้ยเกินกำหนด ณ เวลาสร้างคำขอ
 
   -- Payment Slip (Pawner)
   slip_url TEXT,
@@ -641,6 +646,10 @@ CREATE TABLE contract_action_requests (
   investor_slip_attempt_count INT DEFAULT 0,
 
   -- Signature
+  pawner_signature_url TEXT,
+  pawner_bank_name VARCHAR(100),
+  pawner_bank_account_no VARCHAR(100),
+  pawner_bank_account_name VARCHAR(200),
   signature_url TEXT,
   signed_at TIMESTAMPTZ,
 

@@ -4,11 +4,19 @@ import { verifyPaymentSlip, saveSlipVerification, logContractAction } from '@/li
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 import { Client } from '@line/bot-sdk';
 
-// Pawner LINE OA client
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
+const getPawnerLineClient = () => {
+  const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!channelAccessToken) return null;
+
+  return new Client({
+    channelAccessToken,
+    channelSecret: process.env.LINE_CHANNEL_SECRET || ''
+  });
+};
+
+const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
+  Array.isArray(value) ? value[0] || null : value || null
+);
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const msPerDay = 1000 * 60 * 60 * 24;
@@ -154,7 +162,15 @@ export async function POST(request: NextRequest) {
     }
 
     const contract = actionRequest.contract;
-    const pawner = contract?.pawners;
+    const pawner = normalizeRelation<any>(contract?.pawners);
+    const investor = normalizeRelation<any>(contract?.investors);
+
+    if (!investorLineId || investor?.line_id !== investorLineId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
+    }
 
     // Verify slip before applying the principal increase
     const expectedAmount = actionRequest.increase_amount;
@@ -302,6 +318,11 @@ export async function POST(request: NextRequest) {
         ];
 
         try {
+          const pawnerLineClient = getPawnerLineClient();
+          if (!pawnerLineClient) {
+            throw new Error('Seller LINE OA is not configured');
+          }
+
           await pawnerLineClient.pushMessage(pawner.line_id, {
             type: 'text',
             text: messageLines.join('\n\n')

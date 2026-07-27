@@ -1,19 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { pushLineMessageWithRetry } from '@/lib/line/push-with-retry';
 import { verifyPaymentSlip, saveSlipVerification, logContractAction, getCompanyBankAccount } from '@/lib/services/slip-verification';
-import { getPenaltyRequirement, markPenaltyPaymentVerified, roundCurrency } from '@/lib/services/penalty';
+import {
+  getFrozenLateChargeBreakdown,
+  markPenaltyPaymentVerified,
+  normalizeDate,
+  roundCurrency,
+  type PenaltyRequirement,
+} from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
-// LINE clients
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
+const createLineClient = (channelAccessToken?: string, channelSecret?: string) => {
+  if (!channelAccessToken) return null;
 
-const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
-});
+  return new Client({
+    channelAccessToken,
+    channelSecret: channelSecret || ''
+  });
+};
+
+const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
+  Array.isArray(value) ? value[0] || null : value || null
+);
+
+const resolveContractInvestor = async (supabase: any, contract: any) => {
+  const relatedInvestor = normalizeRelation<any>(contract?.investors);
+  if (relatedInvestor?.line_id || !contract?.investor_id) {
+    return relatedInvestor;
+  }
+
+  const { data: investor, error } = await supabase
+    .from('investors')
+    .select('investor_id, line_id')
+    .eq('investor_id', contract.investor_id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error resolving contract investor:', error);
+    return relatedInvestor;
+  }
+
+  return investor;
+};
+
+const getFrozenPenaltyRequirement = (
+  actionRequest: any,
+  contract: any,
+  baseAmount: number,
+): PenaltyRequirement => {
+  const breakdown = getFrozenLateChargeBreakdown(actionRequest, contract, baseAmount);
+  const contractStartDate = normalizeDate(contract.contract_start_date);
+  const contractEndDate = normalizeDate(contract.contract_end_date);
+
+  return {
+    required: breakdown.totalLateChargeAmount > 0,
+    daysOverdue: breakdown.daysOverdue,
+    penaltyAmount: breakdown.penaltyAmount,
+    overdueInterestAmount: breakdown.overdueInterestAmount,
+    totalLateChargeAmount: breakdown.totalLateChargeAmount,
+    today: breakdown.requestDate,
+    contractStartDate,
+    contractEndDate,
+    paidThroughDate: null,
+  };
+};
+
+const updateActionRequest = async (
+  supabase: any,
+  requestId: string,
+  updateData: Record<string, unknown>,
+) => {
+  const { error } = await supabase
+    .from('contract_action_requests')
+    .update(updateData)
+    .eq('request_id', requestId);
+
+  if (error) {
+    throw error;
+  }
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,23 +149,32 @@ export async function POST(request: NextRequest) {
     }
 
     const contract = actionRequest.contract;
-    const pawner = contract?.pawners;
-    const investor = contract?.investors;
-    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
-    const baseAmount = getBaseAmountForActionRequest(actionRequest);
-    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
-    const expectedAmount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
+    const pawner = normalizeRelation<any>(contract?.pawners);
+    const investor = await resolveContractInvestor(supabase, contract);
 
-    if (expectedAmount !== Number(actionRequest.total_amount || 0)) {
-      await supabase
-        .from('contract_action_requests')
-        .update({
-          total_amount: expectedAmount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('request_id', requestId);
+    if (
+      actionRequest.request_type === 'PRINCIPAL_INCREASE'
+      && (!contract?.investor_id || !investor?.line_id)
+    ) {
+      return NextResponse.json(
+        { error: 'ไม่พบ Buyer เจ้าของสัญญาหรือ LINE ID สำหรับรับคำขอ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 }
+      );
     }
+
+    if (pawnerLineId && pawner?.line_id !== pawnerLineId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
+    }
+
+    const baseAmount = getBaseAmountForActionRequest(actionRequest);
+    const persistedTotalAmount = Number(actionRequest.total_amount || 0);
+    const expectedAmount = roundCurrency(
+      persistedTotalAmount > 0 ? persistedTotalAmount : baseAmount
+    );
+    const penaltyRequirement = getFrozenPenaltyRequirement(actionRequest, contract, baseAmount);
 
     const companyBank = await getCompanyBankAccount();
 
@@ -137,7 +212,8 @@ export async function POST(request: NextRequest) {
       const isPrincipalIncrease = actionRequest.request_type === 'PRINCIPAL_INCREASE';
       updateData.request_status = isPrincipalIncrease ? 'PENDING_INVESTOR_APPROVAL' : 'SLIP_VERIFIED';
 
-      // Log success
+      await updateActionRequest(supabase, requestId, updateData);
+
       await logContractAction(
         actionRequest.contract_id,
         'SLIP_VERIFIED',
@@ -153,11 +229,6 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      await supabase
-        .from('contract_action_requests')
-        .update(updateData)
-        .eq('request_id', requestId);
-
       if (penaltyRequirement.required) {
         await markPenaltyPaymentVerified(supabase, contract, penaltyRequirement, {
           slipUrl,
@@ -168,10 +239,20 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      let buyerNotificationSent = false;
       if (isPrincipalIncrease && investor?.line_id) {
         try {
+          const investorLineClient = createLineClient(
+            process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST,
+            process.env.LINE_CHANNEL_SECRET_INVEST
+          );
+          if (!investorLineClient) {
+            throw new Error('Buyer LINE OA is not configured');
+          }
+
           const approvalCard = createInvestorApprovalCard(actionRequest, contract);
-          await investorLineClient.pushMessage(investor.line_id, approvalCard);
+          await pushLineMessageWithRetry(investorLineClient, investor.line_id, approvalCard);
+          buyerNotificationSent = true;
           await logContractAction(
             actionRequest.contract_id,
             'NOTIFICATION_SENT',
@@ -187,7 +268,19 @@ export async function POST(request: NextRequest) {
             }
           );
         } catch (err) {
-          console.error('Error sending message to investor:', err);
+          console.error('Error sending approval notification to buyer:', err);
+          await logContractAction(
+            actionRequest.contract_id,
+            'ERROR_OCCURRED',
+            'FAILED',
+            'SYSTEM',
+            null,
+            {
+              actionRequestId: requestId,
+              description: 'Failed to send principal increase approval notification to contract owner',
+              errorMessage: err instanceof Error ? err.message : 'Unknown LINE notification error',
+            }
+          );
         }
       }
 
@@ -197,6 +290,8 @@ export async function POST(request: NextRequest) {
         message: 'ตรวจสอบสลิปสำเร็จ',
         nextStep: isPrincipalIncrease ? 'WAIT_INVESTOR_APPROVAL' : 'SIGN_CONTRACT',
         detectedAmount: verificationResult.detectedAmount,
+        expectedAmount,
+        buyerNotificationSent,
       });
 
     } else if (verificationResult.result === 'UNDERPAID') {
@@ -207,10 +302,7 @@ export async function POST(request: NextRequest) {
         updateData.voided_at = new Date().toISOString();
         updateData.void_reason = 'โอนเงินไม่ครบจำนวน 2 ครั้ง';
 
-        await supabase
-          .from('contract_action_requests')
-          .update(updateData)
-          .eq('request_id', requestId);
+        await updateActionRequest(supabase, requestId, updateData);
 
         // Log voided
         await logContractAction(
@@ -231,6 +323,14 @@ export async function POST(request: NextRequest) {
         // Send notification to pawner
         if (pawner?.line_id) {
           try {
+            const pawnerLineClient = createLineClient(
+              process.env.LINE_CHANNEL_ACCESS_TOKEN,
+              process.env.LINE_CHANNEL_SECRET
+            );
+            if (!pawnerLineClient) {
+              throw new Error('Seller LINE OA is not configured');
+            }
+
             await pawnerLineClient.pushMessage(pawner.line_id, {
               type: 'text',
               text: `การดำเนินการเป็นโมฆะ\n\nเนื่องจากคุณโอนเงินไม่ตรงตามจำนวนถึง 2 ครั้ง\n\nกรุณาติดต่อฝ่าย Support\nโทร: 0626092941\n\nแจ้งปัญหา: การ${getActionTypeName(actionRequest.request_type)}ไม่สำเร็จ\nหมายเลขสัญญา: ${contract?.contract_number}`
@@ -251,10 +351,7 @@ export async function POST(request: NextRequest) {
         // First attempt failed - allow retry
         updateData.request_status = 'SLIP_REJECTED';
 
-        await supabase
-          .from('contract_action_requests')
-          .update(updateData)
-          .eq('request_id', requestId);
+        await updateActionRequest(supabase, requestId, updateData);
 
         // Log rejected
         await logContractAction(
@@ -295,10 +392,7 @@ export async function POST(request: NextRequest) {
         updateData.voided_at = new Date().toISOString();
         updateData.void_reason = 'ไม่สามารถอ่านสลิปได้ 2 ครั้ง';
 
-        await supabase
-          .from('contract_action_requests')
-          .update(updateData)
-          .eq('request_id', requestId);
+        await updateActionRequest(supabase, requestId, updateData);
 
         return NextResponse.json({
           success: false,
@@ -310,10 +404,7 @@ export async function POST(request: NextRequest) {
 
       updateData.request_status = 'SLIP_REJECTED';
 
-      await supabase
-        .from('contract_action_requests')
-        .update(updateData)
-        .eq('request_id', requestId);
+      await updateActionRequest(supabase, requestId, updateData);
 
       return NextResponse.json({
         success: false,
@@ -357,7 +448,7 @@ function getBaseAmountForActionRequest(actionRequest: any): number {
 
 function createInvestorApprovalCard(actionRequest: any, contract: any): FlexMessage {
   const item = contract?.items;
-  const pawner = contract?.pawners;
+  const pawner = normalizeRelation<any>(contract?.pawners);
   const increaseAmount = Number(actionRequest.increase_amount || 0);
   const newPrincipal = actionRequest.principal_after_increase;
   const investorRate = Number(contract?.investor_rate || 0.015);

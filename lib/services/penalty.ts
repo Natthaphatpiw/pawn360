@@ -18,6 +18,16 @@ export interface PenaltyRequirement {
   paidThroughDate: Date | null;
 }
 
+export interface FrozenLateChargeBreakdown {
+  totalAmount: number;
+  penaltyAmount: number;
+  overdueInterestAmount: number;
+  totalLateChargeAmount: number;
+  daysOverdue: number;
+  requestDate: Date;
+  hasStoredBreakdown: boolean;
+}
+
 export const normalizeDate = (value: Date | string) => {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
@@ -42,6 +52,67 @@ export const calculatePenaltyAmount = (daysOverdue: number) => (
 export const calculatePenaltyMonths = (daysOverdue: number) => (
   Math.max(0, Math.ceil(Math.max(0, daysOverdue) / DAYS_PER_PENALTY_MONTH))
 );
+
+export const getFrozenLateChargeBreakdown = (
+  actionRequest: any,
+  contract: any,
+  baseAmount: number,
+): FrozenLateChargeBreakdown => {
+  const totalAmount = roundCurrency(
+    Number(actionRequest?.total_amount || 0) > 0
+      ? Number(actionRequest.total_amount)
+      : baseAmount
+  );
+  const totalLateChargeAmount = Math.max(
+    0,
+    roundCurrency(totalAmount - baseAmount)
+  );
+  const requestDate = normalizeDate(actionRequest?.created_at || new Date());
+  const daysOverdue = calculateOverdueDays(contract.contract_end_date, requestDate);
+  const hasStoredBreakdown = actionRequest?.overdue_interest_amount !== null
+    && actionRequest?.overdue_interest_amount !== undefined;
+
+  if (hasStoredBreakdown) {
+    const overdueInterestAmount = Math.min(
+      totalLateChargeAmount,
+      Math.max(0, roundCurrency(Number(actionRequest.overdue_interest_amount || 0)))
+    );
+
+    return {
+      totalAmount,
+      penaltyAmount: Math.max(
+        0,
+        roundCurrency(totalLateChargeAmount - overdueInterestAmount)
+      ),
+      overdueInterestAmount,
+      totalLateChargeAmount,
+      daysOverdue,
+      requestDate,
+      hasStoredBreakdown,
+    };
+  }
+
+  // Legacy requests predate the overdue-interest snapshot. Preserve their
+  // frozen total, derive the flat penalty from the request date, and treat the
+  // remainder as overdue interest instead of mislabeling it all as a penalty.
+  const penaltyAmount = Math.min(
+    totalLateChargeAmount,
+    calculatePenaltyAmount(daysOverdue)
+  );
+
+  return {
+    totalAmount,
+    penaltyAmount,
+    overdueInterestAmount: Math.max(
+      0,
+      roundCurrency(totalLateChargeAmount - penaltyAmount)
+    ),
+    totalLateChargeAmount,
+    daysOverdue,
+    requestDate,
+    hasStoredBreakdown,
+  };
+};
 
 export const calculateOverdueInterestAmount = (
   principalAmount: number,

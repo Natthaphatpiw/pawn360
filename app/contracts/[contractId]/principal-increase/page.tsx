@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Calculator, Wallet, Info } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../_components/TransactionHeader';
-import { withPreview } from '../_lib/preview';
+import { isPreviewMode, withPreview } from '../_lib/preview';
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -19,13 +19,7 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      clearCanvas();
-    }
-  }, [isOpen]);
-
-  const clearCanvas = () => {
+  const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -35,7 +29,13 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      clearCanvas();
+    }
+  }, [isOpen, clearCanvas]);
 
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -173,6 +173,7 @@ export default function PrincipalIncreasePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
+  const previewMode = isPreviewMode(searchParams);
   const { profile } = useLiff();
 
   const [loading, setLoading] = useState(true);
@@ -217,25 +218,30 @@ export default function PrincipalIncreasePage() {
       } else {
         throw new Error('Contract unavailable');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching contract:', error);
-      setContract({
-        contract_id: contractId,
-        contract_number: `CT-${contractId}-MOCK`,
-        interest_rate: 0.03,
-        loan_principal_amount: 10000,
-        original_principal_amount: 10000,
-        current_principal_amount: 10000,
-        items: {
-          brand: 'Apple',
-          model: 'iPhone 13',
-          estimated_value: 18000,
-        },
-      });
-      setError(null);
-      setBankName('พร้อมเพย์');
-      setBankAccountNo('0812345678');
-      setBankAccountName('Mock User');
+      if (previewMode) {
+        setContract({
+          contract_id: contractId,
+          contract_number: `CT-${contractId}-MOCK`,
+          interest_rate: 0.03,
+          loan_principal_amount: 10000,
+          original_principal_amount: 10000,
+          current_principal_amount: 10000,
+          items: {
+            brand: 'Apple',
+            model: 'iPhone 13',
+            estimated_value: 18000,
+          },
+        });
+        setError(null);
+        setBankName('พร้อมเพย์');
+        setBankAccountNo('0812345678');
+        setBankAccountName('Mock User');
+      } else {
+        setContract(null);
+        setError(error.response?.data?.error || 'ไม่สามารถโหลดข้อมูลสัญญาได้ กรุณาลองใหม่อีกครั้ง');
+      }
     } finally {
       setLoading(false);
     }
@@ -264,7 +270,7 @@ export default function PrincipalIncreasePage() {
     } catch (error: any) {
       console.error('Error calculating:', error);
       const amount = parseFloat(increaseAmount);
-      if (amount > 0) {
+      if (previewMode && amount > 0) {
         const newPrincipal = (contract?.current_principal_amount || contract?.loan_principal_amount || 10000) + amount;
         setCalculation({
           currentPrincipal: contract?.current_principal_amount || contract?.loan_principal_amount || 10000,
@@ -322,6 +328,7 @@ export default function PrincipalIncreasePage() {
         contractId,
         actionType: 'PRINCIPAL_INCREASE',
         increaseAmount: parseFloat(increaseAmount),
+        quotedTotalAmount: Number(calculation?.totalToPay || payTodayAmount),
         pawnerLineId: profile?.userId,
         termsAccepted: true,
         pawnerSignatureUrl: uploadRes.data.url,
@@ -349,8 +356,15 @@ export default function PrincipalIncreasePage() {
       }
     } catch (error: any) {
       console.error('Error creating request:', error);
-      const previewRequestId = `preview-increase-${contractId}`;
-      router.push(withPreview(`/contracts/${contractId}/principal-increase/upload`, 'requestId', previewRequestId));
+      if (previewMode) {
+        const previewRequestId = `preview-increase-${contractId}`;
+        router.push(withPreview(`/contracts/${contractId}/principal-increase/upload`, 'requestId', previewRequestId));
+      } else {
+        if (error.response?.data?.recalculationRequired) {
+          await calculateIncrease();
+        }
+        setError(error.response?.data?.error || 'ไม่สามารถส่งคำขอเพิ่มเงินต้นได้ กรุณาลองใหม่อีกครั้ง');
+      }
     } finally {
       setSubmitting(false);
     }

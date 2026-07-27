@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { getPenaltyRequirement, roundCurrency } from '@/lib/services/penalty';
+import { getFrozenLateChargeBreakdown } from '@/lib/services/penalty';
 
 export async function GET(
   request: NextRequest,
@@ -55,19 +55,23 @@ export async function GET(
     }
 
     if (['AWAITING_PAYMENT', 'SLIP_REJECTED'].includes(actionRequest.request_status)) {
-      const penaltyRequirement = await getPenaltyRequirement(supabase, actionRequest.contract);
       const baseAmount = getBaseAmountForActionRequest(actionRequest);
-      const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-      const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+      const breakdown = getFrozenLateChargeBreakdown(
+        actionRequest,
+        actionRequest.contract,
+        baseAmount
+      );
+
       actionRequest.base_amount = baseAmount;
-      actionRequest.penalty_amount = penaltyAmount;
-      actionRequest.overdue_interest_amount = overdueInterestAmount;
-      actionRequest.total_amount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
+      actionRequest.penalty_amount = breakdown.penaltyAmount;
+      actionRequest.overdue_interest_amount = breakdown.overdueInterestAmount;
+      actionRequest.total_amount = breakdown.totalAmount;
       actionRequest.payment_breakdown = {
         baseAmount,
-        penaltyAmount,
-        overdueInterestAmount,
-        totalAmount: actionRequest.total_amount,
+        penaltyAmount: breakdown.penaltyAmount,
+        overdueInterestAmount: breakdown.overdueInterestAmount,
+        totalAmount: breakdown.totalAmount,
+        derivedFromLegacyRequest: !breakdown.hasStoredBreakdown,
       };
     }
 

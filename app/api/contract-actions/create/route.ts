@@ -2,13 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { ensurePenaltyPaymentRecord, getPenaltyRequirement } from '@/lib/services/penalty';
+import { pushLineMessageWithRetry } from '@/lib/line/push-with-retry';
 import { Client, FlexMessage } from '@line/bot-sdk';
 
-// Investor LINE OA client
-const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
-});
+const getInvestorLineClient = () => {
+  const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST;
+  if (!channelAccessToken) return null;
+
+  return new Client({
+    channelAccessToken,
+    channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
+  });
+};
+
+const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
+  Array.isArray(value) ? value[0] || null : value || null
+);
 
 const ACTIVE_REQUEST_STATUSES = [
   'PENDING',
@@ -56,6 +65,7 @@ export async function POST(request: NextRequest) {
       amount,
       reductionAmount,
       increaseAmount,
+      quotedTotalAmount,
       pawnerLineId,
       termsAccepted,
       pawnerSignatureUrl,
@@ -97,8 +107,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const pawner = normalizeRelation<any>(contract.pawners);
+    let investor = normalizeRelation<any>(contract.investors);
+    if (!investor?.line_id && contract.investor_id) {
+      const { data: investorRecord, error: investorLookupError } = await supabase
+        .from('investors')
+        .select('investor_id, line_id')
+        .eq('investor_id', contract.investor_id)
+        .maybeSingle();
+
+      if (investorLookupError) {
+        console.error('Error resolving contract investor:', investorLookupError);
+      } else {
+        investor = investorRecord;
+      }
+    }
+
+    const normalizedContract = {
+      ...contract,
+      pawners: pawner,
+      investors: investor,
+    };
+
+    if (actionType === 'PRINCIPAL_INCREASE' && (!contract.investor_id || !investor?.line_id)) {
+      return NextResponse.json(
+        { error: 'ไม่พบ Buyer เจ้าของสัญญาหรือ LINE ID สำหรับรับคำขอ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 }
+      );
+    }
+
     // Verify pawner
-    if (pawnerLineId && contract.pawners?.line_id !== pawnerLineId) {
+    if (pawnerLineId && pawner?.line_id !== pawnerLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -332,6 +371,33 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    const normalizedQuotedTotal = Number(quotedTotalAmount);
+    const calculatedTotal = Number(requestData.total_amount || 0);
+    if (
+      actionType === 'PRINCIPAL_INCREASE'
+      && (quotedTotalAmount === undefined || !Number.isFinite(normalizedQuotedTotal))
+    ) {
+      return NextResponse.json(
+        { error: 'ไม่พบยอดชำระที่ยืนยัน กรุณาคำนวณและตรวจสอบยอดอีกครั้ง' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      quotedTotalAmount !== undefined
+      && Number.isFinite(normalizedQuotedTotal)
+      && Math.round(normalizedQuotedTotal * 100) !== Math.round(calculatedTotal * 100)
+    ) {
+      return NextResponse.json(
+        {
+          error: `ยอดชำระมีการเปลี่ยนจาก ${normalizedQuotedTotal.toLocaleString()} บาท เป็น ${calculatedTotal.toLocaleString()} บาท กรุณาตรวจสอบยอดล่าสุดและยืนยันใหม่`,
+          recalculationRequired: true,
+          expectedTotalAmount: calculatedTotal,
+        },
+        { status: 409 }
+      );
+    }
+
     // Create request
     const { data: actionRequest, error: createError } = await supabase
       .from('contract_action_requests')
@@ -342,7 +408,10 @@ export async function POST(request: NextRequest) {
     if (createError) {
       console.error('Error creating action request:', createError);
       return NextResponse.json(
-        { error: 'Failed to create action request' },
+        {
+          error: 'ไม่สามารถบันทึกคำขอเพิ่มเงินต้นได้ กรุณาลองใหม่อีกครั้ง',
+          code: createError.code || null,
+        },
         { status: 500 }
       );
     }
@@ -365,13 +434,58 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Send notification to investor for PRINCIPAL_INCREASE
-    if (actionType === 'PRINCIPAL_INCREASE' && contract.investors?.line_id && requestData.request_status === 'PENDING_INVESTOR_APPROVAL') {
+    let buyerNotificationSent = false;
+
+    // Notify the contract owner immediately. The actionable approval card is sent
+    // after the seller payment slip is verified.
+    if (actionType === 'PRINCIPAL_INCREASE' && investor?.line_id) {
       try {
-        const approvalCard = createInvestorApprovalCard(actionRequest, contract);
-        await investorLineClient.pushMessage(contract.investors.line_id, approvalCard);
+        const investorLineClient = getInvestorLineClient();
+        if (!investorLineClient) {
+          throw new Error('Buyer LINE OA is not configured');
+        }
+
+        const notification = requestData.request_status === 'PENDING_INVESTOR_APPROVAL'
+          ? createInvestorApprovalCard(actionRequest, normalizedContract)
+          : {
+            type: 'text' as const,
+            text: `ได้รับคำขอเพิ่มเงินต้นแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nจำนวนที่ขอเพิ่ม: ${Number(actionRequest.increase_amount || 0).toLocaleString()} บาท\n\nขณะนี้กำลังรอการชำระยอดและตรวจสอบหลักฐานจากผู้ส่งคำขอ ระบบจะแจ้งอีกครั้งเมื่อพร้อมให้พิจารณา`,
+          };
+
+        await pushLineMessageWithRetry(investorLineClient, investor.line_id, notification);
+        buyerNotificationSent = true;
+
+        await logContractAction(
+          contractId,
+          'NOTIFICATION_SENT',
+          'COMPLETED',
+          'SYSTEM',
+          null,
+          {
+            actionRequestId: actionRequest.request_id,
+            description: 'Sent principal increase request notification to contract owner',
+            metadata: {
+              requestStatus: requestData.request_status,
+              notificationStage: requestData.request_status === 'PENDING_INVESTOR_APPROVAL'
+                ? 'APPROVAL_READY'
+                : 'REQUEST_RECEIVED',
+            },
+          }
+        );
       } catch (err) {
-        console.error('Error sending message to investor:', err);
+        console.error('Error sending principal increase notification to buyer:', err);
+        await logContractAction(
+          contractId,
+          'ERROR_OCCURRED',
+          'FAILED',
+          'SYSTEM',
+          null,
+          {
+            actionRequestId: actionRequest.request_id,
+            description: 'Failed to send principal increase request notification to contract owner',
+            errorMessage: err instanceof Error ? err.message : 'Unknown LINE notification error',
+          }
+        );
       }
     }
 
@@ -380,6 +494,7 @@ export async function POST(request: NextRequest) {
       requestId: actionRequest.request_id,
       actionType,
       totalAmount: requestData.total_amount,
+      buyerNotificationSent,
       message: 'สร้างคำขอสำเร็จ',
     });
 

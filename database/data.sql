@@ -102,6 +102,7 @@ CREATE TABLE public.contract_action_requests (
   principal_after_increase numeric,
   new_interest_for_remaining_increase numeric,
   total_amount numeric,
+  overdue_interest_amount numeric DEFAULT 0,
   slip_url text,
   slip_uploaded_at timestamp with time zone,
   slip_amount_detected numeric,
