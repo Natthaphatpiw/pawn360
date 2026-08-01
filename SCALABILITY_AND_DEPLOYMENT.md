@@ -188,10 +188,10 @@ Using the measured per-workflow figures in `INFRASTRUCTURE.md` Section 14.1 and 
 | Estimates/day (E) | 1,000 | 10,000 | 100,000 |
 | Cache hit rate (H) | 0.4 | 0.6 | 0.7 |
 | Live AI pipelines/day | 600 | 4,000 | 30,000 |
-| Estimate AI + search / day | ~$5.5 (~฿176) | ~$37 (~฿1,180) | ~$276 (~฿8,830) |
-| Condition analysis / day | ~$0.5 (~฿16) | ~$4.9 (~฿157) | ~$49 (~฿1,570) |
-| **AI + search / month** | **~$180 (~฿5,760)** | **~$1,257 (~฿40,200)** | **~$9,750 (~฿312,000)** |
-| AI cost per estimate | ~฿0.19 | ~฿0.13 | ~฿0.10 |
+| Estimate AI + search / day | ≈$5.5 (≈฿176) | ≈$37 (≈฿1,180) | ≈$276 (≈฿8,830) |
+| Condition analysis / day | ≈$0.5 (≈฿16) | ≈$4.9 (≈฿157) | ≈$49 (≈฿1,570) |
+| **AI + search / month** | **≈$180 (≈฿5,760)** | **≈$1,257 (≈฿40,200)** | **≈$9,750 (≈฿312,000)** |
+| AI cost per estimate | ≈฿0.19 | ≈฿0.13 | ≈฿0.10 |
 
 Two properties matter more than the absolute numbers:
 

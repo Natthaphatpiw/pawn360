@@ -64,7 +64,7 @@ Permissive licenses account for the overwhelming majority; the only copyleft ent
 
 ## 3. Direct Dependencies - License Table
 
-All 38 direct dependencies (production + development) and their installed license. Every one is permissive OSI open source except the LINE LIFF SDK (vendor license).
+All 39 direct dependencies - 25 production and 14 development - and their installed license. Every one is permissive OSI open source except the LINE LIFF SDK (vendor license).
 
 | Package | License | Commercial use |
 |---|---|---|
@@ -94,6 +94,7 @@ All 38 direct dependencies (production + development) and their installed licens
 | bcrypt | MIT | Yes |
 | axios | MIT | Yes |
 | dotenv | BSD-2-Clause | Yes |
+| marked | MIT | Yes |
 | typescript | Apache-2.0 | Yes |
 | eslint | MIT | Yes |
 | eslint-config-next | MIT | Yes |

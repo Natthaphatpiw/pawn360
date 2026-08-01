@@ -349,7 +349,7 @@ The AI/search layer is the only cost driver that scales directly with user activ
 | Claude Haiku 4.5 (fallback only) | $1.00 | - | - | $5.00 |
 | Claude Sonnet 4.6 (fallback only) | $3.00 | - | - | $15.00 |
 | Parallel search, `turbo` mode | $0.001 per search | | | |
-| Exa search, `instant` (fallback) | ~$0.007 per search | | | |
+| Exa search, `instant` (fallback) | ≈$0.007 per search | | | |
 
 Per-workflow cost, measured against live provider calls with synthetic test data:
 
@@ -370,10 +370,10 @@ Mix assumption: 60% generic cache-miss, 20% cache hit, 15% notebook first pass, 
 
 | Estimate flows / month | AI + search USD | AI + search THB | Per-flow THB |
 |---:|---:|---:|---:|
-| 1,000 | $9.59 | ~฿307 | ~฿0.31 |
-| 10,000 | $95.86 | ~฿3,068 | ~฿0.31 |
-| 100,000 | $958.62 | ~฿30,676 | ~฿0.31 |
-| 1,000,000 | ~$9,586 | ~฿306,758 | ~฿0.31 |
+| 1,000 | $9.59 | ≈฿307 | ≈฿0.31 |
+| 10,000 | $95.86 | ≈฿3,068 | ≈฿0.31 |
+| 100,000 | $958.62 | ≈฿30,676 | ≈฿0.31 |
+| 1,000,000 | ≈$9,586 | ≈฿306,758 | ≈฿0.31 |
 
 Sensitivities a DD reader should test:
 

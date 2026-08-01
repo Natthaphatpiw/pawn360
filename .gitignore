@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated due-diligence PDFs (rebuild with scripts/build-dd-pdfs.mjs)
+docs/data-room/*.pdf
