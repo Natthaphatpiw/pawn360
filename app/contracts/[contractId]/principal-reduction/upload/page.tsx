@@ -6,6 +6,7 @@ import { Upload, X, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../../_components/TransactionHeader';
+import PaymentBreakdown from '../../_components/PaymentBreakdown';
 import { getMockPrincipalReductionRequest, isPreviewMode, withPreview } from '../../_lib/preview';
 
 interface CompanyBank {
@@ -166,9 +167,6 @@ export default function PrincipalReductionUploadPage() {
   };
 
   const requiredAmount = verificationResult?.expectedAmount ?? requestDetails?.total_amount;
-  const penaltyAmount = Number(requestDetails?.penalty_amount || requestDetails?.payment_breakdown?.penaltyAmount || 0);
-  const overdueInterestAmount = Number(requestDetails?.overdue_interest_amount || requestDetails?.payment_breakdown?.overdueInterestAmount || 0);
-  const baseAmount = Number(requestDetails?.base_amount || requestDetails?.payment_breakdown?.baseAmount || requestDetails?.total_to_pay_reduction || 0);
 
   if (showVoided) {
     return (
@@ -203,39 +201,17 @@ export default function PrincipalReductionUploadPage() {
       <div className="flex-1 flex flex-col items-center p-4 pb-20 overflow-y-auto">
         {/* Payment Summary */}
         {requestDetails && (
-          <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-foreground-subtle text-sm">ยอดหลักของรายการ:</span>
-              <span className="font-medium text-foreground">
-                {baseAmount.toLocaleString()} บาท
-              </span>
-            </div>
-            {penaltyAmount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
-                <span className="font-medium text-primary">
-                  {penaltyAmount.toLocaleString()} บาท
-                </span>
-              </div>
+          <PaymentBreakdown
+            source={requestDetails}
+            baseLabel="ยอดหลักของรายการ"
+            baseFallback={requestDetails.total_to_pay_reduction}
+            totalLabel="ยอดชำระ"
+            footer={(
+              <p className="mt-2 text-xs text-foreground-subtle">
+                ลดเงินต้น {Number(requestDetails.reduction_amount || 0).toLocaleString()} บาท
+              </p>
             )}
-            {overdueInterestAmount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-foreground-subtle text-sm">ดอกเบี้ยเลท (3%/เดือน):</span>
-                <span className="font-medium text-primary">
-                  {overdueInterestAmount.toLocaleString()} บาท
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-foreground-subtle text-sm">ยอดชำระ:</span>
-              <span className="font-bold text-primary text-lg">
-                {requestDetails.total_amount?.toLocaleString()} บาท
-              </span>
-            </div>
-            <p className="text-xs text-foreground-subtle">
-              ลดเงินต้น {requestDetails.reduction_amount?.toLocaleString()} บาท
-            </p>
-          </div>
+          />
         )}
 
         {/* Retry Warning */}

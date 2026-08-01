@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { requireLiffIdentity } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { getContractRemainingDays } from '@/lib/utils/time';
 import {
   ActorRateLimitError,
   enforceActorRateLimit,
@@ -99,10 +100,9 @@ export async function GET(
       );
     }
 
-    // Calculate remaining days
-    const endDate = new Date(contractData.contract_end_date);
-    const today = new Date();
-    const remainingDays = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    // Calculate remaining days on this contract's own term (a renewal starts
+    // when the previous term ends, so it can begin in the future).
+    const remainingDays = Math.max(0, getContractRemainingDays(contractData));
 
     // Format data for frontend
     const formattedContract = {

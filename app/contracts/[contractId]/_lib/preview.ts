@@ -107,10 +107,28 @@ export function getMockRedemption(redemptionId: string, contractId: string, deli
   const isNearDueCentralPreview = contractId === 'mock-contract-001';
   const resolvedDeliveryMethod = deliveryMethod || (isNearDueCentralPreview ? 'CENTRAL_SCHEDULE_7D' : 'DROPPOINT_SELF_PICKUP');
 
+  // The non-near-due preview carries a late charge so the payment screens can
+  // be checked with the penalty and overdue-interest rows visible.
+  const baseAmount = isNearDueCentralPreview ? 26705 : 10300;
+  const penaltyAmount = isNearDueCentralPreview ? 0 : 100;
+  const overdueInterestAmount = isNearDueCentralPreview ? 0 : 600;
+  const penaltyMonths = isNearDueCentralPreview ? 0 : 2;
+  const daysOverdue = isNearDueCentralPreview ? 0 : 34;
+
   return {
     redemption_id: redemptionId,
-    total_amount: isNearDueCentralPreview ? 26705 : 10300,
-    base_amount: isNearDueCentralPreview ? 26705 : 10300,
+    total_amount: baseAmount + penaltyAmount + overdueInterestAmount,
+    base_amount: baseAmount,
+    penalty_amount: penaltyAmount,
+    overdue_interest_amount: overdueInterestAmount,
+    payment_breakdown: {
+      baseAmount,
+      penaltyAmount,
+      overdueInterestAmount,
+      totalAmount: baseAmount + penaltyAmount + overdueInterestAmount,
+      daysOverdue,
+      penaltyMonths,
+    },
     payment_slip_url: null,
     delivery_method: resolvedDeliveryMethod,
     contract: {

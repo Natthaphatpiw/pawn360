@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { ensurePenaltyPaymentRecord, getPenaltyRequirement, roundCurrency } from '@/lib/services/penalty';
+import {
+  calculatePenaltyMonths,
+  ensurePenaltyPaymentRecord,
+  getPenaltyRequirement,
+  roundCurrency,
+} from '@/lib/services/penalty';
 import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
 import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
 import {
@@ -244,6 +249,15 @@ export async function POST(request: NextRequest) {
         interest_amount: interestDue,
         delivery_fee: deliveryFeeAmount,
         total_amount: totalAmount,
+        // Freeze the quote. Late charges step monthly, so recomputing them at
+        // display time would change the amount the pawner was asked to pay.
+        base_amount: roundCurrency(basePrincipal + interestDue + deliveryFeeAmount),
+        penalty_amount: penaltyAmount,
+        overdue_interest_amount: overdueInterestAmount,
+        penalty_days_overdue: penaltyRequirement.required ? penaltyRequirement.daysOverdue : 0,
+        penalty_months: penaltyRequirement.required
+          ? calculatePenaltyMonths(penaltyRequirement.daysOverdue)
+          : 0,
         delivery_method: safeDeliveryMethod,
         delivery_address_full: deliveryAddressFull,
         delivery_addr_house_no: safeDeliveryAddress ? boundedText(safeDeliveryAddress.houseNo, 100) : null,

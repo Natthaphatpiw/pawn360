@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { getContractRemainingDays } from '@/lib/utils/time';
 import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
 import { requireUuid, sanitizedServerError, transactionRequestErrorResponse } from '@/lib/security/transaction-request';
@@ -163,8 +164,7 @@ export async function GET(
     startDate.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const diffTime = endDate.getTime() - today.getTime();
-    const remainingDays = Math.ceil(diffTime / msPerDay);
+    const remainingDays = getContractRemainingDays(contract);
 
     const displayStatus = getDisplayStatus(contract, remainingDays);
 

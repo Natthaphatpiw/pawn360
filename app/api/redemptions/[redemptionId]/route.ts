@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { getPenaltyRequirement, roundCurrency } from '@/lib/services/penalty';
+import {
+  calculatePenaltyMonths,
+  getFrozenLateChargeBreakdown,
+  roundCurrency,
+} from '@/lib/services/penalty';
 import { requireLiffIdentity } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
 import {
@@ -30,6 +34,11 @@ export async function GET(
         interest_amount,
         delivery_fee,
         total_amount,
+        base_amount,
+        penalty_amount,
+        overdue_interest_amount,
+        penalty_days_overdue,
+        penalty_months,
         delivery_method,
         request_status,
         payment_slip_uploaded_at,
@@ -99,25 +108,46 @@ export async function GET(
       },
     };
 
-    if (redemption?.request_status === 'PENDING') {
-      const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
-      const baseAmount = Number(redemption.principal_amount || 0)
-        + Number(redemption.interest_amount || 0)
-        + Number(redemption.delivery_fee || 0);
-      const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-      const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
-      const totalAmount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
-      responseRedemption.base_amount = baseAmount;
-      responseRedemption.penalty_amount = penaltyAmount;
-      responseRedemption.overdue_interest_amount = overdueInterestAmount;
-      responseRedemption.total_amount = totalAmount;
-      responseRedemption.payment_breakdown = {
-        baseAmount,
-        penaltyAmount,
-        overdueInterestAmount,
-        totalAmount,
-      };
-    }
+    // Always itemise the amount the pawner was quoted, at every status, from the
+    // frozen figures. Recomputing the penalty here would move a money figure
+    // after the pawner has already been told what to pay: the flat penalty
+    // steps every 30 days and the overdue interest accrues monthly.
+    const storedBaseAmount = redemption?.base_amount !== null && redemption?.base_amount !== undefined
+      ? Number(redemption.base_amount)
+      : roundCurrency(
+        Number(redemption?.principal_amount || 0)
+        + Number(redemption?.interest_amount || 0)
+        + Number(redemption?.delivery_fee || 0),
+      );
+    const hasFrozenSplit = redemption?.penalty_amount !== null && redemption?.penalty_amount !== undefined;
+    const breakdown = getFrozenLateChargeBreakdown(
+      {
+        total_amount: redemption?.total_amount,
+        // Rows written before the breakdown columns existed fall back to the
+        // helper's legacy derivation instead of a live recomputation.
+        overdue_interest_amount: hasFrozenSplit ? redemption.overdue_interest_amount : undefined,
+        created_at: redemption?.created_at,
+      },
+      contract,
+      storedBaseAmount,
+    );
+    const penaltyMonths = redemption?.penalty_months !== null && redemption?.penalty_months !== undefined
+      ? Number(redemption.penalty_months)
+      : calculatePenaltyMonths(breakdown.daysOverdue);
+
+    responseRedemption.base_amount = storedBaseAmount;
+    responseRedemption.penalty_amount = breakdown.penaltyAmount;
+    responseRedemption.overdue_interest_amount = breakdown.overdueInterestAmount;
+    responseRedemption.total_amount = breakdown.totalAmount;
+    responseRedemption.payment_breakdown = {
+      baseAmount: storedBaseAmount,
+      penaltyAmount: breakdown.penaltyAmount,
+      overdueInterestAmount: breakdown.overdueInterestAmount,
+      totalAmount: breakdown.totalAmount,
+      daysOverdue: breakdown.daysOverdue,
+      penaltyMonths,
+      derivedFromLegacyRequest: !hasFrozenSplit,
+    };
 
     return NextResponse.json({
       success: true,

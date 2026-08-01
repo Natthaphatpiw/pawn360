@@ -157,6 +157,9 @@ export const serializePenaltyRequirement = (contract: any, requirement: PenaltyR
   contractEndDate: requirement.contractEndDate.toISOString(),
   today: requirement.today.toISOString(),
   daysOverdue: requirement.daysOverdue,
+  // Both late charges are billed per started 30-day month, so the UI can state
+  // "3%/เดือน x N เดือน" instead of an unexplained lump sum.
+  penaltyMonths: calculatePenaltyMonths(requirement.daysOverdue),
   penaltyAmount: requirement.penaltyAmount,
   overdueInterestAmount: requirement.overdueInterestAmount,
   totalLateChargeAmount: requirement.totalLateChargeAmount,

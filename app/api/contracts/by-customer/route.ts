@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
 import { sanitizedServerError } from '@/lib/security/transaction-request';
+import { getContractRemainingDays } from '@/lib/utils/time';
 
 export async function GET(request: NextRequest) {
   try {
@@ -146,8 +147,7 @@ export async function GET(request: NextRequest) {
       endDate.setHours(0, 0, 0, 0);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const diffTime = endDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = getContractRemainingDays(contract);
       const displayStatus = getDisplayStatus(contract, diffDays);
 
       return {

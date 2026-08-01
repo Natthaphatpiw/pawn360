@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { getFrozenLateChargeBreakdown } from '@/lib/services/penalty';
+import { calculatePenaltyMonths, getFrozenLateChargeBreakdown } from '@/lib/services/penalty';
 import { requireContractParty } from '@/lib/security/contract-access';
 import { LiffAuthError } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
@@ -113,7 +113,12 @@ export async function GET(
     actionRequest.contract = safeContract;
     actionRequest.rejection_reason = actionRequest.investor_rejection_reason || null;
 
-    if (['AWAITING_PAYMENT', 'SLIP_REJECTED'].includes(actionRequest.request_status)) {
+    // Itemise at every status, not only while payment is outstanding. The
+    // upload screen is also reached after a rejected or re-uploaded slip, and
+    // without the breakdown the base and late-charge rows silently drop out
+    // while the total keeps the late charges - which reads as an unexplained
+    // increase over the amount quoted on the previous screen.
+    {
       const baseAmount = getBaseAmountForActionRequest(actionRequest);
       const breakdown = getFrozenLateChargeBreakdown(
         actionRequest,
@@ -130,6 +135,8 @@ export async function GET(
         penaltyAmount: breakdown.penaltyAmount,
         overdueInterestAmount: breakdown.overdueInterestAmount,
         totalAmount: breakdown.totalAmount,
+        daysOverdue: breakdown.daysOverdue,
+        penaltyMonths: calculatePenaltyMonths(breakdown.daysOverdue),
         derivedFromLegacyRequest: !breakdown.hasStoredBreakdown,
       };
     }

@@ -6,6 +6,7 @@ import { Upload, X } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../../_components/TransactionHeader';
+import PaymentBreakdown from '../../_components/PaymentBreakdown';
 import { getMockInterestPaymentRequest, isPreviewMode, withPreview } from '../../_lib/preview';
 
 interface CompanyBank {
@@ -178,9 +179,6 @@ export default function InterestPaymentUploadPage() {
     router.push('/contracts');
   };
 
-  const penaltyAmount = Number(requestDetails?.penalty_amount || requestDetails?.payment_breakdown?.penaltyAmount || 0);
-  const overdueInterestAmount = Number(requestDetails?.overdue_interest_amount || requestDetails?.payment_breakdown?.overdueInterestAmount || 0);
-  const baseAmount = Number(requestDetails?.base_amount || requestDetails?.payment_breakdown?.baseAmount || requestDetails?.interest_to_pay || 0);
 
   // Show voided state
   if (showVoided) {
@@ -233,30 +231,11 @@ export default function InterestPaymentUploadPage() {
 
         {/* Payment Summary */}
         {requestDetails && (
-          <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-foreground-subtle text-sm">ดอกเบี้ยและค่าธรรมเนียม:</span>
-              <span className="font-medium text-foreground">{baseAmount.toLocaleString()} บาท</span>
-            </div>
-            {penaltyAmount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
-                <span className="font-medium text-primary">{penaltyAmount.toLocaleString()} บาท</span>
-              </div>
-            )}
-            {overdueInterestAmount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-foreground-subtle text-sm">ดอกเบี้ยเลท (3%/เดือน):</span>
-                <span className="font-medium text-primary">{overdueInterestAmount.toLocaleString()} บาท</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center">
-              <span className="text-foreground-subtle text-sm">ยอดที่ต้องชำระ:</span>
-              <span className="font-bold text-primary text-lg">
-                {requestDetails.total_amount?.toLocaleString()} บาท
-              </span>
-            </div>
-          </div>
+          <PaymentBreakdown
+            source={requestDetails}
+            baseLabel="ดอกเบี้ยและค่าธรรมเนียม"
+            baseFallback={requestDetails.interest_to_pay}
+          />
         )}
 
         {/* Upload Area */}

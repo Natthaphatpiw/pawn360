@@ -6,6 +6,7 @@ import { CheckCircle, Upload } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../../_components/TransactionHeader';
+import PaymentBreakdown from '../../_components/PaymentBreakdown';
 import { getMockRedemption, isPreviewMode, withPreview } from '../../_lib/preview';
 
 export default function RedemptionUploadPage() {
@@ -30,9 +31,6 @@ export default function RedemptionUploadPage() {
     bank_account_name: 'ณัฐภัทร ต้อยจัตุรัส',
     promptpay_number: '0626092941',
   };
-  const penaltyAmount = Number(redemptionDetails?.penalty_amount || redemptionDetails?.payment_breakdown?.penaltyAmount || 0);
-  const overdueInterestAmount = Number(redemptionDetails?.overdue_interest_amount || redemptionDetails?.payment_breakdown?.overdueInterestAmount || 0);
-  const baseAmount = Number(redemptionDetails?.base_amount || redemptionDetails?.payment_breakdown?.baseAmount || 0);
   const receiptRedemptionId = redemptionId || `preview-redeem-${contractId}`;
   const returnReceiptPath = previewMode
     ? `${withPreview(`/contracts/${contractId}/return-receipt`, 'redemptionId', receiptRedemptionId)}${redemptionDetails?.delivery_method ? `&deliveryMethod=${encodeURIComponent(String(redemptionDetails.delivery_method))}` : ''}`
@@ -164,39 +162,16 @@ export default function RedemptionUploadPage() {
 
         {/* Payment Summary */}
         {redemptionDetails && (
-          <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-foreground-subtle text-sm">ยอดหลักของรายการ:</span>
-              <span className="font-medium text-foreground">
-                {baseAmount.toLocaleString()} บาท
-              </span>
-            </div>
-            {penaltyAmount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-foreground-subtle text-sm">ค่าปรับเกินกำหนด:</span>
-                <span className="font-medium text-primary">
-                  {penaltyAmount.toLocaleString()} บาท
-                </span>
-              </div>
+          <PaymentBreakdown
+            source={redemptionDetails}
+            baseLabel="ยอดหลักของรายการ"
+            totalLabel="ยอดชำระ"
+            footer={(
+              <p className="mt-2 text-xs text-foreground-subtle">
+                {redemptionDetails.contract?.items?.brand} {redemptionDetails.contract?.items?.model}
+              </p>
             )}
-            {overdueInterestAmount > 0 && (
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-foreground-subtle text-sm">ดอกเบี้ยเลท (3%/เดือน):</span>
-                <span className="font-medium text-primary">
-                  {overdueInterestAmount.toLocaleString()} บาท
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-foreground-subtle text-sm">ยอดชำระ:</span>
-              <span className="font-bold text-primary text-lg">
-                {redemptionDetails.total_amount?.toLocaleString()} บาท
-              </span>
-            </div>
-            <p className="text-xs text-foreground-subtle">
-              {redemptionDetails.contract?.items?.brand} {redemptionDetails.contract?.items?.model}
-            </p>
-          </div>
+          />
         )}
 
         <div className="w-full max-w-sm bg-background rounded-xl p-4 mb-4">
