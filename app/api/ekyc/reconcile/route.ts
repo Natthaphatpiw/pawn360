@@ -1,6 +1,6 @@
-import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { enqueueEkycNotification, enqueueEkycWebhookEvent } from '@/lib/ekyc/queue';
+import { internalAuthErrorResponse, requireInternalRequest } from '@/lib/security/request-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
 
 const MAX_BATCH = 50;
@@ -8,18 +8,16 @@ const MAX_BATCH = 50;
 // or SENDING lease can be reclaimed without overlapping a live invocation.
 const STALE_AFTER_MS = 2 * 60_000;
 
-function authorized(request: NextRequest): boolean {
-  const secret = String(process.env.CRON_SECRET || '');
-  const header = request.headers.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (secret.length < 24 || !token) return false;
-  const actual = crypto.createHash('sha256').update(token).digest();
-  const expected = crypto.createHash('sha256').update(secret).digest();
-  return crypto.timingSafeEqual(actual, expected);
-}
-
 async function reconcile(request: NextRequest) {
-  if (!authorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Shared with the other cron handlers so an unset CRON_SECRET reports 503
+  // CONFIG_MISSING instead of a bare 401. A local check that answered 401 for
+  // both "not configured" and "wrong token" made an unset secret look like a
+  // rejected caller, which is exactly the wrong diagnosis to hand an operator.
+  try {
+    requireInternalRequest(request, ['CRON_SECRET']);
+  } catch (error) {
+    return internalAuthErrorResponse(error);
+  }
   const supabase = supabaseAdmin();
   const staleBefore = new Date(Date.now() - STALE_AFTER_MS).toISOString();
   const [webhooks, notifications] = await Promise.all([
