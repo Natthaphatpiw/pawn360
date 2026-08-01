@@ -1,5 +1,13 @@
-// Comprehensive Apple Products List (2015-2025)
-// This file contains detailed product information for accurate pricing estimation
+// Comprehensive Apple Products List (2015-2026)
+// Reference data for pricing estimation.
+//
+// NOT WIRED UP: nothing imports this module today. The list a pawner actually
+// picks from is APPLE_MODELS_BY_CATEGORY in app/estimate/page.tsx, and that is
+// the one to update when Apple ships a new product. This file is kept as
+// reference-only price data; treat app/estimate/page.tsx as the source of truth
+// for selectable models.
+//
+// Thai launch prices below are Apple Thailand list prices at announcement.
 
 export interface AppleProduct {
   id: number;
@@ -24,6 +32,61 @@ export interface AppleProduct {
 
 export const APPLE_PRODUCTS: AppleProduct[] = [
   // ==================== IPHONE (2015-2025) ====================
+
+  // iPhone 17 Series (2025). Thai launch prices per Apple Thailand.
+  {
+    id: 990,
+    name: 'iPhone 17 Pro Max',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2025,
+    specs: '256GB',
+    storageOptions: ['256GB', '512GB', '1TB', '2TB'],
+    screenSize: '6.9"',
+    chip: 'A19 Pro',
+    originalPrice: 48900,
+    currentMarketPrice: 0
+  },
+  {
+    id: 991,
+    name: 'iPhone 17 Pro',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2025,
+    specs: '256GB',
+    storageOptions: ['256GB', '512GB', '1TB'],
+    screenSize: '6.3"',
+    chip: 'A19 Pro',
+    originalPrice: 43900,
+    currentMarketPrice: 0
+  },
+  {
+    // Retailers in Thailand also list this as "iPhone 17 Air".
+    id: 992,
+    name: 'iPhone Air',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2025,
+    specs: '256GB',
+    storageOptions: ['256GB', '512GB', '1TB'],
+    screenSize: '6.5"',
+    chip: 'A19 Pro',
+    originalPrice: 39900,
+    currentMarketPrice: 0
+  },
+  {
+    id: 993,
+    name: 'iPhone 17',
+    type: 'Mobile',
+    category: 'iPhone',
+    year: 2025,
+    specs: '256GB',
+    storageOptions: ['256GB', '512GB'],
+    screenSize: '6.3"',
+    chip: 'A19',
+    originalPrice: 29900,
+    currentMarketPrice: 0
+  },
 
   // iPhone 16 Series (2024)
   {

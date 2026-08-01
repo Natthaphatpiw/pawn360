@@ -159,6 +159,7 @@ const APPLE_MODELS_BY_CATEGORY: Record<string, string[]> = {
     'iPad (1st generation)',
   ],
   MacBook: [
+    'MacBook Pro 16-inch (M5 Pro/Max, 2025)',
     'MacBook Pro 14-inch (M5, 2025)',
     'MacBook Pro 14-inch (M4 Pro/Max, 2024)',
     'MacBook Pro 16-inch (M4 Pro/Max, 2024)',
@@ -178,6 +179,8 @@ const APPLE_MODELS_BY_CATEGORY: Record<string, string[]> = {
     'MacBook Pro 13/15-inch (Retina, 2012-2015)',
     'MacBook Pro 13/15/17-inch (Unibody, 2008-2012)',
     'MacBook Pro (Original, 2006)',
+    'MacBook Air 15-inch (M5, 2026)',
+    'MacBook Air 13-inch (M5, 2026)',
     'MacBook Air 13-inch (M4, 2025)',
     'MacBook Air 15-inch (M4, 2025)',
     'MacBook Air 13-inch (M3, 2024)',
@@ -213,6 +216,7 @@ const APPLE_MODELS_BY_CATEGORY: Record<string, string[]> = {
     'Apple Watch SE (1st generation)',
   ],
   AirPods: [
+    'AirPods Pro 3',
     'AirPods Pro (2nd generation) - USB-C',
     'AirPods Pro (2nd generation) - Lightning',
     'AirPods Pro (1st generation)',

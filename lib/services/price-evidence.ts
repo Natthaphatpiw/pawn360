@@ -22,11 +22,28 @@ const GENERIC_IDENTITY_TOKENS = new Set([
   'laptop', 'notebook', 'computer', 'โน้ตบุ๊ก', 'โน้ตบุค', 'คอมพิวเตอร์',
 ]);
 
+const HTML_ENTITIES: Readonly<Record<string, string>> = {
+  '&nbsp;': ' ',
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+  '&baht;': '\u0e3f',
+};
+
 function normalizedEvidenceText(values: Array<string | null | undefined>): string {
   return values
     .filter((value): value is string => typeof value === 'string')
     .join(' ')
     .normalize('NFKC')
+    // Search excerpts arrive with raw markup. `ราคา <strong>30,000 บ</strong>` only reads as a
+    // price once the tags are gone, so strip them before any adjacency rule is
+    // applied - without this, real listings are rejected as having no provable
+    // price and the whole estimate fails with EMPTY_RESULT.
+    .replace(/<[^>]{0,200}>/g, ' ')
+    .replace(/&[a-z#0-9]{2,8};/gi, (entity) => HTML_ENTITIES[entity.toLowerCase()] ?? ' ')
     .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -93,9 +110,15 @@ export function extractExplicitPriceEvidence(
   // "999999999 บาท" would silently yield 99,999,999 THB of "evidence".
   const number = '(?<![\\d.,])(?<amount>\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d{2,8}(?:\\.\\d{1,2})?)(?!\\d)';
 
-  collectMatches(text, new RegExp(`(?:฿|THB\\s*)${number}`, 'giu'), 'THB', exchangeRate, output);
-  collectMatches(text, new RegExp(`${number}\\s*(?:บาท|THB|฿)`, 'giu'), 'THB', exchangeRate, output);
-  collectMatches(text, new RegExp(`(?:ราคา(?:ขาย)?|ราคาเพียง)\\s*[:=~-]?\\s*${number}`, 'giu'), 'THB', exchangeRate, output);
+  // Thai marketplaces write the baht sign detached ("฿ 18,900") and abbreviate
+  // บาท to "บ"/"บ." The trailing guard keeps "บ" from matching the first letter
+  // of an unrelated Thai word such as บริษัท.
+  const bahtSuffix = '(?:บาท|บ(?![\\u0e00-\\u0e7f])|THB|฿)';
+  collectMatches(text, new RegExp(`(?:฿|THB)\\s*${number}`, 'giu'), 'THB', exchangeRate, output);
+  collectMatches(text, new RegExp(`${number}\\s*${bahtSuffix}`, 'giu'), 'THB', exchangeRate, output);
+  // "ราคา" may be separated from the figure by stripped markup or a label, so
+  // allow a short run of non-digit filler rather than whitespace only.
+  collectMatches(text, new RegExp(`(?:ราคา(?:ขาย|เพียง|พิเศษ)?|เพียง)\\s*[^\\d]{0,12}?${number}`, 'giu'), 'THB', exchangeRate, output);
   collectMatches(text, new RegExp(`(?:US\\$|USD\\s*|\\$)${number}`, 'giu'), 'USD', exchangeRate, output);
   collectMatches(text, new RegExp(`${number}\\s*(?:USD|US\\$)`, 'giu'), 'USD', exchangeRate, output);
 

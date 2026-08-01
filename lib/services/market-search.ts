@@ -387,11 +387,14 @@ async function readBoundedExaJson(response: Response): Promise<any> {
 
 function parallelMode(): 'turbo' | 'basic' | 'advanced' {
   const configured = process.env.PARALLEL_SEARCH_MODE?.trim().toLowerCase();
-  if (configured === 'basic' || configured === 'advanced') return configured;
-  // Turbo keeps the default 10-result envelope at one fifth of the basic
-  // request price. Evidence quality is still enforced by the downstream
-  // extraction gate; production can promote this after an offline evaluation.
-  return 'turbo';
+  if (configured === 'turbo' || configured === 'advanced') return configured;
+  // Basic, not turbo. Turbo is a fifth of the price but measured against live
+  // Thai queries it returns off-model pages - a search for "iPhone 14 Pro
+  // 256GB" came back with 15/16/17 Pro price-index articles - which the
+  // exact-model gate then correctly rejects, starving the estimate and failing
+  // the whole job. The ~USD 0.004 saved per cache miss is not worth sending a
+  // pawner to manual valuation.
+  return 'basic';
 }
 
 async function searchParallel(request: MarketSearchRequest): Promise<MarketSearchResponse> {
