@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import {
+  internalAuthErrorResponse,
+  requireInternalRequest,
+} from '@/lib/security/request-auth';
 
 export async function POST(request: NextRequest) {
+  try {
+    requireInternalRequest(request);
+  } catch (error) {
+    return internalAuthErrorResponse(error);
+  }
+
   try {
     const supabase = supabaseAdmin();
 
@@ -30,10 +40,12 @@ export async function POST(request: NextRequest) {
       updated_contracts: updatedContracts
     });
 
-  } catch (error: any) {
-    console.error('Error in migrate-status:', error);
+  } catch (error) {
+    console.error('[contracts:migrate-status] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to migrate contract statuses', code: 'MIGRATION_FAILED' },
       { status: 500 }
     );
   }

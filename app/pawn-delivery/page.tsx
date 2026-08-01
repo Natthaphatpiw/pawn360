@@ -246,7 +246,7 @@ function PawnDeliveryPageContent() {
       }
 
       const response = await axios.get('/api/pawn-delivery/status', {
-        params: { contractId, lineId: effectiveLineId }
+        params: { contractId }
       });
       setStatusLabel(response.data.statusLabel);
       setStepIndex(response.data.stepIndex || 0);

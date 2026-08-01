@@ -8,6 +8,10 @@
 
 import { supabaseAdmin } from '@/lib/supabase/client';
 import type { ListingKind, MatchTier, NotebookListingInput } from '@/lib/services/notebook-pricing';
+import {
+  hasDeterministicProductIdentity,
+  partitionPriceOutliers,
+} from '@/lib/services/price-evidence';
 
 export interface PriceObservationRow {
   item_type: string;
@@ -35,6 +39,11 @@ export interface PriceObservationRow {
   confidence?: number | null;
   line_id?: string | null;
   spec?: Record<string, unknown> | null;
+  evidence_status?: 'VERIFIED' | 'MANUAL_VERIFIED' | 'UNVERIFIED' | 'QUARANTINED_OUTLIER';
+  evidence_fingerprint?: string | null;
+  evidence_provider?: string | null;
+  evidence_verified_at?: string | null;
+  is_outlier?: boolean;
 }
 
 export const normalizeFamilyKey = (family: string | null | undefined): string =>
@@ -44,7 +53,20 @@ const OBSERVATION_TABLE = 'price_observations';
 const INSERT_CHUNK_SIZE = 50;
 
 export async function saveNotebookObservations(rows: PriceObservationRow[]): Promise<void> {
-  const valid = (rows || []).filter((r) => r && Number.isFinite(r.price_thb) && r.price_thb > 0);
+  const valid = (rows || [])
+    .filter((r) => r && Number.isFinite(r.price_thb) && r.price_thb > 0)
+    .map((row) => ({
+      ...row,
+      evidence_status: row.evidence_status || 'UNVERIFIED',
+      evidence_fingerprint: row.evidence_fingerprint || null,
+      evidence_provider: row.evidence_provider || null,
+      evidence_verified_at: ['VERIFIED', 'MANUAL_VERIFIED'].includes(row.evidence_status || '')
+        ? row.evidence_verified_at || new Date().toISOString()
+        : null,
+      is_outlier: row.is_outlier === true,
+      // Historical pricing evidence never requires a direct LINE identifier.
+      line_id: null,
+    }));
   if (valid.length === 0) return;
   try {
     const client = supabaseAdmin();
@@ -79,12 +101,15 @@ export async function fetchRecentNotebookObservations(
     const { data, error } = await client
       .from(OBSERVATION_TABLE)
       .select(
-        'listing_title, listing_url, source, origin, listing_kind, price_thb, cpu, ram_gb, storage_gb, storage_type, gpu'
+        'listing_title, listing_url, source, origin, listing_kind, price_thb, cpu, ram_gb, storage_gb, storage_type, gpu, evidence_status, evidence_fingerprint, evidence_provider, is_outlier'
       )
       .eq('family_norm', familyKey)
       .ilike('brand', brand || '%')
       .in('origin', ['web_search', 'serpapi', 'manual'])
       .in('listing_kind', ['used', 'new_current', 'launch_msrp'])
+      .in('match_level', ['exact', 'family'])
+      .in('evidence_status', ['VERIFIED', 'MANUAL_VERIFIED'])
+      .eq('is_outlier', false)
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -94,8 +119,16 @@ export async function fetchRecentNotebookObservations(
       return [];
     }
 
-    return (data || [])
-      .filter((row: any) => row && Number.isFinite(Number(row.price_thb)) && Number(row.price_thb) > 0)
+    const verifiedRows = (data || [])
+      .filter((row: any) => (
+        row
+        && Number.isFinite(Number(row.price_thb))
+        && Number(row.price_thb) > 0
+        && (
+          row.evidence_status === 'MANUAL_VERIFIED'
+          || hasDeterministicProductIdentity(row.listing_title || '', brand, family)
+        )
+      ))
       .map((row: any): NotebookListingInput => ({
         title: row.listing_title || '',
         price_thb: Number(row.price_thb),
@@ -110,7 +143,16 @@ export async function fetchRecentNotebookObservations(
         gpu: row.gpu || null,
         condition_note: null,
         origin: 'observation',
+        evidence_status: row.evidence_status,
+        evidence_fingerprint: row.evidence_fingerprint || null,
+        evidence_provider: row.evidence_provider || row.origin || 'observation',
       }));
+    const accepted: NotebookListingInput[] = [];
+    for (const kind of ['used', 'new_current', 'launch_msrp'] as ListingKind[]) {
+      const group = verifiedRows.filter((row) => row.listing_kind === kind);
+      accepted.push(...partitionPriceOutliers(group, (row) => row.price_thb).accepted);
+    }
+    return accepted;
   } catch (error) {
     console.warn('⚠️ Failed to read price observations:', error);
     return [];

@@ -10,7 +10,7 @@ import { getInvestorPrincipalIncreaseStatusMeta, getMockPrincipalIncreaseRequest
 export default function InvestorPrincipalIncreaseUploadPage() {
   const params = useParams();
   const requestId = params.requestId as string;
-  const { profile, isLoading: liffLoading } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -31,10 +31,10 @@ export default function InvestorPrincipalIncreaseUploadPage() {
   };
 
   useEffect(() => {
-    if (requestId) {
+    if (requestId && (isInvestorPreviewMode() || (!liffLoading && profile?.userId))) {
       fetchRequestDetails();
     }
-  }, [requestId]);
+  }, [requestId, profile?.userId, liffLoading]);
 
   const fetchRequestDetails = async () => {
     try {
@@ -43,7 +43,9 @@ export default function InvestorPrincipalIncreaseUploadPage() {
         setRequestDetails(getMockPrincipalIncreaseRequest(requestId));
         return;
       }
-      const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`);
+      const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`, {
+        headers: { 'X-LIFF-Role': 'INVESTOR' },
+      });
       if (response.data.success) {
         setRequestDetails(response.data.request);
       }
@@ -100,7 +102,10 @@ export default function InvestorPrincipalIncreaseUploadPage() {
       formData.append('folder', 'investor-slips');
 
       const uploadRes = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-LIFF-Role': 'INVESTOR',
+        }
       });
 
       if (!uploadRes.data.url) {
@@ -135,6 +140,14 @@ export default function InvestorPrincipalIncreaseUploadPage() {
       setUploading(false);
     }
   };
+
+  if (!isInvestorPreviewMode() && !liffLoading && (liffError || !profile?.userId)) {
+    return (
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center p-6 text-center">
+        <p className="text-error">กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่</p>
+      </div>
+    );
+  }
 
   if (liffLoading || loading) {
     return (

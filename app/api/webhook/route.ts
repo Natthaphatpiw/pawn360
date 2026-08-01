@@ -1,10 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent, Client, FlexMessage } from '@line/bot-sdk';
-import { verifySignature, sendStoreLocationCard, sendConfirmationSuccessMessage } from '@/lib/line/client';
+import { sendStoreLocationCard, sendConfirmationSuccessMessage } from '@/lib/line/client';
+import { verifyLineSignatureWithSecret } from '@/lib/security/line';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { ObjectId } from 'mongodb';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
+import {
+  claimWebhookEvent,
+  completeWebhookClaim,
+  readBoundedWebhookText,
+  releaseWebhookClaim,
+  webhookReplayErrorResponse,
+} from '@/lib/security/webhook-replay';
+
+const MAX_LINE_EVENTS = 100;
+
+function lineEventMaterial(event: WebhookEvent): string {
+  const webhookEventId = (event as WebhookEvent & { webhookEventId?: unknown }).webhookEventId;
+  return typeof webhookEventId === 'string' && webhookEventId.length <= 256
+    ? webhookEventId
+    : JSON.stringify(event);
+}
+
+function relationOne<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] || null : value || null;
+}
+
+function validUuid(value: string | null): value is string {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+}
+
+function formatAmount(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toLocaleString('th-TH') : '-';
+}
+
+function logWebhookFailure(stage: string, error?: unknown) {
+  console.error(`[line:webhook] ${stage}`, {
+    type: error instanceof Error ? error.name : 'unknown',
+  });
+}
 
 function getDropPointLineClient() {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT;
@@ -55,62 +92,71 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text();
+    const body = await readBoundedWebhookText(request);
     const signature = request.headers.get('x-line-signature');
+    const channelSecret = process.env.LINE_CHANNEL_SECRET || '';
 
-    console.log('Webhook received:', {
-      hasBody: !!body,
-      bodyLength: body?.length,
-      hasSignature: !!signature,
-      channelSecretConfigured: !!process.env.LINE_CHANNEL_SECRET,
-    });
-
-    // If body is empty, it's a verification request - just return 200
-    if (!body || body.trim() === '') {
-      console.log('Empty body - verification request');
-      return NextResponse.json({ success: true });
+    if (!channelSecret) {
+      console.error('[line:webhook] LINE_CHANNEL_SECRET is not configured');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
     }
 
-    // Verify signature if present
-    if (signature && process.env.LINE_CHANNEL_SECRET) {
-      const isValid = verifySignature(body, signature);
-      console.log('Signature verification:', isValid);
-
-      if (!isValid) {
-        console.error('🚨 SECURITY WARNING: Invalid webhook signature detected!');
-        console.error('🚨 This could indicate a security breach or misconfiguration');
-        console.error('🚨 IMMEDIATE ACTION REQUIRED:');
-        console.error('   1. Check LINE Developers Console > Channel Settings > Basic Settings');
-        console.error('   2. Copy Channel Secret (not Channel Access Token)');
-        console.error('   3. Update LINE_CHANNEL_SECRET in Vercel Environment Variables');
-        console.error('   4. Redeploy the application');
-        console.error('🚨 Temporarily allowing request to prevent service disruption');
-        console.error('🚨 FIX THIS IMMEDIATELY IN PRODUCTION!');
-      }
-    } else {
-      console.warn('No signature or channel secret - skipping verification');
+    if (!signature || !verifyLineSignatureWithSecret(body, signature, channelSecret)) {
+      console.warn('[line:webhook] rejected invalid signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    const data = JSON.parse(body);
-    const events: WebhookEvent[] = data.events || [];
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
 
-    console.log('Processing events:', events.length);
+    let data: { events?: unknown };
+    try {
+      data = JSON.parse(body) as { events?: unknown };
+    } catch {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+    const events = Array.isArray(data.events) ? data.events as WebhookEvent[] : [];
+    if (events.length > MAX_LINE_EVENTS) {
+      return NextResponse.json({ error: 'Too many events' }, { status: 400 });
+    }
 
-    // Process each event
     for (const event of events) {
-      if (event.type === 'follow') {
-        await handleFollowEvent(event);
-      } else if (event.type === 'postback') {
-        await handlePostbackEvent(event);
-      } else if (event.type === 'message') {
-        await handleMessageEvent(event);
+      const claim = await claimWebhookEvent({
+        namespace: 'line-pawner',
+        material: lineEventMaterial(event),
+        signingSecret: channelSecret,
+      });
+      if (claim.duplicate) continue;
+      try {
+        if (event.type === 'follow') {
+          await handleFollowEvent(event);
+        } else if (event.type === 'postback') {
+          await handlePostbackEvent(event);
+        } else if (event.type === 'message') {
+          await handleMessageEvent(event);
+        }
+        await completeWebhookClaim(claim);
+      } catch (error) {
+        await releaseWebhookClaim(claim);
+        throw error;
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
-    console.error('Webhook error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const replayError = webhookReplayErrorResponse(error);
+    if (replayError) return replayError;
+    console.error('[line:webhook] processing failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }
 
@@ -130,52 +176,14 @@ async function handleFollowEvent(event: WebhookEvent) {
     if (!existingCustomer) {
       // User doesn't exist - do nothing
       // They will see the default Rich Menu for new users
-      console.log(`New user followed: ${userId}`);
+      console.log('[line:webhook] new follower received');
     } else {
       // User already exists - Rich Menu will be set when they register
-      console.log(`Existing user followed: ${userId}`);
+      console.log('[line:webhook] existing follower received');
     }
   } catch (error) {
-    console.error('Error handling follow event:', error);
-  }
-}
-
-// Track processed webhook events for idempotency (in-memory cache with TTL)
-const processedEvents = new Map<string, number>();
-const EVENT_TTL_MS = 60000; // 1 minute TTL
-
-function getEventKey(event: WebhookEvent): string {
-  if (event.type === 'postback') {
-    return `${event.source.userId}_${event.postback?.data}_${event.timestamp}`;
-  }
-  return `${event.source.userId}_${event.type}_${event.timestamp}`;
-}
-
-function isEventProcessed(eventKey: string): boolean {
-  const processedAt = processedEvents.get(eventKey);
-  if (!processedAt) return false;
-
-  // Check if event is still within TTL
-  if (Date.now() - processedAt < EVENT_TTL_MS) {
-    return true;
-  }
-
-  // Event expired, remove it
-  processedEvents.delete(eventKey);
-  return false;
-}
-
-function markEventProcessed(eventKey: string): void {
-  processedEvents.set(eventKey, Date.now());
-
-  // Clean up old entries periodically (keep map size reasonable)
-  if (processedEvents.size > 1000) {
-    const now = Date.now();
-    for (const [key, timestamp] of processedEvents) {
-      if (now - timestamp > EVENT_TTL_MS) {
-        processedEvents.delete(key);
-      }
-    }
+    logWebhookFailure('follow handling failed', error);
+    throw error;
   }
 }
 
@@ -188,17 +196,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
   const postbackData = event.postback?.data;
   if (!postbackData) return;
 
-  // Idempotency check - prevent duplicate processing
-  const eventKey = getEventKey(event);
-  if (isEventProcessed(eventKey)) {
-    console.log(`Duplicate postback detected, skipping: ${postbackData} from user: ${userId}`);
-    return;
-  }
-
-  // Mark as processed immediately to prevent concurrent duplicates
-  markEventProcessed(eventKey);
-
-  console.log(`Postback received: ${postbackData} from user: ${userId}`);
+  console.log('[line:webhook] postback received');
 
   try {
     // Parse postback data
@@ -208,11 +206,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
     if (action === 'store_location' && itemId) {
       try {
-        console.log(`Processing store_location for itemId: ${itemId}`);
+        console.log('[line:webhook] store-location action started');
 
         // Validate itemId format
         if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
-          console.error('Invalid itemId format:', itemId);
+          console.warn('[line:webhook] invalid item identifier');
           return;
         }
 
@@ -226,19 +224,24 @@ async function handlePostbackEvent(event: WebhookEvent) {
         });
 
         if (!item) {
-          console.error('Item not found:', itemId);
+          console.warn('[line:webhook] item was not found');
+          return;
+        }
+
+        if (item.lineId !== userId) {
+          console.warn('[line:webhook] item ownership mismatch');
           return;
         }
 
         if (!item.storeId) {
-          console.error('Item has no storeId:', itemId);
+          console.warn('[line:webhook] item has no assigned store');
           return;
         }
 
         // Validate storeId format
         const storeIdStr = item.storeId.toString();
         if (!storeIdStr.match(/^[0-9a-fA-F]{24}$/)) {
-          console.error('Invalid storeId format:', storeIdStr);
+          console.warn('[line:webhook] invalid store identifier');
           return;
         }
 
@@ -248,25 +251,25 @@ async function handlePostbackEvent(event: WebhookEvent) {
         });
 
         if (!store) {
-          console.error('Store not found:', storeIdStr);
+          console.warn('[line:webhook] assigned store was not found');
           return;
         }
 
-        console.log(`Found store: ${store.storeName}, sending location card`);
+        console.log('[line:webhook] sending store location');
 
         // Send store location card
         await sendStoreLocationCard(userId, store);
-                console.log(`Store location card sent successfully for store: ${store.storeName}`);
+                console.log('[line:webhook] store location sent');
               } catch (error) {
-                console.error('Error processing store_location:', error);
-                console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+                logWebhookFailure('store location failed', error);
+                throw error;
               }
             } else if (action === 'confirm_contract_modification' && itemId) {
               try {
-                console.log(`Processing contract modification confirmation for itemId: ${itemId}`);
+                console.log('[line:webhook] contract confirmation started');
 
                 if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
-                  console.error('Invalid itemId format:', itemId);
+                  console.warn('[line:webhook] invalid item identifier');
                   return;
                 }
 
@@ -283,11 +286,31 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   return;
                 }
 
+                if (item.lineId !== userId) {
+                  console.warn('[line:webhook] item ownership mismatch');
+                  return;
+                }
+
+                if (item.confirmationStatus !== 'pending') {
+                  console.warn('[line:webhook] invalid contract confirmation transition');
+                  return;
+                }
+
+                const reservation = await itemsCollection.updateOne(
+                  { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'pending' },
+                  { $set: { confirmationStatus: 'processing', updatedAt: new Date() } },
+                );
+                if (reservation.modifiedCount !== 1) return;
+
                 // เลือกใช้ข้อมูลการยืนยัน (confirmationNewContract มี priority สูงกว่า confirmationProposedContract)
                 const confirmedContract = item.confirmationNewContract || item.confirmationProposedContract;
 
                 if (!confirmedContract) {
                   console.error('No confirmed contract data found');
+                  await itemsCollection.updateOne(
+                    { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'processing' },
+                    { $set: { confirmationStatus: 'pending', updatedAt: new Date() } },
+                  );
                   return;
                 }
 
@@ -297,14 +320,29 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 const periodDays = parseInt(String(confirmedContract.loanDays || confirmedContract.periodDays)) || 30;
                 const totalInterest = parseFloat(String(confirmedContract.interest || confirmedContract.interestAmount)) || 0;
                 const remainingAmount = pawnedPrice + totalInterest;
+                if (
+                  pawnedPrice <= 0
+                  || pawnedPrice > 100_000_000
+                  || interestRate <= 0
+                  || interestRate > 100
+                  || periodDays <= 0
+                  || periodDays > 3650
+                  || !ObjectId.isValid(String(confirmedContract.storeId || ''))
+                ) {
+                  await itemsCollection.updateOne(
+                    { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'processing' },
+                    { $set: { confirmationStatus: 'pending', updatedAt: new Date() } },
+                  );
+                  console.warn('[line:webhook] invalid confirmed contract values');
+                  return;
+                }
 
                 // คำนวณ dueDate อย่างถูกต้อง
                 const startDate = new Date();
                 const dueDate = new Date(startDate.getTime());
                 dueDate.setDate(dueDate.getDate() + periodDays);
 
-                console.log(`💰 Contract calculation - Price: ${pawnedPrice}, Interest: ${totalInterest}, Total: ${remainingAmount}, Days: ${periodDays}`);
-                console.log(`📅 Date calculation - Start: ${startDate.toISOString()}, Due: ${dueDate.toISOString()}, Period: ${periodDays} days`);
+                console.log('[line:webhook] contract values validated');
 
                 // ตรวจสอบว่ามี contract สำหรับ item นี้อยู่แล้วหรือไม่
                 const existingContract = await contractsCollection.findOne({
@@ -312,11 +350,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 });
 
                 if (existingContract) {
-                  console.log(`Contract already exists for item ${itemId}, updating instead of creating new one`);
+                  console.log('[line:webhook] existing contract update started');
 
                   // อัพเดท contract ที่มีอยู่
-                  await contractsCollection.updateOne(
-                    { _id: existingContract._id },
+                  const contractUpdate = await contractsCollection.updateOne(
+                    { _id: existingContract._id, lineId: userId },
                     {
                       $set: {
                         'pawnDetails.pawnedPrice': pawnedPrice,
@@ -329,8 +367,21 @@ async function handlePostbackEvent(event: WebhookEvent) {
                       }
                     }
                   );
+                  if (contractUpdate.matchedCount !== 1) throw new Error('CONTRACT_OWNER_MISMATCH');
 
-                  console.log(`Contract updated successfully for itemId: ${itemId}`);
+                  await itemsCollection.updateOne(
+                    { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'processing' },
+                    {
+                      $set: { confirmationStatus: 'confirmed', updatedAt: new Date() },
+                      $unset: {
+                        confirmationModifications: 1,
+                        confirmationProposedContract: 1,
+                        confirmationTimestamp: 1,
+                      },
+                    },
+                  );
+
+                  console.log('[line:webhook] existing contract updated');
                   return;
                 }
 
@@ -386,7 +437,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
                 // อัปเดต item status และเพิ่ม contract reference
                 await itemsCollection.updateOne(
-                  { _id: new ObjectId(itemId) },
+                  { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'processing' },
                   {
                     $set: {
                       status: 'contracted',
@@ -433,21 +484,30 @@ async function handlePostbackEvent(event: WebhookEvent) {
                     dueDate: dueDate.toISOString(),
                   });
                 } catch (messageError) {
-                  console.error('Error sending confirmation success message:', messageError);
+                  logWebhookFailure('contract success notification delayed', messageError);
                   // ไม่ให้ error นี้หยุดการทำงานหลัก
                 }
 
-                console.log(`Contract created successfully for itemId: ${itemId}, contractId: ${result.insertedId}`);
+                console.log('[line:webhook] contract created');
               } catch (error) {
-                console.error('Error processing contract modification confirmation:', error);
-                console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+                try {
+                  const { db } = await connectToDatabase();
+                  await db.collection('items').updateOne(
+                    { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'processing' },
+                    { $set: { confirmationStatus: 'pending', updatedAt: new Date() } },
+                  );
+                } catch {
+                  // A reconciliation job should surface any stale processing row.
+                }
+                logWebhookFailure('contract modification confirmation failed', error);
+                throw error;
               }
             } else if (action === 'cancel_contract_modification' && itemId) {
               try {
-                console.log(`Processing contract modification cancellation for itemId: ${itemId}`);
+                console.log('[line:webhook] contract cancellation started');
 
                 if (!itemId.match(/^[0-9a-fA-F]{24}$/)) {
-                  console.error('Invalid itemId format:', itemId);
+                  console.warn('[line:webhook] invalid item identifier');
                   return;
                 }
 
@@ -455,8 +515,8 @@ async function handlePostbackEvent(event: WebhookEvent) {
                 const itemsCollection = db.collection('items');
 
                 // Update item confirmation status to canceled
-                await itemsCollection.updateOne(
-                  { _id: new ObjectId(itemId) },
+                const cancelResult = await itemsCollection.updateOne(
+                  { _id: new ObjectId(itemId), lineId: userId, confirmationStatus: 'pending' },
                   {
                     $set: {
                       confirmationStatus: 'canceled',
@@ -465,10 +525,15 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   }
                 );
 
-                console.log(`Contract modification canceled for itemId: ${itemId}`);
+                if (cancelResult.modifiedCount !== 1) {
+                  console.warn('[line:webhook] invalid contract cancellation transition');
+                  return;
+                }
+
+                console.log('[line:webhook] contract confirmation canceled');
               } catch (error) {
-                console.error('Error processing contract modification cancellation:', error);
-                console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+                logWebhookFailure('contract modification cancellation failed', error);
+                throw error;
               }
     } else if (action === 'upload_slip') {
               // Handle slip upload postback (customer wants to upload payment slip)
@@ -480,18 +545,19 @@ async function handlePostbackEvent(event: WebhookEvent) {
               }
 
               try {
-                console.log(`Processing upload_slip for notificationId: ${notificationId}`);
+                console.log('[line:webhook] slip-upload action started');
 
                 const { db } = await connectToDatabase();
                 const notificationsCollection = db.collection('notifications');
 
                 // Find notification
                 const notification = await notificationsCollection.findOne({
-                  shopNotificationId: notificationId
+                  shopNotificationId: notificationId,
+                  lineUserId: userId,
                 });
 
                 if (!notification) {
-                  console.error('Notification not found:', notificationId);
+                  console.warn('[line:webhook] notification was not found');
                   return;
                 }
 
@@ -517,20 +583,21 @@ async function handlePostbackEvent(event: WebhookEvent) {
                   });
                 }
 
-                console.log(`Upload slip flow initiated for notification: ${notificationId}`);
+                console.log('[line:webhook] slip-upload flow initiated');
               } catch (error) {
-                console.error('Error processing upload_slip:', error);
+                logWebhookFailure('slip flow failed', error);
+                throw error;
               }
     } else if (action === 'confirm_pawn') {
       // Handle confirm_pawn postback - Pawner confirms to bring item to drop point
       const contractId = params.get('contractId');
-      if (!contractId) {
+      if (!validUuid(contractId)) {
         console.error('No contractId in confirm_pawn postback');
         return;
       }
 
       try {
-        console.log(`Processing confirm_pawn for contractId: ${contractId}`);
+        console.log('[line:webhook] pawn confirmation started');
         const supabase = supabaseAdmin();
 
         // Get contract with drop point info
@@ -547,9 +614,19 @@ async function handlePostbackEvent(event: WebhookEvent) {
           .single();
 
         if (contractError || !contract) {
-          console.error('Contract not found:', contractError);
+          logWebhookFailure('contract lookup failed', contractError);
           return;
         }
+
+        const contractPawner = relationOne(contract.pawners);
+        if (!contractPawner || contractPawner.line_id !== userId) {
+          console.warn('[line:webhook] contract ownership mismatch');
+          return;
+        }
+        contract.pawners = contractPawner;
+        contract.items = relationOne(contract.items);
+        contract.drop_points = relationOne(contract.drop_points);
+        contract.investors = relationOne(contract.investors);
 
         const { data: loanRequest } = await supabase
           .from('loan_requests')
@@ -576,7 +653,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
         if (contract.item_delivery_status === 'PAWNER_CONFIRMED' ||
             contract.item_delivery_status === 'DELIVERED' ||
             contract.item_delivery_status === 'VERIFIED') {
-          console.log(`Contract ${contractId} already confirmed (status: ${contract.item_delivery_status}), skipping`);
+          console.log('[line:webhook] pawn confirmation already applied');
           const dropPointDestination = formatDropPointDestination(contract.drop_points);
           // Send a polite reminder message instead
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -590,14 +667,23 @@ async function handlePostbackEvent(event: WebhookEvent) {
           return;
         }
 
-        // Update contract status
-        await supabase
+        // Reserve the only valid delivery transition so a second, distinct
+        // postback cannot move a later state (for example IN_TRANSIT) back.
+        const { data: deliveryConfirmed, error: deliveryUpdateError } = await supabase
           .from('contracts')
           .update({
             item_delivery_status: 'PAWNER_CONFIRMED',
             updated_at: new Date().toISOString()
           })
-          .eq('contract_id', contractId);
+          .eq('contract_id', contractId)
+          .eq('item_delivery_status', 'PENDING')
+          .select('contract_id')
+          .maybeSingle();
+        if (deliveryUpdateError) throw new Error('DELIVERY_CONFIRMATION_FAILED');
+        if (!deliveryConfirmed) {
+          console.warn('[line:webhook] invalid delivery confirmation transition');
+          return;
+        }
 
         // Send confirmation to pawner
         const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -620,28 +706,29 @@ async function handlePostbackEvent(event: WebhookEvent) {
             } else {
               await dpClient.pushMessage(contract.drop_points.line_id, dropPointNotification);
             }
-            console.log(`Sent notification to drop point ${contract.drop_points.line_id}`);
+            console.log('[line:webhook] drop-point notification sent');
           } catch (dpError) {
-            console.error('Error sending to drop point:', dpError);
+            logWebhookFailure('drop-point notification delayed', dpError);
           }
         }
 
-        console.log(`Confirm pawn processed for contractId: ${contractId}`);
+        console.log('[line:webhook] pawn confirmation processed');
       } catch (error) {
-        console.error('Error processing confirm_pawn:', error);
+        logWebhookFailure('pawn confirmation failed', error);
+        throw error;
       }
     } else if (action === 'confirm_payment') {
       // Handle confirm_payment postback - Pawner confirms receiving payment from investor
       const contractId = params.get('contractId');
       const paymentId = params.get('paymentId');
 
-      if (!contractId) {
+      if (!validUuid(contractId) || !validUuid(paymentId)) {
         console.error('No contractId in confirm_payment postback');
         return;
       }
 
       try {
-        console.log(`Processing confirm_payment for contractId: ${contractId}`);
+        console.log('[line:webhook] payment confirmation started');
         const supabase = supabaseAdmin();
 
         // Get contract
@@ -657,27 +744,68 @@ async function handlePostbackEvent(event: WebhookEvent) {
           .single();
 
         if (contractError || !contract) {
-          console.error('Contract not found:', contractError);
+          logWebhookFailure('contract lookup failed', contractError);
           return;
         }
 
+        const contractPawner = relationOne(contract.pawners);
+        if (!contractPawner || contractPawner.line_id !== userId) {
+          console.warn('[line:webhook] contract ownership mismatch');
+          return;
+        }
+        contract.pawners = contractPawner;
+        contract.items = relationOne(contract.items);
+        contract.investors = relationOne(contract.investors);
+
         // Idempotency check at database level - check if already confirmed
         if (contract.payment_status === 'COMPLETED' || contract.contract_status === 'CONFIRMED') {
-          console.log(`Contract ${contractId} payment already confirmed (status: ${contract.payment_status}), skipping`);
+          console.log('[line:webhook] payment confirmation already applied');
           // Send a polite confirmation message instead
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken && contract.pawners?.line_id) {
             const client = new Client({ channelAccessToken });
             await client.pushMessage(contract.pawners.line_id, {
               type: 'text',
-              text: `คุณได้ยืนยันการรับเงินไปแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}`
+              text: `คุณได้ยืนยันการรับเงินไปแล้ว\n\nจำนวนเงิน: ${formatAmount(contract.loan_principal_amount)} บาท\nหมายเลขสัญญา: ${contract.contract_number || '-'}`
             });
           }
           return;
         }
 
+        if (contract.payment_status !== 'INVESTOR_PAID') {
+          console.warn('[line:webhook] invalid payment confirmation transition');
+          return;
+        }
+
+        const { data: payment, error: paymentLookupError } = await supabase
+          .from('payments')
+          .select('payment_id, contract_id, payment_status')
+          .eq('payment_id', paymentId)
+          .eq('contract_id', contractId)
+          .maybeSingle();
+        if (paymentLookupError || !payment || !['PENDING', 'COMPLETED'].includes(payment.payment_status)) {
+          console.warn('[line:webhook] payment record mismatch');
+          return;
+        }
+
+        if (payment.payment_status === 'PENDING') {
+          const { data: completedPayment, error: paymentUpdateError } = await supabase
+            .from('payments')
+            .update({
+              payment_status: 'COMPLETED',
+              confirmed_by_recipient: true,
+              confirmed_at: new Date().toISOString(),
+            })
+            .eq('payment_id', paymentId)
+            .eq('contract_id', contractId)
+            .eq('payment_status', 'PENDING')
+            .select('payment_id')
+            .maybeSingle();
+          if (paymentUpdateError || !completedPayment) throw new Error('PAYMENT_CONFIRMATION_CONFLICT');
+        }
+
         // Update contract status to CONFIRMED (fully confirmed contract)
-        await supabase
+        const { data: confirmedContract, error: confirmContractError } = await supabase
           .from('contracts')
           .update({
             payment_status: 'COMPLETED',
@@ -685,18 +813,11 @@ async function handlePostbackEvent(event: WebhookEvent) {
             contract_status: 'CONFIRMED',
             updated_at: new Date().toISOString()
           })
-          .eq('contract_id', contractId);
-
-        // Update payment record if paymentId provided
-        // Valid payment_status values: PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
-        if (paymentId) {
-          await supabase
-            .from('payments')
-            .update({
-              payment_status: 'COMPLETED'
-            })
-            .eq('payment_id', paymentId);
-        }
+          .eq('contract_id', contractId)
+          .eq('payment_status', 'INVESTOR_PAID')
+          .select('contract_id')
+          .maybeSingle();
+        if (confirmContractError || !confirmedContract) throw new Error('CONTRACT_CONFIRMATION_CONFLICT');
 
         // Send confirmation to pawner
         const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -704,7 +825,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const client = new Client({ channelAccessToken });
           await client.pushMessage(contract.pawners.line_id, {
             type: 'text',
-            text: `ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${contract.loan_principal_amount?.toLocaleString()} บาท\nหมายเลขสัญญา: ${contract.contract_number}\n\nสัญญาสินเชื่อเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
+            text: `ยืนยันการรับเงินเรียบร้อยแล้ว\n\nจำนวนเงิน: ${formatAmount(contract.loan_principal_amount)} บาท\nหมายเลขสัญญา: ${contract.contract_number || '-'}\n\nสัญญาสินเชื่อเริ่มต้นแล้ว กรุณาชำระคืนภายในกำหนด`
           });
         }
 
@@ -718,26 +839,27 @@ async function handlePostbackEvent(event: WebhookEvent) {
               text: `ผู้ขอสินเชื่อยืนยันรับเงินแล้ว\n\nหมายเลขสัญญา: ${contract.contract_number}\nสัญญาสินเชื่อเริ่มต้นเรียบร้อยแล้ว`
             });
           } catch (invError) {
-            console.error('Error sending to investor:', invError);
+            logWebhookFailure('investor notification delayed', invError);
           }
         }
 
-        console.log(`Confirm payment processed for contractId: ${contractId}`);
+        console.log('[line:webhook] payment confirmation processed');
       } catch (error) {
-        console.error('Error processing confirm_payment:', error);
+        logWebhookFailure('payment confirmation failed', error);
+        throw error;
       }
     } else if (action === 'reject_payment') {
       // Handle reject_payment postback - Pawner rejects/hasn't received payment
       const contractId = params.get('contractId');
       const paymentId = params.get('paymentId');
 
-      if (!contractId) {
+      if (!validUuid(contractId) || !validUuid(paymentId)) {
         console.error('No contractId in reject_payment postback');
         return;
       }
 
       try {
-        console.log(`Processing reject_payment for contractId: ${contractId}`);
+        console.log('[line:webhook] payment rejection started');
         const supabase = supabaseAdmin();
 
         // Get contract
@@ -752,24 +874,35 @@ async function handlePostbackEvent(event: WebhookEvent) {
           .single();
 
         if (contractError || !contract) {
-          console.error('Contract not found:', contractError);
+          logWebhookFailure('contract lookup failed', contractError);
           return;
         }
 
+        const contractPawner = relationOne(contract.pawners);
+        if (!contractPawner || contractPawner.line_id !== userId) {
+          console.warn('[line:webhook] contract ownership mismatch');
+          return;
+        }
+        contract.pawners = contractPawner;
+        contract.investors = relationOne(contract.investors);
+
         // Fetch payment record (if provided) to strengthen idempotency checks
         let payment: any = null;
-        if (paymentId) {
-          const { data: paymentData } = await supabase
-            .from('payments')
-            .select('payment_id, payment_status, amount, paid_by_investor_id, confirmed_by_recipient, confirmed_at')
-            .eq('payment_id', paymentId)
-            .single();
-          payment = paymentData || null;
+        const { data: paymentData, error: paymentLookupError } = await supabase
+          .from('payments')
+          .select('payment_id, contract_id, payment_status, paid_by_investor_id, confirmed_by_recipient, confirmed_at')
+          .eq('payment_id', paymentId)
+          .eq('contract_id', contractId)
+          .maybeSingle();
+        if (paymentLookupError || !paymentData) {
+          console.warn('[line:webhook] payment record mismatch');
+          return;
         }
+        payment = paymentData;
 
         // Idempotency check - already rejected before
         if (contract.payment_status === 'REJECTED') {
-          console.log(`Contract ${contractId} already marked as REJECTED, skipping duplicate reject_payment`);
+          console.log('[line:webhook] payment rejection already applied');
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken && contract.pawners?.line_id) {
             const client = new Client({ channelAccessToken });
@@ -784,7 +917,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
         // IDEMPOTENCY CHECK - Check funding_status to prevent duplicate rejection actions
         // Only allow reject if funding is still PENDING or payment is still being processed
         if (contract.funding_status === 'FUNDED' || contract.funding_status === 'DISBURSED') {
-          console.log(`Contract ${contractId} already funded (status: ${contract.funding_status}), payment rejection not allowed`);
+          console.log('[line:webhook] payment rejection blocked after funding');
 
           // Send message to pawner explaining the situation
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -807,7 +940,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           payment?.confirmed_by_recipient === true ||
           payment?.confirmed_at
         ) {
-          console.log(`Contract ${contractId} already completed/confirmed, rejection not allowed`);
+          console.log('[line:webhook] payment rejection blocked after confirmation');
 
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken && contract.pawners?.line_id) {
@@ -822,28 +955,33 @@ async function handlePostbackEvent(event: WebhookEvent) {
 
         // Update payment record if paymentId provided
         // Valid payment_status values: PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
-        if (paymentId) {
-          const { error: paymentError } = await supabase
-            .from('payments')
-            .update({
-              payment_status: 'FAILED'
-            })
-            .eq('payment_id', paymentId)
-            .in('payment_status', ['PENDING', 'PROCESSING']); // Only update if still pending/processing
-
-          if (paymentError) {
-            console.error('Error updating payment status:', paymentError);
-          }
+        if (contract.payment_status !== 'INVESTOR_PAID' || payment.payment_status !== 'PENDING') {
+          console.warn('[line:webhook] invalid payment rejection transition');
+          return;
         }
 
+        const { data: failedPayment, error: paymentError } = await supabase
+          .from('payments')
+          .update({ payment_status: 'FAILED' })
+          .eq('payment_id', paymentId)
+          .eq('contract_id', contractId)
+          .eq('payment_status', 'PENDING')
+          .select('payment_id')
+          .maybeSingle();
+        if (paymentError || !failedPayment) throw new Error('PAYMENT_REJECTION_CONFLICT');
+
         // Update contract status to indicate payment issue
-        await supabase
+        const { data: rejectedContract, error: rejectContractError } = await supabase
           .from('contracts')
           .update({
             payment_status: 'REJECTED',
             updated_at: new Date().toISOString()
           })
-          .eq('contract_id', contractId);
+          .eq('contract_id', contractId)
+          .eq('payment_status', 'INVESTOR_PAID')
+          .select('contract_id')
+          .maybeSingle();
+        if (rejectContractError || !rejectedContract) throw new Error('CONTRACT_REJECTION_CONFLICT');
 
         // Send confirmation to pawner
         const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -864,17 +1002,18 @@ async function handlePostbackEvent(event: WebhookEvent) {
               type: 'text',
               text: `ผู้ขอสินเชื่อแจ้งว่ายังไม่ได้รับเงิน\n\nหมายเลขสัญญา: ${contract.contract_number}\n\nกรุณาตรวจสอบการโอนเงินและส่งหลักฐานการโอนเงินใหม่อีกครั้ง`
             });
-            console.log(`Sent notification to investor ${contract.investors.line_id}`);
+            console.log('[line:webhook] investor notification sent');
           } catch (invError) {
-            console.error('Error sending to investor:', invError);
+            logWebhookFailure('investor notification delayed', invError);
           }
         } else {
-          console.log(`Skipped sending message to investor - funding_status: ${contract.funding_status}`);
+          console.log('[line:webhook] investor notification not applicable');
         }
 
-        console.log(`Reject payment processed for contractId: ${contractId}, funding_status: ${contract.funding_status}`);
+        console.log('[line:webhook] payment rejection processed');
       } catch (error) {
-        console.error('Error processing reject_payment:', error);
+        logWebhookFailure('payment rejection failed', error);
+        throw error;
       }
     }
 
@@ -883,13 +1022,13 @@ async function handlePostbackEvent(event: WebhookEvent) {
     // Pawner confirms they received the item
     if (action === 'pawner_confirm_received') {
       const redemptionId = params.get('redemptionId');
-      if (!redemptionId) {
+      if (!validUuid(redemptionId)) {
         console.error('No redemptionId in pawner_confirm_received postback');
         return;
       }
 
       try {
-        console.log(`Processing pawner_confirm_received for redemptionId: ${redemptionId}`);
+        console.log('[line:webhook] redemption confirmation started');
         const supabase = supabaseAdmin();
 
         // Get redemption with all details
@@ -908,13 +1047,24 @@ async function handlePostbackEvent(event: WebhookEvent) {
           .single();
 
         if (redemptionError || !redemption) {
-          console.error('Redemption not found:', redemptionError);
+          logWebhookFailure('redemption lookup failed', redemptionError);
           return;
         }
 
+        const redemptionContract = relationOne(redemption.contract);
+        const redemptionPawner = relationOne(redemptionContract?.pawners);
+        if (!redemptionContract || !redemptionPawner || redemptionPawner.line_id !== userId) {
+          console.warn('[line:webhook] redemption ownership mismatch');
+          return;
+        }
+        redemptionContract.pawners = redemptionPawner;
+        redemptionContract.items = relationOne(redemptionContract.items);
+        redemptionContract.investors = relationOne(redemptionContract.investors);
+        redemption.contract = redemptionContract;
+
         // Idempotency check - check if already confirmed
         if (redemption.request_status === 'PAWNER_CONFIRMED' || redemption.pawner_confirmed_at) {
-          console.log(`Redemption ${redemptionId} already confirmed (status: ${redemption.request_status}), skipping`);
+          console.log('[line:webhook] redemption confirmation already applied');
           const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
           if (channelAccessToken) {
             const client = new Client({ channelAccessToken });
@@ -950,7 +1100,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
         const netProfit = interestEarned;
 
         // Update redemption status
-        await supabase
+        const { data: confirmedRedemption, error: redemptionUpdateError } = await supabase
           .from('redemption_requests')
           .update({
             request_status: 'PAWNER_CONFIRMED',
@@ -960,7 +1110,12 @@ async function handlePostbackEvent(event: WebhookEvent) {
             investor_net_profit: netProfit,
             updated_at: new Date().toISOString(),
           })
-          .eq('redemption_id', redemptionId);
+          .eq('redemption_id', redemptionId)
+          .not('request_status', 'in', '(PAWNER_CONFIRMED,COMPLETED)')
+          .is('pawner_confirmed_at', null)
+          .select('redemption_id')
+          .maybeSingle();
+        if (redemptionUpdateError || !confirmedRedemption) throw new Error('REDEMPTION_CONFIRMATION_CONFLICT');
 
         // Update contract status to COMPLETED
         await supabase
@@ -978,7 +1133,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           try {
             await refreshInvestorTierAndTotals(contract.investor_id);
           } catch (refreshError) {
-            console.error('Error refreshing investor totals:', refreshError);
+            logWebhookFailure('investor totals refresh delayed', refreshError);
           }
         }
 
@@ -1010,13 +1165,14 @@ async function handlePostbackEvent(event: WebhookEvent) {
             if (!invClient) throw new Error('Investor LINE client not configured');
             await invClient.pushMessage(investor.line_id, investorCard);
           } catch (invError) {
-            console.error('Error sending to investor:', invError);
+            logWebhookFailure('investor notification delayed', invError);
           }
         }
 
-        console.log(`Pawner confirmed received for redemptionId: ${redemptionId}`);
+        console.log('[line:webhook] redemption confirmation processed');
       } catch (error) {
-        console.error('Error processing pawner_confirm_received:', error);
+        logWebhookFailure('redemption confirmation failed', error);
+        throw error;
       }
     }
 
@@ -1039,94 +1195,9 @@ async function handlePostbackEvent(event: WebhookEvent) {
       });
     }
 
-    // Investor confirms they received payment
-    if (action === 'investor_confirm_received') {
-      const redemptionId = params.get('redemptionId');
-      if (!redemptionId) {
-        console.error('No redemptionId in investor_confirm_received postback');
-        return;
-      }
-
-      try {
-        console.log(`Processing investor_confirm_received for redemptionId: ${redemptionId}`);
-        const supabase = supabaseAdmin();
-
-        // Get redemption
-        const { data: redemption, error } = await supabase
-          .from('redemption_requests')
-          .select('*, contract:contract_id (*)')
-          .eq('redemption_id', redemptionId)
-          .single();
-
-        if (error || !redemption) {
-          console.error('Redemption not found:', error);
-          return;
-        }
-
-        // Idempotency check - check if already completed
-        if (redemption.request_status === 'COMPLETED') {
-          console.log(`Redemption ${redemptionId} already completed, skipping`);
-          const netProfit = redemption.investor_net_profit || 0;
-          try {
-            const invClient = getInvestorLineClient();
-            if (!invClient) throw new Error('Investor LINE client not configured');
-            await invClient.pushMessage(userId, {
-              type: 'text',
-              text: `คุณได้ยืนยันรับเงินไปแล้ว\n\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`
-            });
-          } catch (msgError) {
-            console.error('Error sending to investor:', msgError);
-          }
-          return;
-        }
-
-        // Update redemption status
-        await supabase
-          .from('redemption_requests')
-          .update({
-            request_status: 'COMPLETED',
-            investor_confirmed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('redemption_id', redemptionId);
-
-        // Send success message to investor
-        const netProfit = redemption.investor_net_profit || 0;
-        const successMessage = `ยินดีด้วย! คุณได้รับกำไรจากสัญญานี้\n\n+${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly\n\nอย่าลืมเช็คข้อเสนอใหม่ๆ เพื่อโอกาสในการสร้างกำไรที่มากขึ้น\n\nPawnly - ลงทุนง่าย กำไรดี`;
-
-        try {
-          const invClient = getInvestorLineClient();
-          if (!invClient) throw new Error('Investor LINE client not configured');
-          await invClient.pushMessage(userId, {
-            type: 'text',
-            text: successMessage
-          });
-        } catch (msgError) {
-          console.error('Error sending to investor:', msgError);
-        }
-
-        console.log(`Investor confirmed received for redemptionId: ${redemptionId}`);
-      } catch (error) {
-        console.error('Error processing investor_confirm_received:', error);
-      }
-    }
-
-    // Investor reports problem
-    if (action === 'investor_report_problem') {
-      try {
-        const invClient = getInvestorLineClient();
-        if (!invClient) throw new Error('Investor LINE client not configured');
-        await invClient.pushMessage(userId, {
-          type: 'text',
-          text: `หากพบปัญหาเกี่ยวกับการรับเงิน\n\nกรุณาติดต่อฝ่าย Support:\nโทร: 062-6092941\n\nเวลาทำการ: 09:00 - 18:00 น.\nทุกวันจันทร์ - เสาร์`
-        });
-      } catch (msgError) {
-        console.error('Error sending support info:', msgError);
-      }
-    }
-
   } catch (error) {
-    console.error('Error handling postback event:', error);
+    logWebhookFailure('postback handling failed', error);
+    throw error;
   }
 }
 
@@ -1194,7 +1265,7 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
             margin: 'lg',
             contents: [
               { type: 'text', text: 'เงินต้น:', color: '#666666', size: 'sm', flex: 3 },
-              { type: 'text', text: `${contract?.loan_principal_amount?.toLocaleString()} บาท`, color: '#333333', size: 'sm', flex: 4 }
+              { type: 'text', text: `${formatAmount(contract?.loan_principal_amount)} บาท`, color: '#333333', size: 'sm', flex: 4 }
             ]
           },
           {
@@ -1204,7 +1275,7 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
             margin: 'sm',
             contents: [
               { type: 'text', text: 'ดอกเบี้ยรับ:', color: '#666666', size: 'sm', flex: 3 },
-              { type: 'text', text: `+${redemption.investor_interest_earned?.toLocaleString()} บาท`, color: '#1E3A8A', size: 'sm', flex: 4, weight: 'bold' }
+              { type: 'text', text: `+${formatAmount(redemption.investor_interest_earned)} บาท`, color: '#1E3A8A', size: 'sm', flex: 4, weight: 'bold' }
             ]
           },
           {
@@ -1214,7 +1285,7 @@ function createInvestorRedemptionCompleteCard(redemption: any, contract: any, ne
             margin: 'sm',
             contents: [
               { type: 'text', text: 'ค่าธรรมเนียม:', color: '#666666', size: 'sm', flex: 3 },
-              { type: 'text', text: `-${redemption.platform_fee_deducted?.toLocaleString()} บาท`, color: '#999999', size: 'sm', flex: 4 }
+              { type: 'text', text: `-${formatAmount(redemption.platform_fee_deducted)} บาท`, color: '#999999', size: 'sm', flex: 4 }
             ]
           },
           {
@@ -1418,8 +1489,6 @@ async function handleMessageEvent(event: WebhookEvent) {
   if (event.message.type !== 'image') return;
 
   const messageId = event.message.id;
-  console.log(`Image message received from ${userId}, messageId: ${messageId}`);
-
   try {
     const { db } = await connectToDatabase();
     const notificationsCollection = db.collection('notifications');
@@ -1432,29 +1501,31 @@ async function handleMessageEvent(event: WebhookEvent) {
     });
 
     if (!notification) {
-      console.log('No pending slip upload found for this user');
       return;
     }
 
-    console.log(`Found pending notification: ${notification.shopNotificationId}, uploading slip`);
-
     // Call upload-payment-proof API
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawnly.io';
+    const internalSecret = String(process.env.INTERNAL_API_SECRET || '').trim();
+    if (!internalSecret) throw new Error('INTERNAL_API_SECRET_NOT_CONFIGURED');
     const response = await fetch(`${baseUrl}/api/customer/upload-payment-proof`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${internalSecret}`,
       },
       body: JSON.stringify({
         notificationId: notification.shopNotificationId,
         lineUserId: userId,
         imageId: messageId
-      })
+      }),
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Failed to upload slip:', error);
+      console.error('[line:webhook] payment proof handoff failed');
 
       // Send error message to user
       const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -1469,17 +1540,21 @@ async function handleMessageEvent(event: WebhookEvent) {
     }
 
     // Clear awaiting flag
-    await notificationsCollection.updateOne(
+    const cleared = await notificationsCollection.updateOne(
       { _id: notification._id },
       {
         $unset: { awaitingSlipUpload: 1 },
         $set: { updatedAt: new Date() }
       }
     );
+    if (cleared.matchedCount !== 1) throw new Error('PAYMENT_PROOF_CONTEXT_CLEAR_FAILED');
 
-    console.log(`Slip uploaded successfully for notification: ${notification.shopNotificationId}`);
+    console.log('[line:webhook] payment proof uploaded');
 
   } catch (error) {
-    console.error('Error handling image message:', error);
+    console.error('[line:webhook] image message processing failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    throw error;
   }
 }

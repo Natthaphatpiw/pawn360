@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
-import { ArrowLeft, PackageCheck, QrCode } from 'lucide-react';
+import { PackageCheck } from 'lucide-react';
 import { isPreviewMode, withPreview } from '../_lib/preview';
+import { useLiff } from '@/lib/liff/liff-provider';
 
 interface ReturnReceipt {
   contract: {
@@ -66,6 +67,7 @@ export default function ReturnReceiptPage() {
   const previewMode = isPreviewMode(searchParams);
   const queryRedemptionId = searchParams.get('redemptionId');
   const queryDeliveryMethod = searchParams.get('deliveryMethod');
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [receipt, setReceipt] = useState<ReturnReceipt | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,10 +92,16 @@ export default function ReturnReceiptPage() {
       }
     };
 
+    if (!previewMode && liffLoading) return;
+    if (!previewMode && !profile?.userId) {
+      setLoading(false);
+      setError(liffError || 'กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      return;
+    }
     if (contractId) {
       fetchReceipt();
     }
-  }, [contractId, queryDeliveryMethod]);
+  }, [contractId, queryDeliveryMethod, previewMode, liffLoading, liffError, profile?.userId]);
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '-';
@@ -233,7 +241,7 @@ export default function ReturnReceiptPage() {
             </div>
 
             <div className="rounded-2xl bg-background-white p-4">
-              <h2 className="mb-3 font-bold text-foreground">ข้อมูลผู้ขอสินเชื่อ</h2>
+              <h2 className="mb-3 font-bold text-foreground">ข้อมูลผู้ขาย</h2>
               <InfoRow label="ชื่อ" value={customerName || '-'} />
               <InfoRow label="เลขบัตรประชาชน" value={receipt.contract.customer?.national_id || '-'} />
               <InfoRow label="เบอร์โทร" value={receipt.contract.customer?.phone_number || '-'} />

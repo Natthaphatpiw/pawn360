@@ -4,6 +4,27 @@ import { Client, FlexMessage } from '@line/bot-sdk';
 import { requirePinToken } from '@/lib/security/pin';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  acquireTransactionLock,
+  transactionLockErrorResponse,
+} from '@/lib/security/transaction-lock';
+import {
+  boundedText,
+  finiteNumber,
+  fingerprintOwnedBlob,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  TransactionRequestError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
+import {
+  ActorRateLimitError,
+  enforceActorRateLimit,
+} from '@/lib/security/actor-rate-limit';
 
 const CONDITION_CHECK_KEYS = [
   'screenCrack',
@@ -52,22 +73,110 @@ const pawnerLineClient = new Client({
   channelSecret: process.env.LINE_CHANNEL_SECRET || ''
 });
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { contractId, lineId, verificationResult, verificationData, storageBoxCode, bagNumber, pinToken } = body;
+const STORAGE_BOX_CODE_REGEX = /^[A-Z0-9-]{2,64}$/;
+const MAX_VERIFICATION_PHOTOS = 5;
 
-    if (!contractId || !lineId || !verificationResult) {
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TransactionRequestError('INVALID_FIELD', 400, 'ข้อมูลการตรวจสอบไม่ถูกต้อง');
+  }
+  return value as Record<string, unknown>;
+}
+
+function optionalBoolean(value: unknown): boolean | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'boolean') {
+    throw new TransactionRequestError('INVALID_FIELD', 400, 'ข้อมูลการตรวจสอบไม่ถูกต้อง');
+  }
+  return value;
+}
+
+function sanitizedPinPayload(payload: Record<string, unknown>) {
+  return {
+    error: typeof payload.error === 'string' ? payload.error : 'กรุณายืนยัน PIN ใหม่',
+    pinRequired: Boolean(payload.pinRequired),
+    pinSetupRequired: Boolean(payload.pinSetupRequired),
+    pinLocked: Boolean(payload.pinLocked),
+    lockRemainingSeconds: Number(payload.lockRemainingSeconds || 0),
+  };
+}
+
+export async function POST(request: NextRequest) {
+  let releaseContractLock: (() => Promise<void>) | null = null;
+  let releaseStorageBoxLock: (() => Promise<void>) | null = null;
+  try {
+    const body = await readBoundedJsonObject(request);
+    const contractId = requireUuid(body.contractId);
+    const verificationResult = boundedText(body.verificationResult, 16, true) || '';
+    if (verificationResult !== 'APPROVED' && verificationResult !== 'REJECTED') {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'ผลการตรวจสอบไม่ถูกต้อง' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
+    const verificationData = asObject(body.verificationData);
+    const pinToken = boundedText(body.pinToken, 256, true) || '';
+    const identity = await requireLiffIdentity(request, 'DROP_POINT');
+    const lineId = identity.lineId;
+    await enforceActorRateLimit({
+      scope: 'drop-point-verification',
+      actor: lineId,
+      limit: 12,
+      windowSeconds: 5 * 60,
+    });
     const pinCheck = await requirePinToken('DROP_POINT', lineId, pinToken);
     if (!pinCheck.ok) {
-      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
+      return NextResponse.json(sanitizedPinPayload(pinCheck.payload), {
+        status: pinCheck.status,
+        headers: { 'Cache-Control': 'no-store' },
+      });
     }
+
+    const checks = Object.fromEntries(
+      ['brand_correct', 'model_correct', 'capacity_correct', 'color_match', 'functionality_ok', 'mdm_lock_status']
+        .map((field) => [field, optionalBoolean(verificationData[field])]),
+    ) as Record<string, boolean | null>;
+    const actualConditionScore = finiteNumber(verificationData.condition_score, {
+      min: 0,
+      max: 100,
+      required: true,
+    }) as number;
+    if (!Number.isInteger(actualConditionScore)) {
+      throw new TransactionRequestError('INVALID_FIELD', 400, 'คะแนนสภาพสินค้าไม่ถูกต้อง');
+    }
+
+    const checklistInput = asObject(verificationData.condition_checklist);
+    const conditionChecklist = Object.fromEntries(
+      CONDITION_CHECK_KEYS.map((key) => [key, optionalBoolean(checklistInput[key])]),
+    ) as Record<ConditionCheckKey, boolean | null>;
+    if (Object.values(conditionChecklist).some((value) => value === null)) {
+      throw new TransactionRequestError('INVALID_FIELD', 400, 'กรุณาตรวจสอบสภาพสินค้าให้ครบถ้วน');
+    }
+
+    const notes = boundedText(verificationData.notes, 1_000) || null;
+    const rawPhotos = verificationData.verification_photos;
+    if (!Array.isArray(rawPhotos) || rawPhotos.length > MAX_VERIFICATION_PHOTOS) {
+      throw new TransactionRequestError('INVALID_FIELD', 400, 'รูปยืนยันสินค้าไม่ถูกต้อง');
+    }
+    if (verificationResult === 'APPROVED' && rawPhotos.length === 0) {
+      throw new TransactionRequestError('FIELD_REQUIRED', 400, 'กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูปก่อนยืนยัน');
+    }
+    const verificationPhotos = rawPhotos.map((url) => requireOwnedBlobUrl(url, ['droppoint-verification/']));
+    if (new Set(verificationPhotos).size !== verificationPhotos.length) {
+      throw new TransactionRequestError('INVALID_FIELD', 400, 'พบรูปยืนยันสินค้าซ้ำ กรุณาตรวจสอบอีกครั้ง');
+    }
+
+    const storageCandidate = body.storageBoxCode
+      ?? verificationData.storage_box_code
+      ?? body.bagNumber
+      ?? verificationData.bag_number;
+    const resolvedStorageBoxCode = boundedText(storageCandidate, 64)?.toUpperCase() || '';
+    if (verificationResult === 'APPROVED' && !STORAGE_BOX_CODE_REGEX.test(resolvedStorageBoxCode)) {
+      throw new TransactionRequestError('INVALID_FIELD', 400, 'หมายเลขกล่องเก็บของไม่ถูกต้อง');
+    }
+
+    releaseContractLock = await acquireTransactionLock('drop-point-verification', contractId, 120);
 
     const supabase = supabaseAdmin();
 
@@ -75,7 +184,7 @@ export async function POST(request: NextRequest) {
     const { data: dropPoint, error: dpError } = await supabase
       .from('drop_points')
       .select('drop_point_id, drop_point_name, phone_number')
-      .eq('line_id', lineId)
+      .eq('line_id', identity.lineId)
       .single();
 
     if (dpError || !dropPoint) {
@@ -85,14 +194,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get contract with all related data
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
       .select(`
-        *,
-        items:item_id (*),
-        pawners:customer_id (*),
-        investors:investor_id (*)
+        contract_id,
+        contract_number,
+        contract_status,
+        item_id,
+        customer_id,
+        investor_id,
+        drop_point_id,
+        loan_principal_amount,
+        item_delivery_status,
+        item_received_at,
+        item_verified_at,
+        items:item_id (
+          item_id,
+          item_type,
+          brand,
+          model,
+          capacity,
+          item_condition,
+          condition_checklist,
+          serial_number,
+          notes,
+          image_urls,
+          verified_by_drop_point,
+          drop_point_verified_at,
+          drop_point_photos,
+          drop_point_condition_score,
+          drop_point_verification_notes,
+          item_status
+        ),
+        pawners:customer_id (
+          firstname,
+          lastname,
+          line_id,
+          bank_name,
+          bank_account_name,
+          bank_account_no
+        ),
+        investors:investor_id (line_id)
       `)
       .eq('contract_id', contractId)
       .single();
@@ -111,45 +253,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const resolvedStorageBoxCode = String(
-      storageBoxCode
-      || verificationData?.storage_box_code
-      || bagNumber
-      || verificationData?.bag_number
-      || ''
-    ).trim().toUpperCase();
+    const item = Array.isArray(contract.items) ? contract.items[0] : contract.items;
+    const pawner = Array.isArray(contract.pawners) ? contract.pawners[0] : contract.pawners;
+    const investor = Array.isArray(contract.investors) ? contract.investors[0] : contract.investors;
+    const normalizedContract = { ...contract, items: item, pawners: pawner, investors: investor };
 
-    if (verificationResult === 'APPROVED' && !resolvedStorageBoxCode) {
+    const completedStatus = verificationResult === 'APPROVED' ? 'VERIFIED' : 'RETURNED';
+    if (contract.item_delivery_status !== 'RECEIVED_AT_DROP_POINT'
+      && contract.item_delivery_status !== completedStatus) {
       return NextResponse.json(
-        { error: 'กรุณากรอกหมายเลขกล่องเก็บของ' },
-        { status: 400 }
+        { error: 'สถานะสินค้าปัจจุบันไม่สามารถตรวจสอบได้ กรุณาโหลดข้อมูลใหม่' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    if (['VERIFIED', 'RETURNED'].includes(contract.item_delivery_status)) {
-      return NextResponse.json(
-        { error: 'Item already verified or returned' },
-        { status: 409 }
-      );
-    }
-
-    const requiredBooleanFields = [
-      'brand_correct',
-      'model_correct',
-      'capacity_correct',
-      'color_match',
-      'functionality_ok',
-      'mdm_lock_status',
-    ] as const;
-
-    const hasIncompleteChecks = requiredBooleanFields.some((field) => typeof verificationData?.[field] !== 'boolean');
-    const hasAnyMismatch = requiredBooleanFields.some((field) => verificationData?.[field] === false);
-    const expectedConditionScore = Number(contract.items?.item_condition || 0);
-    const actualConditionScore = Number(verificationData?.condition_score || 0);
-    const pawnerConditionChecklist = contract.items?.condition_checklist;
-    const dropPointConditionChecklist = verificationData?.condition_checklist;
+    const hasIncompleteChecks = Object.values(checks).some((value) => value === null);
+    const hasAnyMismatch = Object.values(checks).some((value) => value === false);
+    const expectedConditionScore = item?.item_condition === null || item?.item_condition === undefined
+      ? null
+      : Number(item.item_condition);
+    const pawnerConditionChecklist = item?.condition_checklist;
+    const dropPointConditionChecklist = conditionChecklist as Record<ConditionCheckKey, boolean>;
     const hasChecklistMismatch = !isConditionChecklistMatch(pawnerConditionChecklist, dropPointConditionChecklist);
-    const isConditionGapTooHigh = Number.isFinite(expectedConditionScore)
+    const isConditionGapTooHigh = expectedConditionScore !== null && Number.isFinite(expectedConditionScore)
       ? actualConditionScore < (expectedConditionScore - 10)
       : false;
 
@@ -167,35 +293,78 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (verificationResult === 'APPROVED' && (!Array.isArray(verificationData?.verification_photos) || verificationData.verification_photos.length === 0)) {
+    // Rows superseded by an approved reconciliation are retained evidence, not
+    // the current verification, and must not drive the conflict check below.
+    const { data: existingVerification, error: existingVerificationError } = await supabase
+      .from('drop_point_verifications')
+      .select('verification_id, verification_result')
+      .eq('contract_id', contractId)
+      .is('superseded_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existingVerificationError) throw existingVerificationError;
+    if (existingVerification && existingVerification.verification_result !== verificationResult) {
       return NextResponse.json(
-        { error: 'กรุณาถ่ายรูปสินค้าอย่างน้อย 1 รูปก่อนยืนยัน' },
-        { status: 400 }
+        { error: 'รายการนี้มีผลตรวจสอบที่ขัดแย้งกัน กรุณาติดต่อผู้ดูแลระบบ' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    if (existingVerification && contract.item_delivery_status === completedStatus) {
+      return NextResponse.json(
+        {
+          success: true,
+          alreadyCompleted: true,
+          storageBoxCode: verificationResult === 'APPROVED' ? resolvedStorageBoxCode : null,
+        },
+        { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    // Save verification record
-    await supabase
-      .from('drop_point_verifications')
-      .insert({
-        contract_id: contractId,
-        drop_point_id: dropPoint.drop_point_id,
-        item_id: contract.item_id,
-        brand_correct: verificationData.brand_correct,
-        model_correct: verificationData.model_correct,
-        capacity_correct: verificationData.capacity_correct,
-        color_match: verificationData.color_match,
-        functionality_ok: verificationData.functionality_ok,
-        mdm_lock_status: verificationData.mdm_lock_status,
-        condition_score: verificationData.condition_score,
-        condition_checklist: verificationData.condition_checklist,
-        verification_photos: verificationData.verification_photos,
-        notes: verificationData.notes,
-        verification_result: verificationResult,
-        verified_by_line_id: lineId
-      });
+    await Promise.all(verificationPhotos.map((photo) => fingerprintOwnedBlob(photo)));
+
+    let insertedVerificationId: string | null = null;
+    let storageWasNewlyAssigned = false;
+    let itemWasUpdated = false;
+    const verificationPayload = {
+      contract_id: contractId,
+      drop_point_id: dropPoint.drop_point_id,
+      item_id: contract.item_id,
+      ...checks,
+      condition_score: actualConditionScore,
+      condition_checklist: conditionChecklist,
+      verification_photos: verificationPhotos,
+      notes,
+      verification_result: verificationResult,
+      rejection_reason: verificationResult === 'REJECTED' ? notes : null,
+      verified_by_line_id: identity.lineId,
+    };
+
+    const restoreItem = async () => {
+      if (!itemWasUpdated || !item?.item_id) return;
+      await supabase
+        .from('items')
+        .update({
+          item_status: item.item_status,
+          verified_by_drop_point: item.verified_by_drop_point,
+          drop_point_verified_at: item.drop_point_verified_at,
+          drop_point_photos: item.drop_point_photos,
+          drop_point_condition_score: item.drop_point_condition_score,
+          drop_point_verification_notes: item.drop_point_verification_notes,
+        })
+        .eq('item_id', item.item_id);
+    };
+
+    const removeInsertedVerification = async () => {
+      if (!insertedVerificationId) return;
+      await supabase
+        .from('drop_point_verifications')
+        .delete()
+        .eq('verification_id', insertedVerificationId);
+    };
 
     if (verificationResult === 'APPROVED') {
+      releaseStorageBoxLock = await acquireTransactionLock('drop-point-storage-box', resolvedStorageBoxCode, 120);
       const { data: storageBox, error: storageBoxError } = await supabase
         .from('drop_point_storage_boxes')
         .select('box_code, drop_point_id, contract_id, box_status')
@@ -203,7 +372,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (storageBoxError) {
-        console.error('Error loading storage box:', storageBoxError);
+        console.error('[drop-point:verify] storage lookup failed');
         return NextResponse.json(
           {
             error: storageBoxError.code === 'PGRST205'
@@ -235,9 +404,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const notesPayload = splitItemNotesAndPasscode(contract.items?.notes);
+      const notesPayload = splitItemNotesAndPasscode(item?.notes);
       const nowIso = new Date().toISOString();
-      const { error: storageUpdateError } = await supabase
+      storageWasNewlyAssigned = !storageBox.contract_id;
+      let storageUpdate = supabase
         .from('drop_point_storage_boxes')
         .update({
           box_status: 'OCCUPIED',
@@ -245,100 +415,196 @@ export async function POST(request: NextRequest) {
           item_id: contract.item_id,
           customer_id: contract.customer_id,
           contract_number: contract.contract_number,
-          item_brand: contract.items?.brand || null,
-          item_model: contract.items?.model || null,
-          item_type: contract.items?.item_type || null,
+          item_brand: item?.brand || null,
+          item_model: item?.model || null,
+          item_type: item?.item_type || null,
           item_snapshot: {
             item_id: contract.item_id,
-            item_type: contract.items?.item_type || null,
-            brand: contract.items?.brand || null,
-            model: contract.items?.model || null,
-            capacity: contract.items?.capacity || null,
-            item_condition: contract.items?.item_condition ?? null,
-            serial_number: contract.items?.serial_number || null,
+            item_type: item?.item_type || null,
+            brand: item?.brand || null,
+            model: item?.model || null,
+            capacity: item?.capacity || null,
+            item_condition: item?.item_condition ?? null,
+            serial_number: item?.serial_number || null,
             device_passcode: notesPayload.devicePasscode,
           },
-          assigned_by_line_id: lineId,
+          assigned_by_line_id: identity.lineId,
           occupied_at: nowIso,
           released_at: null,
           last_updated_at: nowIso,
         })
-        .eq('box_code', resolvedStorageBoxCode);
+        .eq('box_code', resolvedStorageBoxCode)
+        .eq('drop_point_id', dropPoint.drop_point_id);
+      storageUpdate = storageWasNewlyAssigned
+        ? storageUpdate.is('contract_id', null)
+        : storageUpdate.eq('contract_id', contractId);
+      const { data: assignedStorageBox, error: storageUpdateError } = await storageUpdate
+        .select('box_code')
+        .maybeSingle();
 
-      if (storageUpdateError) {
-        console.error('Error saving storage box assignment:', storageUpdateError);
+      if (storageUpdateError || !assignedStorageBox) {
         return NextResponse.json(
-          { error: 'ไม่สามารถบันทึกหมายเลขกล่องเก็บของได้' },
-          { status: 500 }
+          { error: storageUpdateError ? 'ไม่สามารถบันทึกหมายเลขกล่องเก็บของได้' : 'กล่องเก็บของถูกใช้งานแล้ว กรุณาเลือกกล่องอื่น' },
+          { status: storageUpdateError ? 500 : 409, headers: { 'Cache-Control': 'no-store' } },
         );
       }
 
-      // Update contract status
-      await supabase
-        .from('contracts')
-        .update({
-          item_delivery_status: 'VERIFIED',
-          item_received_at: new Date().toISOString(),
-          item_verified_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('contract_id', contractId);
+      if (!existingVerification) {
+        const { data: createdVerification, error: verificationError } = await supabase
+          .from('drop_point_verifications')
+          .insert(verificationPayload)
+          .select('verification_id')
+          .single();
+        if (verificationError || !createdVerification) {
+          if (storageWasNewlyAssigned) {
+            await releaseStorageAssignment(supabase, resolvedStorageBoxCode, contractId, nowIso);
+          }
+          throw verificationError || new Error('verification insert failed');
+        }
+        insertedVerificationId = createdVerification.verification_id;
+      }
 
-      // Update item status
-      await supabase
+      const { data: updatedItem, error: itemUpdateError } = await supabase
         .from('items')
         .update({
           verified_by_drop_point: true,
-          drop_point_verified_at: new Date().toISOString(),
-          drop_point_photos: verificationData.verification_photos,
-          drop_point_condition_score: verificationData.condition_score,
-          drop_point_verification_notes: verificationData.notes
+          drop_point_verified_at: item?.drop_point_verified_at || nowIso,
+          drop_point_photos: verificationPhotos,
+          drop_point_condition_score: actualConditionScore,
+          drop_point_verification_notes: notes,
         })
-        .eq('item_id', contract.item_id);
+        .eq('item_id', contract.item_id)
+        .select('item_id')
+        .maybeSingle();
+      if (itemUpdateError || !updatedItem) {
+        await removeInsertedVerification();
+        if (storageWasNewlyAssigned) {
+          await releaseStorageAssignment(supabase, resolvedStorageBoxCode, contractId, nowIso);
+        }
+        throw itemUpdateError || new Error('item update failed');
+      }
+      itemWasUpdated = true;
+
+      if (contract.item_delivery_status !== 'VERIFIED') {
+        const { data: updatedContract, error: contractUpdateError } = await supabase
+          .from('contracts')
+          .update({
+            item_delivery_status: 'VERIFIED',
+            item_received_at: contract.item_received_at || nowIso,
+            item_verified_at: contract.item_verified_at || nowIso,
+            updated_at: nowIso,
+          })
+          .eq('contract_id', contractId)
+          .eq('item_delivery_status', 'RECEIVED_AT_DROP_POINT')
+          .select('contract_id')
+          .maybeSingle();
+        if (contractUpdateError || !updatedContract) {
+          await restoreItem();
+          await removeInsertedVerification();
+          if (storageWasNewlyAssigned) {
+            await releaseStorageAssignment(supabase, resolvedStorageBoxCode, contractId, nowIso);
+          }
+          return NextResponse.json(
+            { error: 'สถานะสินค้าเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่' },
+            { status: 409, headers: { 'Cache-Control': 'no-store' } },
+          );
+        }
+      }
 
       // Send notification to investor with payment instructions
-      if (contract.investors?.line_id) {
-        const paymentCard = createPaymentInstructionCard(contract);
+      if (investor?.line_id) {
+        const paymentCard = createPaymentInstructionCard(normalizedContract);
         try {
-          await investorLineClient.pushMessage(contract.investors.line_id, paymentCard);
-          console.log(`Sent payment instruction to investor ${contract.investors.line_id}`);
-        } catch (invError) {
-          console.error('Error sending to investor:', invError);
+          await investorLineClient.pushMessage(investor.line_id, paymentCard);
+        } catch {
+          console.error('[drop-point:verify] investor notification failed');
         }
       }
 
     } else if (verificationResult === 'REJECTED') {
-      // Update contract status
-      await supabase
-        .from('contracts')
+      const nowIso = new Date().toISOString();
+      if (!existingVerification) {
+        const { data: createdVerification, error: verificationError } = await supabase
+          .from('drop_point_verifications')
+          .insert(verificationPayload)
+          .select('verification_id')
+          .single();
+        if (verificationError || !createdVerification) {
+          throw verificationError || new Error('verification insert failed');
+        }
+        insertedVerificationId = createdVerification.verification_id;
+      }
+
+      const { data: updatedItem, error: itemUpdateError } = await supabase
+        .from('items')
         .update({
-          item_delivery_status: 'RETURNED',
-          contract_status: 'TERMINATED',
-          updated_at: new Date().toISOString()
+          item_status: 'RETURNED',
+          verified_by_drop_point: true,
+          drop_point_verified_at: item?.drop_point_verified_at || nowIso,
+          drop_point_photos: verificationPhotos,
+          drop_point_condition_score: actualConditionScore,
+          drop_point_verification_notes: notes,
         })
-        .eq('contract_id', contractId);
+        .eq('item_id', contract.item_id)
+        .select('item_id')
+        .maybeSingle();
+      if (itemUpdateError || !updatedItem) {
+        await removeInsertedVerification();
+        throw itemUpdateError || new Error('item update failed');
+      }
+      itemWasUpdated = true;
+
+      if (contract.item_delivery_status !== 'RETURNED') {
+        const { data: updatedContract, error: contractUpdateError } = await supabase
+          .from('contracts')
+          .update({
+            item_delivery_status: 'RETURNED',
+            contract_status: 'TERMINATED',
+            updated_at: nowIso,
+          })
+          .eq('contract_id', contractId)
+          .eq('item_delivery_status', 'RECEIVED_AT_DROP_POINT')
+          .select('contract_id')
+          .maybeSingle();
+        if (contractUpdateError || !updatedContract) {
+          await restoreItem();
+          await removeInsertedVerification();
+          return NextResponse.json(
+            { error: 'สถานะสินค้าเปลี่ยนแปลงแล้ว กรุณาโหลดข้อมูลใหม่' },
+            { status: 409, headers: { 'Cache-Control': 'no-store' } },
+          );
+        }
+      }
 
       // Notify pawner about rejection
-      if (contract.pawners?.line_id) {
-        await pawnerLineClient.pushMessage(contract.pawners.line_id, {
-          type: 'text',
-          text: `สินค้าของคุณถูกปฏิเสธจาก Drop Point\n\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nกรุณาติดต่อ Drop Point เพื่อรับสินค้าคืนหรือจัดส่งกลับ\nจุดรับฝาก: ${dropPoint.drop_point_name}\nเบอร์ติดต่อ: ${dropPoint.phone_number || 'ไม่ระบุ'}`
-        });
+      if (pawner?.line_id) {
+        try {
+          await pawnerLineClient.pushMessage(pawner.line_id, {
+            type: 'text',
+            text: `สินค้าของคุณถูกปฏิเสธจาก Drop Point\n\nเหตุผล: ${notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nกรุณาติดต่อ Drop Point เพื่อรับสินค้าคืนหรือจัดส่งกลับ\nจุดรับฝาก: ${dropPoint.drop_point_name}\nเบอร์ติดต่อ: ${dropPoint.phone_number || 'ไม่ระบุ'}`
+          });
+        } catch {
+          console.error('[drop-point:verify] seller notification failed');
+        }
       }
 
       // Notify investor
-      if (contract.investors?.line_id) {
-        await investorLineClient.pushMessage(contract.investors.line_id, {
-          type: 'text',
-          text: `สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: ${verificationData.notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nสัญญานี้ถูกยกเลิก`
-        });
+      if (investor?.line_id) {
+        try {
+          await investorLineClient.pushMessage(investor.line_id, {
+            type: 'text',
+            text: `สินค้าถูกปฏิเสธจาก Drop Point\n\nหมายเลขสัญญา: ${contract.contract_number}\nเหตุผล: ${notes || 'สินค้าไม่ตรงตามข้อมูลที่ระบุ'}\n\nสัญญานี้ถูกยกเลิก`
+          });
+        } catch {
+          console.error('[drop-point:verify] asset funding notification failed');
+        }
       }
 
       if (contract.investor_id) {
         try {
           await refreshInvestorTierAndTotals(contract.investor_id);
-        } catch (refreshError) {
-          console.error('Error refreshing investor totals:', refreshError);
+        } catch {
+          console.error('[drop-point:verify] investor totals refresh failed');
         }
       }
     }
@@ -347,15 +613,66 @@ export async function POST(request: NextRequest) {
       success: true,
       message: verificationResult === 'APPROVED' ? 'Verification approved' : 'Verification rejected',
       storageBoxCode: verificationResult === 'APPROVED' ? resolvedStorageBoxCode : null,
-    });
+    }, { headers: { 'Cache-Control': 'no-store' } });
 
-  } catch (error: any) {
-    console.error('Error in verification:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    if (error instanceof ActorRateLimitError) {
+      return NextResponse.json(
+        {
+          error: error.status === 429
+            ? 'ทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองใหม่'
+            : 'ระบบจำกัดคำขอยังไม่พร้อม กรุณาลองใหม่',
+          code: error.code,
+        },
+        {
+          status: error.status,
+          headers: {
+            'Cache-Control': 'no-store',
+            'Retry-After': String(error.retryAfterSeconds),
+          },
+        },
+      );
+    }
+    console.error('[drop-point:verify] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return sanitizedServerError('ไม่สามารถบันทึกผลตรวจสอบสินค้าได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseStorageBoxLock) await releaseStorageBoxLock();
+    if (releaseContractLock) await releaseContractLock();
   }
+}
+
+async function releaseStorageAssignment(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  boxCode: string,
+  contractId: string,
+  nowIso: string,
+) {
+  await supabase
+    .from('drop_point_storage_boxes')
+    .update({
+      box_status: 'AVAILABLE',
+      contract_id: null,
+      item_id: null,
+      customer_id: null,
+      contract_number: null,
+      item_brand: null,
+      item_model: null,
+      item_type: null,
+      item_snapshot: {},
+      assigned_by_line_id: null,
+      occupied_at: null,
+      released_at: nowIso,
+      last_updated_at: nowIso,
+    })
+    .eq('box_code', boxCode)
+    .eq('contract_id', contractId);
 }
 
 function createPaymentInstructionCard(contract: any): FlexMessage {
@@ -381,7 +698,7 @@ function createPaymentInstructionCard(contract: any): FlexMessage {
           align: 'center'
         }, {
           type: 'text',
-          text: 'กรุณาโอนเงินให้ผู้ขอสินเชื่อ',
+          text: 'กรุณาโอนเงินให้ผู้ขาย',
           size: 'sm',
           color: '#ffffff',
           align: 'center',

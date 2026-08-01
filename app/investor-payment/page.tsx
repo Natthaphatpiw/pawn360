@@ -59,7 +59,7 @@ function InvestorPaymentContent() {
         setAmount(mockContract?.loan_principal_amount?.toLocaleString() || '');
         return;
       }
-      const response = await axios.get(`/api/contracts/${effectiveContractId}?viewer=investor&includeBank=true&lineId=${profile?.userId}`);
+      const response = await axios.get(`/api/contracts/${effectiveContractId}?viewer=investor&includeBank=true`);
       setContract(response.data.contract);
       // Pre-fill amount
       setAmount(response.data.contract.loan_principal_amount?.toLocaleString() || '');
@@ -103,7 +103,10 @@ function InvestorPaymentContent() {
       }
 
       const response = await axios.post('/api/upload/image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-LIFF-Role': 'INVESTOR',
+        }
       });
 
       if (response.data.url) {

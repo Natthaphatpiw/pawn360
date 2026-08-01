@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
+import { getLiffAuthorizationHeaders } from '@/lib/liff/auth-header';
 
 export default function EKYCInvestWaitingPage() {
   const router = useRouter();
-  const { profile, isLoading: liffLoading } = useLiff();
+  const { profile, isLoading: liffLoading, liffObject } = useLiff();
 
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
   const [dots, setDots] = useState('');
@@ -15,48 +16,68 @@ export default function EKYCInvestWaitingPage() {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutOccurred = useRef(false);
 
-  // Poll KYC status every 3 seconds
+  // Poll with bounded exponential backoff to avoid a thundering herd while
+  // webhook/queue processing catches up under high traffic.
   useEffect(() => {
+    let stopped = false;
+    let pollAttempt = 0;
+    const scheduleNext = () => {
+      if (stopped || timeoutOccurred.current) return;
+      const delays = [3_000, 5_000, 10_000, 15_000, 30_000];
+      const delay = delays[Math.min(pollAttempt, delays.length - 1)];
+      pollAttempt += 1;
+      pollingRef.current = setTimeout(pollKYCStatus, delay);
+    };
+
     const pollKYCStatus = async () => {
       if (!profile?.userId || timeoutOccurred.current) return;
 
       try {
-        const response = await axios.get(`/api/investors/check?lineId=${profile.userId}`);
+        const response = await axios.get('/api/ekyc/status?role=INVESTOR', {
+          headers: getLiffAuthorizationHeaders(liffObject),
+        });
         if (response.data.exists) {
-          const investor = response.data.investor;
-
-          if (investor.kyc_status === 'VERIFIED') {
+          if (response.data.status === 'VERIFIED') {
             // Success! Clean up and redirect
+            stopped = true;
             if (pollingRef.current) clearInterval(pollingRef.current);
             if (intervalRef.current) clearInterval(intervalRef.current);
             router.push('/register-invest');
-          } else if (investor.kyc_status === 'REJECTED') {
+            return;
+          } else if (response.data.status === 'REJECTED') {
             // Rejected - redirect to eKYC page
+            stopped = true;
             if (pollingRef.current) clearInterval(pollingRef.current);
             if (intervalRef.current) clearInterval(intervalRef.current);
             router.push('/ekyc-invest');
+            return;
+          } else if (response.data.resumeAvailable) {
+            stopped = true;
+            router.push('/ekyc-invest');
+            return;
           }
-          // If still PENDING, continue polling
         }
       } catch (error) {
-        console.error('Error polling KYC status:', error);
+        console.error('Asset Funding eKYC polling failed', {
+          code: axios.isAxiosError(error) ? error.response?.data?.code || 'EKYC_STATUS_FAILED' : 'EKYC_STATUS_FAILED',
+        });
+      } finally {
+        scheduleNext();
       }
     };
 
     if (profile?.userId) {
       // Poll immediately
       pollKYCStatus();
-
-      // Then poll every 3 seconds
-      pollingRef.current = setInterval(pollKYCStatus, 3000);
-      }
+    }
 
     return () => {
+      stopped = true;
       if (pollingRef.current) {
-        clearInterval(pollingRef.current);
+        clearTimeout(pollingRef.current);
       }
     };
-  }, [profile?.userId, router]);
+  }, [profile?.userId, router, liffObject]);
 
   // Countdown timer
   useEffect(() => {
@@ -126,8 +147,8 @@ export default function EKYCInvestWaitingPage() {
 
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
             <p className="text-sm text-red-600">
-              ระบบไม่ได้รับผลการยืนยันตัวตนภายในเวลาที่กำหนด (5 นาที)<br />
-              กรุณาลองทำรายการใหม่อีกครั้ง
+              การตรวจสอบใช้เวลานานกว่าปกติ คุณสามารถปิดหน้านี้ได้<br />
+              ระบบจะส่งผลให้ทาง LINE เมื่อดำเนินการเสร็จสิ้น
             </p>
           </div>
 
@@ -135,8 +156,8 @@ export default function EKYCInvestWaitingPage() {
             onClick={() => router.push('/ekyc-invest')}
             className="w-full bg-[#1E3A8A] hover:bg-[#152C6B] text-white font-bold py-4 rounded-2xl transition-all shadow-sm active:scale-[0.98]"
           >
-            <span className="text-base">ลองใหม่อีกครั้ง</span>
-            <div className="text-[10px] font-light opacity-90 mt-1">Try Again</div>
+            <span className="text-base">ตรวจสอบสถานะอีกครั้ง</span>
+            <div className="text-[10px] font-light opacity-90 mt-1">Check Status</div>
           </button>
         </div>
       </div>

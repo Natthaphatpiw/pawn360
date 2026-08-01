@@ -24,7 +24,10 @@ export default function ToastProvider() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   useEffect(() => {
-    setMounted(true);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setMounted(true);
+    });
     const originalAlert = window.alert;
 
     const handleToast = (event: Event) => {
@@ -47,6 +50,7 @@ export default function ToastProvider() {
     };
 
     return () => {
+      cancelled = true;
       window.removeEventListener('pawnly-toast', handleToast as EventListener);
       window.alert = originalAlert;
     };

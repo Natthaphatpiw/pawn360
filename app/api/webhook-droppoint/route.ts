@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Client, WebhookEvent, FlexMessage, MessageEvent, TextEventMessage } from '@line/bot-sdk';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { verifyLineSignatureWithSecret } from '@/lib/security/line';
+import {
+  claimWebhookEvent,
+  completeWebhookClaim,
+  readBoundedWebhookText,
+  releaseWebhookClaim,
+  webhookReplayErrorResponse,
+} from '@/lib/security/webhook-replay';
+
+function relationOne<T>(value: T | T[] | null | undefined): T | null {
+  return Array.isArray(value) ? value[0] || null : value || null;
+}
+
+function formatAmount(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toLocaleString('th-TH') : '-';
+}
 
 // Drop Point LINE OA credentials - Channel ID = 2008650799
 function getDropPointLineClient() {
@@ -28,26 +46,72 @@ const dropPointRegisterLiffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const events: WebhookEvent[] = body.events;
+    const rawBody = await readBoundedWebhookText(request);
+    const signature = request.headers.get('x-line-signature') || '';
+    const channelSecret = process.env.LINE_CHANNEL_SECRET_DROPPOINT || '';
+
+    if (!channelSecret) {
+      console.error('[droppoint:webhook] channel secret is not configured');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+    }
+
+    if (!verifyLineSignatureWithSecret(rawBody, signature, channelSecret)) {
+      console.warn('[droppoint:webhook] rejected invalid signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    if (!rawBody) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+
+    let body: { events?: unknown };
+    try {
+      body = JSON.parse(rawBody) as { events?: unknown };
+    } catch {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+    const events = Array.isArray(body.events) ? body.events as WebhookEvent[] : [];
+    if (events.length > 100) {
+      return NextResponse.json({ error: 'Too many events' }, { status: 400 });
+    }
 
     for (const event of events) {
-      if (event.type === 'follow') {
-        // New follower - send welcome message
-        await handleFollow(event);
-      } else if (event.type === 'message' && event.message.type === 'text') {
-        // Handle text messages
-        await handleTextMessage(event as MessageEvent & { message: TextEventMessage });
-      } else if (event.type === 'postback') {
-        // Handle postback actions
-        await handlePostback(event);
+      const eventId = (event as WebhookEvent & { webhookEventId?: unknown }).webhookEventId;
+      const claim = await claimWebhookEvent({
+        namespace: 'line-droppoint',
+        material: typeof eventId === 'string' ? eventId : JSON.stringify(event),
+        signingSecret: channelSecret,
+      });
+      if (claim.duplicate) continue;
+      try {
+        if (event.type === 'follow') {
+          await handleFollow(event);
+        } else if (event.type === 'message' && event.message.type === 'text') {
+          await handleTextMessage(event as MessageEvent & { message: TextEventMessage });
+        } else if (event.type === 'postback') {
+          await handlePostback(event);
+        }
+        await completeWebhookClaim(claim);
+      } catch (error) {
+        await releaseWebhookClaim(claim);
+        throw error;
       }
     }
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Drop Point Webhook error:', error);
-    return NextResponse.json({ success: true }); // Always return 200 to LINE
+    return NextResponse.json(
+      { success: true },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    const replayError = webhookReplayErrorResponse(error);
+    if (replayError) return replayError;
+    console.error('[droppoint:webhook] processing failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }
 
@@ -109,13 +173,9 @@ async function handleFollow(event: WebhookEvent & { type: 'follow' }) {
     }
   } as FlexMessage;
 
-  try {
-    const dpClient = getDropPointLineClient();
-    if (!dpClient) throw new Error('DropPoint LINE client not configured');
-    await dpClient.pushMessage(userId, welcomeMessage);
-  } catch (error) {
-    console.error('Error sending welcome message:', error);
-  }
+  const dpClient = getDropPointLineClient();
+  if (!dpClient) throw new Error('DROPPOINT_LINE_CLIENT_NOT_CONFIGURED');
+  await dpClient.pushMessage(userId, welcomeMessage);
 }
 
 async function handleTextMessage(event: MessageEvent & { message: TextEventMessage }) {
@@ -144,7 +204,35 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
 
   if (!userId) return;
 
+  const supabase = supabaseAdmin();
+  const { data: activeDropPoint, error: dropPointLookupError } = await supabase
+    .from('drop_points')
+    .select('drop_point_id')
+    .eq('line_id', userId)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (dropPointLookupError) throw new Error('DROP_POINT_LOOKUP_FAILED');
+  if (!activeDropPoint) {
+    console.warn('[droppoint:webhook] postback rejected for inactive account');
+    return;
+  }
+  const validRedemptionId = redemptionId
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(redemptionId)
+    ? redemptionId
+    : null;
+
   if (action === 'verify_item' && contractId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(contractId)) {
+      return;
+    }
+    const { data: assignedContract, error: contractLookupError } = await supabase
+      .from('contracts')
+      .select('contract_id')
+      .eq('contract_id', contractId)
+      .eq('drop_point_id', activeDropPoint.drop_point_id)
+      .maybeSingle();
+    if (contractLookupError) throw new Error('DROP_POINT_CONTRACT_LOOKUP_FAILED');
+    if (!assignedContract) return;
     // Send verification page link
     const verifyLink = `https://liff.line.me/${process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_LIST || '2008651088-6wNs8Yrr'}?contractId=${contractId}`;
 
@@ -161,26 +249,22 @@ async function handlePostback(event: WebhookEvent & { type: 'postback' }) {
   // ==================== REDEMPTION AMOUNT VERIFICATION ====================
 
   // Drop Point confirms amount is correct
-  if (action === 'redemption_amount_correct' && redemptionId) {
-    await handleRedemptionAmountCorrect(redemptionId, userId, event.replyToken);
+  if (action === 'redemption_amount_correct' && validRedemptionId) {
+    await handleRedemptionAmountCorrect(validRedemptionId, userId, event.replyToken);
   }
 
   // Drop Point says amount is incorrect
-  if (action === 'redemption_amount_incorrect' && redemptionId) {
-    await handleRedemptionAmountIncorrect(redemptionId, userId, event.replyToken);
+  if (action === 'redemption_amount_incorrect' && validRedemptionId) {
+    await handleRedemptionAmountIncorrect(validRedemptionId, userId, event.replyToken);
   }
 
-  // Pawner confirms item received
-  if (action === 'pawner_confirm_received' && redemptionId) {
-    await handlePawnerConfirmReceived(redemptionId, userId, event.replyToken);
-  }
 }
 
 // Handle when Drop Point confirms the redemption amount is correct
 async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLineId: string, replyToken: string) {
   try {
     const supabase = supabaseAdmin();
-    const { data: redemption } = await supabase
+    const { data: redemption, error: redemptionError } = await supabase
       .from('redemption_requests')
       .select(`
         *,
@@ -199,6 +283,10 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       .eq('redemption_id', redemptionId)
       .single();
 
+    if (redemptionError && redemptionError.code !== 'PGRST116') {
+      throw new Error('REDEMPTION_LOOKUP_FAILED');
+    }
+
     if (!redemption) {
       console.error('Redemption not found for verification');
       return;
@@ -214,9 +302,13 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       return;
     }
 
-    const pawner = redemption.contract?.pawners;
-    const investor = redemption.contract?.investors;
-    const dropPoint = redemption.contract?.drop_points;
+    const pawner = relationOne(redemption.contract?.pawners);
+    const investor = relationOne(redemption.contract?.investors);
+    const dropPoint = relationOne(redemption.contract?.drop_points);
+    if (!dropPoint || dropPoint.line_id !== dropPointLineId) {
+      console.warn('[droppoint:webhook] redemption assignment mismatch');
+      return;
+    }
 
     const nowIso = new Date().toISOString();
 
@@ -235,8 +327,7 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       .select('redemption_id');
 
     if (verifyUpdateError) {
-      console.error('Error verifying redemption amount:', verifyUpdateError);
-      return;
+      throw new Error('REDEMPTION_UPDATE_FAILED');
     }
 
     if (!updatedRows || updatedRows.length === 0) {
@@ -249,26 +340,43 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       return;
     }
 
-    await supabase
+    const { error: contractUpdateError } = await supabase
       .from('contracts')
       .update({
         redemption_status: 'IN_PROGRESS',
         updated_at: nowIso,
       })
       .eq('contract_id', redemption.contract_id);
+    if (contractUpdateError) {
+      const { error: rollbackError } = await supabase
+        .from('redemption_requests')
+        .update({
+          request_status: 'SLIP_UPLOADED',
+          verified_by_line_id: null,
+          verified_by_drop_point_id: null,
+          verified_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('redemption_id', redemptionId)
+        .eq('request_status', 'AMOUNT_VERIFIED');
+      if (rollbackError) throw new Error('REDEMPTION_RECONCILIATION_REQUIRED');
+      throw new Error('CONTRACT_REDEMPTION_UPDATE_FAILED');
+    }
 
     // Send message to pawner based on delivery method
     if (pawner?.line_id) {
       try {
         await pawnerLineClient.pushMessage(pawner.line_id, createPawnerItemReadyCard(redemption));
       } catch (msgError) {
-        console.error('Error sending to pawner:', msgError);
+        console.error('[droppoint:webhook] pawner notification delayed', {
+          type: msgError instanceof Error ? msgError.name : 'unknown',
+        });
       }
     }
 
     // Send message to investor about payment received
     if (investor?.line_id) {
-      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number}\nจำนวนเงิน: ${redemption.total_amount?.toLocaleString()} บาท\n\nอยู่ระหว่างส่งคืนสินค้าให้ผู้ขอสินเชื่อ`;
+      const investorMessage = `รับชำระเงินเรียบร้อย\n\nสัญญา: ${redemption.contract?.contract_number || '-'}\nจำนวนเงิน: ${formatAmount(redemption.total_amount)} บาท\n\nอยู่ระหว่างส่งคืนสินค้าให้ผู้ขอสินเชื่อ`;
 
       try {
         await investorLineClient.pushMessage(investor.line_id, {
@@ -276,7 +384,9 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
           text: investorMessage
         });
       } catch (msgError) {
-        console.error('Error sending to investor:', msgError);
+        console.error('[droppoint:webhook] investor notification delayed', {
+          type: msgError instanceof Error ? msgError.name : 'unknown',
+        });
       }
     }
 
@@ -289,7 +399,9 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
       .maybeSingle();
 
     if (storageBoxError && storageBoxError.code !== 'PGRST205') {
-      console.error('Error fetching storage box for return card:', storageBoxError);
+      console.error('[droppoint:webhook] storage-box lookup failed', {
+        code: storageBoxError.code || 'unknown',
+      });
     }
 
     const dpClient = getDropPointLineClient();
@@ -300,10 +412,13 @@ async function handleRedemptionAmountCorrect(redemptionId: string, dropPointLine
     });
     await dpClient.replyMessage(replyToken, returnCard);
 
-    console.log(`Redemption ${redemptionId} amount verified by drop point`);
+    console.log('[droppoint:webhook] redemption amount verified');
 
   } catch (error) {
-    console.error('Error handling redemption amount correct:', error);
+    console.error('[droppoint:webhook] amount confirmation failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    throw error;
   }
 }
 
@@ -419,7 +534,7 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
   try {
     // Get redemption details
     const supabase = supabaseAdmin();
-    const { data: redemption } = await supabase
+    const { data: redemption, error: redemptionError } = await supabase
       .from('redemption_requests')
       .select(`
         *,
@@ -430,6 +545,10 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       `)
       .eq('redemption_id', redemptionId)
       .single();
+
+    if (redemptionError && redemptionError.code !== 'PGRST116') {
+      throw new Error('REDEMPTION_LOOKUP_FAILED');
+    }
 
     if (!redemption) {
       console.error('Redemption not found');
@@ -446,8 +565,12 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       return;
     }
 
-    const pawner = redemption.contract?.pawners;
-    const dropPoint = redemption.contract?.drop_points;
+    const pawner = relationOne(redemption.contract?.pawners);
+    const dropPoint = relationOne(redemption.contract?.drop_points);
+    if (!dropPoint || dropPoint.line_id !== dropPointLineId) {
+      console.warn('[droppoint:webhook] redemption assignment mismatch');
+      return;
+    }
 
     // Update redemption status to CANCELLED
     const nowIso = new Date().toISOString();
@@ -466,8 +589,7 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       .select('redemption_id');
 
     if (cancelError) {
-      console.error('Error cancelling redemption:', cancelError);
-      return;
+      throw new Error('REDEMPTION_CANCEL_FAILED');
     }
 
     if (!cancelledRows || cancelledRows.length === 0) {
@@ -481,13 +603,29 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
     }
 
     // Reset contract redemption status to allow a new request
-    await supabase
+    const { error: contractResetError } = await supabase
       .from('contracts')
       .update({
         redemption_status: 'NONE',
         updated_at: nowIso,
       })
       .eq('contract_id', redemption.contract_id);
+    if (contractResetError) {
+      const { error: rollbackError } = await supabase
+        .from('redemption_requests')
+        .update({
+          request_status: 'SLIP_UPLOADED',
+          verified_at: null,
+          verified_by_line_id: null,
+          verified_by_drop_point_id: null,
+          verification_notes: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('redemption_id', redemptionId)
+        .eq('request_status', 'CANCELLED');
+      if (rollbackError) throw new Error('REDEMPTION_RECONCILIATION_REQUIRED');
+      throw new Error('CONTRACT_REDEMPTION_RESET_FAILED');
+    }
 
     // Send message to pawner about cancellation
     if (pawner?.line_id) {
@@ -499,7 +637,9 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
           text: pawnerMessage
         });
       } catch (msgError) {
-        console.error('Error sending to pawner:', msgError);
+        console.error('[droppoint:webhook] pawner notification delayed', {
+          type: msgError instanceof Error ? msgError.name : 'unknown',
+        });
       }
     }
 
@@ -511,52 +651,13 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
       text: `การไถ่ถอนถูกยกเลิกเนื่องจากยอดเงินไม่ถูกต้อง\n\nบันทึก log เรียบร้อยแล้ว`
     });
 
-    console.log(`Redemption ${redemptionId} cancelled due to amount mismatch`);
+    console.log('[droppoint:webhook] redemption canceled after amount mismatch');
 
   } catch (error) {
-    console.error('Error handling redemption amount incorrect:', error);
-  }
-}
-
-// Handle when Pawner confirms item received
-async function handlePawnerConfirmReceived(redemptionId: string, pawnerLineId: string, replyToken: string) {
-  const supabase = supabaseAdmin();
-
-  try {
-    // Get redemption details
-    const { data: redemption, error } = await supabase
-      .from('redemption_requests')
-      .select(`
-        *,
-        contract:contract_id (
-          contract_number,
-          items:item_id (brand, model),
-          pawners:customer_id (firstname, lastname)
-        )
-      `)
-      .eq('redemption_id', redemptionId)
-      .single();
-
-    if (error || !redemption) {
-      console.error('Redemption not found:', error);
-      return;
-    }
-
-    // Reply to pawner with instructions to upload receipt photos
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawnly.io';
-    const instructionsMessage = `ขอบคุณที่ยืนยันการได้รับสินค้า\n\nกรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน\n\n${baseUrl}/contracts/${redemption.contract_id}/redeem/receipt?redemptionId=${redemptionId}`;
-
-    const dpClient = getDropPointLineClient();
-    if (!dpClient) throw new Error('DropPoint LINE client not configured');
-    await dpClient.replyMessage(replyToken, {
-      type: 'text',
-      text: instructionsMessage
+    console.error('[droppoint:webhook] amount rejection failed', {
+      type: error instanceof Error ? error.name : 'unknown',
     });
-
-    console.log(`Pawner ${pawnerLineId} confirmed receipt for redemption ${redemptionId}`);
-
-  } catch (error) {
-    console.error('Error handling pawner confirm received:', error);
+    throw error;
   }
 }
 

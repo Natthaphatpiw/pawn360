@@ -6,7 +6,8 @@ import { runJob } from '@/lib/job-poll-client';
 
 export async function runAnalyzeConditionJob(
   conditionData: unknown,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onStatus?: (status: any) => void
 ): Promise<ConditionResult> {
   return runJob<ConditionResult>({
     enqueueUrl: '/api/analyze-condition/jobs',
@@ -15,5 +16,6 @@ export async function runAnalyzeConditionJob(
     syncUrl: '/api/analyze-condition',
     payload: conditionData,
     signal,
+    onStatus,
   });
 }

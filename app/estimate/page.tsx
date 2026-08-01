@@ -407,6 +407,9 @@ interface EstimateResult {
   estimatedPrice: number;
   condition: number;
   confidence: number;
+  jobId?: string;
+  estimateAttestation?: string;
+  requiresManualReview?: boolean;
 }
 
 interface Store {
@@ -858,6 +861,9 @@ function EstimatePageInner() {
           estimatedPrice: d.estimated_value || 0,
           condition: d.item_condition || 0,
           confidence: d.ai_confidence || 0,
+          jobId: d.estimate_job_id || undefined,
+          estimateAttestation: d.estimate_attestation || undefined,
+          requiresManualReview: Number(d.ai_confidence || 0) < 0.5,
         });
         setConditionResult({
           score: typeof d.ai_condition_score === 'number' ? d.ai_condition_score : (d.item_condition || 0) / 100,
@@ -941,7 +947,10 @@ function EstimatePageInner() {
           setEstimateResult({
             estimatedPrice,
             condition: conditionScore / 100,
-            confidence: 0.9,
+            confidence: 1,
+            jobId: request.estimate_job_id || request.request_id,
+            estimateAttestation: request.estimate_attestation,
+            requiresManualReview: Boolean(request.requires_manual_review),
           });
           setDesiredPrice(estimatedPrice.toString());
           setConditionResult({
@@ -1113,8 +1122,8 @@ function EstimatePageInner() {
     const newFiles = Array.from(files);
     const totalImages = images.length + newFiles.length;
 
-    if (totalImages > 6) {
-      setError('สามารถอัปโหลดรูปได้สูงสุด 6 รูป');
+    if (totalImages > 4) {
+      setError('สามารถอัปโหลดรูปได้สูงสุด 4 รูป');
       return;
     }
 
@@ -1445,47 +1454,43 @@ function EstimatePageInner() {
         return;
       }
 
-      updateProcessingStatus(20, 'เตรียมรูปภาพ', 'กำลังแปลงรูปภาพสำหรับตรวจสอบ');
+      updateProcessingStatus(20, 'อัปโหลดรูปภาพ', 'กำลังอัปโหลดรูปภาพอย่างปลอดภัยเพื่อใช้ตรวจสอบ');
 
-      // Convert compressed images to base64
-      const base64Images = await Promise.all(
-        compressedImages.map(async (file) => {
-          return new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+      // Upload once before condition analysis and pass short-lived private Blob
+      // URLs to the queue. Sending base64 images in the job body made a single
+      // condition request several MB and multiplied Redis/heartbeat traffic.
+      const [imageHashes, uploadedUrls] = await Promise.all([
+        hashImagesForEstimateCache(compressedImages),
+        uploadImages(compressedImages, signal),
+      ]);
+      setUploadedImageUrls(uploadedUrls);
       ensureNotCanceled(signal);
       updateProcessingStatus(35, 'ตรวจสอบรูปภาพ', 'กำลังตรวจสอบประเภทสินค้าและความสอดคล้องของรูปภาพ');
 
       console.log('🔍 Analyzing condition...');
       // Async job queue: enqueue then poll (same spinner/cancel UX).
       const conditionData = await runAnalyzeConditionJob({
-        images: base64Images,
+        images: uploadedUrls,
         itemType: formData.itemType,
         brand: formData.brand,
         model: formData.model,
         appleCategory: formData.appleCategory,
-      }, signal);
+        lineId: profile.userId,
+      }, signal, (jobStatus) => {
+        if (jobStatus?.status === 'RETRYING') {
+          updateProcessingStatus(
+            40,
+            'รอผู้ให้บริการ',
+            jobStatus.message || 'ระบบจะลองวิเคราะห์ให้อัตโนมัติเมื่อผู้ให้บริการพร้อม'
+          );
+        }
+      });
 
       setConditionResult(conditionData);
       setIsAnalyzing(false);
       console.log('✅ Condition analysis completed');
       ensureNotCanceled(signal);
-      updateProcessingStatus(60, 'อัปโหลดรูปภาพ', 'กำลังอัปโหลดรูปภาพเพื่อประเมินราคา');
-
-      const imageHashes = await hashImagesForEstimateCache(compressedImages);
-      ensureNotCanceled(signal);
-
-      // Step 2: Upload images
-      console.log('📤 Starting image upload...');
-      const uploadedUrls = await uploadImages(compressedImages, signal);
-      setUploadedImageUrls(uploadedUrls);
-      console.log('✅ Image upload completed:', uploadedUrls);
-      ensureNotCanceled(signal);
+      updateProcessingStatus(60, 'เตรียมประเมินราคา', 'กำลังเตรียมข้อมูลเพื่อประเมินราคา');
       updateProcessingStatus(80, 'ประเมินราคา', 'กำลังคำนวณราคาประเมิน');
 
       const pawnerConditionPercent = Math.min(100, Math.max(0, derivedConditionScore));
@@ -1527,6 +1532,7 @@ function EstimatePageInner() {
         images: uploadedUrls,
         imageHashes,
         lineId: profile.userId,
+        conditionJobId: conditionData.jobId,
         // Additional fields based on item type
         ...(formData.itemType === 'กล้อง' && { lenses: formData.lenses?.filter(l => l.trim() !== '') }),
         ...(formData.itemType === 'โน้ตบุค' && {
@@ -1539,7 +1545,15 @@ function EstimatePageInner() {
 
       // Async job queue: enqueue then poll (the API responds in ms; the heavy
       // pipeline runs in the background) — same spinner/cancel UX as before.
-      const estimateResultData = await runEstimateJob(estimateData, signal);
+      const estimateResultData = await runEstimateJob(estimateData, signal, (jobStatus) => {
+        if (jobStatus?.status === 'RETRYING') {
+          updateProcessingStatus(
+            82,
+            'รอผู้ให้บริการ',
+            jobStatus.message || 'ระบบจะลองประเมินราคาให้อัตโนมัติเมื่อผู้ให้บริการพร้อม'
+          );
+        }
+      });
       console.log('✅ Price estimation completed:', estimateResultData);
       setEstimateResult(estimateResultData);
       setDesiredPrice(estimateResultData.estimatedPrice.toString());
@@ -1730,7 +1744,7 @@ function EstimatePageInner() {
             <EstimateSection title="Item Images" subtitle="รูปสินค้า" className="mb-4">
               <div className="flex justify-between items-end mb-2">
                 <FormLabel thai="รูปสินค้า" eng="Item images" required />
-                <span className="text-foreground-subtle text-xs">{images.length}/6</span>
+                <span className="text-foreground-subtle text-xs">{images.length}/4</span>
               </div>
 
               {images.length === 0 ? (
@@ -1760,7 +1774,7 @@ function EstimatePageInner() {
                       </button>
                     </div>
                   ))}
-                  {images.length < 6 && (
+                  {images.length < 4 && (
                     <button
                       onClick={() => setShowTutorial(true)}
                       className="border-2 border-dashed border-primary-border rounded-[var(--radius-lg)] h-24 flex items-center justify-center bg-background-white/75 text-foreground-subtle"
@@ -2358,6 +2372,9 @@ function EstimatePageInner() {
               images: uploadedImageUrls,
               estimatedPrice: estimateResult?.estimatedPrice || 0,
               aiConfidence: estimateResult?.confidence,
+              estimateJobId: estimateResult?.jobId,
+              estimateAttestation: estimateResult?.estimateAttestation,
+              requiresManualReview: estimateResult?.requiresManualReview,
               appleAccessories: formData.appleAccessories
                 ? Object.entries(formData.appleAccessories)
                     .filter(([, value]) => value)

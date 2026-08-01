@@ -135,7 +135,7 @@ export default function InvestmentDashboard() {
         setError(null);
         return;
       }
-      const response = await axios.get(`/api/contracts/by-investor/${profile?.userId}`);
+      const response = await axios.get('/api/contracts/by-investor/me');
       setContracts(response.data.contracts || []);
     } catch (fetchError: any) {
       console.error('Error fetching investment data:', fetchError);

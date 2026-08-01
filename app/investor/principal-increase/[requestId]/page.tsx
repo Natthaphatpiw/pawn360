@@ -29,7 +29,7 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   const router = useRouter();
   const params = useParams();
   const requestId = params.requestId as string;
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [requestDetails, setRequestDetails] = useState<any>(null);
@@ -49,10 +49,13 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
   };
 
   useEffect(() => {
-    if (requestId) {
+    if (requestId && (isInvestorPreviewMode() || (!liffLoading && profile?.userId))) {
       fetchRequestDetails();
+    } else if (!isInvestorPreviewMode() && !liffLoading && (liffError || !profile?.userId)) {
+      setError('กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      setLoading(false);
     }
-  }, [requestId]);
+  }, [requestId, profile?.userId, liffLoading, liffError]);
 
   const fetchRequestDetails = async () => {
     try {
@@ -62,7 +65,9 @@ export default function InvestorPrincipalIncreaseApprovalPage() {
         setError(null);
         return;
       }
-      const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`);
+      const response = await axios.get(`/api/contract-actions/${requestId}?viewer=investor`, {
+        headers: { 'X-LIFF-Role': 'INVESTOR' },
+      });
       if (response.data.success) {
         setRequestDetails(response.data.request);
       }

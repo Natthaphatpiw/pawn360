@@ -86,20 +86,18 @@ The entire web tier, networking, DNS, TLS, edge caching, and edge security are p
 
 - Every backend handler is a Next.js Route Handler compiled into a Vercel Function. Functions are stateless, autoscaling, and billed per invocation and duration.
 - Runtime: Node.js (the default for this application). One route pins `export const runtime = 'nodejs'` explicitly (the investor inbound webhook); the rest inherit the Node.js default. The application is not on the Edge runtime because it depends on Node-only libraries (MongoDB driver, Puppeteer/Chromium, bcrypt).
-- Execution time: latency-sensitive defaults apply, with `export const maxDuration = 60` set on the heavyweight handlers that perform headless-Chromium document rendering or multi-image vision and live web search:
-  - the condition-analysis route (vision precheck + Gemini scoring)
-  - the loan-ticket rendering route
-  - the contract-image rendering route
+- Long-running AI work is removed from the interactive request path. The enqueue routes return a job id, while Vercel Queue consumers run with `maxDuration = 300`. Generic estimates, notebook estimates, condition analysis, and eKYC callbacks use separate topics so each workload can be throttled independently. Headless-Chromium document rendering remains in ordinary Node.js functions.
 - Document and image rendering uses `puppeteer` with `@sparticuz/chromium`, a Chromium build packaged for the AWS Lambda/Vercel Function filesystem and memory constraints.
 - Region: Vercel Functions execute in a configured region. For this workload the data-adjacency target is Southeast Asia (Singapore, `sin1`) to minimize latency to Supabase, MongoDB Atlas, the connected Vercel Blob store, and SEA users. Region selection should be validated against the actual service regions to avoid cross-region round-trips on hot paths.
 - Cold starts: as with any serverless platform, infrequently invoked functions incur cold-start latency. Module-level database and Redis clients are reused across warm invocations to amortize connection setup; Vercel Blob uses stateless HTTP SDK calls.
 
 ### 4.3 Scheduled jobs (Vercel Cron)
 
-Two cron jobs are declared in `vercel.json`, each every five minutes:
+Three cron jobs are declared in `vercel.json`:
 
 | Schedule | Path | Function |
 |---|---|---|
+| `* * * * *` | `/api/ekyc/reconcile` | Re-publishes durable eKYC inbox/outbox records left behind by a transient queue publish or notification failure; requires `CRON_SECRET`. |
 | `*/5 * * * *` | `/api/contracts/process-ticket-queue` | Drains the Supabase ticket-generation queue; issues loan-ticket links to borrower and investor via LINE. |
 | `*/5 * * * *` | `/api/redemptions/auto-confirm-received` | Auto-advances redemptions from `COMPLETED` to a borrower-confirmed state after a 48-hour window. |
 
@@ -107,17 +105,21 @@ Operational note: Vercel Cron invokes the configured path using an HTTP GET requ
 
 ### 4.4 Managed data services on the Vercel side
 
-- Vercel KV (Upstash Redis): the estimate cache and per-image content-hash cache use Upstash Redis through the Vercel KV integration. The application reads the Vercel-KV-style credentials `KV_REST_API_URL`, `KV_REST_API_TOKEN`, and `KV_REST_API_READ_ONLY_TOKEN`. If these are absent, caching is silently skipped and the pipeline runs uncached.
+- Vercel KV (Upstash Redis): in addition to estimate/search/image-hash caches, Redis stores AI job state, idempotency records, processing leases, provider-concurrency semaphores, cost counters, and the application dead-letter index. Redis is therefore required for the production AI queue path; only optional result caches may degrade to a cache miss.
+
+### 4.5 Vercel Queues
+
+Four `queue/v2beta` triggers in `vercel.json` consume `pawnline-estimate-generic-v1`, `pawnline-estimate-notebook-v1`, `pawnline-condition-v1`, and `ekyc-webhook-events`. Messages contain only an opaque job/event id and schema version. Delivery is at least once, so correctness depends on Redis/database idempotency, conditional claims, leases, monotonic state transitions, bounded retries, and the application-level DLQ. Vercel Queues is a beta service; preview validation, load testing, and a rollback path remain deployment requirements.
 
 The primary databases (MongoDB Atlas and Supabase) remain external managed services. Object storage is provided by a private Vercel Blob store connected to the project (see Section 6 and Section 7).
 
-### 4.5 Domains, DNS, and TLS
+### 4.6 Domains, DNS, and TLS
 
 - DNS for `Astly.co` is managed by Vercel (either via Vercel nameservers or delegated records pointing at Vercel). Apex and subdomains resolve to the Vercel Edge Network.
 - TLS certificates are provisioned and auto-renewed by Vercel (Let's Encrypt), with automatic HTTPS and HSTS. No certificate management is performed by the team.
 - The application computes absolute callback and deep-link URLs from `VERCEL_URL` (the deployment's system-assigned hostname) or `NEXT_PUBLIC_BASE_URL` / `NEXT_PUBLIC_DOMAIN`, falling back to the production domain. This is used to construct the Shop System callback URL and LINE deep links.
 
-### 4.6 Edge security (the Cloudflare-equivalent layer)
+### 4.7 Edge security (the Cloudflare-equivalent layer)
 
 With no Cloudflare in the path, the following responsibilities are owned by Vercel's platform:
 
@@ -128,13 +130,13 @@ With no Cloudflare in the path, the following responsibilities are owned by Verc
 
 Application-layer authenticity for inbound machine-to-machine traffic (LINE webhooks, Shop System callbacks, UPPASS eKYC callbacks) is enforced in code via signature verification (Section 10), independent of the edge firewall.
 
-### 4.7 Delivery pipeline (CI/CD)
+### 4.8 Delivery pipeline (CI/CD)
 
 - Git-integrated deployments: every push builds an immutable deployment. Pull requests and non-production branches produce isolated Preview Deployments with their own URLs and environment scope.
 - Production promotion is atomic; rollbacks are instant (re-pointing the alias to a previous immutable deployment).
 - Build: `next build` (production) / `next dev --turbopack` (local). Environment variables are scoped per environment (Production, Preview, Development), encrypted at rest, and injected at build and runtime. `NEXT_PUBLIC_*` variables are inlined into the client bundle; all others remain server-only.
 
-### 4.8 The separate Shop System (independent Vercel app)
+### 4.9 The separate Shop System (independent Vercel app)
 
 The Store/Shop SaaS is a distinct, independently deployed Vercel application (configured via `SHOP_SYSTEM_URL`). This platform pushes signed requests to the Shop System and receives asynchronous callbacks at `/api/webhooks/shop-notification`. The two systems are integrated by signed HTTP, not by a shared database.
 
@@ -163,7 +165,7 @@ The `/api/*` surface is grouped by domain: estimate, condition analysis, manual 
 - `lib/supabase/client.ts` — the Supabase service-role client factory (`supabaseAdmin()`).
 - `lib/line/` — per-actor LINE clients, Flex message templates, admin push.
 - `lib/security/` — PIN authentication and session tokens, LINE and webhook signature verification.
-- `lib/services/` — pricing (`price-representative`), investor tiers, penalty engine, slip verification, geo distance, and the shared Anthropic client (`anthropic-llm`).
+- `lib/services/` — pricing (`price-representative`), investor tiers, penalty engine, slip verification, geo distance, the primary OpenAI Responses client (`openai-llm`), and the Anthropic fallback client (`anthropic-llm`).
 - `lib/storage/blob.ts` — private Vercel Blob uploads and time-limited signed URL generation.
 - `lib/utils/` — financial calculations, QR codes, item private notes.
 
@@ -177,11 +179,12 @@ All third-party systems are reached over the network from Vercel Functions. Inbo
 |---|---|---|---|---|
 | LINE Messaging API (x4 OAs) | Inbound webhooks + outbound push | Customer/store/investor/drop-point messaging, Flex UI, rich menus | HTTPS `api.line.me` | HMAC-SHA256 (base64) signature on inbound; channel access token on outbound |
 | LINE LIFF | Client | Mini-app auth and profile | LINE SDK in browser | LINE login (OAuth) |
-| Anthropic Claude | Outbound | Primary LLM: input normalization, SerpAPI filtering, web-search pricing (Sonnet 4.6); image precheck and slip OCR (Haiku 4.5) | HTTPS `api.anthropic.com/v1/messages` | `x-api-key` (4-key rotation) |
-| Google Gemini | Outbound | Item condition scoring (`gemini-3-flash-preview`) | Google Generative AI SDK | API key (4-key rotation) |
-| OpenAI | Outbound (optional) | Alternate web-search price provider when `PRICE_SEARCH_PROVIDER=openai` | HTTPS Responses API | API key (4-key rotation) |
-| SerpAPI | Outbound | Google Shopping Light price candidates | HTTPS `serpapi.com` | API key |
-| UPPASS | Outbound + inbound webhook | eKYC for borrowers and investors | HTTPS `app.uppass.io` | Bearer API key; inbound HMAC (`x-uppass-signature`) |
+| OpenAI | Outbound | Primary LLM for text, vision, and structured extraction (`gpt-5.6-luna`, `gpt-5.6-terra`) | HTTPS Responses API | API key (up to four rotating keys) |
+| Anthropic Claude | Outbound fallback | Model fallback for migrated text/vision steps (Sonnet 4.6, Haiku 4.5) | HTTPS `api.anthropic.com/v1/messages` | `x-api-key` (up to four keys) |
+| Parallel | Outbound | Primary web search for market evidence | HTTPS Search API via `parallel-web` | API key |
+| Exa | Outbound fallback | Search fallback when Parallel fails or returns no usable evidence | HTTPS Search API via `exa-js` | API key |
+| SerpAPI | Outbound | Optional, independent Google Shopping price source | HTTPS `serpapi.com` | API key |
+| UPPASS | Outbound + inbound webhook | eKYC for sellers and Asset Funding | HTTPS allowlisted UpPass hosts | Bearer API key outbound; role-specific Basic Auth inbound (fail closed) |
 | SlipOK | Outbound | Bank-slip verification (primary path when configured) | HTTPS `api.slipok.com` | `x-authorization` header |
 | Vercel Blob | Outbound | Private object storage for images, contracts, tickets, QR codes | `@vercel/blob` | Project read/write token; operation- and pathname-scoped signed URLs for read |
 | MongoDB Atlas | Outbound | Primary OLTP store | MongoDB wire protocol (TLS) | SRV connection string |
@@ -243,20 +246,19 @@ The connected private Blob store keeps item images, verification photos, contrac
 
 Intelligence is concentrated in the pricing and assessment pipeline and is provider-abstracted.
 
-### 8.1 Provider abstraction
+### 8.1 Provider and effort policy
 
-- `lib/services/anthropic-llm.ts` is the shared Claude client: a direct REST integration to the Anthropic Messages API with four-key rotation on rate-limit/overload, structured output via forced tool use (`anthropicStructured`), image-block construction for vision, and model resolution.
-- Model assignment:
-  - Text steps (input normalization, SerpAPI result filtering, web-search pricing): `claude-sonnet-4-6` (`ANTHROPIC_MODEL`).
-  - Vision steps (image precheck, slip OCR): `claude-haiku-4-5-20251001` (`ANTHROPIC_VISION_MODEL`).
-- The web-search pricing step is additionally provider-switchable via `PRICE_SEARCH_PROVIDER` (`anthropic` default, `openai` alternate) and `PRICE_SEARCH_MODEL`.
-- Condition scoring uses Google Gemini (`gemini-3-flash-preview`) with its own four-key rotation.
+- `lib/services/openai-llm.ts` is the primary Responses API client. `gpt-5.6-luna` handles vision/classification workloads; `gpt-5.6-terra` handles normalization, canonicalization, and price-evidence extraction. Anthropic retains Sonnet/Haiku implementations as automatic model fallback.
+- Reasoning is task-specific rather than globally `medium/xhigh/max`: deterministic normalization, precheck, and vision-spec extraction start at `none`; condition/slip/canonicalization and market extraction start at `low`. Calls with an explicit quality gate may retry once at `low` or `medium`. Higher efforts require evaluation evidence and an explicit per-task override.
+- `lib/services/ai-usage.ts` records model, tokens, latency, fallback/search cost, and per-job/month spend without raw prompts or PII. Redis-backed budget reservations enforce `AI_MAX_JOB_COST_USD` and optional `AI_MONTHLY_BUDGET_USD` across instances.
+- OpenAI SDK retries are disabled; typed provider errors and `Retry-After` are handed to the durable queue, preventing hidden duplicate spend. Key rotation is used for a true per-key rate limit, not to evade account billing quota.
+- Search is separate from reasoning: `lib/services/market-search.ts` uses Parallel first, Exa second, and a stale Redis result as the final search fallback. Search inputs are canonical product/spec text without user identifiers, serials, or image URLs.
 
 ### 8.2 Price derivation pipeline (`/api/estimate`)
 
 1. Cache check (Redis) on a normalized payload including image content hashes.
-2. Agent 1, input normalization (Claude Sonnet 4.6): produces a single canonical product name; color and serial number are deliberately stripped.
-3. Agent 2, representative market price: in parallel, a Claude web-search call returns four to eight Thai-market used listings, and a SerpAPI Google Shopping query is filtered by a Claude call returning the item IDs to keep. Results are combined and passed to `computeRepresentativeUsedPriceTHB`.
+2. Agent 1, input normalization (OpenAI Terra, normally `none`): produces a canonical product name; color and serial number are deliberately stripped. Anthropic is the model fallback.
+3. Market evidence: Parallel search is primary, Exa is the search fallback, and stale Redis evidence may be used during provider outages. Terra extracts only prices supported by the normalized evidence, normally at `low` and escalating to `medium` only when the quality gate is not met. Optional SerpAPI candidates are filtered independently; Anthropic is the extraction/filter fallback.
 4. Representative price estimator (`lib/services/price-representative.ts`): a winsorized percentile-window estimator with two regimes selected by a dispersion score (IQR/median), not a plain median.
 5. Loan principal: `principal = round(marketPrice x 0.6)` (a fixed 60 percent loan-to-value).
 6. Condition blend: `0.6 x borrowerCondition + 0.4 x aiCondition`, normalized and clamped.
@@ -264,14 +266,15 @@ Intelligence is concentrated in the pricing and assessment pipeline and is provi
 
 ### 8.3 Condition scoring pipeline (`/api/analyze-condition`)
 
-- Agent 1, image precheck (Claude Haiku 4.5 vision): confirms the photos match the declared item type and are the same item; rejects mismatches with a 400.
-- Agent 2, condition scoring (Gemini): scores on a fixed 100-point rubric (screen 35, body 30, buttons 20, camera 10, overall 5), returning a normalized score. Results at or below a floor are treated as unusable photos rather than genuine low scores.
+- Agent 1, image precheck (OpenAI Luna, `none`, low-detail image input): confirms the photos match the declared item type and are the same item; rejects mismatches with a 400.
+- Agent 2, condition scoring (OpenAI Luna, `low`, high-detail image input): scores on a fixed 100-point rubric (screen 35, body 30, buttons 20, camera 10, overall 5), returning a normalized score. Results at or below a floor are treated as unusable photos rather than genuine low scores.
+- Both steps fall back to Claude Haiku vision when the OpenAI request fails.
 
 This pipeline is the direct predecessor of, and integration point for, the future self-hosted model (Section 14).
 
 ### 8.4 Bank-slip OCR (`lib/services/slip-verification.ts`)
 
-Primary path is the SlipOK API when configured; otherwise a Claude Haiku 4.5 vision fallback extracts the transfer amount and validity and returns a structured verdict (`MATCHED | UNDERPAID | OVERPAID | UNREADABLE | INVALID`).
+Primary path is the SlipOK API when configured. Otherwise OpenAI Luna (`low`) extracts the transfer amount and validity; Claude Haiku is the fallback if OpenAI fails. The result is a structured verdict (`MATCHED | UNDERPAID | OVERPAID | UNREADABLE | INVALID`). Ambiguous results never authorize payment automatically.
 
 ---
 
@@ -304,7 +307,7 @@ These exist in two parallel mechanisms that must be kept consistent:
 
 ### 9.5 Identity verification (eKYC)
 
-UPPASS is invoked per actor (`/api/ekyc/initiate` for borrowers, `/api/ekyc/initiate-invest` for investors). Results arrive via two webhooks (`/api/ekyc/webhook` and `/api/webhooks/uppass-invest`) and update `kyc_status`.
+UPPASS is invoked per actor (`/api/ekyc/initiate` for sellers, `/api/ekyc/initiate-invest` for Asset Funding) only after server-side LINE ID-token and ownership verification. Results arrive via two Basic-Auth-protected webhooks, are normalized into the `ekyc_webhook_events` durable inbox, and are processed asynchronously by the `ekyc-webhook-events` queue. The minute reconciliation cron recovers inbox/outbox records left by transient queue or LINE failures.
 
 ### 9.6 Scheduled processing
 
@@ -326,7 +329,7 @@ Signature verification is enforced per integration and is intentionally document
 - LINE customer/store webhooks verify the HMAC but log-and-continue on mismatch (a debug posture that should be hardened for production).
 - The alternate customer webhook and investor webhook reject with 401 on bad/missing signatures.
 - The drop-point webhook performs no signature verification.
-- eKYC webhooks treat verification as optional (accept when no signature header or secret is present).
+- UpPass webhooks use role-specific Basic Auth by default and fail closed if authentication is missing or misconfigured. A legacy HMAC mode exists only behind explicit configuration for accounts with a provider-confirmed HMAC contract.
 - Shop System callbacks use a distinct scheme: HMAC-SHA256 (hex) over `notificationId-timestamp` with `WEBHOOK_SECRET` and a five-minute replay window.
 
 ### 10.3 Data-tier protection
@@ -347,11 +350,12 @@ The platform processes Thai PDPA-relevant personal and financial data (national 
 ## 11. Reliability, Scalability, and Performance
 
 - Horizontal scale is provided automatically by Vercel Functions; there is no capacity to provision.
-- Resilience to provider rate limits is built into the LLM clients via multi-key rotation and graceful degradation (the pricing pipeline falls back to a minimum price; slip verification falls back to UNREADABLE rather than failing hard).
-- The estimate cache reduces both latency and LLM spend; cache keys are content-addressed by normalized inputs and image hashes.
-- Idempotency: the customer webhook maintains an in-memory event-deduplication cache; the ticket queue bounds retries (failed after three attempts).
+- Vercel Queues isolate burst traffic by topic; Redis semaphores cap provider concurrency. Typed 429/5xx/timeout failures move jobs to `RETRYING` with bounded exponential backoff and provider `Retry-After` support.
+- The estimate and market caches reduce latency and spend; market search uses a 12-hour fresh cache and a seven-day stale fallback by default.
+- AI jobs use client, Redis, and Vercel idempotency keys plus distributed process leases. Retry exhaustion is recorded in an application DLQ because Vercel Queues does not currently provide a built-in DLQ.
+- eKYC uses a database unique event key, normalized durable inbox/outbox, monotonic status transitions, and separate notification retries to tolerate at-least-once delivery.
 - Connection management: the MongoDB and Redis clients are module-level singletons reused across warm invocations; Vercel Blob access is stateless over HTTPS.
-- Cost and latency on the AI path are managed by model tiering (Sonnet for text reasoning, Haiku for high-volume vision) and by the cache.
+- Cost and latency on the AI path are managed by Luna/Terra task tiering, none/low-first adaptive reasoning, prompt/result caches, explicit budget reservations, and Parallel/Exa search separated from LLM extraction.
 
 ---
 
@@ -359,7 +363,7 @@ The platform processes Thai PDPA-relevant personal and financial data (national 
 
 - Runtime logs are emitted by Route Handlers and collected by Vercel's logging/observability (function logs, analytics). The pricing and assessment paths emit structured progress logs.
 - Deployments are immutable with instant rollback; preview deployments provide per-change verification environments.
-- Recommended additions: centralized structured logging and error tracking, an LLM-call audit trail (model, tokens, latency, fallback path), and synthetic checks on the cron endpoints and the estimate path.
+- AI usage events already capture model, token, latency, provider/fallback and estimated cost metadata without raw prompts. Production still needs centralized alerting/SIEM, synthetic checks, and dashboards for queue age, retries/DLQ, provider 429/5xx, spend, and eKYC reconciliation lag.
 
 ---
 
@@ -368,7 +372,7 @@ The platform processes Thai PDPA-relevant personal and financial data (national 
 - Dual mechanisms for the same business concept (the MongoDB notification collection versus the Supabase contract-action tables) require disciplined dual writes; divergence is a latent risk.
 - Status vocabularies differ between stores (lowercase MongoDB versus uppercase Supabase) and are not interchangeable.
 - The notification `contractId` field actually holds an item identifier; this naming is a footgun.
-- Webhook signature handling is inconsistent across actors (Section 10.2).
+- LINE and other legacy webhook signature handling remains inconsistent across actors; UpPass itself has been moved to fail-closed Basic Auth (Section 10.2).
 - The ticket-queue cron's drain logic is in a POST handler while Vercel Cron issues GET; the effective behavior must be confirmed.
 - The 60 percent loan-to-value and the 500 THB price snapping are fixed in code and mirrored in client UIs; changes must be coordinated.
 - Some internal code identifiers, the persisted MongoDB database name, and a number of state-machine enum values retain legacy naming from an earlier product label; these are implementation details only and are scheduled for gradual normalization.
@@ -380,7 +384,7 @@ The platform processes Thai PDPA-relevant personal and financial data (national 
 
 ### 14.1 Objective
 
-Replace, or progressively displace, the third-party condition-scoring pipeline (currently Claude Haiku vision precheck plus Gemini scoring) with an in-house, open-source computer-vision model that ingests item photographs and outputs a structured condition assessment (an overall condition score plus rubric sub-scores and detected defects). Owning the model reduces per-inference cost and vendor dependence, removes per-request egress of sensitive media to third parties, and lets the assessment be tuned to the platform's actual collateral mix and to the downstream loan-pricing decision.
+Replace, or progressively displace, the third-party condition-scoring pipeline (currently OpenAI Luna with Claude Haiku fallback) with an in-house, open-source computer-vision model that ingests item photographs and outputs a structured condition assessment (an overall condition score plus rubric sub-scores and detected defects). Owning the model reduces per-inference cost and vendor dependence, removes per-request egress of sensitive media to third parties, and lets the assessment be tuned to the platform's actual collateral mix and to the downstream loan-pricing decision.
 
 ### 14.2 The data flywheel
 
@@ -420,7 +424,7 @@ GPU training and inference do not run on Vercel (Vercel Functions provide no GPU
 
 ### 14.5 Integration with the existing system
 
-The model is introduced behind the existing provider abstraction, exactly as Claude and Gemini are today. A new self-hosted condition provider is added alongside the current vision providers and selected by configuration (mirroring `PRICE_SEARCH_PROVIDER` and `ANTHROPIC_VISION_MODEL`). `/api/analyze-condition` calls the in-house inference endpoint and maps its output to the established condition contract consumed by `/api/estimate`. No change to the pricing mathematics or the downstream contract is required; only the source of `aiCondition` changes.
+The model is introduced behind the existing OpenAI-primary/Anthropic-fallback abstraction. A new self-hosted condition provider is added alongside the current vision providers and selected by configuration. `/api/analyze-condition` calls the in-house inference endpoint and maps its output to the established condition contract consumed by `/api/estimate`. No change to the pricing mathematics or the downstream contract is required; only the source of `aiCondition` changes.
 
 ### 14.6 Rollout and governance
 
@@ -447,9 +451,10 @@ In the target state, Vercel continues to host the entire product surface (LIFF a
 - LINE (store): `LINE_STORE_CHANNEL_ACCESS_TOKEN`, `LINE_STORE_CHANNEL_SECRET`.
 - LINE (investor): `LINE_CHANNEL_ACCESS_TOKEN_INVEST`, `LINE_CHANNEL_SECRET_INVEST`.
 - LINE (drop point): `LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT`, `LINE_CHANNEL_SECRET_DROPPOINT`.
-- AI / LLM: `ANTHROPIC_API_KEY(_2/_3/_4)`, `ANTHROPIC_MODEL`, `ANTHROPIC_VISION_MODEL`, `OPENAI_API_KEY(_2/_3/_4)`, `GEMINI_API_KEY(_2/_3/_4)`, `PRICE_SEARCH_PROVIDER`, `PRICE_SEARCH_MODEL`, `PRICE_SEARCH_ENABLE_WEB_FETCH`.
-- Pricing/search: `SERPAPI_ENABLED`, `SERPAPI_API_KEY`, `SERPAPI_EXCHANGE_RATE_THB_PER_USD`, `ESTIMATE_CACHE_TTL_SECONDS`, `ESTIMATE_IMAGE_HASH_CACHE_TTL_SECONDS`.
-- eKYC: `UPPASS_API_URL`, `UPPASS_API_KEY`, `UPPASS_FORM_SLUG`, `UPPASS_WEBHOOK_SECRET`, and the `*_INVEST` equivalents.
+- AI / LLM: `OPENAI_API_KEY(_2/_3/_4)`, `OPENAI_LUNA_MODEL`, `OPENAI_TERRA_MODEL`, `OPENAI_EFFORT_<TASK>`, `OPENAI_TIMEOUT_MS`, `AI_SAFETY_IDENTIFIER_SECRET`, `AI_MAX_JOB_COST_USD`, `AI_MONTHLY_BUDGET_USD`; fallback-only `ANTHROPIC_API_KEY(_2/_3/_4)`, `ANTHROPIC_MODEL`, `ANTHROPIC_VISION_MODEL`, `ANTHROPIC_PRICE_SEARCH_MODEL`.
+- Pricing/search: `PARALLEL_API_KEY`, `PARALLEL_SEARCH_MODE`, `EXA_API_KEY`, `MARKET_SEARCH_CACHE_TTL_SECONDS`, `MARKET_SEARCH_STALE_TTL_SECONDS`; optional `SERPAPI_ENABLED`, `SERPAPI_API_KEY`, `SERPAPI_EXCHANGE_RATE_THB_PER_USD`; estimate/image cache TTLs.
+- Queues: `JOB_DISPATCHER`, `JOB_CONCURRENCY_ESTIMATE_GENERIC`, `JOB_CONCURRENCY_ESTIMATE_NOTEBOOK`, `JOB_CONCURRENCY_CONDITION`; Redis credentials; QStash variables are legacy fallback only.
+- eKYC: role-specific `UPPASS_API_URL`, `UPPASS_API_KEY`, `UPPASS_FORM_SLUG`, allowed hosts, `UPPASS_WEBHOOK_AUTH_MODE`, `UPPASS_WEBHOOK_BASIC_USERNAME`, `UPPASS_WEBHOOK_BASIC_PASSWORD`, and `_INVEST` equivalents; `CRON_SECRET` protects reconciliation.
 - Slip verification: `SLIPOK_API_URL`, `SLIPOK_API_KEY`, `SLIPOK_BRANCH_ID`, `SLIPOK_PASSWORD`.
 - Shop System: `SHOP_SYSTEM_URL`, `WEBHOOK_SECRET`.
 - Feature flags: `MANUAL_ESTIMATE_ENABLED`, `NEXT_PUBLIC_LIFF_MOCK`, `NEXT_PUBLIC_DROPPOINT_MOCK`.

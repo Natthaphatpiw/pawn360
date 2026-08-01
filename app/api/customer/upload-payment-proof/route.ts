@@ -2,187 +2,232 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { putPrivateBlob } from '@/lib/storage/blob';
 import { getLineClient } from '@/lib/line/client';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import {
+  InternalAuthError,
+  internalAuthErrorResponse,
+  liffAuthErrorResponse,
+  requireInternalRequest,
+  requireLiffOwner,
+} from '@/lib/security/request-auth';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  sanitizedServerError,
+  TransactionRequestError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
-/**
- * Downloads image from LINE Message API
- */
-async function downloadLineImage(messageId: string): Promise<Buffer> {
-  const client = getLineClient();
-  const stream = await client.getMessageContent(messageId);
+const MAX_SLIP_BYTES = 2 * 1024 * 1024;
+const MAX_MULTIPART_BYTES = 3 * 1024 * 1024;
 
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
-  });
+type ValidatedImage = { buffer: Buffer; contentType: string; extension: string };
+
+function validateSlipImage(buffer: Buffer): ValidatedImage {
+  if (buffer.length === 0 || buffer.length > MAX_SLIP_BYTES) {
+    throw new TransactionRequestError('SLIP_TOO_LARGE', 413, 'ไฟล์สลิปมีขนาดใหญ่เกินไป');
+  }
+  const jpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  const png = buffer.length >= 8 && buffer.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+  const webp = buffer.length >= 12
+    && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+    && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  if (jpeg) return { buffer, contentType: 'image/jpeg', extension: 'jpg' };
+  if (png) return { buffer, contentType: 'image/png', extension: 'png' };
+  if (webp) return { buffer, contentType: 'image/webp', extension: 'webp' };
+  throw new TransactionRequestError('INVALID_SLIP_IMAGE', 400, 'ไฟล์สลิปไม่ถูกต้อง');
 }
 
-/**
- * Uploads a payment slip to Vercel Blob.
- */
-async function uploadSlipToBlob(
-  slipBuffer: Buffer,
-  notificationId: string
-): Promise<string> {
-  const timestamp = Date.now();
-  const filename = `slip-${notificationId}-${timestamp}.jpg`;
-  const blob = await putPrivateBlob(`slips/${filename}`, slipBuffer, 'image/jpeg');
-  return blob.signedUrl;
+async function downloadLineImage(messageId: string): Promise<Buffer> {
+  const stream = await getLineClient().getMessageContent(messageId);
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of stream) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > MAX_SLIP_BYTES) {
+      stream.destroy();
+      throw new TransactionRequestError('SLIP_TOO_LARGE', 413, 'ไฟล์สลิปมีขนาดใหญ่เกินไป');
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks, totalBytes);
+}
+
+async function sendToShopSystem(
+  notificationId: string,
+  image: ValidatedImage,
+  slipUrl: string,
+): Promise<void> {
+  const shopSystemUrl = process.env.SHOP_SYSTEM_URL || 'https://pawn360-ver.vercel.app';
+  let endpoint: URL;
+  try {
+    endpoint = new URL('/api/notifications/payment-proof', shopSystemUrl);
+  } catch {
+    throw new Error('SHOP_SYSTEM_CONFIG_INVALID');
+  }
+  if (endpoint.protocol !== 'https:' && process.env.NODE_ENV === 'production') {
+    throw new Error('SHOP_SYSTEM_CONFIG_INVALID');
+  }
+
+  const formData = new FormData();
+  const blob = new Blob([new Uint8Array(image.buffer)], { type: image.contentType });
+  formData.append('notificationId', notificationId);
+  formData.append('file', new File([blob], `slip.${image.extension}`, { type: image.contentType }));
+  formData.append('slipUrl', slipUrl);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const serviceToken = String(process.env.SHOP_SYSTEM_API_TOKEN || '').trim();
+    if (process.env.NODE_ENV === 'production' && !serviceToken) {
+      throw new Error('SHOP_SYSTEM_AUTH_NOT_CONFIGURED');
+    }
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: serviceToken ? { Authorization: `Bearer ${serviceToken}` } : undefined,
+      body: formData,
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error('SHOP_SYSTEM_UNAVAILABLE');
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const contentType = request.headers.get('content-type') || '';
+    const contentType = (request.headers.get('content-type') || '').toLowerCase();
+    const multipart = contentType.includes('multipart/form-data');
     let notificationId: string;
     let lineUserId: string;
-    let imageSource: 'file' | 'line';
     let imageFile: File | null = null;
     let imageId: string | null = null;
 
-    if (contentType.includes('multipart/form-data')) {
-      // File upload from web
+    if (multipart) {
+      await requireLiffIdentity(request, 'PAWNER');
+      const contentLength = Number(request.headers.get('content-length') || 0);
+      if (!Number.isFinite(contentLength) || contentLength <= 0 || contentLength > MAX_MULTIPART_BYTES) {
+        return NextResponse.json(
+          { error: 'ไฟล์สลิปมีขนาดใหญ่เกินไป', code: 'SLIP_TOO_LARGE' },
+          { status: 413 },
+        );
+      }
       const formData = await request.formData();
-      notificationId = formData.get('notificationId') as string;
-      lineUserId = formData.get('lineUserId') as string;
-      imageFile = formData.get('file') as File;
-      imageSource = 'file';
+      notificationId = boundedText(formData.get('notificationId'), 128, true) || '';
+      const claimedLineId = boundedText(formData.get('lineUserId'), 128, true) || '';
+      lineUserId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+      const fileValue = formData.get('file');
+      imageFile = fileValue instanceof File ? fileValue : null;
     } else {
-      // JSON request (from LINE webhook handler with imageId)
-      const body = await request.json();
-      notificationId = body.notificationId;
-      lineUserId = body.lineUserId;
-      imageId = body.imageId;
-      imageSource = 'line';
-    }
-
-    if (!notificationId || !lineUserId) {
-      return NextResponse.json(
-        { error: 'ข้อมูลไม่ครบถ้วน' },
-        { status: 400 }
-      );
+      requireInternalRequest(request, ['INTERNAL_API_SECRET']);
+      const body = await readBoundedJsonObject(request, 16 * 1024);
+      notificationId = boundedText(body.notificationId, 128, true) || '';
+      lineUserId = boundedText(body.lineUserId, 128, true) || '';
+      imageId = boundedText(body.imageId, 128, true);
+      if (!/^U[A-Za-z0-9]{20,64}$/.test(lineUserId) || !imageId || !/^[A-Za-z0-9_-]{1,128}$/.test(imageId)) {
+        return NextResponse.json({ error: 'ข้อมูลคำขอไม่ถูกต้อง', code: 'INVALID_REQUEST' }, { status: 400 });
+      }
     }
 
     const { db } = await connectToDatabase();
     const notificationsCollection = db.collection('notifications');
-
-    // 1. Find notification
     const notification = await notificationsCollection.findOne({
       shopNotificationId: notificationId,
-      lineUserId: lineUserId
+      lineUserId,
     });
-
     if (!notification) {
+      return NextResponse.json({ error: 'ไม่พบคำขอที่ระบุ', code: 'NOTIFICATION_NOT_FOUND' }, { status: 404 });
+    }
+
+    releaseLock = await acquireFinancialLock(`customer-payment-proof:${String(notification._id)}`, 120);
+    const current = await notificationsCollection.findOne({ _id: notification._id });
+    if (!current) {
+      return NextResponse.json({ error: 'ไม่พบคำขอที่ระบุ', code: 'NOTIFICATION_NOT_FOUND' }, { status: 404 });
+    }
+    if (['payment_pending', 'payment_uploaded'].includes(current.status) && current.paymentProofUrl) {
+      return NextResponse.json({ success: true, alreadyUploaded: true });
+    }
+    if (current.status !== 'confirmed') {
       return NextResponse.json(
-        { error: 'ไม่พบคำขอที่ระบุ' },
-        { status: 404 }
+        { error: 'คำขอนี้ยังไม่พร้อมรับหลักฐานการชำระ', code: 'INVALID_STATE' },
+        { status: 409 },
       );
     }
 
-    // 2. Check if notification is in confirmed status (ready for payment)
-    if (notification.status !== 'confirmed') {
-      return NextResponse.json(
-        { error: 'คำขอนี้ยังไม่ได้รับการยืนยัน หรือดำเนินการเสร็จสิ้นแล้ว' },
-        { status: 400 }
-      );
-    }
-
-    // 3. Get image buffer
-    let imageBuffer: Buffer;
-    if (imageSource === 'file' && imageFile) {
-      imageBuffer = Buffer.from(await imageFile.arrayBuffer());
-    } else if (imageSource === 'line' && imageId) {
-      imageBuffer = await downloadLineImage(imageId);
+    let rawImage: Buffer;
+    if (multipart && imageFile) {
+      if (imageFile.size > MAX_SLIP_BYTES) {
+        throw new TransactionRequestError('SLIP_TOO_LARGE', 413, 'ไฟล์สลิปมีขนาดใหญ่เกินไป');
+      }
+      rawImage = Buffer.from(await imageFile.arrayBuffer());
+    } else if (!multipart && imageId) {
+      rawImage = await downloadLineImage(imageId);
     } else {
-      return NextResponse.json(
-        { error: 'ไม่พบไฟล์รูปภาพ' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ไม่พบไฟล์สลิป', code: 'SLIP_REQUIRED' }, { status: 400 });
     }
+    const image = validateSlipImage(rawImage);
 
-    // 4. Upload to Vercel Blob
-    const slipUrl = await uploadSlipToBlob(imageBuffer, notificationId);
-
-    // 5. Update notification
-    await notificationsCollection.updateOne(
-      { _id: notification._id },
+    const filename = `slip-${String(notification._id)}-${Date.now()}.${image.extension}`;
+    const blob = await putPrivateBlob(`slips/${filename}`, image.buffer, image.contentType);
+    const updateResult = await notificationsCollection.updateOne(
+      { _id: notification._id, status: 'confirmed' },
       {
         $set: {
           status: 'payment_pending',
-          paymentProofUrl: slipUrl,
-          updatedAt: new Date()
-        }
-      }
+          paymentProofUrl: blob.signedUrl,
+          updatedAt: new Date(),
+        },
+      },
     );
-
-    // 6. Send slip to Shop System for verification
-    const shopSystemUrl = process.env.SHOP_SYSTEM_URL || 'https://pawn360-ver.vercel.app';
+    if (updateResult.modifiedCount !== 1) {
+      return NextResponse.json({ error: 'สถานะคำขอถูกเปลี่ยนแล้ว', code: 'STATE_CONFLICT' }, { status: 409 });
+    }
 
     try {
-      // Convert Buffer to FormData for Shop System
-      const formData = new FormData();
-      const blob = new Blob([new Uint8Array(imageBuffer)], { type: 'image/jpeg' });
-      const file = new File([blob], 'slip.jpg', { type: 'image/jpeg' });
-
-      formData.append('notificationId', notificationId);
-      formData.append('file', file);
-      formData.append('slipUrl', slipUrl);
-
-      const response = await fetch(`${shopSystemUrl}/api/notifications/payment-proof`, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        console.error('Shop System API error:', await response.text());
-        throw new Error('ไม่สามารถส่งสลิปไปยังระบบร้านได้');
-      }
-
-      const shopData = await response.json();
-      console.log('Slip sent to Shop System:', shopData);
-
-      // 7. Send confirmation to customer via LINE
-      const client = getLineClient();
-      await client.pushMessage(lineUserId, {
-        type: 'text',
-        text: 'อัพโหลดสลิปสำเร็จ\n\nกำลังรอพนักงานตรวจสอบ คุณจะได้รับการแจ้งเตือนเมื่อการตรวจสอบเสร็จสิ้น'
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: 'อัพโหลดสลิปสำเร็จ กำลังรอพนักงานตรวจสอบ',
-        slipUrl: slipUrl
-      });
-
-    } catch (shopError: any) {
-      console.error('Failed to send slip to Shop System:', shopError);
-
-      // Still save the slip URL but notify user of issue
+      await sendToShopSystem(notificationId, image, blob.signedUrl);
+    } catch {
       await notificationsCollection.updateOne(
-        { _id: notification._id },
-        {
-          $set: {
-            status: 'payment_uploaded',
-            updatedAt: new Date()
-          }
-        }
+        { _id: notification._id, status: 'payment_pending' },
+        { $set: { status: 'payment_uploaded', updatedAt: new Date() } },
       );
-
       return NextResponse.json(
         {
           success: false,
-          error: 'อัพโหลดสลิปสำเร็จ แต่ไม่สามารถส่งไปยังร้านได้ กรุณาติดต่อร้านโดยตรง',
-          slipUrl: slipUrl
+          error: 'ระบบบันทึกสลิปแล้ว แต่การส่งต่อไปยังร้านล่าช้า ระบบจะเก็บรายการไว้ให้',
+          code: 'SHOP_DELIVERY_DELAYED',
         },
-        { status: 503 }
+        { status: 503, headers: { 'Retry-After': '30' } },
       );
     }
 
-  } catch (error: any) {
-    console.error('Upload payment proof error:', error);
-    return NextResponse.json(
-      { error: 'เกิดข้อผิดพลาดในการอัพโหลดสลิป' },
-      { status: 500 }
-    );
+    try {
+      await getLineClient().pushMessage(lineUserId, {
+        type: 'text',
+        text: 'อัพโหลดสลิปสำเร็จ\n\nกำลังรอพนักงานตรวจสอบ คุณจะได้รับแจ้งเตือนเมื่อการตรวจสอบเสร็จสิ้น',
+      });
+    } catch {
+      console.warn('[customer:payment-proof] LINE confirmation delayed');
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'อัพโหลดสลิปสำเร็จ กำลังรอพนักงานตรวจสอบ',
+    });
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    if (error instanceof InternalAuthError) return internalAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[customer:payment-proof] failed');
+    return sanitizedServerError('เกิดข้อผิดพลาดในการอัพโหลดสลิป กรุณาลองใหม่');
+  } finally {
+    await releaseLock?.();
   }
 }

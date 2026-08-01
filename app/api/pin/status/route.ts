@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPinStatus, normalizeRole } from '@/lib/security/pin';
+import { pinAccessErrorResponse, requirePinActor } from '@/lib/security/pin-access';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +13,12 @@ export async function POST(request: NextRequest) {
         { error: 'Role and LINE ID are required' },
         { status: 400 }
       );
+    }
+
+    try {
+      await requirePinActor(request, role, lineId, 'status', 60, 10 * 60);
+    } catch (error) {
+      return pinAccessErrorResponse(error);
     }
 
     const result = await getPinStatus(role, lineId);
@@ -29,10 +36,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, ...result });
-  } catch (error: any) {
-    console.error('Error checking PIN status:', error);
+  } catch (error) {
+    console.error('[pin:status] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to check PIN status', code: 'PIN_STATUS_FAILED' },
       { status: 500 }
     );
   }

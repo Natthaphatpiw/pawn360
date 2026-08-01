@@ -118,7 +118,7 @@ function InvestorContractDetailContent({ contractId }: { contractId: string }) {
         setError(null);
         return;
       }
-      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor&lineId=${profile?.userId}`);
+      const response = await axios.get(`/api/contracts/${contractId}?viewer=investor`);
       setContract(response.data.contract);
     } catch (fetchError: any) {
       console.error('Error fetching contract:', fetchError);

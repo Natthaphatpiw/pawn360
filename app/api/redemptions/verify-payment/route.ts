@@ -1,164 +1,182 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, TextMessage } from '@line/bot-sdk';
+import { supabaseAdmin } from '@/lib/supabase/client';
+import { requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import {
+  boundedText,
+  finiteNumber,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
-// Pawner LINE OA client
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
+const pawnerLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  ? new Client({
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    channelSecret: process.env.LINE_CHANNEL_SECRET || '',
+  })
+  : null;
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const { redemptionId, action, additionalAmount } = body;
-
-    if (!redemptionId || !action) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    const body = await readBoundedJsonObject(request) as any;
+    const redemptionId = requireUuid(body?.redemptionId);
+    const action = boundedText(body?.action, 40, true) || '';
+    if (!['amount_correct', 'amount_incorrect'].includes(action)) {
+      return NextResponse.json({ error: 'การดำเนินการไม่ถูกต้อง' }, { status: 400 });
     }
 
-    const supabase = supabaseAdmin();
+    const identity = await requireLiffIdentity(request, 'DROP_POINT');
+    releaseLock = await acquireTransactionLock('redemption-payment-review', redemptionId, 90);
 
-    // Get redemption with contract details
-    const { data: redemption, error: redemptionError } = await supabase
+    const supabase = supabaseAdmin();
+    const { data: redemption, error } = await supabase
       .from('redemption_requests')
       .select(`
-        *,
+        redemption_id,
+        request_status,
+        total_amount,
+        delivery_method,
         contract:contract_id (
           contract_id,
           contract_number,
-          loan_principal_amount,
-          interest_amount,
-          total_amount,
-          items:item_id (
-            item_id,
-            brand,
-            model,
-            capacity
-          ),
-          pawners:customer_id (
-            customer_id,
-            firstname,
-            lastname,
-            line_id,
-            phone_number
-          ),
-          drop_points:drop_point_id (
-            drop_point_id,
-            drop_point_name,
-            phone_number
-          )
+          items:item_id (brand, model),
+          pawners:customer_id (line_id),
+          drop_points:drop_point_id (drop_point_name, phone_number, line_id)
         )
       `)
       .eq('redemption_id', redemptionId)
       .single();
 
-    if (redemptionError || !redemption) {
+    if (error || !redemption) {
+      return NextResponse.json({ error: 'ไม่พบคำขอไถ่ถอน' }, { status: 404 });
+    }
+
+    const contract = Array.isArray(redemption.contract) ? redemption.contract[0] : redemption.contract;
+    const dropPoint = Array.isArray(contract?.drop_points) ? contract.drop_points[0] : contract?.drop_points;
+    const pawner = Array.isArray(contract?.pawners) ? contract.pawners[0] : contract?.pawners;
+    const item = Array.isArray(contract?.items) ? contract.items[0] : contract?.items;
+    if (!dropPoint?.line_id || dropPoint.line_id !== identity.lineId) {
+      return NextResponse.json({ error: 'คุณไม่มีสิทธิ์ดำเนินการกับรายการนี้' }, { status: 403 });
+    }
+
+    if (redemption.request_status === 'AMOUNT_VERIFIED' && action === 'amount_correct') {
+      return NextResponse.json({ success: true, alreadyVerified: true });
+    }
+    if (!['SLIP_UPLOADED', 'AMOUNT_MISMATCH'].includes(redemption.request_status)) {
       return NextResponse.json(
-        { error: 'Redemption not found' },
-        { status: 404 }
+        { error: 'สถานะรายการไม่สามารถตรวจสอบยอดได้' },
+        { status: 409 },
       );
     }
 
-    const pawnerLineId = redemption.contract?.pawners?.line_id;
-    const dropPointName = redemption.contract?.drop_points?.drop_point_name || 'จุดรับฝาก';
-
+    const now = new Date().toISOString();
+    let message = '';
     if (action === 'amount_correct') {
-      // Update redemption status to amount verified
-      await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('redemption_requests')
         .update({
           request_status: 'AMOUNT_VERIFIED',
-          verified_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          actual_amount_received: Number(redemption.total_amount || 0),
+          amount_difference: 0,
+          mismatch_type: null,
+          mismatch_resolved: true,
+          mismatch_resolved_at: now,
+          verified_at: now,
+          verified_by_line_id: identity.lineId,
+          updated_at: now,
         })
-        .eq('redemption_id', redemptionId);
-
-      // Send message to pawner based on delivery method
-      if (pawnerLineId) {
-        let message = '';
-        const itemName = [redemption.contract?.items?.brand, redemption.contract?.items?.model]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || 'สินค้า';
-
-        if (['SELF_PICKUP', 'DROPPOINT_SELF_PICKUP'].includes(redemption.delivery_method)) {
-          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nกรุณามารับสินค้าที่ ${dropPointName} พร้อมแสดงหลักฐานการโอนเงิน\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        } else if (['SELF_ARRANGE', 'DROPPOINT_SELF_RIDER'].includes(redemption.delivery_method)) {
-          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nกรุณานัดหมายกับ ${dropPointName} เพื่อมารับสินค้า\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        } else if (redemption.delivery_method === 'CENTRAL_SCHEDULE_7D') {
-          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nAstly จะส่งสินค้ากลับไปยัง ${dropPointName} ภายใน 7 วัน เพื่อให้คุณมารับด้วยตัวเอง\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        } else if (redemption.delivery_method === 'CENTRAL_SELF_PICKUP_TODAY') {
-          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nกรุณาเปิดใบรับของและแสดง QR เมื่อต้องรับสินค้าที่คลังกลาง Astly วันนี้\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        } else if (redemption.delivery_method === 'DROPPOINT_NEXT_DAY_PICKUP') {
-          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nAstly จะส่งสินค้ากลับไปยัง ${dropPointName} เพื่อให้รับในวันถัดไป\n\nหลังได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        } else if (redemption.delivery_method === 'PLATFORM_ARRANGE') {
-          message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nทาง ${dropPointName} จะเตรียมสินค้าไว้ให้ พร้อมให้บริการขนส่งตามที่อยู่ที่คุณระบุ\n\nเมื่อได้รับสินค้าแล้ว กรุณาส่งรูปภาพการได้รับสินค้าคืนมาที่ไลน์นี้ เพื่อยืนยันการเสร็จสิ้นการไถ่ถอน`;
-        }
-
-        try {
-          await pawnerLineClient.pushMessage(pawnerLineId, {
-            type: 'text',
-            text: message
-          } as TextMessage);
-        } catch (msgError) {
-          console.error('Error sending message to pawner:', msgError);
-        }
+        .eq('redemption_id', redemptionId)
+        .in('request_status', ['SLIP_UPLOADED', 'AMOUNT_MISMATCH'])
+        .select('redemption_id')
+        .maybeSingle();
+      if (updateError || !updated) {
+        return NextResponse.json({ error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' }, { status: 409 });
       }
 
-    } else if (action === 'amount_incorrect') {
-      // Update redemption status
-      await supabase
+      const itemName = [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'สินค้า';
+      message = `ยอดเงินถูกต้องแล้ว\n\nสัญญา: ${contract?.contract_number || '-'}\nสินค้า: ${itemName}\n\n${deliveryInstruction(redemption.delivery_method, dropPoint?.drop_point_name)}`;
+    } else {
+      const difference = finiteNumber(body?.additionalAmount, {
+        min: -100_000_000,
+        max: 100_000_000,
+        required: true,
+      }) || 0;
+      if (difference === 0) {
+        return NextResponse.json({ error: 'กรุณาระบุยอดส่วนต่าง' }, { status: 400 });
+      }
+
+      const { data: updated, error: updateError } = await supabase
         .from('redemption_requests')
         .update({
           request_status: 'AMOUNT_MISMATCH',
-          actual_amount_received: redemption.total_amount - (additionalAmount || 0),
-          amount_difference: additionalAmount || 0,
-          mismatch_type: additionalAmount > 0 ? 'OVERPAID' : 'UNDERPAID',
-          updated_at: new Date().toISOString(),
+          actual_amount_received: Number(redemption.total_amount || 0) + difference,
+          amount_difference: difference,
+          mismatch_type: difference > 0 ? 'OVERPAID' : 'UNDERPAID',
+          verified_by_line_id: identity.lineId,
+          updated_at: now,
         })
-        .eq('redemption_id', redemptionId);
+        .eq('redemption_id', redemptionId)
+        .in('request_status', ['SLIP_UPLOADED', 'AMOUNT_MISMATCH'])
+        .select('redemption_id')
+        .maybeSingle();
+      if (updateError || !updated) {
+        return NextResponse.json({ error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' }, { status: 409 });
+      }
 
-      // Send message to pawner
-      if (pawnerLineId) {
-        let message = '';
-        const itemName = [redemption.contract?.items?.brand, redemption.contract?.items?.model]
-          .filter(Boolean)
-          .join(' ')
-          .trim() || 'สินค้า';
-
-        if (additionalAmount > 0) {
-          // Overpaid
-          message = `ยอดเงินที่โอนเกิน\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nยอดที่โอนเกินไป ${additionalAmount.toLocaleString()} บาท\n\nกรุณาติดต่อ ${dropPointName} ที่เบอร์ ${redemption.contract?.drop_points?.phone_number || 'ไม่ระบุ'} เพื่อรับเงินคืน หรือโทรไปยังฝ่ายสนับสนุนที่ 062-6092941`;
-        } else {
-          // Underpaid
-          message = `ยอดเงินที่โอนขาด\n\nสัญญา: ${redemption.contract?.contract_number}\nสินค้า: ${itemName}\n\nยอดที่ขาดไป ${Math.abs(additionalAmount).toLocaleString()} บาท\n\nกรุณาโอนเงินเพิ่มเติมไปยังบัญชี:\nพร้อมเพย์: 0626092941\nชื่อบัญชี: ณัฐภัทร ต้อยจัตุรัส\n\nหรือติดต่อฝ่ายสนับสนุนที่ 062-6092941 เพื่อขอรายละเอียดเพิ่มเติม`;
-        }
-
-        try {
-          await pawnerLineClient.pushMessage(pawnerLineId, {
-            type: 'text',
-            text: message
-          } as TextMessage);
-        } catch (msgError) {
-          console.error('Error sending message to pawner:', msgError);
-        }
+      const itemName = [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'สินค้า';
+      if (difference > 0) {
+        message = `ยอดเงินที่โอนเกิน\n\nสัญญา: ${contract?.contract_number || '-'}\nสินค้า: ${itemName}\n\nยอดที่โอนเกินไป ${difference.toLocaleString()} บาท\n\nกรุณาติดต่อ ${dropPoint?.drop_point_name || 'จุดรับฝาก'} ที่เบอร์ ${dropPoint?.phone_number || 'ไม่ระบุ'} เพื่อรับเงินคืน`;
+      } else {
+        message = `ยอดเงินที่โอนขาด\n\nสัญญา: ${contract?.contract_number || '-'}\nสินค้า: ${itemName}\n\nยอดที่ขาดไป ${Math.abs(difference).toLocaleString()} บาท\n\nกรุณาติดต่อฝ่ายสนับสนุนเพื่อขอรายละเอียดการชำระเพิ่มเติม`;
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Payment verification processed successfully',
-    });
+    if (pawner?.line_id && pawnerLineClient && message) {
+      try {
+        await pawnerLineClient.pushMessage(pawner.line_id, {
+          type: 'text',
+          text: message,
+        } as TextMessage);
+      } catch {
+        console.error('Error sending redemption payment review message');
+      }
+    }
 
-  } catch (error: any) {
-    console.error('Error verifying payment:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, message: 'บันทึกผลตรวจสอบยอดเรียบร้อยแล้ว' });
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error reviewing redemption payment');
+    return sanitizedServerError('ไม่สามารถบันทึกผลตรวจสอบยอดได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
   }
+}
+
+function deliveryInstruction(method: string | null, dropPointName?: string | null): string {
+  const location = dropPointName || 'จุดรับฝาก';
+  if (['SELF_PICKUP', 'DROPPOINT_SELF_PICKUP'].includes(method || '')) {
+    return `กรุณามารับสินค้าที่ ${location} พร้อมแสดงหลักฐานการโอนเงิน`;
+  }
+  if (['SELF_ARRANGE', 'DROPPOINT_SELF_RIDER'].includes(method || '')) {
+    return `กรุณานัดหมายกับ ${location} เพื่อมารับสินค้า`;
+  }
+  if (method === 'CENTRAL_SCHEDULE_7D') {
+    return `Astly จะส่งสินค้ากลับไปยัง ${location} ภายใน 7 วัน`;
+  }
+  if (method === 'CENTRAL_SELF_PICKUP_TODAY') {
+    return 'กรุณาเปิดใบรับของและแสดง QR เมื่อต้องรับสินค้าที่คลังกลาง Astly วันนี้';
+  }
+  if (method === 'DROPPOINT_NEXT_DAY_PICKUP') {
+    return `Astly จะส่งสินค้ากลับไปยัง ${location} เพื่อให้รับในวันถัดไป`;
+  }
+  return `${location} จะเตรียมสินค้าและประสานการส่งคืนให้คุณ`;
 }

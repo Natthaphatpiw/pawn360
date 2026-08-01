@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +10,12 @@ export async function GET(request: NextRequest) {
         { error: 'Line ID is required' },
         { status: 400 }
       );
+    }
+
+    try {
+      await requireLiffOwner(request, 'PAWNER', lineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
     }
 
     const supabase = supabaseAdmin();
@@ -54,10 +61,12 @@ export async function GET(request: NextRequest) {
       source: pawner.default_drop_point_source,
       updated_at: pawner.default_drop_point_updated_at,
     });
-  } catch (error: any) {
-    console.error('Error fetching default branch:', error);
+  } catch (error) {
+    console.error('[pawners:default-branch:get] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to fetch default branch', code: 'DEFAULT_BRANCH_FETCH_FAILED' },
       { status: 500 }
     );
   }
@@ -75,6 +84,12 @@ export async function POST(request: NextRequest) {
         { error: 'Missing lineId or branchId' },
         { status: 400 }
       );
+    }
+
+    try {
+      await requireLiffOwner(request, 'PAWNER', lineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
     }
 
     const supabase = supabaseAdmin();
@@ -110,10 +125,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error updating default branch:', error);
+  } catch (error) {
+    console.error('[pawners:default-branch:post] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to update default branch', code: 'DEFAULT_BRANCH_UPDATE_FAILED' },
       { status: 500 }
     );
   }

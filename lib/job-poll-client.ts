@@ -1,9 +1,12 @@
+'use client';
+
 // Generic client-side job runner: enqueue → poll until terminal, with the
 // same spinner/cancel UX as a plain request. Shared by the estimate and
-// condition job clients. Falls back to a synchronous endpoint when the queue
-// is unavailable (503) so a missing Redis never blocks the user.
+// condition job clients. Production never bypasses queue backpressure with a
+// synchronous retry; local development keeps that convenience fallback.
 
 import axios from 'axios';
+import liff from '@line/liff';
 
 export interface RunJobConfig {
   enqueueUrl: string;
@@ -15,11 +18,12 @@ export interface RunJobConfig {
   firstPollDelayMs?: number;
   pollIntervalMs?: number;
   timeoutMs?: number;
+  onStatus?: (status: any) => void;
 }
 
 const DEFAULT_FIRST_POLL_DELAY_MS = 2000; // cache hits complete in ~1-2s
 const DEFAULT_POLL_INTERVAL_MS = 5000;
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;
 
 function abortError(): Error {
   const error = new Error('canceled');
@@ -53,9 +57,21 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     signal?.addEventListener('abort', onAbort, { once: true });
   });
 
-async function cancelJobQuietly(cancelUrl: string): Promise<void> {
+function liffAuthHeaders(): Record<string, string> {
   try {
-    await axios.post(cancelUrl);
+    const idToken = liff.getIDToken();
+    return idToken ? { Authorization: `Bearer ${idToken}` } : {};
+  } catch {
+    return {};
+  }
+}
+
+async function cancelJobQuietly(
+  cancelUrl: string,
+  headers: Record<string, string>
+): Promise<void> {
+  try {
+    await axios.post(cancelUrl, undefined, { headers });
   } catch {
     // best-effort
   }
@@ -72,18 +88,27 @@ export async function runJob<T>(config: RunJobConfig): Promise<T> {
     firstPollDelayMs = DEFAULT_FIRST_POLL_DELAY_MS,
     pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
     timeoutMs = DEFAULT_TIMEOUT_MS,
+    onStatus,
   } = config;
+  const headers = liffAuthHeaders();
+  const idempotencyKey = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   let jobId: string;
   try {
-    const enqueue = await axios.post(enqueueUrl, payload, { signal });
+    const enqueue = await axios.post(enqueueUrl, payload, {
+      signal,
+      headers: { ...headers, 'Idempotency-Key': idempotencyKey },
+    });
     jobId = enqueue.data?.jobId;
     if (!jobId) throw jobError('เกิดข้อผิดพลาดในการเข้าคิวประมวลผล');
   } catch (error: any) {
     if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError') throw error;
-    // Queue unavailable (e.g. Redis not configured) → synchronous fallback.
-    if (error?.response?.status === 503) {
-      const direct = await axios.post(syncUrl, payload, { signal });
+    // Local-only convenience. Production preserves queue backpressure instead
+    // of multiplying load against an already rate-limited provider.
+    if (error?.response?.status === 503 && process.env.NODE_ENV !== 'production') {
+      const direct = await axios.post(syncUrl, payload, { signal, headers });
       return direct.data as T;
     }
     throw error;
@@ -94,32 +119,50 @@ export async function runJob<T>(config: RunJobConfig): Promise<T> {
   const startedAt = Date.now();
 
   await sleep(firstPollDelayMs, signal).catch(async (err) => {
-    await cancelJobQuietly(jobCancelUrl);
+    await cancelJobQuietly(jobCancelUrl, headers);
     throw err;
   });
 
   for (;;) {
     if (signal?.aborted) {
-      void cancelJobQuietly(jobCancelUrl);
+      void cancelJobQuietly(jobCancelUrl, headers);
       throw abortError();
     }
 
     let status: any;
     try {
-      const response = await axios.get(jobStatusUrl, { signal });
+      const response = await axios.get(jobStatusUrl, { signal, headers });
       status = response.data;
+      onStatus?.(status);
     } catch (error: any) {
       if (error?.code === 'ERR_CANCELED' || error?.name === 'AbortError') {
-        void cancelJobQuietly(jobCancelUrl);
+        void cancelJobQuietly(jobCancelUrl, headers);
         throw error;
       }
-      // Transient poll failure (network blip) — keep polling until timeout.
+      const httpStatus = Number(error?.response?.status || 0);
+      const retryable = httpStatus === 0
+        || httpStatus === 408
+        || httpStatus === 425
+        || httpStatus === 429
+        || httpStatus >= 500;
+      if (!retryable) {
+        const message = error?.response?.data?.error
+          || 'ไม่สามารถตรวจสอบสถานะงานได้ กรุณาเข้าสู่ระบบใหม่';
+        throw jobError(message, error?.response?.data?.code || 'job_status_unavailable');
+      }
+      // A network blip, timeout, rate limit, or provider 5xx is transient.
+      // Preserve the queued job and retry polling until the overall timeout.
       status = null;
     }
 
     if (status) {
       if (status.status === 'COMPLETED' && status.result) {
-        return status.result as T;
+        const result = status.result;
+        return (
+          result && typeof result === 'object' && !Array.isArray(result)
+            ? { ...result, jobId }
+            : result
+        ) as T;
       }
       if (status.status === 'FAILED') {
         throw jobError(status.error || 'เกิดข้อผิดพลาดในการประมวลผล', status.code);
@@ -130,12 +173,16 @@ export async function runJob<T>(config: RunJobConfig): Promise<T> {
     }
 
     if (Date.now() - startedAt > timeoutMs) {
-      void cancelJobQuietly(jobCancelUrl);
+      void cancelJobQuietly(jobCancelUrl, headers);
       throw jobError('การประมวลผลใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง', 'job_client_timeout');
     }
 
-    await sleep(pollIntervalMs, signal).catch((err) => {
-      void cancelJobQuietly(jobCancelUrl);
+    const nextPollMs = Number(status?.pollAfterMs);
+    const safePollMs = Number.isFinite(nextPollMs)
+      ? Math.min(30_000, Math.max(1_000, nextPollMs))
+      : pollIntervalMs;
+    await sleep(safePollMs, signal).catch((err) => {
+      void cancelJobQuietly(jobCancelUrl, headers);
       throw err;
     });
   }

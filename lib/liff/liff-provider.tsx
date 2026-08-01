@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from 'react';
 import liff from '@line/liff';
+import axios from 'axios';
 
 // ─── Mock profile (ใช้ตอน development) ───────────────────────────────────────
 // แก้ข้อมูลตรงนี้ได้เลยเพื่อจำลอง LINE user ต่าง ๆ
@@ -49,6 +50,26 @@ export function LiffProvider({
   const [profile, setProfile] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Attach the LIFF ID token to same-origin API calls made through axios.
+  // This enables server-side ownership checks without copying auth header
+  // plumbing into every LIFF page. Webhook/provider calls are not affected.
+  useLayoutEffect(() => {
+    const interceptor = axios.interceptors.request.use((config) => {
+      const url = typeof config.url === 'string' ? config.url : '';
+      if (!url.startsWith('/api/')) return config;
+      try {
+        const idToken = liff.getIDToken();
+        if (idToken) {
+          config.headers.set('Authorization', `Bearer ${idToken}`);
+        }
+      } catch {
+        // The API returns a deliberate 401 when authentication is required.
+      }
+      return config;
+    });
+    return () => axios.interceptors.request.eject(interceptor);
+  }, []);
 
   useEffect(() => {
     const initializeLiff = async () => {

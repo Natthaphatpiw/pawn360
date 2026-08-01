@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { sanitizedServerError } from '@/lib/security/transaction-request';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const lineId = searchParams.get('lineId');
-
-    if (!lineId) {
-      return NextResponse.json(
-        { error: 'LINE ID is required' },
-        { status: 400 }
-      );
-    }
+    const { lineId } = await requireLiffIdentity(request, 'PAWNER');
 
     const supabase = supabaseAdmin();
 
@@ -23,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     if (pawnerError || !pawner) {
       return NextResponse.json(
-        { error: 'Customer not found' },
+        { error: 'ไม่พบข้อมูลผู้ใช้', code: 'PAWNER_NOT_FOUND' },
         { status: 404 }
       );
     }
@@ -31,7 +26,8 @@ export async function GET(request: NextRequest) {
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select('contract_id')
-      .eq('customer_id', pawner.customer_id);
+      .eq('customer_id', pawner.customer_id)
+      .limit(500);
 
     if (contractsError) {
       throw contractsError;
@@ -39,7 +35,10 @@ export async function GET(request: NextRequest) {
 
     const contractIds = (contracts || []).map((contract) => contract.contract_id);
     if (contractIds.length === 0) {
-      return NextResponse.json({ success: true, requests: [] });
+      return NextResponse.json(
+        { success: true, requests: [] },
+        { headers: { 'Cache-Control': 'private, no-store' } },
+      );
     }
 
     const { data: requests, error: requestsError } = await supabase
@@ -87,7 +86,8 @@ export async function GET(request: NextRequest) {
         'INVESTOR_TRANSFERRED',
         'AWAITING_PAWNER_CONFIRM'
       ])
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (requestsError) {
       throw requestsError;
@@ -96,12 +96,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       requests: requests || [],
-    });
-  } catch (error: any) {
-    console.error('Error fetching action requests:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    console.error('[contract-actions:by-pawner] failed');
+    return sanitizedServerError('ไม่สามารถโหลดสถานะคำขอได้ กรุณาลองใหม่');
   }
 }

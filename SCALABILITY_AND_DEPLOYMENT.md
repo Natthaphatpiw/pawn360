@@ -40,6 +40,8 @@ Deployment maturity in one paragraph: every change ships through a Git-integrate
 
 This document quantifies the above, identifies the precise points that bottleneck first, and presents a staged roadmap with concrete trigger metrics for each upgrade, so that scaling is a planned, budgeted progression rather than a reactive scramble.
 
+> **Deep dive.** `PRODUCTION_READINESS_LLM_SEARCH_QUEUE_EKYC.md` (Thai) is the implementation-level companion: queue topology and recovery semantics, the provider-capacity limiter, measured per-workflow AI cost, the user-facing error taxonomy, and the deploy gates and their current pass/fail state.
+
 ---
 
 ## 2. Scaling Design Principles
@@ -59,18 +61,18 @@ This document quantifies the above, identifies the precise points that bottlenec
 | Dimension | Current state |
 |---|---|
 | Compute | Vercel Functions, Node.js runtime, Fluid compute; auto-scales to 30,000 concurrent (Pro) |
-| Application surface | ~115 API route handlers, 76 pages, 39 LIFF layouts, 2 cron jobs (5-min cadence) |
-| Heavy endpoints | Condition analysis, loan-ticket rendering, contract-image rendering set `maxDuration = 60s` |
+| Application surface | Next.js route handlers and LIFF pages, 4 Vercel Queue consumers, 3 cron schedules |
+| Heavy endpoints | AI Queue consumers use `maxDuration = 300s`; eKYC consumer uses 60s |
 | Primary DB | Supabase PostgreSQL (Pro); default Micro compute = 60 direct / 200 pooled connections (confirm live size) |
 | Operational DB | MongoDB Atlas (confirm dedicated M10+); client cached across warm invocations |
 | Cache | Upstash Redis; estimate responses + image-hash, 30-day TTL, content-hash keyed |
 | Object storage | Vercel Blob (managed object storage), private signed-URL access |
-| AI providers | Anthropic (text + vision), Google Gemini (vision), OpenAI (optional), each with 4-key rotation |
+| AI providers | OpenAI Luna/Terra primary; Anthropic Sonnet/Haiku emergency fallback; Parallel search with Exa fallback |
 
 Known performance characteristics (honest baseline):
 - Cached estimate: sub-second (Redis hit short-circuits the whole pipeline).
-- Cold estimate (cache miss): on the order of 15-35 seconds, because it performs live AI web-search pricing plus a SerpAPI query and LLM filtering. This latency is bounded by third-party AI/search round-trips, not by the platform's compute. It is mitigated today by aggressive caching and a progress-oriented UX, and will be reduced structurally by the in-house condition/pricing models on the roadmap.
-- Condition analysis: bounded by `maxDuration = 60s`; typically a few seconds (vision precheck + Gemini scoring).
+- Cold estimate (cache miss): asynchronous and provider-bound; the LIFF receives a job ID, polls status, and can wait through bounded provider backoff without holding an HTTP request open.
+- Condition analysis: Luna performs image/type consistency precheck and rubric scoring, with Anthropic vision only when OpenAI fails.
 - Standard CRUD endpoints: dominated by a single database round-trip; sub-second.
 
 ---
@@ -101,10 +103,23 @@ Serverless and per-request priced, so it scales with demand without provisioning
 
 ### 4.5 AI and LLM tier (the cost-and-rate scaling axis)
 
-- Throughput resilience: each provider client rotates across up to four API keys and degrades gracefully on rate-limit/quota errors, so burst capacity is the sum of the keys' limits rather than a single key's ceiling.
-- Cost control by model tiering: heavyweight reasoning uses a larger model (Claude Sonnet 4.6 for text), high-volume vision uses a smaller, cheaper model (Claude Haiku 4.5), and condition scoring uses Gemini Flash. Each task is matched to the cheapest adequate model.
+- Throughput resilience: Vercel Queues, a shared Redis provider-capacity guard, bounded concurrency and `Retry-After` backoff absorb bursts. Key rotation occurs only on an explicit per-key rate-limit response; quota/billing and ambiguous network failures do not fan out duplicate paid requests.
+- Cost control by model tiering: Luna handles constrained vision/classification; Terra handles canonicalization and evidence extraction. Defaults are `none`/`low`, with one `medium` quality retry only where deterministic validation fails; Anthropic is incident fallback, not the normal path.
 - Cost control by caching: the estimate cache removes repeat AI cost entirely for identical inputs.
 - Structural cost reduction on the roadmap: the planned in-house, open-source condition model (see `SYSTEM_ARCHITECTURE.md` Section 14) replaces per-call third-party vision inference with owned inference, converting a per-transaction variable cost into a largely fixed GPU cost and removing per-request egress of sensitive media. Because AI runs behind a provider abstraction, this is a configuration-level substitution.
+
+#### How a provider rate limit is absorbed rather than surfaced as an error
+
+This is the specific behaviour a reviewer should test under load. When the platform reaches the provider's requests-per-minute, tokens-per-minute, or concurrency ceiling, the user does not receive a failure:
+
+1. **Admission at the call boundary.** `lib/services/provider-capacity.ts` checks RPM, TPM and concurrency in one atomic Redis Lua operation, at both provider and provider+model level, before any billable request leaves the platform. Tokens are reserved as an upper bound and reconciled against actual usage after the call.
+2. **Typed backpressure, not an exception.** Exhaustion raises a retryable `RATE_LIMITED` error carrying `retryAfterMs` - time to the next minute bucket for an RPM limit, or the earliest in-flight lease expiry for a concurrency limit.
+3. **The job returns to the queue.** The worker moves the job to `RETRYING` with `nextRetryAtMs`, and the polling client shows a Thai "the provider is busy, your job is still queued" message with an approximate wait. Backoff is exponential with full jitter, bounded to 5-300 seconds, and honours a provider-supplied `Retry-After` when present.
+4. **The user waits inside the queue, not inside an HTTP request.** The LIFF client polls a job id and can wait up to 15 minutes without holding a connection open, so a provider throttle never becomes a function timeout.
+5. **Keys are not burned.** API-key rotation happens only on a genuine per-key provider 429. The platform's own capacity error and any billing/quota exhaustion (`BUDGET_EXHAUSTED`) deliberately do **not** rotate keys, because neither is fixed by trying a different key.
+6. **Ambiguous outcomes stay reserved.** If a call times out with no response, the token reservation is retained rather than refunded, so a provider that already charged us cannot be double-spent by an immediate retry.
+
+Sizing note: the limiter defaults (OpenAI 240 rpm / 1M tpm / 16 concurrent, Anthropic 120 / 500k / 8) are placeholders and must be set from the negotiated account tier via `PROVIDER_CAPACITY_*` before load testing, otherwise the load test measures our placeholder rather than the provider.
 
 ### 4.6 Object storage and integrations
 
@@ -120,10 +135,10 @@ Honest "what breaks first" assessment, in the order it is likely to bind:
 | Rank | Bottleneck | Why it binds first | Headroom / remedy |
 |---|---|---|---|
 | 1 | Supabase database connections | Serverless can fan out wider than Postgres accepts; pooled cap is tied to compute size (200 on Micro) | Scale compute tier (200 -> 12,000 pooled across sizes); rely on Supavisor transaction pooling; add read replicas for read-heavy load |
-| 2 | AI provider rate limits and cost | Estimate/condition flows are AI-bound; per-minute token/request caps and per-call cost grow linearly with volume | Multi-key rotation; cache; model tiering; negotiate higher provider limits; deploy in-house model |
+| 2 | AI/search provider rate limits and cost | Estimate/condition flows are provider-bound; TPM/RPM and per-call cost grow with cache misses | Queue backpressure; shared call-boundary limiter; cache/single-flight; budget ceilings; negotiate higher limits; deploy in-house model |
 | 3 | Cold-estimate latency (15-35s) | Live third-party web-search pricing is inherently slow | Cache; async/progressive UX; in-house pricing/condition model; pre-computation for popular items |
 | 4 | Single-region database latency/availability | Supabase is single-region; any cross-region split with the Blob store adds latency | Co-locate function + DB + Blob regions; read replicas; Atlas multi-region if RTO requires |
-| 5 | Cron throughput | Two 5-minute crons drain queues; best-effort delivery, no auto-retry | Idempotent handlers; raise frequency or shard queue; move to a dedicated queue/worker if volume demands |
+| 5 | Reconciliation/cron throughput | Crons are repair loops and can be missed or duplicated | Idempotent handlers; durable Queue/inbox/outbox; alert on stale work; never use cron as the primary AI work queue |
 | 6 | Function payload limit (4.5 MB) | Large media cannot transit function bodies | Move uploads above the limit to Vercel Blob client uploads; align the current 10 MB app cap |
 
 Compute concurrency (30,000) and Blob capacity are effectively non-binding at any realistic near-term scale. The genuine scaling work is database sizing, Function upload limits, and AI capacity/cost - all adjustable with known patterns.
@@ -162,7 +177,28 @@ Illustrative worked example (planning figures, not guarantees):
 
 Interpretation: across a 100x growth in estimates, the compute and storage tiers absorb the load without architectural change; the scaling actions are (a) increasing database compute size a few steps, (b) adding read replicas, and (c) bringing the in-house AI model online to cap AI unit cost. None of these require re-architecture or downtime.
 
-Unit economics are clean to compute: because the system is per-transaction (one estimate, one condition analysis, one contract), per-transaction infrastructure and AI cost can be modeled directly and trends downward with cache hit rate and the in-house model. A bottoms-up cost-per-transaction sheet keyed to these drivers should accompany this document in the data room.
+Unit economics are clean to compute: because the system is per-transaction (one estimate, one condition analysis, one contract), per-transaction infrastructure and AI cost can be modeled directly and trends downward with cache hit rate and the in-house model.
+
+### 6.1 AI cost at each stage (measured, not estimated)
+
+Using the measured per-workflow figures in `INFRASTRUCTURE.md` Section 14.1 and the stage drivers above, at 32 THB/USD:
+
+| Driver | Stage 0 | Stage 1 | Stage 2 |
+|---|---:|---:|---:|
+| Estimates/day (E) | 1,000 | 10,000 | 100,000 |
+| Cache hit rate (H) | 0.4 | 0.6 | 0.7 |
+| Live AI pipelines/day | 600 | 4,000 | 30,000 |
+| Estimate AI + search / day | ~$5.5 (~฿176) | ~$37 (~฿1,180) | ~$276 (~฿8,830) |
+| Condition analysis / day | ~$0.5 (~฿16) | ~$4.9 (~฿157) | ~$49 (~฿1,570) |
+| **AI + search / month** | **~$180 (~฿5,760)** | **~$1,257 (~฿40,200)** | **~$9,750 (~฿312,000)** |
+| AI cost per estimate | ~฿0.19 | ~฿0.13 | ~฿0.10 |
+
+Two properties matter more than the absolute numbers:
+
+1. **Cost per estimate falls as volume grows**, because a higher cache hit rate is the natural consequence of more users pricing the same popular models. This is the opposite of the usual "AI cost scales linearly" concern and is a direct result of keying the market cache on canonical product identity rather than on the user's own photos.
+2. **The ceiling is enforced, not projected.** `AI_MONTHLY_BUDGET_USD`, `AI_MAX_OWNER_DAILY_COST_USD` and `AI_MAX_JOB_COST_USD` abort before a provider call, so an unexpected traffic pattern or an abusive account degrades to a queued/manual state instead of producing an unbounded invoice. Under the previous `xhigh`/`max` configuration the Stage 2 line would have been roughly ฿4.1M/month rather than ฿312k.
+
+A bottoms-up cost-per-transaction sheet keyed to these drivers, plus the eKYC per-verification vendor fee, should accompany this document in the data room.
 
 ---
 
@@ -230,7 +266,7 @@ Recommended hardening for scale (Section 16): add an automated CI test gate befo
 
 - Three environment scopes: Production, Preview, and Development. Each has its own isolated set of environment variables.
 - Secrets management: all credentials are Vercel environment variables, encrypted at rest, never committed to source. Only `NEXT_PUBLIC_*` values are bundled to the browser; everything else is server-only. AI provider keys are provisioned in sets of four per provider to support rotation under rate limits.
-- Configuration as control surface: feature flags and behavior switches (manual-estimate toggle, SerpAPI enable, AI provider and model selection, exchange rate, cache TTLs, LIFF identifiers) are environment-driven, so capacity and behavior can be changed without a code release - including instant provider failover by flipping `PRICE_SEARCH_PROVIDER` or model variables.
+- Configuration as control surface: feature flags, reviewed model names, per-task effort, provider capacity, budgets, exchange rate, cache TTLs and LIFF identifiers are environment-driven. Parallel → Exa → stale cache and OpenAI → Anthropic fallback order remain fixed in code so a typo cannot silently bypass controls.
 - Least privilege: database access uses scoped credentials; Blob uses a project-connected store token plus pathname/operation-scoped signed URLs; provider keys are per-service. A periodic credential-rotation and least-privilege review is recommended as a process control.
 
 ---
@@ -245,6 +281,24 @@ The dual-store design (PostgreSQL via Supabase, document store via MongoDB Atlas
 - Cache versioning: the estimate cache key is versioned (`estimate:global:v1`); changing the cached payload shape requires bumping the version to invalidate cleanly - a built-in, safe cache-migration mechanism.
 
 Net: schema and data migrations are performed without downtime via expand-contract on Postgres and additive evolution on MongoDB, with atomic, reversible application deploys coordinating each step.
+
+### 11.1 The migration gate (`npm run preflight:production`)
+
+Because production promotion on Vercel is atomic and the application and database are versioned separately, the failure mode this architecture is most exposed to is *code deployed ahead of its migration*. Several subsystems fail closed in exactly that state: the UpPass webhook returns 503 without `ekyc_webhook_events`, and the market-observation cache silently disables itself without the price-evidence columns.
+
+The preflight script is therefore both an environment gate and a schema gate:
+
+- it validates every required environment variable, secret length, HTTPS URL, role-separation invariant (for example seller and Asset Funding UpPass keys must differ) and fail-closed flag (`ALLOW_SYNCHRONOUS_AI_ROUTES`, `ALLOW_AI_SLIP_AUTO_APPROVAL`, `UPPASS_WEBHOOK_AUTH_MODE`, `NEXT_PUBLIC_LIFF_MOCK`) without ever printing a secret value;
+- it then probes the live Supabase REST endpoint for the specific tables and columns each hardening migration introduces, and names the exact migration file for anything missing;
+- it exits non-zero on any failure, so it can be wired as a required CI step before promotion. `--skip-schema` / `PREFLIGHT_SKIP_SCHEMA=true` exists only for network-isolated environments and should never be used on a release run.
+
+Migrations must be applied in this order, and `2026_08_01_harden_transaction_integrity.sql` must run with autocommit because it uses `CREATE INDEX CONCURRENTLY`:
+
+```bash
+npm run preflight:production
+```
+
+Current status (verified 1 August 2026): the four Supabase hardening migrations are **not yet applied** to the configured project, so this gate fails by design until they are run.
 
 ---
 

@@ -78,6 +78,18 @@ Astly's eKYC step captures **face-match and liveness** data. Biometric data used
 - Astly nonetheless **determines the purpose and means** of this processing and therefore **remains the Data Controller**; UPPASS acts as a processor. Astly must therefore obtain the explicit consent itself (and cover UPPASS under a data-processing agreement - see `DATA_PROCESSING_AGREEMENTS.md`).
 - Consequence: the borrower cannot be onboarded without completing biometric eKYC, so if a borrower **declines** biometric consent, Astly cannot verify identity to the required assurance level and the application cannot proceed on this route. This does not make the consent "unfree": the biometric data is not used for any purpose beyond identity assurance, and declining simply means the eKYC-gated path is unavailable, not that unrelated services are withheld (to confirm with Thai data-protection counsel on framing the alternative/decline path).
 
+### Technical evidence that the minimization claim is real
+
+The statement below tells the data subject that Astly retains only the verification result. That claim is enforced in code, not by policy alone, and a reviewer can verify it:
+
+- The vendor callback is normalized at ingress (`lib/ekyc/webhook-ingress.ts`) and **only** the event type, application status, eKYC status, provider timestamp, opaque `uppass_slug` and a hashed event key are written. Raw answers, document images, biometric payloads, hosted form URLs and LINE IDs are never persisted from the callback.
+- The two tables that hold this data (`ekyc_attempts`, `ekyc_webhook_events`) are server-only: RLS is enabled and `anon`/`authenticated` privileges are revoked at the database level.
+- Astly's own identity gate additionally verifies who is asking - the LINE ID token is validated server-side against LINE before an eKYC session can be initiated or a status read, so one user cannot start or inspect another user's verification.
+
+### Assurance limitation to disclose internally
+
+UPPASS publishes ISO/IEC 27001 certification (BSI, certificate IS773635) but **does not publish an ISO/IEC 30107-3 or iBeta presentation-attack-detection certification** for its liveness check. Until that evidence is obtained, the internal characterisation of this control should be *document capture plus selfie match*, not certified anti-spoofing. This does not change the consent requirement - biometric data is processed either way, so Sec 26 explicit consent applies - but it does affect how much reliance the credit and fraud policies should place on the result. See `DATA_PROCESSING_AGREEMENTS.md` Section 5.
+
 ### Consent statement (exact wording, granular, separate checkbox)
 
 This statement is presented on its **own control** (a dedicated unticked checkbox), separate from the loan agreement, the general terms, and any marketing opt-in. It must be shown in the user's language (Thai/English) before the eKYC capture begins.

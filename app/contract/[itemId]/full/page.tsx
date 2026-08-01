@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Noto_Sans_Thai } from 'next/font/google';
 import Image from 'next/image';
 import html2canvas from 'html2canvas';
+import { useLiff } from '@/lib/liff/liff-provider';
 
 const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
@@ -61,14 +62,7 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
   const [isDrawing, setIsDrawing] = useState(false);
   const [name, setName] = useState(initialName || '');
 
-  useEffect(() => {
-    if (isOpen) {
-      setName(initialName || '');
-      clearCanvas();
-    }
-  }, [isOpen, initialName]);
-
-  const clearCanvas = () => {
+  function clearCanvas() {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -78,7 +72,19 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    clearCanvas();
+    queueMicrotask(() => {
+      if (!cancelled) setName(initialName || '');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, initialName]);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
@@ -229,6 +235,7 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
 }
 
 export default function FullContractPage({ params }: { params: Promise<{ itemId: string }> }) {
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
   const [itemId, setItemId] = useState<string>('');
 
   useEffect(() => {
@@ -276,7 +283,9 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(`/api/pawn-requests/${itemId}`);
+        const response = await axios.get(`/api/pawn-requests/${itemId}`, {
+          headers: { 'X-LIFF-Role': 'STORE' },
+        });
         if (response.data.success) {
           setItem(response.data.item);
           setCustomer(response.data.customer);
@@ -289,10 +298,13 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
       }
     };
 
-    if (itemId) {
+    if (!liffLoading && !liffError && profile?.userId && itemId) {
       fetchData();
+    } else if (!liffLoading && (liffError || !profile?.userId)) {
+      setError('กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      setLoading(false);
     }
-  }, [itemId]);
+  }, [itemId, profile?.userId, liffLoading, liffError]);
 
   // Calculate interest
   const calculateInterest = () => {

@@ -133,7 +133,7 @@ function OfferDetailContent() {
         setError(null);
         return;
       }
-      const response = await axios.get(`/api/contracts/${effectiveContractId}?viewer=investor&lineId=${profile?.userId}`);
+      const response = await axios.get(`/api/contracts/${effectiveContractId}?viewer=investor`);
       setContract(response.data.contract);
     } catch (error: any) {
       console.error('Error fetching contract:', error);

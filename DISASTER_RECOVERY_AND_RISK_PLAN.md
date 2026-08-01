@@ -143,10 +143,24 @@ Concise runbooks for the credible disaster scenarios. Each lists detection, resp
 - Response: rotate the affected secret in Vercel (DB credentials, service-role key, AI keys, IAM keys, webhook secrets); redeploy; review access logs; if the Supabase service-role key leaked, rotate immediately (it is the master data credential). Multi-key AI rotation limits blast radius for AI keys.
 - RTO: minutes (rotation + redeploy).
 
-### S7 - Critical dependency outage (AI provider, eKYC, PSP, LINE)
-- Detection: elevated error/timeout rates per integration.
-- Response: graceful degradation already built in - AI rate-limit/failure falls back (minimum price / unreadable verdict); slip verification falls back from SlipOK to Claude vision; multi-key rotation absorbs provider throttling. For a hard outage, affected flows queue or are temporarily disabled while core flows continue.
-- RPO/RTO: no data loss; feature-level degradation rather than outage.
+### S7 - Critical dependency outage (AI provider, search provider, eKYC, PSP, LINE)
+- Detection: elevated error/timeout rates per integration; queue oldest-message age climbing; fallback-provider usage rate above 1%.
+- Response: graceful degradation is built in per boundary, and in-flight work is never dropped because the durable job record - not the HTTP request - owns the work.
+
+| Dependency | Failure behaviour | User-visible result |
+|---|---|---|
+| OpenAI (primary LLM) | Automatic fallback to Anthropic (Sonnet 4.6 text / Haiku 4.5 vision). A genuine per-key 429 rotates through up to four keys; a quota/billing exhaustion does **not** burn keys | None, other than a small latency increase |
+| Both LLM providers | Job returns to `RETRYING` with bounded backoff; after retry exhaustion it becomes `FAILED` with a Thai message plus a job id, and sanitized technical metadata lands in the 7-day application DLQ | "Please try again shortly", job id retained |
+| Parallel (primary search) | Automatic fallback to Exa; if Exa also fails, the platform serves **stale cached market evidence** rather than fabricating a price | Slightly older market reference, flagged in metadata |
+| All search + no cache | Estimate is not produced; the manual-estimate path is offered | Manual valuation by an operator |
+| Redis (Upstash) | The provider-capacity limiter is fail-closed, so AI jobs stop being admitted rather than running uncontrolled. Existing durable state is untouched | AI features unavailable; contracts, reads and LINE flows continue |
+| UpPass (eKYC) | Initiation returns a bounded retry; inbound results are never lost because the inbox/outbox plus the one-minute reconciler replay them once the provider recovers | Verification deferred, not failed |
+| SlipOK | AI OCR may *read* the slip but cannot authorize it; the payment routes to manual review | Operator confirms payment |
+| LINE Messaging | Notification outbox retries with an idempotent retry key; the reconciler republishes stalled rows | Delayed notification, no duplicate messages |
+
+- **Queue-layer recovery.** Vercel Queues delivers at least once with up to 24-hour retention and no built-in DLQ, so the application supplies the durability guarantees: idempotency keys at publish, atomic claims and leases with heartbeats, generation fencing so a late delivery from a previous attempt becomes a no-op, bounded retry with full jitter, and a seven-day Redis DLQ index. A worker that is killed mid-flight loses its lease, and the job is re-claimed rather than lost or double-charged.
+- **eKYC-specific recovery.** UpPass callbacks are persisted to a durable inbox before acknowledgement, so an outage of our queue or workers cannot lose a verification result. `/api/ekyc/reconcile` runs every minute under `CRON_SECRET` and republishes any inbox or notification-outbox row that has been stalled for more than two minutes, incrementing a generation counter that invalidates the older in-flight message. Status transitions are monotonic, so a replayed or out-of-order event can never regress a `VERIFIED` or `REJECTED` actor.
+- RPO/RTO: no data loss; feature-level degradation rather than outage. Recovery of deferred work is automatic within one reconciler cycle (~1-2 minutes) once the dependency returns.
 
 ### S8 - Bad deployment / code defect in production
 - Detection: error spike post-deploy; failed smoke checks.
@@ -190,6 +204,21 @@ The architecture degrades gracefully rather than failing wholesale:
 - Asynchronous buffering: lifecycle operations are mediated by durable envelopes and advanced by webhooks/cron, so transient downstream outages cause queueing, not loss.
 - Communication: incidents should trigger user-facing status messaging over LINE and an internal incident channel; an incident-commander role and a stakeholder-comms template are recommended (R-DR-7).
 - Manual fallback: critical money-gating steps (slip verification, drop-point confirmation) already have a manual-review path, allowing operations to continue under degraded automation.
+
+### 7.1 Deliberate load-shedding controls
+
+Under stress the platform prefers to slow down rather than fail or overspend. These are the levers an operator can pull, in increasing order of impact, without dropping accepted work:
+
+| Lever | Effect | Accepted work |
+|---|---|---|
+| Lower `JOB_CONCURRENCY_*` to 1 | Throttles worker parallelism per topic | Preserved - drains slower |
+| Lower `PROVIDER_CAPACITY_*` | Reduces the rate at which billable calls are admitted | Preserved - queued longer |
+| Lower `AI_MAX_OWNER_DAILY_COST_USD` | Caps individual heavy users | Preserved for other users |
+| Disable enqueue endpoints (WAF or flag) | Stops new AI work; consumers keep draining | Preserved |
+| `SERPAPI_ENABLED=false` | Removes an optional price source | Preserved, slightly less evidence |
+| Fall back to `PARALLEL_SEARCH_MODE=basic` | Cheaper/slower search tier | Preserved |
+
+Two properties make this safe: the client waits on a job id rather than an open HTTP connection (so throttling never becomes a timeout), and every accepted job is durable in Redis with a Blob-backed payload, so shedding admission never discards work already taken from a user.
 
 ---
 

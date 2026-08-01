@@ -64,7 +64,7 @@ Permissive licenses account for the overwhelming majority; the only copyleft ent
 
 ## 3. Direct Dependencies - License Table
 
-All 36 direct dependencies (production + development) and their installed license. Every one is permissive OSI open source except the LINE LIFF SDK (vendor license).
+All 38 direct dependencies (production + development) and their installed license. Every one is permissive OSI open source except the LINE LIFF SDK (vendor license).
 
 | Package | License | Commercial use |
 |---|---|---|
@@ -78,11 +78,13 @@ All 36 direct dependencies (production + development) and their installed licens
 | mongodb | Apache-2.0 | Yes |
 | @upstash/redis | MIT | Yes |
 | @vercel/blob | Apache-2.0 | Yes |
-| @google/generative-ai | Apache-2.0 | Yes |
+| @vercel/queue | MIT | Yes |
 | openai | Apache-2.0 | Yes |
+| parallel-web | MIT | Yes |
+| exa-js | MIT | Yes |
 | @line/bot-sdk | Apache-2.0 | Yes |
 | @line/liff | LINE Developers Agreement (vendor) | Yes, per LINE terms |
-| @line/liff-mock (dev) | Not installed in tree (confirm; LINE-published, likely Apache-2.0) | Confirm |
+| @line/liff-mock (dev) | Apache-2.0 | Yes |
 | puppeteer | Apache-2.0 | Yes |
 | @sparticuz/chromium | MIT | Yes |
 | html2canvas | MIT | Yes |
@@ -193,7 +195,7 @@ These are not current dependencies but are the most likely future license-due-di
 | L1 | No third-party attribution/notices file shipped | Low-Medium | Generate `THIRD-PARTY-NOTICES` and include license texts |
 | L2 | No automated license gate in CI | Medium | Add a scanner that fails on GPL/AGPL/SSPL/unknown |
 | L3 | LINE LIFF governed by a vendor agreement (non-OSI) | Low-Medium | Review the LINE Developers Agreement for restrictions |
-| L4 | `openai` pinned to `latest` - resolved license can drift with version | Low | Pin the version; the lockfile records the exact resolved license |
+| L4 | OpenAI SDK license/version can drift on a future upgrade | Low | Version 6.16.0 is pinned in both manifest and lockfile; rerun license review on upgrade |
 | L5 | Future in-house model base-weights license unverified | Medium (future) | Verify commercial-use license of any pretrained weights |
 | L6 | LGPL/MPL components must remain unmodified to retain the simple compliance posture | Low | Document "used unmodified"; revisit if ever forked |
 

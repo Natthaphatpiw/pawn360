@@ -1,149 +1,144 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/client';
 import { Client, TextMessage } from '@line/bot-sdk';
+import { supabaseAdmin } from '@/lib/supabase/client';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
-// Pawner LINE OA client
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
-
-const round2 = (value: number) => Math.round(value * 100) / 100;
+const pawnerLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN
+  ? new Client({
+    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+    channelSecret: process.env.LINE_CHANNEL_SECRET || '',
+  })
+  : null;
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const { redemptionId, receiptPhotos, pawnerLineId } = body;
+    const body = await readBoundedJsonObject(request) as any;
+    const redemptionId = requireUuid(body?.redemptionId);
+    const claimedLineId = boundedText(body?.pawnerLineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
 
-    if (!redemptionId || !receiptPhotos || receiptPhotos.length === 0) {
+    if (!Array.isArray(body?.receiptPhotos) || body.receiptPhotos.length < 1 || body.receiptPhotos.length > 6) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'กรุณาอัปโหลดรูปหลักฐาน 1-6 รูป' },
+        { status: 400 },
       );
     }
+    const receiptPhotos = body.receiptPhotos.map((url: unknown) => requireOwnedBlobUrl(
+      url,
+      ['pawn-items/', 'redemption-receipts/'],
+    ));
+
+    releaseLock = await acquireTransactionLock('redemption-receipt', redemptionId, 90);
 
     const supabase = supabaseAdmin();
-
-    // Get redemption details
-    const { data: redemption, error: redemptionError } = await supabase
+    const { data: redemption, error } = await supabase
       .from('redemption_requests')
       .select(`
-        *,
+        redemption_id,
+        request_status,
+        item_return_confirmed_at,
+        pawner_receipt_uploaded_at,
         contract:contract_id (
           contract_id,
           contract_number,
-          loan_principal_amount,
-          interest_amount,
-          total_amount,
-          contract_start_date,
-          contract_end_date,
-          contract_duration_days,
-          platform_fee_rate,
-          platform_fee_amount,
-          investor_rate,
-          investor_id,
-          items:item_id (
-            brand,
-            model,
-            capacity
-          ),
-          pawners:customer_id (
-            customer_id,
-            firstname,
-            lastname
-          )
+          contract_status,
+          item_delivery_status,
+          pawners:customer_id (line_id)
         )
       `)
       .eq('redemption_id', redemptionId)
       .single();
 
-    if (redemptionError || !redemption) {
+    if (error || !redemption) {
+      return NextResponse.json({ error: 'ไม่พบคำขอไถ่ถอน' }, { status: 404 });
+    }
+
+    const contract = Array.isArray(redemption.contract) ? redemption.contract[0] : redemption.contract;
+    const pawner = Array.isArray(contract?.pawners) ? contract.pawners[0] : contract?.pawners;
+    if (!pawner?.line_id || pawner.line_id !== verifiedLineId) {
+      return NextResponse.json({ error: 'คุณไม่มีสิทธิ์ดำเนินการกับรายการนี้' }, { status: 403 });
+    }
+
+    if (redemption.pawner_receipt_uploaded_at) {
+      return NextResponse.json({ success: true, alreadyUploaded: true });
+    }
+
+    // A seller-supplied photo is evidence only; it must never be able to mark
+    // a financial contract complete. Completion must already have been
+    // confirmed by the assigned Drop Point workflow.
+    if (
+      redemption.request_status !== 'COMPLETED'
+      || !redemption.item_return_confirmed_at
+      || contract?.contract_status !== 'COMPLETED'
+      || contract?.item_delivery_status !== 'RETURNED'
+    ) {
       return NextResponse.json(
-        { error: 'Redemption not found' },
-        { status: 404 }
+        {
+          error: 'จุดรับฝากยังไม่ได้ยืนยันการส่งคืนสินค้า กรุณารอการยืนยันก่อนส่งหลักฐาน',
+          code: 'RETURN_NOT_CONFIRMED',
+        },
+        { status: 409, headers: { 'Retry-After': '30' } },
       );
     }
 
-    // Update redemption with receipt photos
-    await supabase
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await supabase
       .from('redemption_requests')
       .update({
         pawner_receipt_photos: receiptPhotos,
-        pawner_receipt_uploaded_at: new Date().toISOString(),
-        pawner_receipt_verified: true,
-        item_return_confirmed_at: new Date().toISOString(),
-        request_status: 'COMPLETED',
-        final_completion_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        pawner_receipt_uploaded_at: now,
+        // Uploading is not independent proof that the photos are authentic.
+        pawner_receipt_verified: false,
+        updated_at: now,
       })
-      .eq('redemption_id', redemptionId);
+      .eq('redemption_id', redemptionId)
+      .eq('request_status', 'COMPLETED')
+      .not('item_return_confirmed_at', 'is', null)
+      .is('pawner_receipt_uploaded_at', null)
+      .select('redemption_id')
+      .maybeSingle();
 
-    // Update contract status
-    await supabase
-      .from('contracts')
-      .update({
-        contract_status: 'COMPLETED',
-        redemption_status: 'COMPLETED',
-        item_delivery_status: 'RETURNED',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('contract_id', redemption.contract_id);
+    if (updateError || !updated) {
+      return NextResponse.json(
+        { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+        { status: 409 },
+      );
+    }
 
-    // Calculate investor earnings based on actual days (tier-based rate)
-    const msPerDay = 1000 * 60 * 60 * 24;
-    const startDate = new Date(redemption.contract?.contract_start_date || new Date().toISOString());
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(redemption.contract?.contract_end_date || new Date().toISOString());
-    endDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const rawDaysInContract = Number(redemption.contract?.contract_duration_days || 0)
-      || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
-    const daysInContract = Math.max(1, rawDaysInContract);
-    const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
-    const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
-
-    const investorRate = Number(redemption.contract?.investor_rate || 0.015);
-    const principal = Number(redemption.contract?.loan_principal_amount || 0);
-    const interestEarned = round2(principal * investorRate * (daysElapsed / 30));
-    const platformFee = Number(redemption.contract?.platform_fee_amount) || 0;
-    const investorNetProfit = interestEarned;
-
-    // Update redemption with earnings info
-    await supabase
-      .from('redemption_requests')
-      .update({
-        investor_interest_earned: interestEarned,
-        platform_fee_deducted: platformFee,
-        investor_net_profit: investorNetProfit,
-      })
-      .eq('redemption_id', redemptionId);
-
-    // Send thank you message to pawner
-    if (pawnerLineId) {
-      const thankYouMessage = `ขอบคุณที่ใช้บริการ Pawnly\n\nการไถ่ถอนสัญญา ${redemption.contract?.contract_number} เสร็จสิ้นเรียบร้อยแล้ว\n\nหากมีปัญหาหรือคำถามใดๆ สามารถติดต่อฝ่ายสนับสนุนได้ที่ 062-6092941\n\nขอบคุณที่ไว้วางใจ Pawnly`;
-
+    if (pawnerLineClient) {
       try {
-        await pawnerLineClient.pushMessage(pawnerLineId, {
+        await pawnerLineClient.pushMessage(verifiedLineId, {
           type: 'text',
-          text: thankYouMessage
+          text: `ได้รับรูปหลักฐานการรับสินค้าคืนแล้ว\n\nสัญญา ${contract.contract_number}\n\nขอบคุณที่ใช้บริการ Astly`,
         } as TextMessage);
-      } catch (msgError) {
-        console.error('Error sending thank you message to pawner:', msgError);
+      } catch {
+        console.error('Error sending redemption receipt acknowledgement');
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Receipt photos uploaded and redemption completed successfully',
+      message: 'บันทึกรูปหลักฐานเรียบร้อยแล้ว',
     });
-
-  } catch (error: any) {
-    console.error('Error uploading receipt:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error uploading redemption receipt');
+    return sanitizedServerError('ไม่สามารถบันทึกรูปหลักฐานได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
   }
 }

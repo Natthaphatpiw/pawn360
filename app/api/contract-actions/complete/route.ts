@@ -1,26 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { pushLineTextMessage, lineRetryKeyFromMaterial } from '@/lib/line/push-text';
+import { requirePinToken } from '@/lib/security/pin';
+import { requireContractParty } from '@/lib/security/contract-access';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { refreshInvestorTierAndTotals } from '@/lib/services/investor-tier';
-import { Client } from '@line/bot-sdk';
-import { requirePinToken } from '@/lib/security/pin';
-
-// LINE clients
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
-
-const investorLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
-});
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const msPerDay = 1000 * 60 * 60 * 24;
 
+const relationOne = <T,>(value: T | T[] | null | undefined): T | null => (
+  Array.isArray(value) ? value[0] || null : value || null
+);
+
 const toUtcDateOnly = (value: string | Date) => {
   const source = new Date(value);
+  if (!Number.isFinite(source.getTime())) throw new Error('CONTRACT_DATE_INVALID');
   return new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth(), source.getUTCDate()));
 };
 
@@ -31,18 +37,16 @@ const addUtcDays = (value: Date, days: number) => {
 };
 
 const getRenewedContractWindow = (durationDays: number) => {
-  const normalizedDuration = Math.max(1, durationDays);
+  const normalizedDuration = Math.max(1, Math.min(Math.round(durationDays), 3_650));
   const now = new Date();
   const contractStartDate = new Date(Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
     now.getUTCDate() + 1,
   ));
-  const contractEndDate = addUtcDays(contractStartDate, normalizedDuration - 1);
-
   return {
     contractStartDate,
-    contractEndDate,
+    contractEndDate: addUtcDays(contractStartDate, normalizedDuration - 1),
   };
 };
 
@@ -50,12 +54,14 @@ const formatThaiDate = (value: Date) => (
   value.toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })
 );
 
-const buildContractNumber = () => (
-  `CTR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+// A retry of the same action must address the same unique contract number.
+const buildContractNumber = (requestId: string) => (
+  `CTR-R-${requestId.replace(/-/g, '').slice(0, 20).toUpperCase()}`
 );
 
 const buildRenewedContractRecord = (params: {
-  contract: any;
+  requestId: string;
+  contract: Record<string, any>;
   principalAmount: number;
   interestAmount: number;
   contractStartDate: Date;
@@ -63,12 +69,13 @@ const buildRenewedContractRecord = (params: {
   durationDays: number;
   signedContractUrl?: string | null;
 }) => {
-  const platformFeeRate = params.contract.platform_fee_rate ?? 0.01;
-  const platformFeeAmount = round2(params.principalAmount * platformFeeRate * (params.durationDays / 30));
-  const originalContractId = params.contract.original_contract_id || params.contract.contract_id;
+  const platformFeeRate = Number(params.contract.platform_fee_rate ?? 0.01);
+  const platformFeeAmount = round2(
+    params.principalAmount * platformFeeRate * (params.durationDays / 30),
+  );
 
   return {
-    contract_number: buildContractNumber(),
+    contract_number: buildContractNumber(params.requestId),
     customer_id: params.contract.customer_id,
     investor_id: params.contract.investor_id,
     drop_point_id: params.contract.drop_point_id,
@@ -91,7 +98,7 @@ const buildRenewedContractRecord = (params: {
     contract_status: 'CONFIRMED',
     funding_status: params.contract.funding_status || 'FUNDED',
     parent_contract_id: params.contract.contract_id,
-    original_contract_id: originalContractId,
+    original_contract_id: params.contract.original_contract_id || params.contract.contract_id,
     contract_file_url: params.contract.contract_file_url,
     signed_contract_url: params.signedContractUrl || params.contract.signed_contract_url,
     item_delivery_status: params.contract.item_delivery_status,
@@ -113,208 +120,181 @@ const buildRenewedContractRecord = (params: {
 };
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const { requestId, signatureUrl, pawnerLineId, pinToken } = body;
-
-    if (!requestId) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    if (!pawnerLineId) {
-      return NextResponse.json(
-        { error: 'Pawner LINE ID is required' },
-        { status: 400 }
-      );
-    }
-
-    const pinCheck = await requirePinToken('PAWNER', pawnerLineId, pinToken);
-    if (!pinCheck.ok) {
-      return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
-    }
+    const body = await readBoundedJsonObject(request, 32 * 1024);
+    const requestId = requireUuid(body.requestId);
+    const pinToken = boundedText(body.pinToken, 256, true) || '';
+    const signatureUrl = body.signatureUrl
+      ? requireOwnedBlobUrl(body.signatureUrl, ['signatures/'])
+      : null;
 
     const supabase = supabaseAdmin();
-
-    // Get action request
-    const { data: actionRequest, error: requestError } = await supabase
+    const { data: rawActionRequest, error: requestError } = await supabase
       .from('contract_action_requests')
       .select(`
         *,
         contract:contract_id (
           *,
-          items:item_id (*),
-          pawners:customer_id (*),
-          investors:investor_id (*)
+          pawners:customer_id (customer_id, line_id),
+          investors:investor_id (investor_id, line_id)
         )
       `)
       .eq('request_id', requestId)
       .single();
 
-    if (requestError || !actionRequest) {
+    if (requestError || !rawActionRequest) {
       return NextResponse.json(
-        { error: 'Request not found' },
-        { status: 404 }
+        { error: 'ไม่พบคำขอ', code: 'ACTION_REQUEST_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    const contract = actionRequest.contract;
-    const pawner = contract?.pawners;
-    const investor = contract?.investors;
-
-    // Check if already completed (idempotency)
-    if (actionRequest.request_status === 'COMPLETED') {
-      return NextResponse.json({
-        success: true,
-        message: 'ดำเนินการสำเร็จแล้ว',
-        alreadyCompleted: true,
-        actionType: actionRequest.request_type,
+    const actionRequest: any = rawActionRequest;
+    const contract = relationOne<any>(actionRequest.contract);
+    if (!contract) {
+      return NextResponse.json(
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    const pawnerLineId = await requireContractParty(request, contract, 'PAWNER');
+    const pinCheck = await requirePinToken('PAWNER', pawnerLineId, pinToken);
+    if (!pinCheck.ok) {
+      return NextResponse.json(pinCheck.payload, {
+        status: pinCheck.status,
+        headers: { 'Cache-Control': 'no-store' },
       });
     }
 
-    // For PRINCIPAL_INCREASE, this is called after investor payment verification
-    // For others, this is called after slip verification and signing
-    if (actionRequest.request_type === 'PRINCIPAL_INCREASE') {
-      // Check if investor has approved and paid
-      const validStatuses = ['INVESTOR_SLIP_VERIFIED', 'AWAITING_PAWNER_CONFIRM', 'INVESTOR_TRANSFERRED'];
-      if (!validStatuses.includes(actionRequest.request_status)) {
-        return NextResponse.json(
-          { error: 'คำขอยังไม่พร้อมดำเนินการ กรุณารอการอนุมัติจากนักลงทุน' },
-          { status: 400 }
-        );
-      }
-    } else {
-      // For INTEREST_PAYMENT and PRINCIPAL_REDUCTION
-      const validStatuses = ['SLIP_VERIFIED', 'AWAITING_SIGNATURE'];
-      if (!validStatuses.includes(actionRequest.request_status)) {
-        if (actionRequest.request_status === 'SLIP_REJECTED' || actionRequest.request_status === 'SLIP_REJECTED_FINAL') {
-          return NextResponse.json(
-            { error: 'สลิปถูกปฏิเสธ กรุณาอัปโหลดสลิปใหม่' },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json(
-          { error: 'คำขอยังไม่พร้อมดำเนินการ กรุณาอัปโหลดสลิปก่อน' },
-          { status: 400 }
-        );
-      }
-    }
+    releaseLock = await acquireFinancialLock(`contract-action-contract:${actionRequest.contract_id}`, 180);
 
-    // Update signature if provided
-    if (signatureUrl) {
-      await supabase
-        .from('contract_action_requests')
-        .update({
-          signature_url: signatureUrl,
-          signed_at: new Date().toISOString(),
-        })
-        .eq('request_id', requestId);
+    const { data: lockedActionState, error: lockedActionError } = await supabase
+      .from('contract_action_requests')
+      .select('request_status, request_type, pawner_signature_url, signature_url')
+      .eq('request_id', requestId)
+      .single();
+    if (lockedActionError || !lockedActionState) {
+      return NextResponse.json(
+        { error: 'ไม่พบคำขอ', code: 'ACTION_REQUEST_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    actionRequest.request_status = lockedActionState.request_status;
+    actionRequest.request_type = lockedActionState.request_type;
+    actionRequest.pawner_signature_url = lockedActionState.pawner_signature_url;
+    actionRequest.signature_url = lockedActionState.signature_url;
+
+    if (actionRequest.request_type === 'PRINCIPAL_INCREASE') {
+      return NextResponse.json(
+        {
+          error: 'กรุณายืนยันการรับเงินจากหน้าสถานะคำขอ',
+          code: 'PRINCIPAL_INCREASE_CONFIRMATION_REQUIRED',
+        },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    const validStatuses = ['SLIP_VERIFIED', 'AWAITING_SIGNATURE'];
+
+    if (actionRequest.request_status === 'COMPLETED') {
+      const { data: existingContract } = await supabase
+        .from('contracts')
+        .select('contract_id, contract_number')
+        .eq('contract_number', buildContractNumber(requestId))
+        .maybeSingle();
+      return NextResponse.json({
+        success: true,
+        alreadyCompleted: true,
+        actionType: actionRequest.request_type,
+        newContract: existingContract || null,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+    if (!validStatuses.includes(actionRequest.request_status)) {
+      const rejected = String(actionRequest.request_status).includes('REJECTED');
+      return NextResponse.json(
+        {
+          error: rejected
+            ? 'หลักฐานถูกปฏิเสธ กรุณาอัปโหลดใหม่'
+            : 'คำขอยังไม่พร้อมดำเนินการ กรุณาตรวจสอบสถานะอีกครั้ง',
+          code: rejected ? 'ACTION_EVIDENCE_REJECTED' : 'ACTION_NOT_READY',
+        },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
     const now = new Date();
     const contractEndDate = toUtcDateOnly(contract.contract_end_date);
-    const contractStartDateOriginal = toUtcDateOnly(contract.contract_start_date);
+    const contractStartDate = toUtcDateOnly(contract.contract_start_date);
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
     const rawDurationDays = Number(contract.contract_duration_days || 0)
-      || Math.ceil((contractEndDate.getTime() - contractStartDateOriginal.getTime()) / msPerDay);
-    const durationDaysDefault = Math.max(1, rawDurationDays);
-    let newContractPayload: {
-      principalAmount: number;
-      interestAmount: number;
-      contractStartDate: Date;
-      contractEndDate: Date;
-      durationDays: number;
-      signedContractUrl?: string | null;
-    } | null = null;
+      || Math.ceil((contractEndDate.getTime() - contractStartDate.getTime()) / msPerDay);
+    const durationDays = Math.max(1, Math.min(Math.round(rawDurationDays), 3_650));
+    const renewedWindow = getRenewedContractWindow(durationDays);
+
+    let principalAmount = 0;
     let notificationMessage = '';
-
-    switch (actionRequest.request_type) {
-      case 'INTEREST_PAYMENT': {
-        const principalAmount = Number(contract.current_principal_amount || contract.loan_principal_amount || 0);
-        const durationDays = durationDaysDefault;
-        const renewedWindow = getRenewedContractWindow(durationDays);
-        const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
-
-        newContractPayload = {
-          principalAmount,
-          interestAmount,
-          contractStartDate: renewedWindow.contractStartDate,
-          contractEndDate: renewedWindow.contractEndDate,
-          durationDays,
-          signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
-        };
-
-        notificationMessage = `ต่อดอกเบี้ยเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nดอกเบี้ยที่ชำระ: ${Number(actionRequest.interest_to_pay || 0).toLocaleString()} บาท\nเริ่มสัญญาใหม่: ${formatThaiDate(renewedWindow.contractStartDate)}\nครบกำหนดใหม่: ${formatThaiDate(renewedWindow.contractEndDate)}`;
-        break;
-      }
-
-      case 'PRINCIPAL_REDUCTION': {
-        const principalAmount = Number(actionRequest.principal_after_reduction || contract.current_principal_amount || contract.loan_principal_amount || 0);
-        const durationDays = durationDaysDefault;
-        const renewedWindow = getRenewedContractWindow(durationDays);
-        const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
-
-        newContractPayload = {
-          principalAmount,
-          interestAmount,
-          contractStartDate: renewedWindow.contractStartDate,
-          contractEndDate: renewedWindow.contractEndDate,
-          durationDays,
-          signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || actionRequest.signature_url || contract.signed_contract_url,
-        };
-
-        notificationMessage = `ลดเงินต้นเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nเงินต้นใหม่: ${principalAmount.toLocaleString()} บาท\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`;
-        break;
-      }
-
-      case 'PRINCIPAL_INCREASE': {
-        const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
-        const durationDays = durationDaysDefault;
-        const renewedWindow = getRenewedContractWindow(durationDays);
-        const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
-
-        newContractPayload = {
-          principalAmount,
-          interestAmount,
-          contractStartDate: renewedWindow.contractStartDate,
-          contractEndDate: renewedWindow.contractEndDate,
-          durationDays,
-          signedContractUrl: actionRequest.pawner_signature_url || signatureUrl || contract.signed_contract_url,
-        };
-
-        notificationMessage = `เพิ่มเงินต้นเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nเงินต้นใหม่: ${principalAmount.toLocaleString()} บาท\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`;
-        break;
-      }
-    }
-
-    if (!newContractPayload) {
+    if (actionRequest.request_type === 'INTEREST_PAYMENT') {
+      principalAmount = Number(contract.current_principal_amount || contract.loan_principal_amount || 0);
+      notificationMessage = `ต่อดอกเบี้ยเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nดอกเบี้ยที่ชำระ: ${Number(actionRequest.interest_to_pay || 0).toLocaleString()} บาท\nเริ่มสัญญาใหม่: ${formatThaiDate(renewedWindow.contractStartDate)}\nครบกำหนดใหม่: ${formatThaiDate(renewedWindow.contractEndDate)}`;
+    } else if (actionRequest.request_type === 'PRINCIPAL_REDUCTION') {
+      principalAmount = Number(actionRequest.principal_after_reduction || 0);
+      notificationMessage = `ลดเงินต้นเรียบร้อย\n\nสัญญาเดิม: ${contract.contract_number}\nสัญญาใหม่: (กำลังสร้าง)\nเงินต้นใหม่: ${principalAmount.toLocaleString()} บาท`;
+    } else {
       return NextResponse.json(
-        { error: 'Invalid action type' },
-        { status: 400 }
+        { error: 'ประเภทรายการไม่ถูกต้อง', code: 'ACTION_TYPE_INVALID' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       );
     }
+    if (!Number.isFinite(principalAmount) || principalAmount <= 0 || principalAmount > 100_000_000) {
+      throw new Error('ACTION_PRINCIPAL_INVALID');
+    }
 
-    const { data: newContract, error: newContractError } = await supabase
+    const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
+    const persistedSignature = signatureUrl
+      || actionRequest.pawner_signature_url
+      || actionRequest.signature_url
+      || contract.signed_contract_url;
+
+    if (signatureUrl) {
+      const { error: signatureError } = await supabase
+        .from('contract_action_requests')
+        .update({ signature_url: signatureUrl, signed_at: now.toISOString() })
+        .eq('request_id', requestId)
+        .in('request_status', validStatuses);
+      if (signatureError) throw signatureError;
+    }
+
+    const newRecord = buildRenewedContractRecord({
+      requestId,
+      contract,
+      principalAmount,
+      interestAmount,
+      contractStartDate: renewedWindow.contractStartDate,
+      contractEndDate: renewedWindow.contractEndDate,
+      durationDays,
+      signedContractUrl: persistedSignature,
+    });
+    let { data: newContract, error: newContractError } = await supabase
       .from('contracts')
-      .insert(buildRenewedContractRecord({ contract, ...newContractPayload }))
-      .select()
+      .insert(newRecord)
+      .select('contract_id, contract_number')
       .single();
 
-    if (newContractError || !newContract) {
-      console.error('Error creating renewed contract:', newContractError);
-      return NextResponse.json(
-        { error: 'Failed to create renewed contract' },
-        { status: 500 }
-      );
+    // Crash/retry recovery: the deterministic unique number identifies the
+    // contract created by this action and lets the state transition continue.
+    if (newContractError?.code === '23505') {
+      const existing = await supabase
+        .from('contracts')
+        .select('contract_id, contract_number')
+        .eq('contract_number', newRecord.contract_number)
+        .maybeSingle();
+      newContract = existing.data;
+      newContractError = existing.error;
     }
+    if (newContractError || !newContract) throw newContractError || new Error('RENEWED_CONTRACT_CREATE_FAILED');
 
-    const resolvedMessage = notificationMessage.replace('(กำลังสร้าง)', newContract.contract_number);
-
-    // Close old contract
-    await supabase
+    const { data: closedContracts, error: closeError } = await supabase
       .from('contracts')
       .update({
         contract_status: 'COMPLETED',
@@ -323,26 +303,38 @@ export async function POST(request: NextRequest) {
         last_action_type: actionRequest.request_type,
         updated_at: now.toISOString(),
       })
-      .eq('contract_id', actionRequest.contract_id);
-
-    // Mark request as completed
-    await supabase
-      .from('contract_action_requests')
-      .update({
-        request_status: 'COMPLETED',
-        completed_at: now.toISOString(),
-      })
-      .eq('request_id', requestId);
-
-    if (contract?.investor_id) {
-      try {
-        await refreshInvestorTierAndTotals(contract.investor_id);
-      } catch (refreshError) {
-        console.error('Error refreshing investor totals:', refreshError);
-      }
+      .eq('contract_id', actionRequest.contract_id)
+      .in('contract_status', ['ACTIVE', 'CONFIRMED', 'EXTENDED'])
+      .select('contract_id');
+    if (closeError) throw closeError;
+    if (!closedContracts?.length && contract.contract_status !== 'COMPLETED') {
+      const current = await supabase
+        .from('contracts')
+        .select('contract_status')
+        .eq('contract_id', actionRequest.contract_id)
+        .single();
+      if (current.data?.contract_status !== 'COMPLETED') throw new Error('CONTRACT_STATE_CONFLICT');
     }
 
-    // Log completion
+    const { data: completedRequests, error: completionError } = await supabase
+      .from('contract_action_requests')
+      .update({ request_status: 'COMPLETED', completed_at: now.toISOString() })
+      .eq('request_id', requestId)
+      .in('request_status', validStatuses)
+      .select('request_id');
+    if (completionError) throw completionError;
+    if (!completedRequests?.length) {
+      const current = await supabase
+        .from('contract_action_requests')
+        .select('request_status')
+        .eq('request_id', requestId)
+        .single();
+      if (current.data?.request_status !== 'COMPLETED') throw new Error('ACTION_STATE_CONFLICT');
+    }
+
+    if (contract.investor_id) {
+      await refreshInvestorTierAndTotals(contract.investor_id).catch(() => {});
+    }
     await logContractAction(
       actionRequest.contract_id,
       actionRequest.request_type,
@@ -353,54 +345,51 @@ export async function POST(request: NextRequest) {
         actionRequestId: requestId,
         amount: actionRequest.total_amount,
         principalBefore: contract.current_principal_amount || contract.loan_principal_amount,
-        principalAfter: newContractPayload.principalAmount,
+        principalAfter: principalAmount,
         contractEndDateBefore: contract.contract_end_date,
-        contractEndDateAfter: newContractPayload.contractEndDate.toISOString(),
+        contractEndDateAfter: renewedWindow.contractEndDate.toISOString(),
         description: `${actionRequest.request_type} completed successfully`,
         metadata: {
           newContractId: newContract.contract_id,
           newContractNumber: newContract.contract_number,
         },
-      }
-    );
+      },
+    ).catch(() => {});
 
-    // Send notifications
-    // To Pawner
-    if (pawner?.line_id) {
-      try {
-        await pawnerLineClient.pushMessage(pawner.line_id, {
-          type: 'text',
-          text: resolvedMessage
-        });
-      } catch (err) {
-        console.error('Error sending to pawner:', err);
-      }
-    }
-
-    // To Investor
-    if (investor?.line_id) {
-      try {
-        await investorLineClient.pushMessage(investor.line_id, {
-          type: 'text',
-          text: resolvedMessage
-        });
-      } catch (err) {
-        console.error('Error sending to investor:', err);
-      }
-    }
+    const message = `${notificationMessage.replace('(กำลังสร้าง)', newContract.contract_number)}\nดอกเบี้ยในสัญญาใหม่: ${interestAmount.toLocaleString()} บาท`;
+    const pawner = relationOne<any>(contract.pawners);
+    const investor = relationOne<any>(contract.investors);
+    await Promise.allSettled([
+      pushLineTextMessage({
+        channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+        to: pawner?.line_id,
+        text: message,
+        retryKey: lineRetryKeyFromMaterial(`action-complete:pawner:${requestId}`),
+      }),
+      pushLineTextMessage({
+        channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST,
+        to: investor?.line_id,
+        text: message,
+        retryKey: lineRetryKeyFromMaterial(`action-complete:investor:${requestId}`),
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
-      message: 'ดำเนินการสำเร็จ',
       actionType: actionRequest.request_type,
       newContract,
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract-action:complete] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
     });
-
-  } catch (error: any) {
-    console.error('Error completing action:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return sanitizedServerError('ไม่สามารถดำเนินรายการได้ชั่วคราว กรุณาตรวจสอบสถานะแล้วลองใหม่');
+  } finally {
+    await releaseLock?.();
   }
 }

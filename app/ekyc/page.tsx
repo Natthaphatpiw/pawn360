@@ -1,25 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { clearPawnerEstimateResume, getPawnerEstimateResume } from '@/lib/pawner-estimate-resume';
-import { hasKycSubmissionCompleted, isKycNeedReview } from '@/lib/kyc/review';
 import { openLiffEntry } from '@/lib/liff/navigation';
+import { getLiffAuthorizationHeaders } from '@/lib/liff/auth-header';
 
 export default function EKYCPage() {
   const router = useRouter();
-  const { profile, isLoading: liffLoading } = useLiff();
+  const { profile, isLoading: liffLoading, liffObject } = useLiff();
 
   const [loading, setLoading] = useState(false);
   const [checkingCustomer, setCheckingCustomer] = useState(true); // New state for initial check
   const [error, setError] = useState<string | null>(null);
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [accountExists, setAccountExists] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
   const [waitingForReview, setWaitingForReview] = useState(false);
 
-  const redirectToPostKycDestination = (lineId: string) => {
+  const redirectToPostKycDestination = useCallback((lineId: string) => {
     const resume = getPawnerEstimateResume(lineId);
     if (resume?.returnAfterVerify && resume.draftId) {
       clearPawnerEstimateResume(lineId);
@@ -34,7 +34,7 @@ export default function EKYCPage() {
     }
 
     router.push('/register');
-  };
+  }, [router]);
 
   // Get customer ID and check KYC status
   useEffect(() => {
@@ -47,35 +47,39 @@ export default function EKYCPage() {
 
       setCheckingCustomer(true);
       try {
-        const response = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
+        const headers = getLiffAuthorizationHeaders(liffObject);
+        const response = await axios.get('/api/ekyc/status?role=PAWNER', { headers });
         if (response.data.exists) {
-          const pawner = response.data.pawner;
-          setCustomerId(pawner.customer_id);
-          setKycStatus(pawner.kyc_status);
-          const submitted = hasKycSubmissionCompleted(pawner);
-          const needReview = isKycNeedReview(pawner);
+          setAccountExists(true);
+          setKycStatus(response.data.status);
+          const submitted = Boolean(response.data.submissionCompleted);
+          const needReview = Boolean(response.data.reviewRequired);
 
           // Redirect based on KYC status
-          if (pawner.kyc_status === 'VERIFIED') {
+          if (response.data.status === 'VERIFIED') {
             redirectToPostKycDestination(profile.userId);
             return;
           }
 
-          if (pawner.kyc_status === 'PENDING' && (needReview || submitted)) {
+          if (response.data.status === 'PENDING' && (needReview || submitted)) {
             setWaitingForReview(true);
             return;
           }
 
-          if (pawner.kyc_status === 'PENDING' && pawner.ekyc_url) {
-            window.location.href = pawner.ekyc_url;
+          if (response.data.status === 'PENDING' && response.data.resumeAvailable) {
+            const resumed = await axios.post('/api/ekyc/initiate', {}, { headers });
+            if (resumed.data.success && resumed.data.url) window.location.href = resumed.data.url;
             return;
           }
         } else {
           router.push('/register');
         }
       } catch (error) {
-        console.error('Error getting customer ID:', error);
-        setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        const publicError = axios.isAxiosError(error) ? error.response?.data?.error : null;
+        console.error('Seller eKYC status check failed', {
+          code: axios.isAxiosError(error) ? error.response?.data?.code || 'EKYC_STATUS_FAILED' : 'EKYC_STATUS_FAILED',
+        });
+        setError(publicError || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
       } finally {
         setCheckingCustomer(false);
       }
@@ -84,10 +88,10 @@ export default function EKYCPage() {
     if (!liffLoading && profile?.userId) {
       checkCustomer();
     }
-  }, [profile?.userId, router, liffLoading]);
+  }, [profile?.userId, router, liffLoading, liffObject, redirectToPostKycDestination]);
 
   const handleStartKYC = async () => {
-    if (!customerId) {
+    if (!accountExists) {
       setError('ไม่พบข้อมูลลูกค้า กรุณาลงทะเบียนก่อน');
       return;
     }
@@ -97,8 +101,8 @@ export default function EKYCPage() {
 
     try {
       // 1. Call API to initiate eKYC
-      const response = await axios.post('/api/ekyc/initiate', {
-        customerId
+      const response = await axios.post('/api/ekyc/initiate', {}, {
+        headers: getLiffAuthorizationHeaders(liffObject),
       });
 
       if (response.data.success && response.data.url) {
@@ -108,9 +112,11 @@ export default function EKYCPage() {
       } else {
         throw new Error('Failed to get verification URL');
       }
-    } catch (error: any) {
-      console.error('eKYC error:', error);
-      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการเริ่มต้นการยืนยันตัวตน');
+    } catch (error: unknown) {
+      console.error('Seller eKYC start failed', {
+        code: axios.isAxiosError(error) ? error.response?.data?.code || 'EKYC_START_FAILED' : 'EKYC_START_FAILED',
+      });
+      setError(axios.isAxiosError(error) ? error.response?.data?.error || 'เกิดข้อผิดพลาดในการเริ่มต้นการยืนยันตัวตน' : 'เกิดข้อผิดพลาดในการเริ่มต้นการยืนยันตัวตน');
       setLoading(false);
     }
   };
@@ -128,7 +134,7 @@ export default function EKYCPage() {
   }
 
   // Show error state if no customer ID after loading completes
-  if (!customerId && error) {
+  if (!accountExists && error) {
     return (
       <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
         <div className="w-full max-w-md">
@@ -172,8 +178,8 @@ export default function EKYCPage() {
     );
   }
 
-  // If still no customerId after all checks, redirect to register
-  if (!customerId) {
+  // If there is still no account after all checks, redirect to registration.
+  if (!accountExists) {
     router.push('/register');
     return null;
   }

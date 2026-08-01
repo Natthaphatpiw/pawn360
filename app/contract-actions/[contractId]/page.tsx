@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Noto_Sans_Thai } from 'next/font/google';
 import liff from '@line/liff';
-import PinModal from '@/components/PinModal';
-import { getPinSession } from '@/lib/security/pin-session';
 
 const sarabun = Noto_Sans_Thai({
   subsets: ['thai'],
@@ -40,11 +38,8 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [lineUserId, setLineUserId] = useState<string>('');
   const [resolvedContractId, setResolvedContractId] = useState<string>('');
-  const [pinModalOpen, setPinModalOpen] = useState(false);
-  const pendingActionRef = useRef<((token: string) => void) | null>(null);
 
   useEffect(() => {
     const getParams = async () => {
@@ -101,88 +96,17 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
 
     switch (actionType) {
       case 'redeem':
-        await handlePinGuardedAction(() => handleRedemptionRequest);
+        router.push(`/contracts/${contractId}/redeem`);
         break;
       case 'renew':
-        await handlePinGuardedAction(() => handleExtensionRequest);
+        router.push(`/contracts/${contractId}/interest-payment`);
         break;
       case 'increase':
-        // เพิ่มต้น - ยังใช้ flow เดิม
-        router.push(`/contract-actions/${contractId}/increase`);
+        router.push(`/contracts/${contractId}/principal-increase`);
         break;
       case 'reduce':
-        // ลดต้น - ยังใช้ flow เดิม (ไปหน้า payment แต่ให้ user ระบุจำนวน)
-        router.push(`/contract-actions/${contractId}/payment?action=${actionType}&amount=0`);
+        router.push(`/contracts/${contractId}/principal-reduction`);
         break;
-    }
-  };
-
-  const handlePinGuardedAction = async (actionFactory: () => (pinToken: string) => Promise<void>) => {
-    const session = getPinSession('PAWNER', lineUserId);
-    if (session?.token) {
-      await actionFactory()(session.token);
-      return;
-    }
-
-    pendingActionRef.current = async (token: string) => {
-      await actionFactory()(token);
-    };
-    setPinModalOpen(true);
-  };
-
-  const handleRedemptionRequest = async (pinToken: string) => {
-    try {
-      setSubmitting(true);
-
-      const response = await axios.post('/api/customer/request-redemption', {
-        contractId,
-        lineUserId,
-        message: 'ลูกค้าต้องการไถ่ถอนสัญญา',
-        pinToken
-      });
-
-      if (response.data.success) {
-        alert('✅ ส่งคำขอไถ่ถอนเรียบร้อยแล้ว\n\nพนักงานจะดำเนินการภายใน 24 ชั่วโมง คุณจะได้รับ QR Code สำหรับชำระเงินผ่าน LINE Chat');
-
-        // Close LIFF window and return to LINE chat
-        if (liff.isInClient()) {
-          liff.closeWindow();
-        } else {
-          router.push('/contracts');
-        }
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleExtensionRequest = async (pinToken: string) => {
-    try {
-      setSubmitting(true);
-
-      const response = await axios.post('/api/customer/request-extension', {
-        contractId,
-        lineUserId,
-        message: 'ลูกค้าต้องการต่อดอกเบี้ย',
-        pinToken
-      });
-
-      if (response.data.success) {
-        alert('✅ ส่งคำขอต่อดอกเบี้ยเรียบร้อยแล้ว\n\nพนักงานจะดำเนินการภายใน 24 ชั่วโมง คุณจะได้รับ QR Code สำหรับชำระเงินผ่าน LINE Chat');
-
-        // Close LIFF window and return to LINE chat
-        if (liff.isInClient()) {
-          liff.closeWindow();
-        } else {
-          router.push('/contracts');
-        }
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'เกิดข้อผิดพลาดในการส่งคำขอ');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -258,8 +182,7 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
         {/* ไถ่ถอน */}
         <button
           onClick={() => handleAction('redeem')}
-          disabled={submitting}
-          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors disabled:opacity-50"
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#fff9c4',
             color: '#f9a825',
@@ -283,8 +206,7 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
         {/* ต่อดอกเบี้ย */}
         <button
           onClick={() => handleAction('renew')}
-          disabled={submitting}
-          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors disabled:opacity-50"
+          className="w-full py-4 rounded-2xl font-bold text-left px-4 border-2 transition-colors"
           style={{
             backgroundColor: '#259b24',
             color: '#E7EFE9',
@@ -348,17 +270,6 @@ export default function ContractActionsPage({ params }: { params: Promise<{ cont
         </button>
       </div>
 
-      <PinModal
-        open={pinModalOpen}
-        role="PAWNER"
-        lineId={lineUserId}
-        onClose={() => setPinModalOpen(false)}
-        onVerified={(token) => {
-          setPinModalOpen(false);
-          pendingActionRef.current?.(token);
-          pendingActionRef.current = null;
-        }}
-      />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { AlertTriangle, Info } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../_components/TransactionHeader';
-import { withPreview } from '../_lib/preview';
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -19,13 +18,7 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      clearCanvas();
-    }
-  }, [isOpen]);
-
-  const clearCanvas = () => {
+  function clearCanvas() {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -35,7 +28,13 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
-  };
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      clearCanvas();
+    }
+  }, [isOpen]);
 
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -213,7 +212,7 @@ export default function PrincipalReductionPage() {
   const router = useRouter();
   const params = useParams();
   const contractId = params.contractId as string;
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -228,20 +227,26 @@ export default function PrincipalReductionPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (liffLoading) return;
+    if (liffError || !profile?.userId) {
+      setError('กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      setLoading(false);
+      return;
+    }
     if (contractId) {
       fetchContractSummary();
       fetchCompanyBank();
     }
-  }, [contractId]);
+  }, [contractId, profile?.userId, liffLoading, liffError]);
 
   useEffect(() => {
     const amountValue = parseFloat(reductionAmount);
-    if (contractId && amountValue > 0) {
+    if (contractId && profile?.userId && amountValue > 0) {
       fetchCalculation(amountValue);
     } else {
       setCalculation(null);
     }
-  }, [contractId, reductionAmount]);
+  }, [contractId, reductionAmount, profile?.userId]);
 
   const fetchContractSummary = async () => {
     try {
@@ -251,14 +256,10 @@ export default function PrincipalReductionPage() {
         return;
       }
       throw new Error('Contract summary unavailable');
-    } catch (error) {
-      console.error('Error fetching contract summary:', error);
-      setContract({
-        contract_id: contractId,
-        contract_number: `CT-${contractId}-MOCK`,
-        item: { brand: 'Apple', model: 'iPhone 13' },
-        remainingPrincipal: 10000,
-      });
+    } catch {
+      console.error('[principal-reduction] contract unavailable');
+      setContract(null);
+      setError('ไม่สามารถโหลดข้อมูลสัญญาได้ กรุณาลองใหม่');
     } finally {
       setLoading(false);
     }
@@ -281,34 +282,9 @@ export default function PrincipalReductionPage() {
         throw new Error('Principal reduction calculation unavailable');
       }
     } catch (error: any) {
-      console.error('Error fetching calculation:', error);
-      const mockReductionAmount = amountValue > 0 ? amountValue : 2000;
-      setCalculation({
-        contractId,
-        actionType: 'PRINCIPAL_REDUCTION',
-        currentPrincipal: 10000,
-        interestRate: 0.03,
-        dailyInterestRate: 0.001,
-        daysInContract: 30,
-        daysElapsed: 30,
-        daysRemaining: 0,
-        interestAccrued: 300,
-        feeAmount: 100,
-        interestAccruedWithFee: 400,
-        reductionAmount: mockReductionAmount,
-        interestForPeriod: 400,
-        interestFirstPart: 400,
-        interestRemaining: 240,
-        interestTotalIfPayLater: 540,
-        totalToPay: mockReductionAmount + 400,
-        baseTotalToPay: mockReductionAmount + 400,
-        principalAfterReduction: 10000 - mockReductionAmount,
-        newInterestForRemaining: 240,
-        interestSavings: 300,
-        description: 'Mock preview calculation',
-        penaltyRequired: false,
-        penaltyAmount: 0,
-      });
+      console.error('[principal-reduction] calculation unavailable');
+      setCalculation(null);
+      setError(error.response?.data?.error || 'ไม่สามารถคำนวณยอดได้ กรุณาลองใหม่');
     }
   };
 
@@ -373,10 +349,8 @@ export default function PrincipalReductionPage() {
         router.push(`/contracts/${contractId}/principal-reduction/upload?requestId=${nextRequestId}`);
       }
     } catch (error: any) {
-      console.error('Error creating request:', error);
+      console.error('[principal-reduction] request creation failed');
       setError(error.response?.data?.error || error.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
-      const previewRequestId = `preview-reduction-${contractId}`;
-      router.push(withPreview(`/contracts/${contractId}/principal-reduction/upload`, 'requestId', previewRequestId));
     } finally {
       setSubmitting(false);
     }
@@ -401,7 +375,7 @@ export default function PrincipalReductionPage() {
     return (
       <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-red-600">ไม่พบข้อมูลสัญญา</p>
+          <p className="text-red-600">{error || 'ไม่พบข้อมูลสัญญา'}</p>
         </div>
       </div>
     );

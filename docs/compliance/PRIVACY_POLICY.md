@@ -70,20 +70,26 @@ Astly.co and our web surfaces use cookies and similar technologies. We display a
 
 We do not sell your personal data. We share it only with service providers (processors) who help us operate the platform, and only for the purposes described above. Each processor acts under a data processing agreement (DPA) that restricts their use of your data to our instructions.
 
-| Recipient / processor | Function | Hosting region |
-|---|---|---|
-| UPPASS | eKYC identity verification, including biometric / liveness | SE Asia (vendor) |
-| Anthropic (Claude) | AI analysis of item photographs and bank slips | US |
-| Google (Gemini) | AI condition scoring of item photographs | US (paid tier / Vertex) |
-| OpenAI | Optional web search for **product text only** (no personal data of item images) | US |
-| Vercel | Application hosting, compute and logs | US-default (configurable) |
-| Supabase | Primary database | AWS region (to confirm) |
-| MongoDB Atlas | Operational database | AWS region (to confirm) |
-| Vercel Blob | Object storage (item photos, bank slips, contracts) | Configured Blob store region (confirm) |
-| Upstash | Cache | AWS region |
-| Payment PSP (planned) | Funds collection and routing | TH / SE Asia |
+| Recipient / processor | Function | Does it receive your personal data? | Hosting region |
+|---|---|---|---|
+| UPPASS | eKYC identity verification, including biometric / liveness | Yes - ID documents and biometric data | Vendor region (to confirm) |
+| OpenAI | Primary analysis of item photographs, product text, and bank slips when our primary slip checker is unavailable | Yes - item photographs and slips | US (contract/region to confirm) |
+| Anthropic (Claude) | Emergency fallback for the same analysis, used only if OpenAI is unavailable | Yes, on the fallback path only | US (contract/region to confirm) |
+| SlipOK | Bank-slip verification | Yes - bank-slip images | TH (to confirm) |
+| Parallel | Searching the public web for market prices | **No** - only a product description such as "Apple MacBook Air M2 13 256GB" | Provider region (to confirm) |
+| Exa | Backup web search if Parallel is unavailable | **No** - the same product description only | Provider region (to confirm) |
+| Vercel | Application hosting, compute and logs | Yes | US-default (configurable) |
+| Supabase | Primary database | Yes | AWS region (to confirm) |
+| MongoDB Atlas | Operational database | Yes | AWS region (to confirm) |
+| Vercel Blob | Object storage (item photos, bank slips, contracts) | Yes | Configured Blob store region (confirm) |
+| Upstash | Cache and job state | Yes (derived values and identifiers) | AWS region |
+| LINE | Message delivery and login | Yes - your LINE account identity | Per LINE's own terms |
+| Payment PSP (planned) | Funds collection and routing | Yes | TH / SE Asia |
 
-**AI providers operate under a no-training / zero-data-retention posture, so they do not use your data to train their models.** Biometric eKYC data is held by our vendor rather than on Astly systems, minimizing where the highest-risk data resides.
+Two points worth making plainly:
+
+- **When we search the web to price your item, we do not send anything about you.** We send only a description of the product itself. Your name, LINE account, national ID, contract details and the photographs you uploaded are never part of a web search.
+- **We ask our AI providers not to train on your data and not to keep it.** Our contracts and configuration require a no-training posture and the shortest available retention, and we configure our AI integration so that responses are not stored on the provider's side. Biometric eKYC data is held by our verification vendor rather than on Astly systems, which limits where the highest-risk data resides.
 
 ### International (cross-border) transfers - Sec 28-29
 
@@ -119,7 +125,10 @@ We apply technical and organizational safeguards appropriate to the risk. In sum
 - **At rest:** AES-256 encryption across all data stores.
 - **Authentication:** PINs are hashed with bcrypt (cost 10); sessions use opaque, short-lived tokens.
 - **Access:** databases are not publicly reachable and are accessed only through server-side privileged access; object storage is private and served via time-limited signed URLs.
-- **Data minimization:** the highest-risk biometric data is minimized by holding it at the eKYC vendor rather than on Astly systems.
+- **Identity:** we verify your LINE login with LINE itself on our servers before acting on any request, so no one can act as you simply by claiming your account id. Actions that move money additionally require your 6-digit PIN.
+- **Data minimization:** the highest-risk biometric data is minimized by holding it at the eKYC vendor rather than on Astly systems. When your identity check completes, we record only the outcome - not your answers, your document images, or your biometric data.
+- **Background processing:** work such as valuing your item runs on an internal queue. Those internal messages contain only a reference number; your photographs are never placed on a queue, and a worker can only read images from our own private storage.
+- **Verification results cannot be reversed by a stray message.** Once your identity check is recorded as verified or rejected, a repeated or out-of-order notification from our verification vendor cannot silently change it.
 
 Fuller detail is in `../../DATA_SECURITY.md`.
 

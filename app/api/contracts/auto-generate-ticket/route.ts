@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import {
+  InternalAuthError,
+  internalAuthErrorResponse,
+  requireInternalRequest,
+} from '@/lib/security/request-auth';
+import {
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 /**
  * API to trigger automatic loan contract generation when contract status becomes CONFIRMED
@@ -7,17 +18,9 @@ import { supabaseAdmin } from '@/lib/supabase/client';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { contractId, type } = body;
-
-    console.log('[Auto-Generate] Received request:', { contractId, type });
-
-    if (!contractId) {
-      return NextResponse.json(
-        { error: 'Contract ID is required' },
-        { status: 400 }
-      );
-    }
+    requireInternalRequest(request);
+    const body = await readBoundedJsonObject(request, 16 * 1024);
+    const contractId = requireUuid(body.contractId);
 
     const supabase = supabaseAdmin();
 
@@ -29,16 +32,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (contractError || !contract) {
-      console.error('[Auto-Generate] Contract not found:', contractError);
       return NextResponse.json(
-        { error: 'Contract not found' },
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
         { status: 404 }
       );
     }
 
     // Check if contract is CONFIRMED
     if (contract.contract_status !== 'CONFIRMED') {
-      console.log('[Auto-Generate] Contract not CONFIRMED yet:', contract.contract_status);
       return NextResponse.json({
         success: false,
         message: 'Contract is not CONFIRMED yet',
@@ -48,7 +49,6 @@ export async function POST(request: NextRequest) {
 
     // Check if loan contract already exists
     if (contract.contract_file_url) {
-      console.log('[Auto-Generate] Pawn ticket already exists:', contract.contract_file_url);
       return NextResponse.json({
         success: true,
         message: 'Pawn ticket already generated',
@@ -61,8 +61,6 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawnly.io';
     const ticketUrl = `${baseUrl}/pawn-ticket/${contractId}`;
 
-    console.log('[Auto-Generate] Generated ticket URL:', ticketUrl);
-
     // Return instruction for manual generation (since we can't use Puppeteer on Vercel)
     // The frontend will need to access this URL to generate and upload the image
     return NextResponse.json({
@@ -73,11 +71,11 @@ export async function POST(request: NextRequest) {
       instruction: 'Frontend should access ticket URL and trigger save to generate image'
     });
 
-  } catch (error: any) {
-    console.error('[Auto-Generate] Error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to auto-generate loan contract' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof InternalAuthError) return internalAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    console.error('[contract:auto-generate-ticket] failed');
+    return sanitizedServerError();
   }
 }

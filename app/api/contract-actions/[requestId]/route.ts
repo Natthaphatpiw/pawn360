@@ -1,58 +1,117 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getFrozenLateChargeBreakdown } from '@/lib/services/penalty';
+import { requireContractParty } from '@/lib/security/contract-access';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { requireUuid, sanitizedServerError, transactionRequestErrorResponse } from '@/lib/security/transaction-request';
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ requestId: string }> }
 ) {
   try {
-    const { requestId } = await context.params;
+    const { requestId: rawRequestId } = await context.params;
+    const requestId = requireUuid(rawRequestId);
     const { searchParams } = new URL(request.url);
-    const viewer = searchParams.get('viewer');
-
-    if (!requestId) {
-      return NextResponse.json(
-        { error: 'Missing request ID' },
-        { status: 400 }
-      );
-    }
+    const viewer = searchParams.get('viewer') === 'investor' ? 'investor' : 'pawner';
 
     const supabase = supabaseAdmin();
 
-    const { data: actionRequest, error } = await supabase
+    const { data: rawActionRequest, error } = await supabase
       .from('contract_action_requests')
       .select(`
-        *,
+        request_id,
+        contract_id,
+        request_type,
+        request_status,
+        reduction_amount,
+        increase_amount,
+        interest_to_pay,
+        interest_for_period,
+        total_to_pay_reduction,
+        total_amount,
+        principal_before,
+        principal_after_reduction,
+        principal_after_increase,
+        new_principal_amount,
+        new_end_date,
+        terms_accepted,
+        pawner_signature_url,
+        signature_url,
+        pawner_bank_name,
+        pawner_bank_account_no,
+        pawner_bank_account_name,
+        investor_rejection_reason,
+        created_at,
+        updated_at,
         contract:contract_id (
-          *,
-          items:item_id (*),
-          pawners:customer_id (*),
-          investors:investor_id (*)
+          contract_id,
+          contract_number,
+          contract_status,
+          contract_start_date,
+          contract_end_date,
+          contract_duration_days,
+          loan_principal_amount,
+          current_principal_amount,
+          original_principal_amount,
+          interest_rate,
+          investor_rate,
+          items:item_id (
+            item_id, brand, model, capacity, estimated_value, item_condition, image_urls
+          ),
+          pawners:customer_id (
+            customer_id, line_id, bank_name, bank_account_no, bank_account_name, promptpay_number
+          ),
+          investors:investor_id (investor_id, line_id)
         )
       `)
       .eq('request_id', requestId)
       .single();
 
-    if (error || !actionRequest) {
+    if (error || !rawActionRequest) {
       return NextResponse.json(
-        { error: 'Request not found' },
+        { error: 'ไม่พบคำขอ', code: 'REQUEST_NOT_FOUND' },
         { status: 404 }
       );
     }
+    const actionRequest: any = rawActionRequest;
 
-    if (viewer === 'investor' && actionRequest.contract?.pawners) {
-      const pawner = actionRequest.contract.pawners;
+    await requireContractParty(
+      request,
+      actionRequest.contract,
+      viewer === 'investor' ? 'INVESTOR' : 'PAWNER',
+    );
+
+    const relationOne = <T,>(value: T | T[] | null | undefined): T | null => (
+      Array.isArray(value) ? value[0] || null : value || null
+    );
+    const pawner = relationOne<any>(actionRequest.contract?.pawners);
+    const safeContract = { ...actionRequest.contract } as Record<string, unknown>;
+    delete safeContract.investors;
+    if (viewer === 'investor') {
       actionRequest.contract.pawners = {
-        customer_id: pawner.customer_id,
-        bank_name: pawner.bank_name ?? null,
-        bank_account_no: pawner.bank_account_no ?? null,
-        bank_account_name: pawner.bank_account_name ?? null
+        customer_id: pawner?.customer_id ?? null,
+        bank_name: pawner?.bank_name ?? null,
+        bank_account_no: pawner?.bank_account_no ?? null,
+        bank_account_name: pawner?.bank_account_name ?? null
       };
       if (actionRequest.pawner_signature_url) {
         actionRequest.pawner_signature_url = null;
       }
+      if (actionRequest.signature_url) actionRequest.signature_url = null;
+    } else {
+      safeContract.pawners = pawner ? {
+        customer_id: pawner.customer_id,
+        bank_name: pawner.bank_name ?? null,
+        bank_account_no: pawner.bank_account_no ?? null,
+        bank_account_name: pawner.bank_account_name ?? null,
+        promptpay_number: pawner.promptpay_number ?? null,
+      } : null;
     }
+    if (viewer === 'investor') safeContract.pawners = actionRequest.contract.pawners;
+    actionRequest.contract = safeContract;
+    actionRequest.rejection_reason = actionRequest.investor_rejection_reason || null;
 
     if (['AWAITING_PAYMENT', 'SLIP_REJECTED'].includes(actionRequest.request_status)) {
       const baseAmount = getBaseAmountForActionRequest(actionRequest);
@@ -78,14 +137,14 @@ export async function GET(
     return NextResponse.json({
       success: true,
       request: actionRequest,
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
 
-  } catch (error: any) {
-    console.error('Error fetching action request:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    console.error('[contract-actions:detail] failed');
+    return sanitizedServerError('ไม่สามารถโหลดข้อมูลคำขอได้ กรุณาลองใหม่');
   }
 }
 

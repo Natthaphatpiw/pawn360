@@ -82,16 +82,23 @@ export default function CookieBanner() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const stored = safeParse(window.localStorage.getItem(STORAGE_KEY));
-    if (stored) {
-      setConsent(stored);
-      setDraft(stored);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const stored = safeParse(window.localStorage.getItem(STORAGE_KEY));
+      if (stored) {
+        setConsent(stored);
+        setDraft(stored);
+        setIsMounted(true);
+        loadScripts(stored);
+        return;
+      }
       setIsMounted(true);
-      loadScripts(stored);
-      return;
-    }
-    setIsMounted(true);
-    setShowBanner(true);
+      setShowBanner(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

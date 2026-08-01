@@ -3,6 +3,18 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { getCompanyBankAccount, saveSlipVerification, verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { getPenaltyRequirement, markPenaltyPaymentVerified, roundCurrency } from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import { paymentEvidenceWasUsed } from '@/lib/security/payment-evidence';
+import {
+  boundedText,
+  fingerprintOwnedBlob,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 // Drop Point LINE OA client
 const dropPointLineClient = process.env.LINE_CHANNEL_ACCESS_TOKEN_DROPPOINT ? new Client({
@@ -16,16 +28,17 @@ const getDropPointReturnUrl = (redemptionId: string) => {
 };
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
+  let releaseEvidenceLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
+    const body = await readBoundedJsonObject(request) as any;
     const { redemptionId, slipUrl, pawnerLineId } = body;
 
-    if (!redemptionId || !slipUrl) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const safeRedemptionId = requireUuid(redemptionId);
+    const safeSlipUrl = requireOwnedBlobUrl(slipUrl, ['pawn-items/', 'redemption-slips/']);
+    const claimedLineId = boundedText(pawnerLineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    releaseLock = await acquireTransactionLock('redemption-slip', safeRedemptionId, 300);
 
     const supabase = supabaseAdmin();
 
@@ -39,6 +52,8 @@ export async function POST(request: NextRequest) {
           contract_number,
           contract_start_date,
           contract_end_date,
+          contract_status,
+          redemption_status,
           customer_id,
           investor_id,
           loan_principal_amount,
@@ -75,7 +90,7 @@ export async function POST(request: NextRequest) {
           )
         )
       `)
-      .eq('redemption_id', redemptionId)
+      .eq('redemption_id', safeRedemptionId)
       .single();
 
     if (redemptionError || !redemption) {
@@ -85,13 +100,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contract = redemption.contract;
-    const pawner = contract?.pawners;
+    const contract = Array.isArray(redemption.contract) ? redemption.contract[0] : redemption.contract;
+    const pawner = Array.isArray(contract?.pawners) ? contract.pawners[0] : contract?.pawners;
 
-    if (pawnerLineId && pawner?.line_id && pawner.line_id !== pawnerLineId) {
+    if (!pawner?.line_id || pawner.line_id !== verifiedLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
+      );
+    }
+
+    if (!contract || !['ACTIVE', 'CONFIRMED'].includes(contract.contract_status)) {
+      return NextResponse.json(
+        { error: 'สัญญาไม่อยู่ในสถานะที่ชำระเงินไถ่ถอนได้' },
+        { status: 409 },
+      );
+    }
+
+    if (redemption.request_status === 'AMOUNT_VERIFIED') {
+      if (contract.redemption_status !== 'IN_PROGRESS') {
+        const { data: repairedContract, error: repairError } = await supabase
+          .from('contracts')
+          .update({
+            redemption_status: 'IN_PROGRESS',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('contract_id', redemption.contract_id)
+          .in('contract_status', ['ACTIVE', 'CONFIRMED'])
+          .select('contract_id')
+          .maybeSingle();
+        if (repairError || !repairedContract) {
+          return sanitizedServerError('ชำระเงินสำเร็จแล้ว แต่ยังไม่สามารถปรับสถานะสัญญาได้ กรุณาลองใหม่');
+        }
+      }
+      return NextResponse.json({ success: true, alreadyVerified: true, result: 'MATCHED' });
+    }
+
+    const slipFingerprint = `sha256:${await fingerprintOwnedBlob(safeSlipUrl)}`;
+    releaseEvidenceLock = await acquireTransactionLock('payment-evidence', slipFingerprint.slice(7), 300);
+
+    if (await paymentEvidenceWasUsed(supabase, slipFingerprint)) {
+      return NextResponse.json(
+        { error: 'สลิปนี้ถูกใช้แล้ว กรุณาใช้สลิปใหม่' },
+        { status: 409 },
+      );
+    }
+    if (!['PENDING', 'AMOUNT_MISMATCH'].includes(redemption.request_status)) {
+      return NextResponse.json(
+        { error: 'สถานะรายการไม่สามารถส่งสลิปได้' },
+        { status: 409 },
       );
     }
 
@@ -102,41 +159,80 @@ export async function POST(request: NextRequest) {
     const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
     const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
     const expectedAmount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
+    if (
+      !Number.isFinite(baseAmount)
+      || baseAmount <= 0
+      || !Number.isFinite(penaltyAmount)
+      || penaltyAmount < 0
+      || !Number.isFinite(overdueInterestAmount)
+      || overdueInterestAmount < 0
+      || !Number.isFinite(expectedAmount)
+      || expectedAmount <= 0
+    ) {
+      return NextResponse.json(
+        { error: 'ไม่สามารถตรวจสอบยอดไถ่ถอนได้ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 },
+      );
+    }
 
     if (expectedAmount !== Number(redemption.total_amount || 0)) {
-      await supabase
+      const { data: amountUpdated, error: amountUpdateError } = await supabase
         .from('redemption_requests')
         .update({
           total_amount: expectedAmount,
           updated_at: new Date().toISOString(),
         })
-        .eq('redemption_id', redemptionId);
+        .eq('redemption_id', safeRedemptionId)
+        .in('request_status', ['PENDING', 'AMOUNT_MISMATCH'])
+        .select('redemption_id')
+        .maybeSingle();
+      if (amountUpdateError) {
+        return sanitizedServerError('ไม่สามารถปรับยอดไถ่ถอนให้เป็นปัจจุบันได้ กรุณาลองใหม่');
+      }
+      if (!amountUpdated) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
     }
 
     const companyBank = await getCompanyBankAccount();
-    const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
+    const verificationResult = await verifyPaymentSlip(safeSlipUrl, expectedAmount, {
       receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
       receiverPromptpay: companyBank.promptpay_number || null,
       receiverName: companyBank.account_name || companyBank.bank_account_name || null,
       useSlipOkLogCheck: true,
     });
 
-    const { count: previousAttempts } = await supabase
+    const { count: previousAttempts, error: attemptsError } = await supabase
       .from('slip_verifications')
       .select('verification_id', { count: 'exact', head: true })
-      .eq('redemption_id', redemptionId);
+      .eq('redemption_id', safeRedemptionId);
+    if (attemptsError) {
+      return sanitizedServerError('ไม่สามารถตรวจสอบประวัติการส่งสลิปได้ กรุณาลองใหม่');
+    }
 
-    await saveSlipVerification(
+    const savedVerification = await saveSlipVerification(
       null,
-      redemptionId,
-      slipUrl,
+      safeRedemptionId,
+      safeSlipUrl,
       expectedAmount,
-      verificationResult,
+      {
+        ...verificationResult,
+        rawResponse: {
+          provider: verificationResult.rawResponse?.provider || null,
+          fingerprint: slipFingerprint,
+        },
+      },
       (previousAttempts || 0) + 1,
     );
+    if (!savedVerification) {
+      return sanitizedServerError('ไม่สามารถบันทึกผลตรวจสลิปได้ กรุณาลองใหม่');
+    }
 
     const baseUpdateData: any = {
-      payment_slip_url: slipUrl,
+      payment_slip_url: safeSlipUrl,
       payment_slip_uploaded_at: new Date().toISOString(),
       actual_amount_received: verificationResult.detectedAmount,
       amount_difference: verificationResult.difference,
@@ -148,13 +244,26 @@ export async function POST(request: NextRequest) {
     };
 
     if (verificationResult.result !== 'MATCHED') {
-      await supabase
+      const { data: mismatchUpdated, error: mismatchUpdateError } = await supabase
         .from('redemption_requests')
         .update({
           ...baseUpdateData,
           request_status: 'PENDING',
         })
-        .eq('redemption_id', redemptionId);
+        .eq('redemption_id', safeRedemptionId)
+        .in('request_status', ['PENDING', 'AMOUNT_MISMATCH'])
+        .select('redemption_id')
+        .maybeSingle();
+
+      if (mismatchUpdateError) {
+        return sanitizedServerError('ไม่สามารถบันทึกผลตรวจสลิปได้ กรุณาลองใหม่');
+      }
+      if (!mismatchUpdated) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
 
       return NextResponse.json(
         {
@@ -168,44 +277,58 @@ export async function POST(request: NextRequest) {
     }
 
     // Update redemption after successful slip verification
-    const { error: updateError } = await supabase
+    const { data: updatedRedemption, error: updateError } = await supabase
       .from('redemption_requests')
       .update({
         ...baseUpdateData,
         request_status: 'AMOUNT_VERIFIED',
         verified_at: new Date().toISOString(),
       })
-      .eq('redemption_id', redemptionId);
+      .eq('redemption_id', safeRedemptionId)
+      .in('request_status', ['PENDING', 'AMOUNT_MISMATCH'])
+      .select('redemption_id')
+      .maybeSingle();
 
-    if (updateError) {
-      console.error('Error updating redemption:', updateError);
+    if (updateError || !updatedRedemption) {
+      console.error('Error updating redemption');
       return NextResponse.json(
-        { error: 'Failed to update redemption' },
-        { status: 500 }
+        { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+        { status: 409 }
       );
     }
 
-    if (penaltyRequirement.required) {
-      await markPenaltyPaymentVerified(supabase, contract, penaltyRequirement, {
-        slipUrl,
-        detectedAmount: verificationResult.detectedAmount,
-        verificationResult: verificationResult.result,
-        verificationDetails: verificationResult.rawResponse,
-        attemptCount: (previousAttempts || 0) + 1,
-      });
-    }
-
     // Update contract redemption status
-    await supabase
+    const { data: updatedContract, error: contractUpdateError } = await supabase
       .from('contracts')
       .update({
         redemption_status: 'IN_PROGRESS',
         updated_at: new Date().toISOString(),
       })
-      .eq('contract_id', redemption.contract_id);
+      .eq('contract_id', redemption.contract_id)
+      .in('contract_status', ['ACTIVE', 'CONFIRMED'])
+      .select('contract_id')
+      .maybeSingle();
+
+    if (contractUpdateError || !updatedContract) {
+      return sanitizedServerError('ชำระเงินสำเร็จแล้ว แต่ยังไม่สามารถปรับสถานะสัญญาได้ กรุณาลองใหม่');
+    }
+
+    if (penaltyRequirement.required) {
+      await markPenaltyPaymentVerified(supabase, contract, penaltyRequirement, {
+        slipUrl: safeSlipUrl,
+        detectedAmount: verificationResult.detectedAmount,
+        verificationResult: verificationResult.result,
+        verificationDetails: {
+          provider: verificationResult.rawResponse?.provider || null,
+          fingerprint: slipFingerprint,
+        },
+        attemptCount: (previousAttempts || 0) + 1,
+      });
+    }
 
     // Send notification to Drop Point
-    const dropPointLineId = redemption.contract?.drop_points?.line_id;
+    const dropPoint = Array.isArray(contract.drop_points) ? contract.drop_points[0] : contract.drop_points;
+    const dropPointLineId = dropPoint?.line_id;
     if (dropPointLineId && dropPointLineClient) {
       try {
         const { data: storageBox, error: storageBoxError } = await supabase
@@ -217,7 +340,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
 
         if (storageBoxError && storageBoxError.code !== 'PGRST205') {
-          console.error('Error fetching storage box for redemption card:', storageBoxError);
+          console.error('Error fetching storage box for redemption card');
         }
 
         const { data: bagAssignment, error: bagAssignmentError } = await supabase
@@ -229,10 +352,10 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
 
         if (bagAssignmentError) {
-          console.error('Error fetching bag assignment for redemption card:', bagAssignmentError);
+          console.error('Error fetching bag assignment for redemption card');
         }
 
-        const notificationCard = createDropPointRedemptionCard(redemption, getDropPointReturnUrl(redemptionId));
+        const notificationCard = createDropPointRedemptionCard(redemption, getDropPointReturnUrl(safeRedemptionId));
         const bagOrBoxCode = bagAssignment?.bag_number || storageBox?.box_code || null;
         if (storageBox?.box_code && bagAssignment?.bag_number && bagAssignment.bag_number !== storageBox.box_code) {
           (notificationCard.contents as any).body.contents.splice(3, 0, {
@@ -259,9 +382,8 @@ export async function POST(request: NextRequest) {
           });
         }
         await dropPointLineClient.pushMessage(dropPointLineId, notificationCard);
-        console.log(`Sent redemption notification to drop point: ${dropPointLineId}`);
-      } catch (msgError) {
-        console.error('Error sending to drop point:', msgError);
+      } catch {
+        console.error('Error sending redemption notification to drop point');
       }
     }
 
@@ -271,12 +393,17 @@ export async function POST(request: NextRequest) {
       result: verificationResult.result,
     });
 
-  } catch (error: any) {
-    console.error('Error uploading slip:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error uploading redemption slip');
+    return sanitizedServerError('ไม่สามารถตรวจสอบสลิปได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
+    if (releaseEvidenceLock) await releaseEvidenceLock();
   }
 }
 

@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { VALID_BANK_ACCOUNT_TYPES } from '@/lib/utils/bank-account-types';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+
+const MAX_JSON_BYTES = 64 * 1024;
+
+function isBoundedText(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLength;
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_JSON_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const {
-      lineId,
+      lineId: claimedLineId,
       firstname,
       lastname,
       phoneNumber,
@@ -21,11 +36,27 @@ export async function POST(request: NextRequest) {
     const normalizedReferralCode = referralCode?.trim()?.toUpperCase() || null;
 
     // Validation
-    if (!lineId || !firstname || !lastname || !phoneNumber || !nationalId) {
+    if (
+      !isBoundedText(claimedLineId, 80)
+      || !isBoundedText(firstname, 120)
+      || !isBoundedText(lastname, 120)
+      || !isBoundedText(phoneNumber, 32)
+      || !isBoundedText(nationalId, 32)
+      || (address && JSON.stringify(address).length > 8_192)
+      || (bankInfo && JSON.stringify(bankInfo).length > 4_096)
+      || (preferences && JSON.stringify(preferences).length > 16_384)
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Invalid or missing fields', code: 'INVALID_INPUT' },
         { status: 400 }
       );
+    }
+
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'INVESTOR', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
     }
 
     const supabase = supabaseAdmin();
@@ -86,7 +117,7 @@ export async function POST(request: NextRequest) {
         investor_tier: 'SILVER',
         total_active_principal: 0
       }])
-      .select()
+      .select('investor_id, kyc_status, referral_code, max_investment_amount, investment_preferences, investor_tier, total_active_principal, auto_invest_enabled, auto_liquidation_enabled')
       .single();
 
     if (error) {
@@ -96,12 +127,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       investor
-    });
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
 
-  } catch (error: any) {
-    console.error('Error registering investor:', error);
+  } catch (error) {
+    console.error('[investors:register] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'ไม่สามารถลงทะเบียนได้ชั่วคราว', code: 'REGISTRATION_FAILED' },
       { status: 500 }
     );
   }

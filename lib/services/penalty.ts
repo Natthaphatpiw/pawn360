@@ -266,6 +266,21 @@ export const ensurePenaltyPaymentRecord = async (
     .single();
 
   if (createError) {
+    // The production integrity migration enforces one ledger per
+    // (contract_id, penalty_date). A concurrent creator is an idempotent race,
+    // not a server failure: read and reuse the winning record.
+    if (createError.code === '23505') {
+      const { data: racedPayments, error: racedError } = await supabase
+        .from('penalty_payments')
+        .select('*')
+        .eq('contract_id', contract.contract_id)
+        .eq('penalty_date', penaltyDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (racedError) throw racedError;
+      const raced = Array.isArray(racedPayments) ? racedPayments[0] : null;
+      if (raced) return raced;
+    }
     throw createError;
   }
 

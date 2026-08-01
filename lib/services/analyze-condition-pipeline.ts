@@ -4,9 +4,8 @@
 // synchronously (POST /api/analyze-condition) and as a background job
 // (/api/analyze-condition/jobs — see lib/services/analyze-condition-jobs.ts).
 //
-// Scoring runs on OpenAI gpt-5.6-luna vision (Responses API); Claude vision is
-// the resilience fallback. The image precheck stays on Claude. No Next.js
-// request/response types in here.
+// Precheck and scoring run on OpenAI gpt-5.6-luna with task-sized reasoning;
+// Claude vision remains the resilience fallback. No Next.js request/response types.
 
 import {
   anthropicStructured,
@@ -15,17 +14,34 @@ import {
 } from '@/lib/services/anthropic-llm';
 import {
   hasOpenAIKeys,
+  getOpenAILunaModel,
+  getOpenAIReasoningEffortForTask,
   getOpenAIVisionModel,
+  openaiStructuredJson,
   openaiVisionJson,
 } from '@/lib/services/openai-llm';
+import {
+  isProviderError,
+  normalizeProviderError,
+  ProviderError,
+  providerErrorCode,
+} from '@/lib/services/provider-error';
+import {
+  deriveAISafetyIdentifier,
+  getAISafetyIdentifier,
+  runWithAIUsageContext,
+} from '@/lib/services/ai-usage';
 
-export const MAX_IMAGE_COUNT = 6;
+export const MAX_IMAGE_COUNT = 4;
 export const MAX_TOTAL_IMAGE_MB = 10;
 const MIN_AI_CONDITION_SCORE = 0.3;
 
 export interface AnalyzeConditionRequest {
   images: string[];
   itemType: string;
+  // Bound from the verified LIFF subject by the enqueue route. The vision
+  // pipeline ignores it; the job layer uses it for status/cancel ownership.
+  lineId?: string;
   brand?: string;
   model?: string;
   appleCategory?: string;
@@ -48,11 +64,13 @@ export type ConditionResult = {
   };
   recommendation: string;
   imageQuality: string;
+  /** Added by the authenticated polling client after a completed queue job. */
+  jobId?: string;
 };
 
 export type AnalyzeConditionRunResult =
   | { ok: true; payload: ConditionResult }
-  | { ok: false; status: number; error: string; code?: string };
+  | { ok: false; status: number; error: string; code?: string; retryAfterSeconds?: number };
 
 type ImagePrecheckResult = {
   pass: boolean;
@@ -186,7 +204,7 @@ ${productLine}
 };
 
 // ---------------------------------------------------------------------------
-// Image precheck (Claude): type match + same-item consistency
+// Image precheck: OpenAI Luna primary, Claude vision fallback
 // ---------------------------------------------------------------------------
 
 async function precheckImages(options: AnalyzeConditionRequest): Promise<ImagePrecheckResult> {
@@ -220,14 +238,7 @@ expectedType: ${expectedType}
   "recommendation": "คำแนะนำให้ผู้ใช้ถ่ายภาพใหม่หรือเพิ่มเติม"
 }`;
 
-  const parsed = await anthropicStructured<ImagePrecheckResult>({
-    userText: prompt,
-    images: options.images.slice(0, MAX_IMAGE_COUNT),
-    model: getAnthropicVisionModel(),
-    toolName: 'image_precheck',
-    toolDescription: 'Return the image precheck result.',
-    maxTokens: 1024,
-    schema: {
+  const schema = {
       type: 'object',
       additionalProperties: false,
       properties: {
@@ -252,10 +263,52 @@ expectedType: ${expectedType}
         recommendation: { type: 'string' },
       },
       required: ['pass', 'reason', 'expectedType', 'consistentItem', 'imageChecks', 'recommendation'],
-    },
-  });
+    };
+
+  let parsed: ImagePrecheckResult | null = null;
+  let openAIFailure: ProviderError | null = null;
+  if (hasOpenAIKeys()) {
+    try {
+      parsed = await openaiStructuredJson<ImagePrecheckResult>({
+        userText: prompt,
+        images: options.images.slice(0, MAX_IMAGE_COUNT),
+        imageDetail: 'low',
+        model: getOpenAILunaModel(),
+        effort: getOpenAIReasoningEffortForTask('condition_image_precheck'),
+        schemaName: 'image_precheck',
+        maxOutputTokens: 4000,
+        schema,
+        label: 'condition_image_precheck',
+        promptCacheKey: 'condition_image_precheck',
+      });
+    } catch (error) {
+      openAIFailure = normalizeProviderError('openai', error, 'condition_image_precheck');
+      console.warn('OpenAI image precheck failed; trying Anthropic:', {
+        kind: openAIFailure.kind,
+        retryable: openAIFailure.retryable,
+      });
+    }
+  }
+
+  if (!parsed && hasAnthropicKeys()) {
+    try {
+      parsed = await anthropicStructured<ImagePrecheckResult>({
+        userText: prompt,
+        images: options.images.slice(0, MAX_IMAGE_COUNT),
+        model: getAnthropicVisionModel(),
+        toolName: 'image_precheck',
+        toolDescription: 'Return the image precheck result.',
+        maxTokens: 1024,
+        schema,
+      });
+    } catch (error) {
+      const anthropicFailure = normalizeProviderError('anthropic', error, 'condition_image_precheck');
+      throw anthropicFailure.retryable ? anthropicFailure : (openAIFailure || anthropicFailure);
+    }
+  }
 
   if (!parsed) {
+    if (openAIFailure?.retryable) throw openAIFailure;
     return {
       pass: false,
       reason: 'ไม่สามารถตรวจสอบรูปภาพได้',
@@ -278,6 +331,7 @@ expectedType: ${expectedType}
 
 const CONDITION_RESULT_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   properties: {
     score: { type: 'number' },
     totalScore: { type: 'number' },
@@ -288,18 +342,23 @@ const CONDITION_RESULT_SCHEMA = {
     assessmentIssue: { type: 'string' },
     detailedBreakdown: {
       type: 'object',
+      additionalProperties: false,
       properties: {
-        screen: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
-        body: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
-        buttons: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
-        camera: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
-        overall: { type: 'object', properties: { score: { type: 'number' }, description: { type: 'string' } } },
+        screen: { type: 'object', additionalProperties: false, properties: { score: { type: 'number' }, description: { type: 'string' } }, required: ['score', 'description'] },
+        body: { type: 'object', additionalProperties: false, properties: { score: { type: 'number' }, description: { type: 'string' } }, required: ['score', 'description'] },
+        buttons: { type: 'object', additionalProperties: false, properties: { score: { type: 'number' }, description: { type: 'string' } }, required: ['score', 'description'] },
+        camera: { type: 'object', additionalProperties: false, properties: { score: { type: 'number' }, description: { type: 'string' } }, required: ['score', 'description'] },
+        overall: { type: 'object', additionalProperties: false, properties: { score: { type: 'number' }, description: { type: 'string' } }, required: ['score', 'description'] },
       },
+      required: ['screen', 'body', 'buttons', 'camera', 'overall'],
     },
     recommendation: { type: 'string' },
     imageQuality: { type: 'string' },
   },
-  required: ['totalScore', 'reason'],
+  required: [
+    'score', 'totalScore', 'grade', 'reason', 'assessable', 'assessmentStatus',
+    'assessmentIssue', 'detailedBreakdown', 'recommendation', 'imageQuality',
+  ],
 };
 
 async function scoreConditionWithClaudeVision(
@@ -329,6 +388,7 @@ async function analyzeCondition(
 
   const boundedImages = images.slice(0, MAX_IMAGE_COUNT);
   let parsed: ConditionResult | null = null;
+  let openAIFailure: ProviderError | null = null;
 
   if (canUseOpenAI) {
     try {
@@ -336,22 +396,39 @@ async function analyzeCondition(
       parsed = await openaiVisionJson<ConditionResult>({
         userText: buildConditionPrompt(options),
         images: boundedImages,
-        maxOutputTokens: 3500,
+        imageDetail: 'high',
+        model: getOpenAILunaModel(),
+        reasoningEffort: getOpenAIReasoningEffortForTask('condition_scoring'),
+        maxOutputTokens: 6000,
+        schema: CONDITION_RESULT_SCHEMA,
+        schemaName: 'condition_assessment',
+        label: 'condition_scoring',
+        promptCacheKey: 'condition_scoring',
       });
       if (!parsed) throw new Error('OpenAI returned no parseable condition JSON');
     } catch (error) {
-      if (!canUseClaude) throw error;
-      console.warn('🔁 OpenAI condition scoring failed — falling back to Claude vision:', error);
+      openAIFailure = normalizeProviderError('openai', error, 'condition_scoring');
+      if (!canUseClaude) throw openAIFailure;
+      console.warn('OpenAI condition scoring failed; trying Anthropic:', {
+        kind: openAIFailure.kind,
+        retryable: openAIFailure.retryable,
+      });
       parsed = null;
     }
   }
 
   if (!parsed) {
     console.log('🔍 Scoring condition with Claude vision (same rubric)...');
-    parsed = await scoreConditionWithClaudeVision(boundedImages, options);
+    try {
+      parsed = await scoreConditionWithClaudeVision(boundedImages, options);
+    } catch (error) {
+      const anthropicFailure = normalizeProviderError('anthropic', error, 'condition_scoring');
+      throw anthropicFailure.retryable ? anthropicFailure : (openAIFailure || anthropicFailure);
+    }
   }
 
   if (!parsed) {
+    if (openAIFailure?.retryable) throw openAIFailure;
     throw new Error('Condition scoring failed on all providers');
   }
 
@@ -462,12 +539,15 @@ function normalizeImageInput(value: string): string {
 export async function runAnalyzeConditionPipeline(
   body: AnalyzeConditionRequest
 ): Promise<AnalyzeConditionRunResult> {
+  if (body?.lineId && !getAISafetyIdentifier()) {
+    return runWithAIUsageContext(
+      { safetyIdentifier: deriveAISafetyIdentifier(body.lineId) },
+      () => runAnalyzeConditionPipeline(body)
+    );
+  }
   try {
     const { images, itemType, brand, model, appleCategory } = body || ({} as AnalyzeConditionRequest);
 
-    if (!hasAnthropicKeys()) {
-      return { ok: false, status: 500, error: 'Anthropic API key not configured' };
-    }
     if (!hasOpenAIKeys() && !hasAnthropicKeys()) {
       return { ok: false, status: 500, error: 'No vision provider configured' };
     }
@@ -494,7 +574,7 @@ export async function runAnalyzeConditionPipeline(
 
     const options = { images: normalizedImages, itemType, brand, model, appleCategory };
 
-    console.log('🔍 Prechecking images with Claude...');
+    console.log('🔍 Prechecking images with OpenAI Luna (Claude fallback)...');
     const precheck = await precheckImages(options);
     if (!precheck.pass) {
       const recommendation = precheck.recommendation ? `คำแนะนำ: ${precheck.recommendation}` : '';
@@ -534,7 +614,27 @@ export async function runAnalyzeConditionPipeline(
 
     return { ok: true, payload: conditionResult };
   } catch (error) {
-    console.error('Error analyzing condition:', error);
+    if (isProviderError(error)) {
+      console.error('Condition provider failure:', {
+        provider: error.provider,
+        kind: error.kind,
+        retryable: error.retryable,
+        status: error.status,
+        requestId: error.requestId,
+      });
+      return {
+        ok: false,
+        status: error.retryable ? 503 : 500,
+        error: error.retryable
+          ? 'ระบบวิเคราะห์รูปภาพกำลังมีผู้ใช้งานจำนวนมาก งานของคุณจะลองใหม่อัตโนมัติ กรุณารอสักครู่'
+          : 'ระบบวิเคราะห์รูปภาพไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่ภายหลัง',
+        code: providerErrorCode(error),
+        retryAfterSeconds: error.retryAfterMs
+          ? Math.max(1, Math.ceil(error.retryAfterMs / 1000))
+          : undefined,
+      };
+    }
+    console.error('Condition analysis failed with an unclassified error.');
     return { ok: false, status: 500, error: 'เกิดข้อผิดพลาดในการวิเคราะห์สภาพ' };
   }
 }

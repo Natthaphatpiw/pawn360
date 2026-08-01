@@ -15,14 +15,28 @@ const conditionJobQueue = new JobQueue<AnalyzeConditionRequest, ConditionResult>
   namespace: 'condition:job:v1',
   processPath: '/api/analyze-condition/jobs/process',
   run: (request) => runAnalyzeConditionPipeline(request),
+  getLineId: (request) => request.lineId,
+  vercelTopic: 'pawnline-condition-v1',
+  concurrency: () => ({
+    group: 'condition-vision',
+    defaultLimit: 8,
+    envVar: 'JOB_CONCURRENCY_CONDITION',
+  }),
   timeoutMessage: 'การวิเคราะห์สภาพใช้เวลานานผิดปกติและถูกยกเลิก กรุณาลองใหม่อีกครั้ง',
 });
 
 export const isConditionJobStoreAvailable = () => conditionJobQueue.isStoreAvailable();
-export const createConditionJob = (request: AnalyzeConditionRequest) => conditionJobQueue.create(request);
+export const createConditionJob = (request: AnalyzeConditionRequest, idempotencyKey?: string) =>
+  conditionJobQueue.create(request, idempotencyKey);
 export const getConditionJob = (jobId: string) => conditionJobQueue.get(jobId);
 export const cancelConditionJob = (jobId: string) => conditionJobQueue.cancel(jobId);
-export const processConditionJob = (jobId: string) => conditionJobQueue.process(jobId);
+export const processConditionJob = (
+  jobId: string,
+  options?: Parameters<typeof conditionJobQueue.process>[1]
+) => conditionJobQueue.process(jobId, options);
 export const getConditionJobDispatchMode = () => conditionJobQueue.getDispatchMode();
 export const dispatchConditionJobViaQstash = (jobId: string) => conditionJobQueue.dispatchViaQstash(jobId);
+export const dispatchConditionJobViaVercel = (jobId: string, request: AnalyzeConditionRequest) =>
+  conditionJobQueue.dispatchViaVercel(jobId, request);
+export const failConditionJobDispatch = (jobId: string) => conditionJobQueue.failDispatch(jobId);
 export const getConditionJobWorkerSecret = () => conditionJobQueue.getWorkerSecret();

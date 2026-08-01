@@ -244,7 +244,7 @@ export default function AboutPage() {
             At Astly, trust is our currency. Every transaction is backed by Thai legal frameworks, every asset is secured in premium vaults, and every valuation is verified by AI trained on global market data. We are not just a platform; we are your local partner in financial growth.
             </p>
             <p className="mt-4 text-sm font-light leading-6 text-s1 font-english">
-            ที่ Astly "ความไว้วางใจ" คือหัวใจสำคัญของเรา ทุกธุรกรรมได้รับการคุ้มครองภายใต้กรอบกฎหมายไทย ทรัพย์สินทุกชิ้นถูกจัดเก็บในห้องมั่นคงระดับพรีเมียม และทุกการประเมินราคาถูกยืนยันโดย AI ที่ฝึกฝนจากข้อมูลตลาดโลก เราไม่ได้เป็นเพียงแค่แพลตฟอร์ม แต่เราคือพันธมิตรท้องถิ่นที่จะช่วยให้คุณเติบโตทางการเงิน
+            ที่ Astly &ldquo;ความไว้วางใจ&rdquo; คือหัวใจสำคัญของเรา ทุกธุรกรรมได้รับการคุ้มครองภายใต้กรอบกฎหมายไทย ทรัพย์สินทุกชิ้นถูกจัดเก็บในห้องมั่นคงระดับพรีเมียม และทุกการประเมินราคาถูกยืนยันโดย AI ที่ฝึกฝนจากข้อมูลตลาดโลก เราไม่ได้เป็นเพียงแค่แพลตฟอร์ม แต่เราคือพันธมิตรท้องถิ่นที่จะช่วยให้คุณเติบโตทางการเงิน
             </p>
           </div>
         </section>

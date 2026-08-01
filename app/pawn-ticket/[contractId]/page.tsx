@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Home, SearchX } from 'lucide-react';
 import axios from 'axios';
 import { getMockContractDetail, getMockContractsEnabled } from '@/lib/mock-contracts';
+import { useLiff } from '@/lib/liff/liff-provider';
 
 const MOCK_PAWNER_SIGNATURE_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120' viewBox='0 0 300 120'%3E%3Crect width='300' height='120' fill='white' fill-opacity='0'/%3E%3Cpath d='M30 78 C55 35 78 102 102 62 S145 48 167 70 S210 92 232 56 S260 48 272 70' fill='none' stroke='%23111827' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E";
 const MOCK_INVESTOR_SIGNATURE_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120' viewBox='0 0 300 120'%3E%3Crect width='300' height='120' fill='white' fill-opacity='0'/%3E%3Cpath d='M24 72 C58 38 78 94 108 58 C132 30 156 94 184 60 C208 35 230 78 274 50' fill='none' stroke='%23111827' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E";
@@ -101,15 +102,19 @@ export default function PawnTicketPage() {
   const params = useParams();
   const contractId = params.contractId as string;
   const mockMode = getMockContractsEnabled();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [ticketData, setTicketData] = useState<any>(null);
 
   useEffect(() => {
-    if (contractId) {
+    if (liffLoading) return;
+    if (contractId && (mockMode || profile?.userId)) {
       fetchTicketData();
+    } else {
+      setLoading(false);
     }
-  }, [contractId, mockMode]);
+  }, [contractId, mockMode, liffLoading, profile?.userId]);
 
   const fetchTicketData = async () => {
     try {
@@ -120,7 +125,9 @@ export default function PawnTicketPage() {
         return;
       }
 
-      const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}?viewer=pawner`);
+      const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}?viewer=pawner`, {
+        headers: { 'X-LIFF-Role': 'PAWNER' },
+      });
       setTicketData(response.data.ticketData);
     } catch (error) {
       console.error('Error fetching ticket data:', error);
@@ -134,10 +141,18 @@ export default function PawnTicketPage() {
     router.push('/contracts');
   };
 
-  if (loading) {
+  if (liffLoading || loading) {
     return (
       <div className="min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />
+      </div>
+    );
+  }
+
+  if (liffError) {
+    return (
+      <div className="min-h-screen bg-background-white flex items-center justify-center p-4 text-error">
+        ไม่สามารถยืนยันบัญชี LINE ได้ กรุณาเปิดลิงก์ผ่าน LINE ใหม่
       </div>
     );
   }

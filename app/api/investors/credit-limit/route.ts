@@ -1,23 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { INVESTOR_TIER_THRESHOLDS } from '@/lib/services/investor-tier';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+
+const MAX_JSON_BYTES = 64 * 1024;
 
 export async function PUT(request: NextRequest) {
   try {
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_JSON_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const {
-      lineId,
+      lineId: claimedLineId,
       maxInvestmentAmount,
       preferences,
       autoMatchEnabled,
       autoLiquidationEnabled,
     } = body;
 
-    if (!lineId) {
+    if (typeof claimedLineId !== 'string' || !claimedLineId.trim() || claimedLineId.length > 80) {
       return NextResponse.json(
         { error: 'Line ID is required' },
         { status: 400 }
       );
+    }
+
+    if (preferences && JSON.stringify(preferences).length > 16_384) {
+      return NextResponse.json(
+        { error: 'Investment preferences are too large', code: 'INVALID_INPUT' },
+        { status: 400 }
+      );
+    }
+
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'INVESTOR', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
     }
 
     const supabase = supabaseAdmin();
@@ -90,7 +115,7 @@ export async function PUT(request: NextRequest) {
       .from('investors')
       .update(updateData)
       .eq('line_id', lineId)
-      .select()
+      .select('investor_id, investor_tier, total_active_principal, max_investment_amount, investment_preferences, auto_invest_enabled, auto_liquidation_enabled')
       .single();
 
     if (updateError) {
@@ -104,11 +129,13 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       investor: updatedInvestor,
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
+  } catch (error) {
+    console.error('[investors:credit-limit] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
     });
-  } catch (error: any) {
-    console.error('Error updating credit limit:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'ไม่สามารถบันทึกการตั้งค่าการลงทุนได้ชั่วคราว', code: 'CREDIT_LIMIT_UPDATE_FAILED' },
       { status: 500 }
     );
   }

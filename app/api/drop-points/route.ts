@@ -10,13 +10,28 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('drop_points')
-      .select('*')
+      .select(`
+        drop_point_id,
+        drop_point_name,
+        addr_house_no,
+        addr_street,
+        addr_sub_district,
+        addr_district,
+        addr_province,
+        addr_postcode,
+        latitude,
+        longitude,
+        phone_number,
+        google_map_url,
+        map_embed,
+        opening_hours
+      `)
       .eq('is_active', true)
       .eq('is_accepting_items', true)
       .order('drop_point_name', { ascending: true });
 
     if (error) {
-      console.error('Error fetching drop points:', error);
+      console.error('Error fetching drop points', { code: error.code || 'DB_ERROR' });
       return NextResponse.json(
         { error: 'Failed to fetch branches' },
         { status: 500 }
@@ -39,11 +54,15 @@ export async function GET() {
       operating_hours: formatOperatingHours(dp.opening_hours),
     }));
 
-    return NextResponse.json({
-      branches,
+    return NextResponse.json({ branches }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
+      },
     });
   } catch (error) {
-    console.error('Error in drop-points API:', error);
+    console.error('Error in drop-points API', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -61,7 +80,7 @@ function formatOperatingHours(hoursJson: any): string {
       return `จันทร์-ศุกร์: ${hoursJson.monday}, เสาร์: ${hoursJson.saturday || hoursJson.monday}, อาทิตย์: ${hoursJson.sunday || hoursJson.monday}`;
     }
     return 'โปรดติดต่อสาขา';
-  } catch (e) {
+  } catch {
     return 'โปรดติดต่อสาขา';
   }
 }

@@ -1,65 +1,128 @@
 # Environment Variables Setup
 
-Copy these variables to your `.env.local` file:
+คัดลอก `.env.example` เป็น `.env.local` แล้วใส่ค่าจริงผ่าน Vercel Environment Variables สำหรับ Production/Preview แยกกัน ห้าม commit ค่า secret และห้ามเปิด mock flags ใน production
+
+## LLM และการค้นหาราคา
 
 ```bash
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_API_KEY_2=your_openai_api_key_backup_2
-OPENAI_API_KEY_3=your_openai_api_key_backup_3
-OPENAI_API_KEY_4=your_openai_api_key_backup_4
+# OpenAI เป็น LLM หลัก; ตั้ง backup keys ได้ แต่ไม่ควรใช้เพื่อหลบ billing quota
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY_2=
+OPENAI_API_KEY_3=
+OPENAI_API_KEY_4=
+OPENAI_LUNA_MODEL=gpt-5.6-luna
+OPENAI_TERRA_MODEL=gpt-5.6-terra
+OPENAI_TIMEOUT_MS=90000
+OPENAI_STORE_RESPONSES=false
 
-# Gemini Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_API_KEY_2=your_gemini_api_key_backup_2
-GEMINI_API_KEY_3=your_gemini_api_key_backup_3
-GEMINI_API_KEY_4=your_gemini_api_key_backup_4
+# ค่า fallback ของ call เก่าที่ยังไม่ได้กำหนด policy ราย task
+OPENAI_LUNA_REASONING_EFFORT=low
+OPENAI_TERRA_REASONING_EFFORT=low
+OPENAI_NOTEBOOK_REASONING_EFFORT=low
 
-# Vercel Blob Configuration (private store)
-BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_token_here
-BLOB_STORE_ID=store_your_store_id_here
-BLOB_WEBHOOK_PUBLIC_KEY=your_blob_webhook_public_key_here
+# Optional task override; ถ้าไม่ตั้ง ระบบใช้ none/low และยกระดับหนึ่งขั้นเมื่อ quality gate ไม่ผ่าน
+# OPENAI_EFFORT_CONDITION_IMAGE_PRECHECK=none
+# OPENAI_EFFORT_CONDITION_SCORING=low
+# OPENAI_EFFORT_NOTEBOOK_VISION_SPEC=none
+# OPENAI_EFFORT_SLIP_VERIFICATION=low
+# OPENAI_EFFORT_GENERIC_NORMALIZE_INPUT=none
+# OPENAI_EFFORT_NOTEBOOK_NORMALIZE_INPUT=none
+# OPENAI_EFFORT_GENERIC_SERPAPI_FILTER=none
+# OPENAI_EFFORT_NOTEBOOK_SERPAPI_FILTER=low
+# OPENAI_EFFORT_NOTEBOOK_CANONICAL_SPEC=low
+# OPENAI_EFFORT_GENERIC_MARKET_EXTRACT=low
+# OPENAI_EFFORT_NOTEBOOK_MARKET_EXTRACT=low
 
-# MongoDB Configuration
-MONGODB_URI=<REDACTED>
-MONGODB_DB=pawn
+# Anthropic ใช้เป็น model fallback เมื่อ OpenAI ใช้งานไม่ได้
+ANTHROPIC_API_KEY=
+ANTHROPIC_API_KEY_2=
+ANTHROPIC_API_KEY_3=
+ANTHROPIC_API_KEY_4=
+ANTHROPIC_MODEL=claude-sonnet-4-6
+ANTHROPIC_VISION_MODEL=claude-haiku-4-5-20251001
+ANTHROPIC_PRICE_SEARCH_MODEL=claude-sonnet-4-6
 
-# LINE Channel Configuration (ตามที่ตั้งค่าใน Vercel)
-LINE_CHANNEL_ACCESS_TOKEN=<REDACTED>
-LINE_CHANNEL_SECRET=<REDACTED>
-# LINE Investor OA
-LINE_CHANNEL_ACCESS_TOKEN_INVEST=<REDACTED>
-LINE_CHANNEL_SECRET_INVEST=<REDACTED>
+# Web search: Parallel -> Exa -> stale Redis cache
+PARALLEL_API_KEY=your_parallel_api_key
+PARALLEL_SEARCH_MODE=turbo
+PARALLEL_SEARCH_TIMEOUT_MS=12000
+EXA_API_KEY=your_exa_api_key
+EXA_SEARCH_TIMEOUT_MS=30000
+MARKET_SEARCH_CACHE_TTL_SECONDS=21600
+MARKET_SEARCH_STALE_TTL_SECONDS=604800
+MARKET_SEARCH_MAX_EXCERPT_CHARS_PER_RESULT=2500
 
-# Manual Estimate (Admin OA)
-MANUAL_ESTIMATE_ENABLED=true
-LINE_ADMIN_CHANNEL_ACCESS_TOKEN=<REDACTED>
-LINE_ADMIN_CHANNEL_SECRET=<REDACTED>
-# Optional: comma-separated admin LINE IDs for push/multicast (fallback uses broadcast)
-LINE_ADMIN_TARGET_IDS=Uxxxxxxxxxxxx,Uyyyyyyyyyyyy
-NEXT_PUBLIC_LIFF_ID_ADMIN_ESTIMATE=2008954664-Wan1WlHX
+# SerpAPI เป็นแหล่งราคาโครงสร้างเสริม ไม่ใช่ fallback ของ Parallel
+SERPAPI_ENABLED=false
+SERPAPI_API_KEY=
+SERPAPI_EXCHANGE_RATE_THB_PER_USD=32
 
-# LINE LIFF Configuration
-# สำหรับ estimate page
-LINE_LIFF_ID=2008216710-54P86MRY
-NEXT_PUBLIC_LIFF_ID=2008216710-54P86MRY
-
-# สำหรับ register page (ตามที่ผู้ใช้ระบุ)
-NEXT_PUBLIC_LIFF_ID_REGISTER=2008216710-BEZ5XNyd
-
-# สำหรับชำระค่าปรับ
-NEXT_PUBLIC_LIFF_ID_PENALTY_PAYMENT=2008216710-Z54fuL3s
-
-# Cron (optional)
-CRON_SECRET=your_cron_secret
-
-# Rich Menu IDs (ตามที่ตั้งค่าใน Vercel)
-RICH_MENU_ID_NEW_USER=your_new_user_rich_menu_id
-RICH_MENU_ID_MEMBER=your_member_rich_menu_id
-
-# Base URL (ตามที่ตั้งค่าใน Vercel)
-NEXT_PUBLIC_BASE_URL=https://pawn360.vercel.app
-
-# QR Code Storage (ตามที่ตั้งค่าใน Vercel)
-QR_CODE_STORAGE_PATH=your_qr_storage_path
+# Cost/usage guardrails; ต้องมี Redis เพื่อบังคับ budget ข้าม instance
+AI_USAGE_TTL_SECONDS=7776000
+AI_MONTHLY_BUDGET_USD=
+AI_MAX_JOB_COST_USD=1
+AI_SAFETY_IDENTIFIER_SECRET=generate_a_long_random_secret
+ALLOW_SYNCHRONOUS_AI_ROUTES=false
 ```
+
+อย่ากำหนด effort เป็น `xhigh` หรือ `max` แบบ global ใน production โดยไม่มีผล eval รองรับ เพราะ reasoning token และเวลาเพิ่มขึ้นมาก ค่า task override จะครอบทั้งรอบแรกและ retry ของ task นั้น จึงควรใช้เฉพาะการทดลองที่วัดผลแล้ว
+
+## Vercel Queues และ Redis
+
+```bash
+KV_REST_API_URL=https://YOUR_DATABASE.upstash.io
+KV_REST_API_TOKEN=your_upstash_token
+KV_REST_API_READ_ONLY_TOKEN=your_upstash_read_only_token
+
+# Production: Vercel Queues; local next dev จะใช้ waitUntil อัตโนมัติ
+JOB_DISPATCHER=vercel
+JOB_CONCURRENCY_ESTIMATE_GENERIC=6
+JOB_CONCURRENCY_ESTIMATE_NOTEBOOK=2
+JOB_CONCURRENCY_CONDITION=8
+
+# ใช้เฉพาะ legacy QStash fallback
+QSTASH_TOKEN=
+JOB_WORKER_SECRET=generate_a_long_random_secret
+JOB_CALLBACK_BASE_URL=https://your-production-domain.example
+
+# ป้องกัน cron reconciliation
+CRON_SECRET=generate_a_different_long_random_secret
+```
+
+Queue topics และ consumer routes ถูกประกาศใน `vercel.json`; deployment ต้องรองรับ `queue/v2beta` ก่อนเปิด traffic จริง Vercel Queues ส่งแบบ at-least-once ดังนั้นห้ามถอด idempotency/lease/DLQ ใน application
+
+## UpPass eKYC
+
+```bash
+# Seller และ Asset Funding ต้องมี credentials แยกกัน; ไม่มี role fallback
+UPPASS_API_URL=https://app.uppass.io
+UPPASS_API_KEY=your_seller_uppass_api_key
+UPPASS_FORM_SLUG=your_seller_form_slug
+UPPASS_API_URL_INVEST=https://app.uppass.io
+UPPASS_API_KEY_INVEST=your_asset_funding_uppass_api_key
+UPPASS_FORM_SLUG_INVEST=your_asset_funding_form_slug
+UPPASS_REQUEST_TIMEOUT_MS=12000
+
+# จำกัด host ป้องกัน SSRF; comma-separated
+UPPASS_ALLOWED_HOSTS=app.uppass.io,api.uppass.io
+UPPASS_FORM_ALLOWED_HOSTS=app.uppass.io
+UPPASS_FORM_ALLOWED_HOSTS_INVEST=app.uppass.io
+
+# UpPass documented mode: Basic Auth และ fail closed
+UPPASS_WEBHOOK_AUTH_MODE=basic
+UPPASS_WEBHOOK_BASIC_USERNAME=generate_a_random_username
+UPPASS_WEBHOOK_BASIC_PASSWORD=generate_a_long_random_password
+UPPASS_WEBHOOK_AUTH_MODE_INVEST=basic
+UPPASS_WEBHOOK_BASIC_USERNAME_INVEST=generate_a_different_random_username
+UPPASS_WEBHOOK_BASIC_PASSWORD_INVEST=generate_a_different_long_random_password
+
+# เปิด legacy_hmac เฉพาะเมื่อมีข้อตกลง provider ยืนยันรูปแบบ signature แล้ว
+# UPPASS_WEBHOOK_AUTH_MODE=legacy_hmac
+# UPPASS_WEBHOOK_SECRET=minimum_32_character_secret
+```
+
+หลัง deploy ต้องรัน migration `database/migrations/2026_08_01_harden_ekyc.sql` ก่อนรับ webhook และตั้ง Basic Auth ชุดเดียวกันใน UpPass Dashboard ห้ามปล่อย credential ว่าง เพราะ endpoint จะตอบ `503` แบบ fail-closed
+
+## Infrastructure หลัก
+
+ใช้ชื่อและ placeholder จาก `.env.example` สำหรับ Supabase, MongoDB, Vercel Blob, LINE/LIFF, SlipOK และ Shop System ค่าที่มี `NEXT_PUBLIC_` เท่านั้นที่เข้าถึงได้จาก browser; ห้ามใส่ service-role key, provider key หรือ webhook secret ในตัวแปร public

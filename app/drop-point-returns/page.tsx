@@ -200,7 +200,10 @@ function DropPointReturnsContent() {
       formData.append('file', file);
       formData.append('folder', 'drop-point-returns');
       const response = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-LIFF-Role': 'DROP_POINT',
+        },
       });
       if (response.data.url) {
         setReturnPhotos((prev) => {

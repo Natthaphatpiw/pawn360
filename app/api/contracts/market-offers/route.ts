@@ -1,19 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { sanitizedServerError } from '@/lib/security/transaction-request';
 
 const MAX_OFFER_AGE_HOURS = 4;
 const MAX_OFFER_AGE_MS = MAX_OFFER_AGE_HOURS * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
+    const identity = await requireLiffIdentity(request, 'INVESTOR');
     const supabase = supabaseAdmin();
+    const { data: investor, error: investorError } = await supabase
+      .from('investors')
+      .select('investor_id, kyc_status, is_active, is_blocked')
+      .eq('line_id', identity.lineId)
+      .single();
+    if (
+      investorError
+      || !investor
+      || investor.kyc_status !== 'VERIFIED'
+      || investor.is_active === false
+      || investor.is_blocked === true
+    ) {
+      return NextResponse.json(
+        { error: 'กรุณายืนยันบัญชี Asset Funding ก่อนดูข้อเสนอ', code: 'INVESTOR_ACCESS_REQUIRED' },
+        { status: 403, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
-    // Get contracts that are pending investor (market offers)
-    // These are contracts waiting for investor funding
     const { data: contracts, error: contractsError } = await supabase
       .from('contracts')
       .select(`
-        *,
+        contract_id,
+        contract_status,
+        funding_status,
+        investor_id,
+        loan_principal_amount,
+        contract_duration_days,
+        created_at,
+        updated_at,
         items:item_id (
           item_id,
           brand,
@@ -31,14 +57,11 @@ export async function GET(request: NextRequest) {
       .in('contract_status', ['PENDING', 'PENDING_SIGNATURE'])
       .eq('funding_status', 'PENDING')
       .is('investor_id', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (contractsError) {
-      console.error('Error fetching market offers:', contractsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch market offers' },
-        { status: 500 }
-      );
+      throw contractsError;
     }
 
     const now = Date.now();
@@ -74,13 +97,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       offers: offersWithInfo
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
 
-  } catch (error: any) {
-    console.error('Error fetching market offers:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    console.error('[contract:market-offers] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return sanitizedServerError('ไม่สามารถโหลดข้อเสนอได้ชั่วคราว');
   }
 }

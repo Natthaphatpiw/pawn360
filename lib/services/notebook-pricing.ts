@@ -36,6 +36,10 @@ export interface NotebookListingInput {
   gpu?: string | null;
   condition_note?: string | null;
   origin: ListingOrigin;
+  /** Deterministic source-evidence state; historical reuse requires VERIFIED. */
+  evidence_status?: 'VERIFIED' | 'MANUAL_VERIFIED' | 'UNVERIFIED' | 'QUARANTINED_OUTLIER';
+  evidence_fingerprint?: string | null;
+  evidence_provider?: string | null;
 }
 
 export interface NotebookPricingConfig {
@@ -265,6 +269,7 @@ const tierRank = (tier: MatchTier) => TIER_ORDER.indexOf(tier);
 
 function classifyTier(
   target: NotebookSpec,
+  listing: NotebookListingInput,
   config: ResolvedListingConfig,
   labeled: MatchTier | null | undefined,
   cfg: NotebookPricingConfig
@@ -287,7 +292,25 @@ function classifyTier(
       ? target.gpuClass === config.gpu.gpuClass
       : null;
 
-  const canBeExact = cpuMatch !== false && ramMatch !== false && storageMatch !== false && gpuMatch !== false;
+  const positiveSpecMatches = [cpuMatch, ramMatch, storageMatch, gpuMatch]
+    .filter((value) => value === true).length;
+  const normalizedTitle = (listing.title || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^a-z0-9ก-๙]+/g, ' ');
+  const familyTokens = String(target.family || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .split(/[^a-z0-9ก-๙]+/)
+    .filter((token) => token.length >= 2 && !['laptop', 'notebook'].includes(token));
+  const verifiedFamily = familyTokens.length > 0
+    && familyTokens.every((token) => normalizedTitle.includes(token));
+  const canBeExact = cpuMatch !== false
+    && ramMatch !== false
+    && storageMatch !== false
+    && gpuMatch !== false
+    && positiveSpecMatches >= 1
+    && verifiedFamily;
 
   // A spec-blind target (no usable CPU score, no RAM, no storage) can't verify
   // any "exact" claim — cap such listings at family so a junk-spec input can
@@ -476,7 +499,7 @@ export function computeNotebookPrice(
   for (const listing of sane) {
     const config = resolveListingConfig(listing);
     const isAnchor = listing.listing_kind !== 'used';
-    const tier = isAnchor ? 'exact' : classifyTier(target, config, listing.match, cfg);
+    const tier = isAnchor ? 'exact' : classifyTier(target, listing, config, listing.match, cfg);
     const adjusted = adjustCompPrice(target, listing, config, tier, cfg);
     if (!adjusted) {
       dropped += 1;

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const resolveStatusLabel = (status?: string) => {
   switch (status) {
@@ -36,15 +43,8 @@ const resolveStepIndex = (status?: string) => {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const contractId = searchParams.get('contractId')?.trim();
-    const lineId = searchParams.get('lineId')?.trim();
-
-    if (!contractId || !lineId) {
-      return NextResponse.json(
-        { error: 'Missing contractId or lineId' },
-        { status: 400 }
-      );
-    }
+    const contractId = requireUuid(searchParams.get('contractId'));
+    const identity = await requireLiffIdentity(request, 'PAWNER');
 
     const supabase = supabaseAdmin();
 
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
       ? contract.pawners[0]
       : contract.pawners;
 
-    if (pawner?.line_id !== lineId) {
+    if (!pawner?.line_id || pawner.line_id !== identity.lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -79,8 +79,30 @@ export async function GET(request: NextRequest) {
 
     const { data: deliveryRequest, error: requestError } = await supabase
       .from('pawn_delivery_requests')
-      .select('*')
+      .select(`
+        delivery_request_id,
+        contract_id,
+        status,
+        delivery_fee,
+        address_house_no,
+        address_village,
+        address_street,
+        address_sub_district,
+        address_district,
+        address_province,
+        address_postcode,
+        address_full,
+        contact_phone,
+        notes,
+        driver_assigned_at,
+        item_picked_at,
+        arrived_at,
+        created_at,
+        updated_at
+      `)
       .eq('contract_id', contractId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (requestError || !deliveryRequest) {
@@ -103,12 +125,12 @@ export async function GET(request: NextRequest) {
       deliveryRequest,
       statusLabel,
       stepIndex,
-    });
-  } catch (error: any) {
-    console.error('Error fetching delivery status:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('[pawn-delivery:status] failed');
+    return sanitizedServerError('ไม่สามารถโหลดสถานะการจัดส่งได้ กรุณาลองใหม่');
   }
 }

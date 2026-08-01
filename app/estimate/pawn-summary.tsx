@@ -58,6 +58,9 @@ interface PawnSummaryProps {
     images: string[];
     estimatedPrice: number;
     aiConfidence?: number;
+    estimateJobId?: string;
+    estimateAttestation?: string;
+    requiresManualReview?: boolean;
     appleAccessories?: string[];
     processor?: string;
     ram?: string;
@@ -198,6 +201,7 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
     Boolean(deliveryMethod) &&
     Boolean(duration) &&
     Boolean(selectedBranchId) &&
+    !itemData.requiresManualReview &&
     (!isSerialRequired || Boolean(normalizedSerial));
 
   const currentBranch = branches.find(b => b.branch_id === selectedBranchId);
@@ -447,6 +451,11 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
       return;
     }
 
+    if (itemData.requiresManualReview) {
+      alert('ข้อมูลราคาตลาดยังมีความเชื่อมั่นไม่เพียงพอ กรุณารอเจ้าหน้าที่ตรวจสอบราคาก่อนส่งคำขอ');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       if (mockMode) {
@@ -544,7 +553,11 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
         estimateResult: {
           estimatedPrice: itemData.estimatedPrice,
           confidence: itemData.aiConfidence,
+          estimateJobId: itemData.estimateJobId,
+          estimateAttestation: itemData.estimateAttestation,
         },
+        estimateJobId: itemData.estimateJobId,
+        estimateAttestation: itemData.estimateAttestation,
         cpu: itemData.processor,
         ram: itemData.ram,
         storage: itemData.storage,
@@ -584,7 +597,11 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
     estimateResult: {
       estimatedPrice: itemData.estimatedPrice,
       confidence: itemData.aiConfidence,
+      estimateJobId: itemData.estimateJobId,
+      estimateAttestation: itemData.estimateAttestation,
     },
+    estimateJobId: itemData.estimateJobId,
+    estimateAttestation: itemData.estimateAttestation,
     cpu: itemData.processor,
     ram: itemData.ram,
     storage: itemData.storage,
@@ -722,6 +739,15 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
           <div className="text-primary text-sm opacity-80 relative z-10">บาท</div>
         </div>
+
+        {itemData.requiresManualReview && (
+          <div className="mb-6 rounded-xl border border-warning/40 bg-warning-soft p-4 text-sm text-foreground-muted">
+            <p className="font-semibold text-warning">ต้องตรวจสอบราคาโดยเจ้าหน้าที่</p>
+            <p className="mt-1 text-xs text-foreground-subtle">
+              หลักฐานราคาตลาดยังไม่เพียงพอ ระบบจึงยังไม่เปิดให้ส่งคำขอด้วยราคานี้
+            </p>
+          </div>
+        )}
 
         {/* 4. Loan Amount Input */}
         <div className="mb-6">

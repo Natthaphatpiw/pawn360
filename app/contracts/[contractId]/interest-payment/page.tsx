@@ -6,7 +6,6 @@ import { AlertTriangle, Info } from 'lucide-react';
 import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../_components/TransactionHeader';
-import { withPreview } from '../_lib/preview';
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -19,13 +18,7 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      clearCanvas();
-    }
-  }, [isOpen]);
-
-  const clearCanvas = () => {
+  function clearCanvas() {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -35,7 +28,13 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
-  };
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      clearCanvas();
+    }
+  }, [isOpen]);
 
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -204,7 +203,7 @@ export default function InterestPaymentPage() {
   const router = useRouter();
   const params = useParams();
   const contractId = params.contractId as string;
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -218,11 +217,17 @@ export default function InterestPaymentPage() {
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
+    if (liffLoading) return;
+    if (liffError || !profile?.userId) {
+      setError('กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      setLoading(false);
+      return;
+    }
     if (contractId) {
       fetchCalculation();
       fetchCompanyBank();
     }
-  }, [contractId]);
+  }, [contractId, profile?.userId, liffLoading, liffError]);
 
   const fetchCalculation = async () => {
     try {
@@ -238,29 +243,10 @@ export default function InterestPaymentPage() {
         throw new Error('Interest calculation unavailable');
       }
     } catch (error: any) {
-      console.error('Error fetching calculation:', error);
-      setContract({
-        contract_id: contractId,
-        contract_number: `CT-${contractId}-MOCK`,
-        item: { brand: 'Apple', model: 'iPhone 13' },
-      });
-      setCalculation({
-        interestToPay: 300,
-        totalToPay: 400,
-        baseTotalToPay: 400,
-        newEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        extensionDays: 30,
-        currentPrincipal: 10000,
-        interestRate: 0.03,
-        daysElapsed: 30,
-        daysRemaining: 0,
-        contractEndDate: new Date().toISOString(),
-        feeAmount: 100,
-        interestAccrued: 300,
-        interestAccruedWithFee: 400,
-        penaltyRequired: false,
-        penaltyAmount: 0,
-      });
+      console.error('[interest-payment] calculation unavailable');
+      setContract(null);
+      setCalculation(null);
+      setError(error.response?.data?.error || 'ไม่สามารถคำนวณยอดได้ กรุณาลองใหม่');
     } finally {
       setLoading(false);
     }
@@ -326,10 +312,8 @@ export default function InterestPaymentPage() {
         router.push(`/contracts/${contractId}/interest-payment/upload?requestId=${nextRequestId}`);
       }
     } catch (error: any) {
-      console.error('Error creating request:', error);
+      console.error('[interest-payment] request creation failed');
       setError(error.response?.data?.error || error.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
-      const previewRequestId = `preview-interest-${contractId}`;
-      router.push(withPreview(`/contracts/${contractId}/interest-payment/upload`, 'requestId', previewRequestId));
     } finally {
       setSubmitting(false);
     }
@@ -354,7 +338,7 @@ export default function InterestPaymentPage() {
     return (
       <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-red-600">ไม่พบข้อมูลสัญญา</p>
+          <p className="text-red-600">{error || 'ไม่พบข้อมูลสัญญา'}</p>
         </div>
       </div>
     );

@@ -1,11 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+
+const MAX_JSON_BYTES = 64 * 1024;
+
+function isBoundedText(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLength;
+}
 
 export async function PUT(request: NextRequest) {
   try {
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_JSON_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const {
-      lineId,
+      lineId: claimedLineId,
       firstname,
       lastname,
       phoneNumber,
@@ -16,15 +31,31 @@ export async function PUT(request: NextRequest) {
       signatureUrl
     } = body;
 
-    if (!lineId) {
+    if (!isBoundedText(claimedLineId, 80)) {
       return NextResponse.json(
         { error: 'Line ID is required' },
         { status: 400 }
       );
     }
 
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'INVESTOR', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
+
     // Validation - required fields
-    if (!firstname || !lastname || !phoneNumber) {
+    if (
+      !isBoundedText(firstname, 120)
+      || !isBoundedText(lastname, 120)
+      || !isBoundedText(phoneNumber, 32)
+      || (nationalId != null && nationalId !== '' && !isBoundedText(nationalId, 32))
+      || (email != null && email !== '' && !isBoundedText(email, 254))
+      || (signatureUrl != null && signatureUrl !== '' && !isBoundedText(signatureUrl, 2_048))
+      || (address && JSON.stringify(address).length > 8_192)
+      || (bankInfo && JSON.stringify(bankInfo).length > 4_096)
+    ) {
       return NextResponse.json(
         { error: 'กรุณากรอกข้อมูลที่จำเป็น (ชื่อ, นามสกุล, เบอร์โทร)' },
         { status: 400 }
@@ -88,7 +119,7 @@ export async function PUT(request: NextRequest) {
       .from('investors')
       .update(updateData)
       .eq('line_id', lineId)
-      .select()
+      .select('investor_id')
       .single();
 
     if (updateError) {
@@ -102,13 +133,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'อัพเดทข้อมูลเรียบร้อยแล้ว',
-      investor: updatedInvestor
-    });
+      investorId: updatedInvestor.investor_id,
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
 
-  } catch (error: any) {
-    console.error('Error in investor update API:', error);
+  } catch (error) {
+    console.error('[investors:update] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'เกิดข้อผิดพลาดในการอัพเดทข้อมูล', code: 'UPDATE_FAILED' },
       { status: 500 }
     );
   }

@@ -28,7 +28,7 @@ function PenaltyPaymentContent() {
   const searchParams = useSearchParams();
   const contractId = searchParams.get('contractId') || '';
   const returnTo = searchParams.get('returnTo') || '';
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [penaltyInfo, setPenaltyInfo] = useState<PenaltyInfo | null>(null);
@@ -61,9 +61,15 @@ function PenaltyPaymentContent() {
       setErrorMessage('ไม่พบสัญญาที่ต้องชำระค่าปรับ');
       return;
     }
+    if (liffLoading) return;
+    if (!profile?.userId) {
+      setLoading(false);
+      setErrorMessage(liffError || 'กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      return;
+    }
     fetchPenaltyStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contractId, profile?.userId]);
+  }, [contractId, liffLoading, liffError, profile?.userId]);
 
   const fetchPenaltyStatus = async () => {
     try {
@@ -71,7 +77,6 @@ function PenaltyPaymentContent() {
       const response = await axios.get('/api/penalties/status', {
         params: {
           contractId,
-          lineId: profile?.userId,
         },
       });
 
@@ -151,8 +156,11 @@ function PenaltyPaymentContent() {
       formData.append('file', slipFile);
       formData.append('folder', 'penalty-slips');
 
-      const uploadRes = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadRes = await axios.post('/api/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-LIFF-Role': 'PAWNER',
+        }
       });
 
       if (!uploadRes.data.url) {

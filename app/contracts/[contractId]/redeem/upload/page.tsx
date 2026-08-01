@@ -17,7 +17,7 @@ export default function RedemptionUploadPage() {
   const previewMode = isPreviewMode(searchParams);
   const previewDeliveryMethod = searchParams.get('deliveryMethod');
 
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -43,17 +43,17 @@ export default function RedemptionUploadPage() {
   useEffect(() => {
     if (previewMode) {
       setRedemptionDetails(getMockRedemption(redemptionId || `preview-redeem-${contractId}`, contractId, previewDeliveryMethod || undefined));
-    } else if (redemptionId) {
+    } else if (!liffLoading && profile?.userId && redemptionId) {
       fetchRedemptionDetails();
     }
-  }, [redemptionId, previewMode, contractId, previewDeliveryMethod]);
+  }, [redemptionId, previewMode, contractId, previewDeliveryMethod, liffLoading, profile?.userId]);
 
   const fetchRedemptionDetails = async () => {
     try {
       const response = await axios.get(`/api/redemptions/${redemptionId}`);
       if (response.data.success) {
         setRedemptionDetails(response.data.redemption);
-        if (response.data.redemption?.payment_slip_url) {
+        if (response.data.redemption?.payment_slip_uploaded) {
           setShowSuccess(true);
         }
       }
@@ -105,8 +105,11 @@ export default function RedemptionUploadPage() {
       formData.append('file', slipFile);
       formData.append('folder', 'redemption-slips');
 
-      const uploadRes = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const uploadRes = await axios.post('/api/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-LIFF-Role': 'PAWNER',
+        }
       });
 
       if (!uploadRes.data.url) {

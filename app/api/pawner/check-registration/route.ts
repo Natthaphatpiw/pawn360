@@ -1,50 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabaseAdmin } from '@/lib/supabase/client';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import {
+  ActorRateLimitError,
+  enforceActorRateLimit,
+} from '@/lib/security/actor-rate-limit';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const lineId = searchParams.get('lineId');
+    const claimedLineId = String(searchParams.get('lineId') || '').trim();
 
-    if (!lineId) {
+    if (!claimedLineId) {
       return NextResponse.json(
-        { error: 'lineId is required' },
-        { status: 400 }
+        { error: 'ข้อมูลบัญชีไม่ครบถ้วน', code: 'LINE_ID_REQUIRED' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    // Check if pawner exists in the database
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
+    await enforceActorRateLimit({
+      scope: 'pawner-registration-status',
+      actor: lineId,
+      limit: 30,
+      windowSeconds: 10 * 60,
+    });
+
+    const supabase = supabaseAdmin();
     const { data, error } = await supabase
       .from('pawners')
-      .select('customer_id, firstname, lastname, kyc_status')
+      .select('customer_id, kyc_status')
       .eq('line_id', lineId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 is "not found" error
-      console.error('Error checking registration:', error);
+    if (error) {
+      console.error('[pawner:registration-status] database failure', {
+        code: error.code || 'unknown',
+      });
       return NextResponse.json(
-        { error: 'Database error' },
-        { status: 500 }
+        { error: 'ไม่สามารถตรวจสอบสถานะการลงทะเบียนได้', code: 'REGISTRATION_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
       );
     }
 
     const isRegistered = !!data;
 
-    return NextResponse.json({
-      isRegistered,
-      pawnerData: data || null,
-    });
-  } catch (error) {
-    console.error('Error in check-registration:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      {
+        isRegistered,
+        pawnerData: data
+          ? { customer_id: data.customer_id, kyc_status: data.kyc_status }
+          : null,
+      },
+      { headers: { 'Cache-Control': 'no-store, private' } },
+    );
+  } catch (error) {
+    if (error instanceof ActorRateLimitError) {
+      return NextResponse.json(
+        {
+          error: error.status === 429
+            ? 'ตรวจสอบสถานะถี่เกินไป กรุณารอสักครู่'
+            : 'ระบบควบคุมการใช้งานยังไม่พร้อม กรุณาลองใหม่',
+          code: error.code,
+          retryable: true,
+        },
+        {
+          status: error.status,
+          headers: {
+            'Cache-Control': 'no-store',
+            'Retry-After': String(error.retryAfterSeconds),
+          },
+        },
+      );
+    }
+    console.error('[pawner:registration-status] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถตรวจสอบสถานะการลงทะเบียนได้', code: 'REGISTRATION_LOOKUP_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

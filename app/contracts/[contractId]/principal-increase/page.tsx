@@ -174,7 +174,7 @@ export default function PrincipalIncreasePage() {
   const searchParams = useSearchParams();
   const contractId = params.contractId as string;
   const previewMode = isPreviewMode(searchParams);
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [contract, setContract] = useState<any>(null);
@@ -193,14 +193,24 @@ export default function PrincipalIncreasePage() {
   const [bankAccountName, setBankAccountName] = useState('');
 
   useEffect(() => {
+    if (previewMode) {
+      fetchContractDetails();
+      return;
+    }
+    if (liffLoading) return;
+    if (liffError || !profile?.userId) {
+      setError('กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      setLoading(false);
+      return;
+    }
     fetchContractDetails();
-  }, [contractId]);
+  }, [contractId, previewMode, profile?.userId, liffLoading, liffError]);
 
   useEffect(() => {
-    if (contract && increaseAmount) {
+    if (contract && increaseAmount && (previewMode || profile?.userId)) {
       calculateIncrease();
     }
-  }, [increaseAmount, contract]);
+  }, [increaseAmount, contract, previewMode, profile?.userId]);
 
   const fetchContractDetails = async () => {
     try {

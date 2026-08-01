@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { Client } from '@line/bot-sdk';
 import { buildPenaltyLiffUrl, calculateOverdueDays, getPenaltyRequirement, normalizeDate } from '@/lib/services/penalty';
-
-const pawnerClient = process.env.LINE_CHANNEL_ACCESS_TOKEN && process.env.LINE_CHANNEL_SECRET
-  ? new Client({
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-    channelSecret: process.env.LINE_CHANNEL_SECRET,
-  })
-  : null;
-
-const investorClient = process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST && process.env.LINE_CHANNEL_SECRET_INVEST
-  ? new Client({
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST,
-    channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST,
-  })
-  : null;
+import { lineRetryKeyFromMaterial, pushLineTextMessage } from '@/lib/line/push-text';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import {
+  InternalAuthError,
+  internalAuthErrorResponse,
+  requireInternalRequest,
+} from '@/lib/security/request-auth';
+import { sanitizedServerError } from '@/lib/security/transaction-request';
 
 const formatThaiDate = (value: Date | string) => (
   new Date(value).toLocaleDateString('th-TH', {
@@ -28,17 +21,6 @@ const formatThaiDate = (value: Date | string) => (
 const getContractsLiffUrl = () => {
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_CONTRACTS || '2008216710-WJXR6xOM';
   return `https://liff.line.me/${liffId}`;
-};
-
-const ensureCronAuthorized = (request: NextRequest) => {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    return true;
-  }
-
-  const header = request.headers.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  return token === secret;
 };
 
 const buildDayRange = (day: Date) => {
@@ -72,8 +54,7 @@ const shouldSendToday = async (supabase: any, params: {
     .lt('created_at', dayEnd.toISOString());
 
   if (error) {
-    console.error('Error checking notifications:', error);
-    return true;
+    throw error;
   }
 
   return (count || 0) === 0;
@@ -88,7 +69,7 @@ const recordNotification = async (supabase: any, params: {
   contractId: string;
 }) => {
   const { recipientType, recipientId, notificationType, title, message, contractId } = params;
-  await supabase
+  const { error } = await supabase
     .from('notifications')
     .insert({
       recipient_type: recipientType,
@@ -101,18 +82,28 @@ const recordNotification = async (supabase: any, params: {
       sent_via: ['LINE'],
       created_at: new Date().toISOString(),
     });
+  if (error) throw error;
 };
 
-const sendLineMessage = async (client: Client | null, lineId: string | null, text: string) => {
-  if (!client || !lineId) {
+const sendLineMessage = async (
+  channelAccessToken: string | undefined,
+  lineId: string | null,
+  text: string,
+  retryMaterial: string,
+) => {
+  if (!channelAccessToken || !lineId) {
     return false;
   }
 
   try {
-    await client.pushMessage(lineId, { type: 'text', text });
+    await pushLineTextMessage({
+      channelAccessToken,
+      to: lineId,
+      text,
+      retryKey: lineRetryKeyFromMaterial(retryMaterial),
+    });
     return true;
-  } catch (error) {
-    console.error('Error sending LINE message:', error);
+  } catch {
     return false;
   }
 };
@@ -179,7 +170,12 @@ const runReminders = async (supabase: any, today: Date) => {
       });
 
       if (shouldSend) {
-        const sent = await sendLineMessage(pawnerClient, pawner?.line_id || null, message);
+        const sent = await sendLineMessage(
+          process.env.LINE_CHANNEL_ACCESS_TOKEN,
+          pawner?.line_id || null,
+          message,
+          `due-reminder:${contract.contract_id}:3:${dayStart.toISOString()}`,
+        );
         if (sent) {
           await recordNotification(supabase, {
             recipientType: 'PAWNER',
@@ -208,7 +204,12 @@ const runReminders = async (supabase: any, today: Date) => {
       });
 
       if (shouldSend) {
-        const sent = await sendLineMessage(pawnerClient, pawner?.line_id || null, message);
+        const sent = await sendLineMessage(
+          process.env.LINE_CHANNEL_ACCESS_TOKEN,
+          pawner?.line_id || null,
+          message,
+          `due-reminder:${contract.contract_id}:1:${dayStart.toISOString()}`,
+        );
         if (sent) {
           await recordNotification(supabase, {
             recipientType: 'PAWNER',
@@ -237,7 +238,12 @@ const runReminders = async (supabase: any, today: Date) => {
       });
 
       if (shouldSendPawner) {
-        const sent = await sendLineMessage(pawnerClient, pawner?.line_id || null, message);
+        const sent = await sendLineMessage(
+          process.env.LINE_CHANNEL_ACCESS_TOKEN,
+          pawner?.line_id || null,
+          message,
+          `due-reminder:${contract.contract_id}:0:pawner:${dayStart.toISOString()}`,
+        );
         if (sent) {
           await recordNotification(supabase, {
             recipientType: 'PAWNER',
@@ -264,7 +270,12 @@ const runReminders = async (supabase: any, today: Date) => {
         : false;
 
       if (shouldSendInvestor && investor?.line_id) {
-        const sent = await sendLineMessage(investorClient, investor.line_id, investorMessage);
+        const sent = await sendLineMessage(
+          process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST,
+          investor.line_id,
+          investorMessage,
+          `due-reminder:${contract.contract_id}:0:investor:${dayStart.toISOString()}`,
+        );
         if (sent) {
           await recordNotification(supabase, {
             recipientType: 'INVESTOR',
@@ -337,7 +348,12 @@ const runReminders = async (supabase: any, today: Date) => {
       }
 
       const pawner = Array.isArray(contract.pawners) ? contract.pawners[0] : contract.pawners;
-      const sent = await sendLineMessage(pawnerClient, pawner?.line_id || null, message);
+      const sent = await sendLineMessage(
+        process.env.LINE_CHANNEL_ACCESS_TOKEN,
+        pawner?.line_id || null,
+        message,
+        `penalty-reminder:${contract.contract_id}:${start.toISOString()}`,
+      );
       if (sent) {
         await recordNotification(supabase, {
           recipientType: 'PAWNER',
@@ -358,27 +374,32 @@ const runReminders = async (supabase: any, today: Date) => {
 };
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    if (!ensureCronAuthorized(request)) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    requireInternalRequest(request, ['CRON_SECRET', 'INTERNAL_API_SECRET']);
 
     const supabase = supabaseAdmin();
-    const results = await runReminders(supabase, new Date());
+    const today = normalizeDate(new Date());
+    releaseLock = await acquireFinancialLock(
+      `due-reminders:${today.toISOString().slice(0, 10)}`,
+      15 * 60,
+    );
+    const results = await runReminders(supabase, today);
 
     return NextResponse.json({
       success: true,
       results,
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error: unknown) {
+    if (error instanceof InternalAuthError) return internalAuthErrorResponse(error);
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract:due-reminders] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
     });
-  } catch (error: any) {
-    console.error('Error sending due reminders:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return sanitizedServerError('ไม่สามารถประมวลผลการแจ้งเตือนได้');
+  } finally {
+    await releaseLock?.();
   }
 }
 

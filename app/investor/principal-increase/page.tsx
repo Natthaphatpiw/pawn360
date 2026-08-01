@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { isInvestorPreviewMode, MOCK_PRINCIPAL_INCREASE_REQUEST_ID } from '@/lib/mock-investment';
 
@@ -10,8 +10,6 @@ export const dynamic = 'force-dynamic';
 function InvestorPrincipalIncreaseEntryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [, setRequestId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const resolvedRequestId = useMemo(() => {
     const direct = searchParams.get('requestId');
@@ -28,21 +26,16 @@ function InvestorPrincipalIncreaseEntryInner() {
 
   useEffect(() => {
     if (!resolvedRequestId && isInvestorPreviewMode()) {
-      setRequestId(MOCK_PRINCIPAL_INCREASE_REQUEST_ID);
       router.replace(`/investor/principal-increase/${MOCK_PRINCIPAL_INCREASE_REQUEST_ID}`);
       return;
     }
 
     if (resolvedRequestId) {
-      setRequestId(resolvedRequestId);
       router.replace(`/investor/principal-increase/${resolvedRequestId}`);
-      return;
     }
-
-    setLoading(false);
   }, [resolvedRequestId, router]);
 
-  if (loading) {
+  if (resolvedRequestId || isInvestorPreviewMode()) {
     return (
       <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />

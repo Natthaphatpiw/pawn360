@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import {
+  dropPointAccessErrorResponse,
+  requireDropPointActor,
+} from '@/lib/security/drop-point-access';
 
 const RETURN_PENDING_STATUSES = ['AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
 
@@ -8,14 +12,12 @@ export async function GET(
   context: { params: Promise<{ lineId: string }> }
 ) {
   try {
-    const { lineId } = await context.params;
-
-    if (!lineId) {
-      return NextResponse.json(
-        { error: 'LINE ID is required' },
-        { status: 400 }
-      );
-    }
+    const { lineId: claimedLineId } = await context.params;
+    const lineId = await requireDropPointActor(
+      request,
+      claimedLineId,
+      'drop-point-return-list',
+    );
 
     const supabase = supabaseAdmin();
 
@@ -23,12 +25,22 @@ export async function GET(
       .from('drop_points')
       .select('drop_point_id, drop_point_name, drop_point_code')
       .eq('line_id', lineId)
-      .single();
+      .eq('is_active', true)
+      .maybeSingle();
 
-    if (dpError || !dropPoint) {
+    if (dpError) {
+      console.error('[drop-points:returns] drop point lookup failed', {
+        code: dpError.code || 'unknown',
+      });
       return NextResponse.json(
-        { error: 'Drop point not found' },
-        { status: 404 }
+        { error: 'ไม่สามารถตรวจสอบข้อมูลจุดรับสินค้าได้', code: 'DROP_POINT_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
+    }
+    if (!dropPoint) {
+      return NextResponse.json(
+        { error: 'ไม่พบจุดรับสินค้าที่เปิดใช้งาน', code: 'DROP_POINT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -37,13 +49,11 @@ export async function GET(
       .select(`
         redemption_id,
         request_status,
-        total_amount,
-        delivery_method,
         verified_at,
         created_at,
         updated_at,
         item_return_confirmed_at,
-        contract:contract_id (
+        contract:contracts!inner (
           contract_id,
           contract_number,
           contract_status,
@@ -53,11 +63,6 @@ export async function GET(
             brand,
             model,
             image_urls
-          ),
-          pawners:customer_id (
-            firstname,
-            lastname,
-            phone_number
           )
         )
       `)
@@ -67,7 +72,13 @@ export async function GET(
       .order('updated_at', { ascending: false });
 
     if (redemptionError) {
-      throw redemptionError;
+      console.error('[drop-points:returns] redemption query failed', {
+        code: redemptionError.code || 'unknown',
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดรายการส่งคืนได้', code: 'RETURN_LIST_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
     }
 
     const normalizedRedemptions = (redemptions || []).map((redemption) => ({
@@ -87,7 +98,13 @@ export async function GET(
         .in('contract_id', contractIds);
 
       if (storageBoxesError && storageBoxesError.code !== 'PGRST205') {
-        throw storageBoxesError;
+        console.error('[drop-points:returns] storage box query failed', {
+          code: storageBoxesError.code || 'unknown',
+        });
+        return NextResponse.json(
+          { error: 'ไม่สามารถโหลดข้อมูลกล่องจัดเก็บได้', code: 'STORAGE_BOX_LOOKUP_FAILED' },
+          { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+        );
       }
 
       storageBoxByContractId = (storageBoxes || []).reduce<Record<string, string>>((acc, row) => {
@@ -104,24 +121,39 @@ export async function GET(
         && redemption.contract?.item_delivery_status !== 'RETURNED'
       ))
       .map((redemption) => ({
-      ...redemption,
-      displayStatus: 'รอคืนของ',
-      displayDate: redemption.verified_at || redemption.updated_at || redemption.created_at,
-      storage_box_code: redemption.contract?.contract_id
-        ? storageBoxByContractId[redemption.contract.contract_id] || null
-        : null,
+        redemption_id: redemption.redemption_id,
+        request_status: redemption.request_status,
+        contract: redemption.contract
+          ? {
+              contract_id: redemption.contract.contract_id,
+              contract_number: redemption.contract.contract_number,
+              items: redemption.contract.items,
+            }
+          : null,
+        displayStatus: 'รอคืนของ',
+        displayDate: redemption.verified_at || redemption.updated_at || redemption.created_at,
+        storage_box_code: redemption.contract?.contract_id
+          ? storageBoxByContractId[redemption.contract.contract_id] || null
+          : null,
       }));
 
-    return NextResponse.json({
-      success: true,
-      dropPoint,
-      redemptions: formatted
-    });
-  } catch (error: any) {
-    console.error('Error fetching drop point returns:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      {
+        success: true,
+        dropPoint,
+        redemptions: formatted,
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    const accessResponse = dropPointAccessErrorResponse(error);
+    if (accessResponse) return accessResponse;
+    console.error('[drop-points:returns] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถโหลดรายการส่งคืนได้', code: 'RETURN_LIST_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

@@ -83,7 +83,8 @@ function DropPointPickupPageContent() {
       try {
         setLoading(true);
         const response = await axios.get('/api/pawn-delivery/drop-point', {
-          params: { deliveryRequestId, lineId: profile.userId },
+          params: { deliveryRequestId },
+          headers: { 'X-LIFF-Role': 'DROP_POINT' },
         });
         setDeliveryRequest(response.data.deliveryRequest || null);
         setContract(response.data.contract || null);
@@ -124,7 +125,8 @@ function DropPointPickupPageContent() {
         action,
       });
       const response = await axios.get('/api/pawn-delivery/drop-point', {
-        params: { deliveryRequestId, lineId: profile.userId },
+        params: { deliveryRequestId },
+        headers: { 'X-LIFF-Role': 'DROP_POINT' },
       });
       setDeliveryRequest(response.data.deliveryRequest || null);
       setContract(response.data.contract || null);

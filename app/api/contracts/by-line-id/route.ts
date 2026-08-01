@@ -1,80 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { sanitizedServerError } from '@/lib/security/transaction-request';
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const lineId = searchParams.get('lineId');
-
-    if (!lineId) {
-      return NextResponse.json(
-        { error: 'lineId is required' },
-        { status: 400 }
-      );
-    }
+    const { lineId } = await requireLiffIdentity(request, 'PAWNER');
 
     const { db } = await connectToDatabase();
     const contractsCollection = db.collection('contracts');
 
-    // อัพเดทสถานะสัญญาที่เลยกำหนดก่อนแสดงผล
-    await updateOverdueContracts(db, lineId);
-
     // ค้นหาสัญญาทั้งหมดที่มี lineId นี้
     const contracts = await contractsCollection
       .find({ lineId })
+      .project({
+        _id: 1,
+        contractNumber: 1,
+        status: 1,
+        item: 1,
+        pawnDetails: 1,
+        dates: 1,
+        transactionHistory: 1,
+        storeId: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
       .sort({ createdAt: -1 })
+      .limit(100)
       .toArray();
+
+    const now = Date.now();
+    const safeContracts = contracts.map((contract) => ({
+      ...contract,
+      status: contract.status === 'active'
+        && contract.dates?.dueDate
+        && new Date(contract.dates.dueDate).getTime() < now
+        ? 'overdue'
+        : contract.status,
+    }));
 
     return NextResponse.json({
       success: true,
-      contracts,
+      contracts: safeContracts,
     });
-  } catch (error: any) {
-    console.error('Error fetching contracts:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch contracts' },
-      { status: 500 }
-    );
-  }
-}
-
-// Function to update overdue contracts
-async function updateOverdueContracts(db: any, lineId: string) {
-  try {
-    const contractsCollection = db.collection('contracts');
-    const currentDate = new Date();
-
-    // Find contracts that are active and past due date
-    const overdueContracts = await contractsCollection
-      .find({
-        lineId,
-        status: 'active',
-        'dates.dueDate': { $lt: currentDate }
-      })
-      .toArray();
-
-    if (overdueContracts.length > 0) {
-      console.log(`Updating ${overdueContracts.length} overdue contracts for user ${lineId}`);
-
-      // Update status to overdue
-      await contractsCollection.updateMany(
-        {
-          lineId,
-          status: 'active',
-          'dates.dueDate': { $lt: currentDate }
-        },
-        {
-          $set: {
-            status: 'overdue',
-            updatedAt: new Date()
-          }
-        }
-      );
-
-      console.log('Overdue contracts updated successfully');
-    }
-  } catch (error) {
-    console.error('Error updating overdue contracts:', error);
-    // Don't throw error to prevent breaking the main flow
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    console.error('[contracts:by-line-id] failed');
+    return sanitizedServerError('ไม่สามารถโหลดรายการสัญญาได้ กรุณาลองใหม่');
   }
 }

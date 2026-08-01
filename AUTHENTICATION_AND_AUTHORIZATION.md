@@ -29,13 +29,15 @@ Astly uses a custom, lightweight authentication and authorization design rather 
 
 | Layer | Mechanism | Purpose |
 |---|---|---|
-| End-user identity | LINE Login via LIFF (OAuth in LINE) | Establishes who the user is (`profile.userId`, passed to APIs as `lineId`) |
+| End-user identity | LINE Login via LIFF, with the ID token **verified server-side against LINE** per actor role | Establishes who the user is; the verified token subject - not a client-supplied `lineId` - is the actor identity |
 | Step-up authentication | Six-digit PIN (bcrypt) + opaque server session token | Re-authenticates the user for sensitive, money-moving mutations |
 | Authorization | `requirePinToken` server gate + per-route application checks + actor segmentation | Decides what an authenticated actor may do |
 | Machine-to-machine | HMAC webhook signatures + cron bearer secret | Authenticates inbound callbacks from LINE, the Shop System, UPPASS, and scheduled jobs |
 | Data tier | Supabase service-role, MongoDB connection credential, Vercel Blob read/write token + signed URLs | Authorizes backend access to data stores |
 
-Key design facts: there is no password database (identity is delegated to LINE); sensitive actions require a PIN re-auth with a deliberately short 2-minute token; and all database access is server-side with privileged credentials, which makes the API layer - not database row-level security - the true authorization boundary. The honest implications of that design are detailed in Sections 8 and 9.
+Key design facts: there is no password database (identity is delegated to LINE); the LINE ID token is verified server-side against LINE on every protected route, so identity is not client-asserted; sensitive actions additionally require a PIN re-auth with a deliberately short 2-minute token; and all database access is server-side with privileged credentials, which makes the API layer - not database row-level security - the true authorization boundary. The honest implications of that design are detailed in Sections 8 and 9.
+
+There is also a fifth, less obvious layer worth naming for a financial reviewer: **value integrity**. Authenticating the caller is not sufficient when the caller can edit the numbers a legitimate session produced, so AI-derived valuations, confidence scores and condition scores are cryptographically bound to the server that computed them (`DATA_SECURITY.md` Section 6.1).
 
 ---
 
@@ -62,7 +64,20 @@ There is intentionally no heavyweight auth framework. Verified: `package.json` c
 - Identity propagation: the LINE user id is read as `profile.userId` and sent to backend routes under the field name `lineId`. This `lineId` is the actor identity used throughout the API.
 - Development bypass: when `NEXT_PUBLIC_LIFF_MOCK === 'true'` (or, for drop-point pages, `NEXT_PUBLIC_DROPPOINT_MOCK === 'true'` or a `?mock=1` query parameter), the provider short-circuits real LINE auth and injects a hard-coded mock profile (`userId: 'Umock_dev_user_001'`). This is a development convenience and must never be enabled in a production build (Section 8).
 
-Honest characterization for diligence: LIFF establishes identity, not server-trusted authorization. The `lineId` is supplied by the client in the request body and is trusted by the backend as the actor identity; the current flow does not independently verify a LINE ID token / access token server-side against that `lineId`. The protections that actually gate sensitive actions are the PIN token gate and per-route application checks (Sections 4-5). Strengthening this by verifying a LINE token server-side is a hardening item.
+### 3.1 Server-side LINE ID-token verification (implemented)
+
+The platform previously trusted the `lineId` supplied in the request body as the actor identity. **That is no longer the case.** `lib/security/liff-auth.ts` now verifies a LINE ID token server-side on every protected route:
+
+- the client sends the LIFF ID token in the `Authorization` header (attached centrally by `lib/liff/auth-header.ts`, so callers cannot forget it);
+- the server posts the token to LINE's own endpoint `https://api.line.me/oauth2/v2.1/verify` with the **role-specific** Login channel id, so a token minted for the borrower channel cannot authorize an investor or drop-point action;
+- issuer, audience (single or array), subject and expiry are all validated; the resolved subject becomes the actor identity;
+- a `lineId` present in the body or query string is treated as a *claim*, not as identity - it is compared to the verified subject and a mismatch is a `403`, not a silent accept;
+- verification results are cached in Redis for at most the token's remaining lifetime (capped at 300 s) keyed by a digest of the token, so the LINE round-trip does not become a per-request latency or availability tax;
+- the roles are `PAWNER`, `INVESTOR`, `STORE`, `DROP_POINT` and `ADMIN`, each bound to its own `LINE_LOGIN_CHANNEL_ID*` environment variable; `ADMIN` additionally requires membership of the explicit `ADMIN_LINE_IDS` allowlist.
+
+This gate is applied across roughly 56 route files, including every AI-job enqueue/poll/cancel route, the eKYC initiation and status routes, contract and item reads, registration/profile updates, and the financial mutation routes (which additionally require the PIN step-up in Section 4).
+
+Honest characterization for diligence: identity is now server-verified, so an attacker cannot assume another user by editing a request body. The remaining caveat is the development bypass above - `NEXT_PUBLIC_LIFF_MOCK` must be `false` in production, which the production preflight script enforces as a hard gate.
 
 ---
 
@@ -136,33 +151,39 @@ The consistent theme: a small number of high-privilege backend credentials sit b
 
 ## 6. Machine-to-Machine Authentication (Webhooks and Cron)
 
-Inbound callbacks and scheduled jobs authenticate by HMAC signature or a shared secret. Enforcement is currently inconsistent across endpoints - documented transparently below because it is the most important hardening area.
+Inbound callbacks and scheduled jobs authenticate by HMAC signature, provider Basic Auth, or a shared secret. Enforcement was previously inconsistent; it has been standardized so that **every** inbound machine endpoint now rejects rather than fails open.
 
 ### 6.1 LINE webhook signatures
 
-- Scheme: HMAC-SHA256 over the raw request body, keyed by the channel secret, base64-encoded, compared to the `x-line-signature` header. There are three near-duplicate implementations (a canonical one in `lib/security/line.ts`, one in `lib/line/client.ts`, and inline copies in some routes); the comparisons use plain string equality (not constant-time).
+- Scheme: HMAC-SHA256 over the raw request body, keyed by the channel secret, base64-encoded, compared to the `x-line-signature` header.
+- All LINE webhook routes now share the single canonical implementation `verifyLineSignatureWithSecret` in `lib/security/line.ts`, which uses a constant-time comparison and takes the channel secret explicitly so each Official Account verifies with its **own** secret rather than the customer channel's.
+- A missing header, a missing configured secret, or a mismatch is a `401`. There is no log-and-continue path and no shared-channel fallback (`LINE_STORE_ALLOW_SHARED_CHANNEL` must be `false` in production).
 
-### 6.2 Per-endpoint enforcement matrix (verified)
+### 6.2 Per-endpoint enforcement matrix (verified in code, August 2026)
 
-| Endpoint | Verifies? | On failure | Status |
+| Endpoint | Mechanism | On failure | Status |
 |---|---|---|---|
-| `/api/line/webhook` (alternate customer) | Yes, unconditionally | Rejects `401` | Enforced |
-| `/api/webhooks/line-invest` (investor) | Yes | Rejects `401` (also 401 if header missing) | Enforced |
-| `/api/webhooks/shop-notification` (Shop System) | Yes + replay window | Rejects `401` | Enforced |
-| `/api/webhook` (customer) | Yes, but log-and-continue | Logs warning, processes anyway | Not enforced |
-| `/api/webhook-store` (store) | Yes, but log-and-continue; key/guard mismatch | Logs warning, processes anyway | Not enforced |
-| `/api/ekyc/webhook` (UPPASS borrower) | Optional | Accepts when no signature or no secret; else `401` | Fail-open |
-| `/api/webhooks/uppass-invest` (UPPASS investor) | Optional | Accepts when no signature or no secret; else `401` | Fail-open |
-| `/api/webhook-droppoint` (drop-point) | No | No check at all | None |
+| `/api/webhook` (customer OA) | LINE HMAC, own channel secret | `401` | Enforced |
+| `/api/webhook-store` (store OA) | LINE HMAC, store channel secret | `401` | Enforced |
+| `/api/webhook-droppoint` (drop-point OA) | LINE HMAC, drop-point channel secret | `401` | Enforced |
+| `/api/webhooks/line-invest` (investor OA) | LINE HMAC, investor channel secret | `401` | Enforced |
+| `/api/webhooks/shop-notification` (Shop System) | HMAC + replay window | `401` | Enforced |
+| `/api/ekyc/webhook` (UPPASS borrower) | Role-scoped **Basic Auth**, constant-time | `401`; `503` when unconfigured | Enforced, fail-closed |
+| `/api/webhooks/uppass-invest` (UPPASS investor) | Role-scoped **Basic Auth**, constant-time | `401`; `503` when unconfigured | Enforced, fail-closed |
+| `/api/line/webhook` (legacy alternate customer) | Retired - the legacy path is no longer a second, weaker entry point | n/a | Consolidated |
+| `/api/queues/*` (queue consumers) | Air-gapped: invocable only by Vercel's internal queue infrastructure via `handleCallback` | n/a | Platform-enforced |
+
+The key change for a DD reader: previously two eKYC endpoints **accepted unsigned requests** and three LINE endpoints processed on signature mismatch. Both classes are now closed. Absent configuration produces `503` (service unavailable), never an accept - a missing environment variable can no longer be mistaken for permission.
 
 ### 6.3 Shop System scheme
 
-HMAC-SHA256 (hex) over the string `notificationId-timestamp` (not the full body), keyed by `WEBHOOK_SECRET` with a committed hard-coded fallback string, compared with `crypto.timingSafeEqual`, plus a 5-minute replay window on the timestamp. Because the signature covers only the id and timestamp (not the payload), it does not bind the message contents - a hardening item.
+HMAC-SHA256 over the request body, keyed by `WEBHOOK_SECRET`, compared with `crypto.timingSafeEqual`, plus a replay window on the timestamp. `SHOP_WEBHOOK_SIGNATURE_MODE=body-hmac-v2` binds the **full payload** rather than only the id and timestamp; the previous id-and-timestamp scheme survives only behind an explicit `SHOP_WEBHOOK_ALLOW_LEGACY_HMAC` flag, which the production preflight requires to be `false`. The committed hard-coded fallback secret has been removed - an unset `WEBHOOK_SECRET` now fails closed.
 
-### 6.4 Cron authentication
+### 6.4 Cron and internal-job authentication
 
-- `/api/redemptions/auto-confirm-received`: checks `Authorization: Bearer <CRON_SECRET>` - but only if `CRON_SECRET` is set (open if unset). Vercel fires crons as GET, matching this handler.
-- `/api/contracts/process-ticket-queue`: no authentication on either handler. The queue-draining logic is in the POST handler while Vercel crons issue GET (which returns counts only), so the drain is not actually triggered by the cron, and the unauthenticated POST is publicly invocable.
+- All cron handlers go through `requireInternalRequest(request, ['CRON_SECRET'])`, which requires a bearer secret and fails closed when unset. This covers `/api/redemptions/auto-confirm-received`, `/api/contracts/process-ticket-queue`, and the one-minute `/api/ekyc/reconcile` inbox/outbox reconciler.
+- `/api/contracts/process-ticket-queue` previously exposed an unauthenticated POST that could be invoked publicly, and its GET/POST split meant the cron never actually drained the queue. Both are fixed: the handler is authenticated and the cron path performs the drain, with the same secret usable for an authenticated manual replay.
+- The AI job workers additionally require `JOB_WORKER_SECRET`, and internal service-to-service calls require `INTERNAL_API_SECRET`. Preflight enforces a minimum length of 32 characters on each and rejects placeholder values.
 
 ---
 
@@ -178,51 +199,68 @@ HMAC-SHA256 (hex) over the string `notificationId-timestamp` (not the full body)
 
 ## 8. Security Posture and Hardening Backlog
 
-Presented transparently. The architecture is sound; the items below are concrete hardenings that should be prioritized for a financial platform. Each is verified against the code.
+Presented transparently, with the resolved items retained so a reviewer can see both the original finding and its remediation. Each status is verified against the code as of August 2026.
+
+### 8.1 Closed findings
+
+| # | Original finding | Severity | Resolution |
+|---|---|---|---|
+| A1 | Several webhooks did not enforce signatures (`/api/webhook`, `/api/webhook-store` log-and-continue) | High | **Closed.** All LINE webhooks reject `401` on missing or invalid signature, using one canonical constant-time implementation and each channel's own secret |
+| A2 | `/api/webhook-droppoint` performed no verification yet could drive redemption state | High | **Closed.** Verifies the drop-point channel signature before any state mutation |
+| A3 | eKYC webhooks failed open - omitting the signature header could flip `kyc_status` to `VERIFIED` by `uppass_slug` | High | **Closed.** Role-scoped Basic Auth with constant-time comparison; missing configuration returns `503`, never an accept. The status machine is additionally monotonic, so even a valid event cannot re-open a terminal state |
+| A4 | `lineId` was client-supplied and trusted as the actor identity | High | **Closed.** LINE ID tokens are verified server-side against LINE with the role-specific channel id across ~56 routes (Section 3.1); a claimed `lineId` that differs from the verified subject is a `403` |
+| A5 | `process-ticket-queue` had no auth and its drain ran on POST while the cron fired GET | Medium-High | **Closed.** `requireInternalRequest(['CRON_SECRET'])` on the handler and the cron path performs the drain |
+| A6 | Committed hard-coded fallback webhook secret; LINE secret fell back to an empty string | Medium-High | **Closed.** Fallbacks removed; unset secrets fail closed and preflight rejects short/placeholder values |
+| A7 | Shop System signature covered only id+timestamp, not the payload | Medium | **Closed.** `SHOP_WEBHOOK_SIGNATURE_MODE=body-hmac-v2` signs the full body; the legacy scheme requires an explicit flag that preflight forces to `false` |
+| A8 | PIN `/reset` bypassed lockout with no rate limit | Medium | **Closed.** `/reset` now requires a verified LIFF identity for the same subject and is rate-limited to 5 attempts/hour. Adding an OTP factor remains a roadmap improvement |
+| A9 | Open `/api/pin/status` allowed enumeration of registered users | Medium | **Closed.** All PIN routes require a verified LIFF identity bound to the requested `(role, lineId)` |
+| A12 | Dev mock bypass gated only by a build-time flag | Medium | **Mitigated.** `NEXT_PUBLIC_LIFF_MOCK` and `NEXT_PUBLIC_DROPPOINT_MOCK` must be `false` for the production preflight to pass, and the server-side job/identity gate ignores mock mode outside development |
+
+Two controls were added that had no prior finding but materially change the authorization story:
+
+- **Job and resource ownership.** AI jobs, contracts, items, drop-point records and profile reads resolve ownership from the database against the verified LINE subject. A user polling or cancelling another user's job receives `403`. This closes a class of IDOR that existed on several read routes (`/api/pawners/check`, `/api/investors/check` and the contract/drop-point readers).
+- **Value integrity.** An authenticated user can no longer alter an AI valuation, confidence score or condition score between computation and loan submission - see `DATA_SECURITY.md` Section 6.1.
+
+### 8.2 Open findings
 
 | # | Finding | Severity | Remediation |
 |---|---|---|---|
-| A1 | Several webhooks do not enforce signatures: `/api/webhook` and `/api/webhook-store` log-and-continue; `/api/webhook-droppoint` performs no verification; the two UPPASS eKYC webhooks fail open (accept when the signature header or secret is absent) | High | Enforce strict verification on all inbound webhooks (reject on missing/invalid signature); never fail open |
-| A2 | `/api/webhook-droppoint` (unauthenticated) can drive drop-point redemption/amount-verification state via service-role writes | High | Add signature verification before any state mutation |
-| A3 | eKYC webhooks fail open - an attacker omitting the signature header could flip `kyc_status` to VERIFIED by `uppass_slug` | High | Require the signature and secret; reject when absent |
-| A4 | `lineId` is client-supplied and trusted as the actor identity; no server-side LINE token verification | High | Verify a LINE ID/access token server-side and bind it to `lineId` |
-| A5 | `process-ticket-queue` has no auth and its drain runs on POST while the cron fires GET | Medium-High | Add `CRON_SECRET` auth; align the cron's method with the draining handler |
-| A6 | Committed hard-coded fallback webhook secret; LINE secret falls back to empty string when unset | Medium-High | Remove fallbacks; fail closed when secrets are unconfigured |
-| A7 | Shop System signature covers only id+timestamp, not the payload | Medium | Sign the full body so message contents are bound |
-| A8 | PIN lockout is fully bypassable via `/reset` using low-entropy identifiers (phone + national ID / drop-point code), with no rate limit or captcha on reset | Medium | Rate-limit reset, add additional factors, and consider OTP for recovery |
-| A9 | Open `/api/pin/status` enables enumeration of registered `(role, lineId)` users and their lock state; probing also materializes `user_security` rows | Medium | Rate-limit / authenticate status; avoid creating rows on probe |
-| A10 | PIN session token stored in plaintext in the DB column; `requirePinToken` uses non-constant-time `!==`; LINE HMAC comparisons not constant-time | Low-Medium | Hash stored tokens; use `crypto.timingSafeEqual` for all secret comparisons |
-| A11 | Default Blob signed-URL lifetime is 7 days; URLs are not bound to a user identity | Medium | Shorten TTLs (minutes-hours) for sensitive media; scope access |
-| A12 | Dev mock bypass is gated only by a `NEXT_PUBLIC_*` build-time flag (and a `?mock=1` query on drop-point pages) | Medium | Ensure mock flags are never set in production builds; add a runtime guard |
-| A13 | RLS not present in repo migrations; service-role-only access makes the API layer the sole authorization boundary | Medium | Version-control RLS policies as a backstop; add authz tests across all 73 Supabase routes |
-| A14 | Single high-privilege credential set per store, shared across all actors; no per-actor/per-request scoping | Medium | Scope credentials; rotate on a schedule; consider least-privilege per role |
+| A10 | PIN session token is stored in plaintext in `user_security.pin_session_token` and compared with a non-constant-time `!==` | Low-Medium | Store a hash of the token and compare with `crypto.timingSafeEqual`. Impact is bounded by the 2-minute TTL, but it is cheap to fix |
+| A11 | Default Blob signed-URL lifetime is 7 days (`DEFAULT_SIGNED_URL_EXPIRATION_SECONDS`) and URLs are not bound to a user identity | Medium | Shorten to minutes-hours for slips, contracts and eKYC-adjacent media; consider per-request short-lived issuance |
+| A13 | RLS policies are version-controlled only for the new eKYC tables; the remaining Supabase tables rely on the API layer as the sole authorization boundary | Medium | Bring all RLS policies under migration control as a backstop and add authorization tests across the Supabase routes |
+| A14 | A single high-privilege credential set per store is shared across all actors | Medium | Scope credentials, rotate on a schedule, and consider least-privilege roles per actor |
+| A15 | No automated authorization test suite | Medium | The identity/ownership gates are now uniform enough to be table-tested; a regression here would be silent |
 
 ---
 
 ## 9. Risk Register and DD Checklist
 
-| # | Risk | Severity | Status / mitigation |
+| # | Risk | Severity | Status |
 |---|---|---|---|
-| AA1 | Inconsistent / fail-open webhook authentication | High | Hardening A1-A3, A6-A7 |
-| AA2 | Client-trusted identity (no server LINE-token check) | High | Hardening A4 |
-| AA3 | Authorization concentrated in app layer (RLS not enforcing) | Medium-High | Hardening A13; authz test coverage |
-| AA4 | Recovery/lockout bypass via low-entropy identifiers | Medium | Hardening A8 |
-| AA5 | Unauthenticated cron/queue endpoint | Medium-High | Hardening A5 |
-| AA6 | Long-lived, identity-agnostic signed Blob URLs | Medium | Hardening A11 |
-| AA7 | Mock-auth backdoor if misconfigured in prod | Medium | Hardening A12 |
+| AA1 | Inconsistent / fail-open webhook authentication | ~~High~~ | **Closed** (A1-A3, A6-A7) |
+| AA2 | Client-trusted identity | ~~High~~ | **Closed** (A4) |
+| AA3 | Authorization concentrated in the app layer (RLS not enforcing) | Medium-High | Open (A13, A15) |
+| AA4 | Recovery/lockout bypass via low-entropy identifiers | ~~Medium~~ | **Closed** (A8) - residual: identity questions are still the recovery factor, OTP recommended |
+| AA5 | Unauthenticated cron/queue endpoint | ~~Medium-High~~ | **Closed** (A5) |
+| AA6 | Long-lived, identity-agnostic signed Blob URLs | Medium | Open (A11) |
+| AA7 | Mock-auth backdoor if misconfigured in production | Medium | Mitigated by the preflight gate (A12) |
+| AA8 | Provider-side webhook authenticity cannot be strengthened beyond Basic Auth | Medium | Vendor limitation; compensated by fail-closed auth, replay hashing and a monotonic state machine |
 
-DD checklist (data-room items): confirm production env has no `NEXT_PUBLIC_LIFF_MOCK`/`NEXT_PUBLIC_DROPPOINT_MOCK`; confirm `CRON_SECRET`, `WEBHOOK_SECRET`, and all LINE/UPPASS secrets are set (no fallbacks in effect); confirm Supabase RLS posture (and bring policies under version control); review the webhook-signature hardening status; confirm Blob signed-URL TTLs; and review the per-route authorization test coverage.
+DD checklist (data-room items): confirm production env has `NEXT_PUBLIC_LIFF_MOCK=false` and `NEXT_PUBLIC_DROPPOINT_MOCK=false`; confirm `CRON_SECRET`, `JOB_WORKER_SECRET`, `INTERNAL_API_SECRET`, `WEBHOOK_SECRET`, `ESTIMATE_ATTESTATION_SECRET` and all LINE/UPPASS credentials are set with no fallbacks in effect and are role-separated; confirm the five `LINE_LOGIN_CHANNEL_ID*` values match the real Login channels; confirm `ADMIN_LINE_IDS` contains only intended operators; confirm Supabase RLS posture and bring the remaining policies under version control; confirm Blob signed-URL TTLs; and review per-route authorization test coverage. `npm run preflight:production` mechanically checks most of this and fails closed.
 
-Framing for reviewers: the authentication and authorization design is coherent and uses appropriate primitives (delegated identity, bcrypt, short-lived opaque tokens, HMAC signatures, service-role isolation). The findings above are typical of a fast-moving pre-Series product and are individually low-effort to remediate; none requires re-architecture. Prioritizing A1-A5 (webhook enforcement, identity verification, and cron auth) closes the highest-impact gaps.
+Framing for reviewers: the highest-impact findings from the previous review - fail-open webhooks, client-trusted identity, and unauthenticated cron - are closed and verifiable in code. What remains is defense-in-depth (token hashing, signed-URL TTLs, version-controlled RLS, least-privilege credentials) plus test coverage. None requires re-architecture.
 
 ---
 
 ## 10. Appendix - Endpoint and Credential Map
 
-Auth endpoints (all POST): `app/api/pin/{setup, verify, status, reset}`.
+Auth endpoints (all POST): `app/api/pin/{setup, verify, status, reset}` - all now behind a verified LIFF identity for the requested `(role, lineId)`, with `/reset` additionally rate-limited to 5/hour.
 PIN-gated mutation routes (10): `contracts/create`, `contracts/request-action`, `contract-actions/complete`, `customer/request-redemption`, `customer/request-extension`, `customer/request-increase-principal`, `customer/request-reduce-principal`, `contracts/investor-action`, `drop-points/verify`, `drop-points/returns/confirm`.
-Webhooks (8): `webhook`, `line/webhook`, `webhook-store`, `webhook-droppoint`, `webhooks/line-invest`, `webhooks/shop-notification`, `ekyc/webhook`, `webhooks/uppass-invest`.
-Crons (2): `contracts/process-ticket-queue`, `redemptions/auto-confirm-received`.
+Webhooks (7 active): `webhook`, `webhook-store`, `webhook-droppoint`, `webhooks/line-invest`, `webhooks/shop-notification`, `ekyc/webhook`, `webhooks/uppass-invest`. The legacy `line/webhook` second entry point has been consolidated so it cannot bypass body limits, signature checks or replay protection.
+Crons (3, all `CRON_SECRET`-gated): `contracts/process-ticket-queue`, `redemptions/auto-confirm-received`, `ekyc/reconcile`.
+Queue consumers (4, air-gapped to Vercel's queue infrastructure): `queues/estimate-generic`, `queues/estimate-notebook`, `queues/analyze-condition`, `queues/process-ekyc-webhook`.
+
+Identity and secret environment variables: `LINE_LOGIN_CHANNEL_ID`, `_INVEST`, `_STORE`, `_DROPPOINT`, `_ADMIN`; `ADMIN_LINE_IDS`; `CRON_SECRET`; `JOB_WORKER_SECRET`; `INTERNAL_API_SECRET`; `WEBHOOK_SECRET`; `ESTIMATE_ATTESTATION_SECRET`; `AI_SAFETY_IDENTIFIER_SECRET`; `RATE_LIMIT_IDENTIFIER_SECRET`; `UPPASS_WEBHOOK_BASIC_USERNAME`/`_PASSWORD` and their `_INVEST` counterparts.
 
 Auth-relevant environment variables: `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `MONGODB_URI`, `BLOB_READ_WRITE_TOKEN`, the per-actor LINE channel secrets/tokens, `UPPASS_WEBHOOK_SECRET`(`_INVEST`), `WEBHOOK_SECRET`, `CRON_SECRET`, and the mock flags `NEXT_PUBLIC_LIFF_MOCK` / `NEXT_PUBLIC_DROPPOINT_MOCK`.
 

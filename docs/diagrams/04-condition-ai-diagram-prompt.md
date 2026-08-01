@@ -47,7 +47,7 @@ ZONE 3 — "Trust & Risk Controls"  (amber)
 
 ZONE 4 — "Product Integration"  (indigo)
 - "Plugs into Astly's instant-valuation pipeline through one stable interface"
-- "Live today on commercial AI (Claude, Gemini); the proprietary engine swaps in behind the same interface"
+- "Live today on OpenAI Luna with Anthropic incident fallback; the proprietary engine swaps in behind the same interface"
 - "De-risked rollout: shadow -> canary -> primary, with automatic fallback"
 - "Borrower sees an instant, trustworthy in-app valuation"
 

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
 import { supabaseAdmin } from '@/lib/supabase/client';
+
+async function requireOwner(request: NextRequest, lineId: string) {
+  if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_LIFF_MOCK === 'true') return;
+  const identity = await requireLiffIdentity(request, 'INVESTOR');
+  if (identity.lineId !== lineId) throw new LiffAuthError('LIFF_AUTH_SUBJECT_MISMATCH', 403);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +17,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { error: 'Line ID is required' },
         { status: 400 }
+      );
+    }
+
+    try {
+      await requireOwner(request, lineId);
+    } catch (error) {
+      if (error instanceof LiffAuthError) {
+        return NextResponse.json(
+          {
+            error: error.status === 403
+              ? 'คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้'
+              : 'กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบอีกครั้ง',
+            code: error.code,
+          },
+          { status: error.status, headers: { 'Cache-Control': 'no-store' } }
+        );
+      }
+      return NextResponse.json(
+        { error: 'ไม่สามารถตรวจสอบสิทธิ์ได้ชั่วคราว', code: 'LIFF_AUTH_ERROR' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } }
       );
     }
 
@@ -71,12 +98,12 @@ export async function GET(request: NextRequest) {
           currentInvestedAmount
         }
       }
-    });
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
 
   } catch (error: any) {
     console.error('Error checking investor:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'ไม่สามารถตรวจสอบข้อมูล Asset Funding ได้ชั่วคราว', code: 'INVESTOR_LOOKUP_FAILED' },
       { status: 500 }
     );
   }

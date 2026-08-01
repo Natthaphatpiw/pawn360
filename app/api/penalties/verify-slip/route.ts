@@ -3,25 +3,51 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import { getCompanyBankAccount, verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { toDateString } from '@/lib/services/penalty';
 import { Client } from '@line/bot-sdk';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import { paymentEvidenceWasUsed } from '@/lib/security/payment-evidence';
+import {
+  boundedText,
+  fingerprintOwnedBlob,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const investorLineClient = new Client({
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST || '',
   channelSecret: process.env.LINE_CHANNEL_SECRET_INVEST || ''
 });
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const penaltyId = typeof body?.penaltyId === 'string' ? body.penaltyId.trim() : '';
-    const slipUrl = typeof body?.slipUrl === 'string' ? body.slipUrl.trim() : '';
-    const pawnerLineId = typeof body?.pawnerLineId === 'string' ? body.pawnerLineId.trim() : '';
+async function persistPenaltyUpdate(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  penaltyId: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('penalty_payments')
+    .update(payload)
+    .eq('penalty_id', penaltyId)
+    .in('status', ['PENDING', 'SLIP_UPLOADED', 'REJECTED'])
+    .select('penalty_id')
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
 
-    if (!penaltyId || !slipUrl) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
+  let releaseEvidenceLock: (() => Promise<void>) | null = null;
+  try {
+    const body = await readBoundedJsonObject(request) as any;
+    const penaltyId = requireUuid(body?.penaltyId);
+    const slipUrl = requireOwnedBlobUrl(body?.slipUrl, ['pawn-items/', 'penalty-slips/']);
+    const pawnerLineId = boundedText(body?.pawnerLineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', pawnerLineId);
+
+    releaseLock = await acquireTransactionLock('penalty-verify', penaltyId, 300);
 
     const supabase = supabaseAdmin();
     const { data: payment, error: paymentError } = await supabase
@@ -55,7 +81,7 @@ export async function POST(request: NextRequest) {
     const pawner = Array.isArray(contract?.pawners) ? contract.pawners[0] : contract?.pawners;
     const investor = Array.isArray(contract?.investors) ? contract.investors[0] : contract?.investors;
 
-    if (pawnerLineId && pawner?.line_id && pawner.line_id !== pawnerLineId) {
+    if (!pawner?.line_id || pawner.line_id !== verifiedLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -70,7 +96,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (['REJECTED_FINAL', 'CANCELLED'].includes(payment.status)) {
+    const slipFingerprint = `sha256:${await fingerprintOwnedBlob(slipUrl)}`;
+    releaseEvidenceLock = await acquireTransactionLock('payment-evidence', slipFingerprint.slice(7), 300);
+
+    if (await paymentEvidenceWasUsed(supabase, slipFingerprint)) {
+      return NextResponse.json(
+        { error: 'สลิปนี้ถูกใช้แล้ว กรุณาใช้สลิปใหม่' },
+        { status: 409 },
+      );
+    }
+
+    if (!['PENDING', 'SLIP_UPLOADED', 'REJECTED'].includes(payment.status)) {
       return NextResponse.json(
         { error: 'Penalty payment is no longer valid' },
         { status: 400 }
@@ -79,6 +115,16 @@ export async function POST(request: NextRequest) {
 
     const attemptCount = (payment.slip_attempt_count || 0) + 1;
     if (attemptCount > 2) {
+      const updated = await persistPenaltyUpdate(supabase, penaltyId, {
+        status: 'REJECTED_FINAL',
+        updated_at: new Date().toISOString(),
+      });
+      if (!updated) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
       return NextResponse.json(
         { error: 'เกินจำนวนครั้งที่อนุญาต กรุณาติดต่อฝ่าย Support' },
         { status: 400 }
@@ -86,6 +132,12 @@ export async function POST(request: NextRequest) {
     }
 
     const expectedAmount = Number(payment.penalty_amount || 0);
+    if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+      return NextResponse.json(
+        { error: 'ไม่สามารถตรวจสอบยอดค่าปรับได้ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 },
+      );
+    }
     const companyBank = await getCompanyBankAccount();
     const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
       receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
@@ -99,7 +151,10 @@ export async function POST(request: NextRequest) {
       slip_uploaded_at: new Date().toISOString(),
       slip_amount_detected: verificationResult.detectedAmount,
       slip_verification_result: verificationResult.result,
-      slip_verification_details: verificationResult.rawResponse,
+      slip_verification_details: {
+        provider: verificationResult.rawResponse?.provider || null,
+        fingerprint: slipFingerprint,
+      },
       slip_attempt_count: attemptCount,
       updated_at: new Date().toISOString(),
     };
@@ -109,10 +164,13 @@ export async function POST(request: NextRequest) {
       updateData.verified_at = new Date().toISOString();
       updateData.paid_through_date = toDateString(new Date());
 
-      await supabase
-        .from('penalty_payments')
-        .update(updateData)
-        .eq('penalty_id', penaltyId);
+      const updated = await persistPenaltyUpdate(supabase, penaltyId, updateData);
+      if (!updated) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
 
       if (investor?.line_id) {
         try {
@@ -120,8 +178,8 @@ export async function POST(request: NextRequest) {
             type: 'text',
             text: `ผู้ขอสินเชื่อได้ชำระค่าปรับแล้ว\nสัญญาเลขที่ ${contract?.contract_number || ''}`.trim(),
           });
-        } catch (lineError) {
-          console.error('Error sending penalty notification to investor:', lineError);
+        } catch {
+          console.error('Error sending penalty notification to investor');
         }
       }
 
@@ -140,10 +198,13 @@ export async function POST(request: NextRequest) {
         updateData.status = 'REJECTED';
       }
 
-      await supabase
-        .from('penalty_payments')
-        .update(updateData)
-        .eq('penalty_id', penaltyId);
+      const updated = await persistPenaltyUpdate(supabase, penaltyId, updateData);
+      if (!updated) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
 
       if (attemptCount >= 2) {
         return NextResponse.json({
@@ -169,10 +230,13 @@ export async function POST(request: NextRequest) {
     if (attemptCount >= 2) {
       updateData.status = 'REJECTED_FINAL';
 
-      await supabase
-        .from('penalty_payments')
-        .update(updateData)
-        .eq('penalty_id', penaltyId);
+      const updated = await persistPenaltyUpdate(supabase, penaltyId, updateData);
+      if (!updated) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
 
       return NextResponse.json({
         success: false,
@@ -183,10 +247,13 @@ export async function POST(request: NextRequest) {
     }
 
     updateData.status = 'REJECTED';
-    await supabase
-      .from('penalty_payments')
-      .update(updateData)
-      .eq('penalty_id', penaltyId);
+    const updated = await persistPenaltyUpdate(supabase, penaltyId, updateData);
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+        { status: 409 },
+      );
+    }
 
     return NextResponse.json({
       success: false,
@@ -195,11 +262,16 @@ export async function POST(request: NextRequest) {
       attemptCount,
       remainingAttempts: 2 - attemptCount,
     });
-  } catch (error: any) {
-    console.error('Error verifying penalty slip:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error verifying penalty slip');
+    return sanitizedServerError('ไม่สามารถตรวจสอบสลิปได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
+    if (releaseEvidenceLock) await releaseEvidenceLock();
   }
 }

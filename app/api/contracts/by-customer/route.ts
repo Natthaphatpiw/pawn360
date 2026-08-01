@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { sanitizedServerError } from '@/lib/security/transaction-request';
 
 export async function GET(request: NextRequest) {
-  console.log('📥 [by-customer] GET request received');
   try {
-    const { searchParams } = new URL(request.url);
-    const lineId = searchParams.get('lineId');
-    console.log('🔍 [by-customer] lineId:', lineId);
-
-    if (!lineId) {
-      console.log('❌ [by-customer] Missing lineId');
-      return NextResponse.json(
-        { error: 'LINE ID is required' },
-        { status: 400 }
-      );
-    }
+    const { lineId } = await requireLiffIdentity(request, 'PAWNER');
 
     const supabase = supabaseAdmin();
-    console.log('✅ [by-customer] Supabase client initialized');
 
     // First, get the customer_id from the pawners table
     const { data: pawner, error: pawnerError } = await supabase
@@ -28,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     if (pawnerError || !pawner) {
       return NextResponse.json(
-        { error: 'Customer not found' },
+        { error: 'ไม่พบข้อมูลผู้ใช้', code: 'PAWNER_NOT_FOUND' },
         { status: 404 }
       );
     }
@@ -78,7 +69,8 @@ export async function GET(request: NextRequest) {
       `)
       .eq('customer_id', pawner.customer_id)
       .in('contract_status', visibleStatuses)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(500);
 
     if (contractsError) {
       throw contractsError;
@@ -168,13 +160,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       contracts: contractsWithStatus
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
 
-  } catch (error: any) {
-    console.error('Error fetching contracts:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    console.error('[contracts:by-customer] failed');
+    return sanitizedServerError('ไม่สามารถโหลดรายการสัญญาได้ กรุณาลองใหม่');
   }
 }

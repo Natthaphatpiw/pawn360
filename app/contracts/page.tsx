@@ -108,7 +108,7 @@ export default function PawnerContractList() {
       }
 
       // Fetch contracts
-      const response = await axios.get(`/api/contracts/by-customer?lineId=${profile.userId}`);
+      const response = await axios.get('/api/contracts/by-customer');
 
       if (response.data.success) {
         setContracts(response.data.contracts);

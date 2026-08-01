@@ -320,7 +320,10 @@ export default function InvestorEditProfile() {
         uploadFormData.append('folder', 'signatures');
 
         const uploadResponse = await axios.post('/api/upload', uploadFormData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'X-LIFF-Role': 'INVESTOR',
+          },
         });
 
         if (!uploadResponse.data.url) {

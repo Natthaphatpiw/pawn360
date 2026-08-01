@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshBlobUrls } from '@/lib/storage/blob';
 import { buildItemNotesWithPasscode, splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import {
+  boundedText,
+  finiteNumber,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,15 +25,18 @@ const NO_STORE_HEADERS = {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const lineId = searchParams.get('lineId');
-    const itemId = searchParams.get('itemId');
+    const claimedLineId = searchParams.get('lineId') || '';
+    const rawItemId = boundedText(searchParams.get('itemId'), 64);
+    const itemId = rawItemId ? requireUuid(rawItemId) : null;
 
-    if (!lineId) {
+    if (!claimedLineId) {
       return NextResponse.json(
         { error: 'LINE ID is required' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+
+    const lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
 
     const supabase = supabaseAdmin();
 
@@ -89,19 +102,19 @@ export async function GET(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
 
-  } catch (error: any) {
-    console.error('Error fetching draft items:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error fetching draft items');
+    return sanitizedServerError();
   }
 }
 
 // POST - Save a draft item
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readBoundedJsonObject(request) as any;
     const {
       lineId,
       itemType,
@@ -120,6 +133,8 @@ export async function POST(request: NextRequest) {
       imageUrls,
       conditionResult,
       estimateResult,
+      estimateAttestation,
+      estimateJobId,
       conditionChecklist,
       // Laptop specific
       cpu,
@@ -130,14 +145,20 @@ export async function POST(request: NextRequest) {
       lenses
     } = body;
 
-    if (!lineId) {
+    const claimedLineId = boundedText(lineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+
+    if (!verifiedLineId) {
       return NextResponse.json(
         { error: 'LINE ID is required' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    if (!itemType || !brand || !model) {
+    const safeItemType = boundedText(itemType, 80, true) || '';
+    const safeBrand = boundedText(brand, 120, true) || '';
+    const safeModel = boundedText(model, 180, true) || '';
+    if (!safeItemType || !safeBrand || !safeModel) {
       return NextResponse.json(
         { error: 'Item type, brand, and model are required' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -146,70 +167,97 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseAdmin();
 
+    if (!Array.isArray(imageUrls) || imageUrls.length === 0 || imageUrls.length > 4) {
+      return NextResponse.json(
+        { error: 'กรุณาอัปโหลดรูปภาพ 1-4 รูป' },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+    const safeImageUrls = imageUrls.map((url: unknown) => requireOwnedBlobUrl(url, ['pawn-items/']));
+    if (Array.isArray(lenses) && lenses.length > 10) {
+      return NextResponse.json(
+        { error: 'ระบุเลนส์ได้สูงสุด 10 รายการ' },
+        { status: 400, headers: NO_STORE_HEADERS },
+      );
+    }
+
     // Check if user is registered (optional - draft can be saved without registration)
     const { data: pawner } = await supabase
       .from('pawners')
       .select('customer_id')
-      .eq('line_id', lineId)
+      .eq('line_id', verifiedLineId)
       .single();
 
-    const totalScore =
+    const totalScoreCandidate =
       typeof conditionResult?.totalScore === 'number'
         ? conditionResult.totalScore
         : typeof conditionResult?.score === 'number'
           ? Math.round(conditionResult.score * 100)
           : null;
+    const totalScore = finiteNumber(totalScoreCandidate, { min: 0, max: 100 });
 
-    const aiScore =
+    const aiScoreCandidate =
       typeof conditionResult?.score === 'number'
         ? conditionResult.score
         : typeof conditionResult?.totalScore === 'number'
           ? conditionResult.totalScore / 100
           : null;
+    const aiScore = finiteNumber(aiScoreCandidate, { min: 0, max: 1 });
 
-    const estimatedValue =
+    const estimatedValueCandidate =
       typeof estimateResult?.estimatedValue === 'number'
         ? estimateResult.estimatedValue
         : typeof estimateResult?.estimatedPrice === 'number'
           ? estimateResult.estimatedPrice
           : 0;
+    const estimatedValue = finiteNumber(estimatedValueCandidate, {
+      min: 0,
+      max: 100_000_000,
+    }) || 0;
 
-    const aiConfidence =
-      typeof estimateResult?.confidence === 'number' ? estimateResult.confidence : null;
+    const aiConfidence = finiteNumber(
+      typeof estimateResult?.confidence === 'number' ? estimateResult.confidence : null,
+      { min: 0, max: 1 },
+    );
 
     // Insert draft item
     const { data: item, error } = await supabase
       .from('items')
       .insert([{
         customer_id: pawner?.customer_id || null,
-        line_id: lineId,
-        item_type: itemType,
-        brand,
-        model,
-        capacity: capacity || null,
-        color: color || null,
-        serial_number: serialNo || null,
-        screen_size: screenSize || null,
-        watch_size: watchSize || null,
-        watch_connectivity: watchConnectivity || null,
-        accessories: accessories || null,
-        defects: defects || null,
-        notes: buildItemNotesWithPasscode(notes, devicePasscode),
-        image_urls: imageUrls || [],
+        line_id: verifiedLineId,
+        item_type: safeItemType,
+        brand: safeBrand,
+        model: safeModel,
+        capacity: boundedText(capacity, 120),
+        color: boundedText(color, 120),
+        serial_number: boundedText(serialNo, 180),
+        screen_size: boundedText(screenSize, 80),
+        watch_size: boundedText(watchSize, 80),
+        watch_connectivity: boundedText(watchConnectivity, 80),
+        accessories: boundedText(accessories, 2_000),
+        defects: boundedText(defects, 2_000),
+        notes: buildItemNotesWithPasscode(
+          boundedText(notes, 2_000),
+          boundedText(devicePasscode, 128),
+        ),
+        image_urls: safeImageUrls,
         item_condition: totalScore,
         ai_condition_score: aiScore,
-        ai_condition_reason: conditionResult?.reason || null,
+        ai_condition_reason: boundedText(conditionResult?.reason, 2_000),
         condition_checklist: conditionChecklist || null,
         estimated_value: estimatedValue,
         ai_confidence: aiConfidence,
+        estimate_attestation: boundedText(estimateAttestation, 4_096),
+        estimate_job_id: boundedText(estimateJobId, 128),
         item_status: 'DRAFT',
         // Laptop specific
-        cpu: cpu || null,
-        ram: ram || null,
-        storage: storage || null,
-        gpu: gpu || null,
+        cpu: boundedText(cpu, 180),
+        ram: boundedText(ram, 120),
+        storage: boundedText(storage, 120),
+        gpu: boundedText(gpu, 180),
       }])
-      .select()
+      .select('item_id, item_status, estimate_attestation, estimate_job_id, created_at')
       .single();
 
     if (error) {
@@ -217,16 +265,26 @@ export async function POST(request: NextRequest) {
     }
 
     // If there are camera lenses, insert them
-    if (lenses && lenses.length > 0 && item) {
+    if (Array.isArray(lenses) && lenses.length > 0 && item) {
       const lensRecords = lenses
-        .filter((lens: string) => lens.trim() !== '')
+        .map((lens: unknown) => boundedText(lens, 180))
+        .filter((lens: string | null): lens is string => Boolean(lens))
         .map((lens: string) => ({
           item_id: item.item_id,
           lens_model: lens
         }));
 
       if (lensRecords.length > 0) {
-        await supabase.from('item_lenses').insert(lensRecords);
+        const { error: lensError } = await supabase.from('item_lenses').insert(lensRecords);
+        if (lensError) {
+          await supabase
+            .from('items')
+            .delete()
+            .eq('item_id', item.item_id)
+            .eq('line_id', verifiedLineId)
+            .eq('item_status', 'DRAFT');
+          throw lensError;
+        }
       }
     }
 
@@ -235,12 +293,12 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
 
-  } catch (error: any) {
-    console.error('Error saving draft item:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error saving draft item');
+    return sanitizedServerError();
   }
 }
 
@@ -248,28 +306,39 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const itemId = searchParams.get('itemId');
-    const lineId = searchParams.get('lineId');
+    const rawItemId = boundedText(searchParams.get('itemId'), 64);
+    const itemId = rawItemId ? requireUuid(rawItemId) : null;
+    const claimedLineId = searchParams.get('lineId') || '';
 
-    if (!itemId || !lineId) {
+    if (!itemId || !claimedLineId) {
       return NextResponse.json(
         { error: 'Item ID and LINE ID are required' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
+    const lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+
     const supabase = supabaseAdmin();
 
     // Only allow deleting draft items owned by this LINE user
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('items')
       .delete()
       .eq('item_id', itemId)
       .eq('line_id', lineId)
-      .eq('item_status', 'DRAFT');
+      .eq('item_status', 'DRAFT')
+      .select('item_id')
+      .maybeSingle();
 
     if (error) {
       throw error;
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: 'ไม่พบรายการแบบร่าง' },
+        { status: 404, headers: NO_STORE_HEADERS },
+      );
     }
 
     return NextResponse.json(
@@ -277,11 +346,11 @@ export async function DELETE(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
 
-  } catch (error: any) {
-    console.error('Error deleting draft item:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error deleting draft item');
+    return sanitizedServerError();
   }
 }

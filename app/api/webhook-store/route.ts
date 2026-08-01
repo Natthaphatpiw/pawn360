@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebhookEvent } from '@line/bot-sdk';
 import { Client, ClientConfig } from '@line/bot-sdk';
+import { verifyLineSignatureWithSecret } from '@/lib/security/line';
+import {
+  claimWebhookEvent,
+  completeWebhookClaim,
+  readBoundedWebhookText,
+  releaseWebhookClaim,
+  webhookReplayErrorResponse,
+} from '@/lib/security/webhook-replay';
 
 // Lazy initialization of LINE client
 let storeClient: Client | null = null;
 
 function getStoreClient(): Client {
   if (!storeClient) {
-    const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-    const channelSecret = process.env.LINE_CHANNEL_SECRET;
+    const allowSharedChannel = process.env.LINE_STORE_ALLOW_SHARED_CHANNEL === 'true';
+    const channelAccessToken = process.env.LINE_STORE_CHANNEL_ACCESS_TOKEN
+      || (allowSharedChannel ? process.env.LINE_CHANNEL_ACCESS_TOKEN : '');
+    const channelSecret = process.env.LINE_STORE_CHANNEL_SECRET
+      || (allowSharedChannel ? process.env.LINE_CHANNEL_SECRET : '');
 
     if (!channelAccessToken || !channelSecret) {
       throw new Error('LINE channel access token or secret not configured');
@@ -24,18 +35,6 @@ function getStoreClient(): Client {
   return storeClient;
 }
 
-function verifyStoreSignature(body: string, signature: string): boolean {
-  const crypto = require('crypto');
-  const channelSecret = process.env.LINE_CHANNEL_SECRET || '';
-
-  const hash = crypto
-    .createHmac('SHA256', channelSecret)
-    .update(body)
-    .digest('base64');
-
-  return hash === signature;
-}
-
 export async function GET() {
   return NextResponse.json({
     message: 'Store Webhook endpoint is working',
@@ -45,55 +44,72 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text();
+    const body = await readBoundedWebhookText(request);
     const signature = request.headers.get('x-line-signature');
+    const channelSecret = process.env.LINE_STORE_CHANNEL_SECRET
+      || (process.env.LINE_STORE_ALLOW_SHARED_CHANNEL === 'true'
+        ? process.env.LINE_CHANNEL_SECRET
+        : '')
+      || '';
 
-    console.log('Store Webhook received:', {
-      hasBody: !!body,
-      bodyLength: body?.length,
-      hasSignature: !!signature,
-      channelSecretConfigured: !!process.env.LINE_STORE_CHANNEL_SECRET,
-    });
-
-    // If body is empty, it's a verification request - just return 200
-    if (!body || body.trim() === '') {
-      console.log('Empty body - verification request');
-      return NextResponse.json({ success: true });
+    if (!channelSecret) {
+      console.error('[store:webhook] channel secret is not configured');
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
     }
 
-    // Verify signature if present
-    if (signature && process.env.LINE_STORE_CHANNEL_SECRET) {
-      const isValid = verifyStoreSignature(body, signature);
-      console.log('Store Signature verification:', isValid);
-
-      if (!isValid) {
-        console.error('Invalid signature - Store Channel Secret might be incorrect');
-        console.warn('⚠️  Allowing request despite invalid signature (DEBUG MODE)');
-      }
-    } else {
-      console.warn('No signature or channel secret - skipping verification');
+    if (!signature || !verifyLineSignatureWithSecret(body, signature, channelSecret)) {
+      console.warn('[store:webhook] rejected invalid signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    const data = JSON.parse(body);
-    const events: WebhookEvent[] = data.events || [];
+    if (!body) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
 
-    console.log('Processing store events:', events.length);
+    let data: { events?: unknown };
+    try {
+      data = JSON.parse(body) as { events?: unknown };
+    } catch {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+    const events = Array.isArray(data.events) ? data.events as WebhookEvent[] : [];
+    if (events.length > 100) {
+      return NextResponse.json({ error: 'Too many events' }, { status: 400 });
+    }
 
-    // Process each event
     for (const event of events) {
-      if (event.type === 'follow') {
-        try {
+      const webhookEventId = (event as WebhookEvent & { webhookEventId?: unknown }).webhookEventId;
+      const claim = await claimWebhookEvent({
+        namespace: 'line-store',
+        material: typeof webhookEventId === 'string' ? webhookEventId : JSON.stringify(event),
+        signingSecret: channelSecret,
+      });
+      if (claim.duplicate) continue;
+      try {
+        if (event.type === 'follow') {
           await handleStoreFollowEvent(event);
-        } catch (error) {
-          console.error('Error handling store follow event:', error);
         }
+        await completeWebhookClaim(claim);
+      } catch (error) {
+        await releaseWebhookClaim(claim);
+        throw error;
       }
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
-    console.error('Store Webhook error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const replayError = webhookReplayErrorResponse(error);
+    if (replayError) return replayError;
+    console.error('[store:webhook] processing failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }
 
@@ -103,17 +119,9 @@ async function handleStoreFollowEvent(event: WebhookEvent) {
   const userId = event.source.userId;
   if (!userId) return;
 
-  try {
-    console.log(`Store user followed: ${userId}`);
-
-    // Get LINE client and send welcome message
-    const client = getStoreClient();
-    await client.pushMessage(userId, {
-      type: 'text',
-      text: 'ยินดีต้อนรับสู่ระบบจัดการจุดรับฝาก\n\nกรุณาลงทะเบียนร้านค้าผ่านเมนูด้านล่าง'
-    });
-  } catch (error) {
-    console.error('Error handling store follow event:', error);
-    // Continue without throwing - webhook should not fail
-  }
+  const client = getStoreClient();
+  await client.pushMessage(userId, {
+    type: 'text',
+    text: 'ยินดีต้อนรับสู่ระบบจัดการจุดรับฝาก\n\nกรุณาลงทะเบียนร้านค้าผ่านเมนูด้านล่าง'
+  });
 }

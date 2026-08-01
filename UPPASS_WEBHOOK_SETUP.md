@@ -1,272 +1,74 @@
-# UpPass Webhook Configuration Guide
+# UpPass Webhook Production Setup
 
-## 📍 Webhook URL ที่ต้องตั้งค่าใน UpPass Dashboard
+ระบบแยก webhook ตาม actor:
 
-```
-https://your-domain.com/api/ekyc/webhook
-```
+- Seller: `https://your-domain.example/api/ekyc/webhook`
+- Asset Funding: `https://your-domain.example/api/webhooks/uppass-invest`
 
-### สำหรับ Development (Local Testing with ngrok):
-```bash
-# 1. Install ngrok
-npm install -g ngrok
+## 1. Database migration
 
-# 2. Start your Next.js app
-npm run dev
+รัน migration นี้ก่อนเปิด webhook:
 
-# 3. In another terminal, start ngrok
-ngrok http 3000
-
-# 4. Use the ngrok URL in UpPass Dashboard
-https://abc123.ngrok.io/api/ekyc/webhook
+```text
+database/migrations/2026_08_01_harden_ekyc.sql
 ```
 
----
+Migration เพิ่ม `ekyc_attempts` สำหรับ single-active-session/admission control และ `ekyc_webhook_events` เป็น durable normalized inbox/outbox ทั้งสองตารางเปิด RLS, revoke `anon/authenticated` และให้ service role เท่านั้น โดยไม่เก็บ raw answers, รูปบัตร หรือ biometric payload
 
-## 🔐 Environment Variables Required
+## 2. Authentication (fail closed)
 
-Add these to your `.env.local`:
+UpPass Connect ใช้ Basic Auth เป็นค่าเริ่มต้นที่รองรับใน implementation ตั้ง username/password คนละชุดต่อ actor ทั้งใน Vercel และ UpPass Dashboard:
 
 ```bash
-# UpPass eKYC Configuration
-UPPASS_API_KEY=your-uppass-api-key-here
-UPPASS_FORM_SLUG=your-uppass-form-slug-here
-UPPASS_API_URL=https://api.uppass.io
-UPPASS_WEBHOOK_SECRET=your-webhook-secret-here
+UPPASS_WEBHOOK_AUTH_MODE=basic
+UPPASS_WEBHOOK_BASIC_USERNAME=generate_a_random_username
+UPPASS_WEBHOOK_BASIC_PASSWORD=generate_a_long_random_password
 
-# Your Application URL
-NEXT_PUBLIC_BASE_URL=https://your-domain.com
-
-# LINE Configuration (for notifications)
-LINE_CHANNEL_ACCESS_TOKEN=your-line-channel-access-token
-LINE_CHANNEL_SECRET=your-line-channel-secret
-
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+UPPASS_WEBHOOK_AUTH_MODE_INVEST=basic
+UPPASS_WEBHOOK_BASIC_USERNAME_INVEST=generate_a_different_random_username
+UPPASS_WEBHOOK_BASIC_PASSWORD_INVEST=generate_a_different_long_random_password
 ```
 
----
+ถ้า credential หายหรือ mode ไม่ถูกต้อง endpoint ตอบ `503`; credential ไม่ตรงตอบ `401` และไม่มี unauthenticated fallback การเปรียบเทียบ credential ใช้ constant-time hash comparison
 
-## 📨 Webhook Events ที่รองรับ
+`legacy_hmac` มีไว้เฉพาะบัญชีที่ได้รับการยืนยันรูปแบบ HMAC จาก UpPass เป็นลายลักษณ์อักษร ต้องตั้ง mode และ secret ยาวอย่างน้อย 32 ตัวอักษรโดยชัดเจน ห้ามตั้งเป็น fallback ของ Basic Auth
 
-| Event Type | Description | Status Update |
-|------------|-------------|---------------|
-| `submit_form` | เมื่อ user submit การยืนยันตัวตน | ✅ อัพเดท KYC status |
-| `update_status` | เมื่อ admin เปลี่ยนสถานะใน UpPass Portal | ✅ อัพเดท KYC status |
-| `drop_off` | เมื่อฟอร์มยืนยันตัวตนหมดอายุ | ⚠️ รีเซ็ตสถานะ |
-| `ekyc_front_card_reached_max_attempts` | เมื่อการสแกนบัตรครบจำนวนครั้งสูงสุด | ❌ ปฏิเสธ |
-| `ekyc_liveness_reached_max_attempt` | เมื่อการตรวจสอบใบหน้าครบจำนวนครั้งสูงสุด | ❌ ปฏิเสธ |
+## 3. Outbound initiation
 
----
+Seller และ Asset Funding ต้องกำหนด `UPPASS_API_URL`, `UPPASS_API_KEY`, `UPPASS_FORM_SLUG` และชุด `_INVEST` แยกกัน ระบบไม่ fallback ข้าม role เพื่อป้องกันใช้ verification form ผิด policy
 
-## 🔄 Webhook Payload Structure
+- LIFF ส่ง LINE ID token; server ตรวจ issuer, audience, expiry, subject และ role ก่อน lookup actor
+- API base URL และ `form_url` ที่ UpPass ส่งกลับต้องเป็น HTTPS/443, ไม่มี embedded credentials และอยู่ใน allowlist
+- มี timeout, response-size bound, rate limit ต่อ actor และ attempt ledger ป้องกัน session ซ้ำ
+- `ekyc_url` เดิมจะ reuse เฉพาะ URL ที่ผ่าน allowlist เท่านั้น
 
-```json
-{
-  "event": {
-    "type": "submit_form",
-    "nounce": "string",
-    "created_at": "2024-01-01T00:00:00Z"
-  },
-  "application": {
-    "id": 12345,
-    "no": "APP-2024-001",
-    "form": "form-slug",
-    "slug": "unique-session-slug",
-    "status": "accepted",
-    "other_status": {
-      "ekyc": "verified"
-    },
-    "submitted_at": "2024-01-01T00:00:00Z"
-  },
-  "extra": {
-    "ekyc": {
-      "liveness": {...},
-      "face_compare": {...},
-      "identity_document": {...}
-    }
-  },
-  "answers": {
-    "th_first_name": {
-      "value": "สมชาย",
-      "created_at": "2024-01-01T00:00:00Z"
-    }
-  }
-}
-```
+## 4. Webhook ingress และ queue
 
----
+Ingress รับเฉพาะ `application/json` ไม่เกิน 512 KiB ตรวจ Basic Auth ก่อน parse/process แล้ว normalize เหลือเฉพาะ event type, opaque slug, provider status และ timestamp จากนั้น:
 
-## 🎯 Status Mapping
+1. hash event identity และ insert `ekyc_webhook_events` ด้วย unique key
+2. ส่ง message `{ kind, eventId }` ไป topic `ekyc-webhook-events`
+3. consumer ใช้ monotonic status transitions อัปเดต actor
+4. แยก LINE notification เป็น message ที่ retry ได้เอง
+5. cron `/api/ekyc/reconcile` ทุก 1 นาที re-enqueue outbox ที่ค้าง โดยต้องมี `Authorization: Bearer <CRON_SECRET>`
 
-| UpPass Status | Database Status | Description |
-|---------------|-----------------|-------------|
-| `accepted` | `VERIFIED` | ✅ ยืนยันตัวตนสำเร็จ |
-| `rejected` | `REJECTED` | ❌ ยืนยันตัวตนไม่สำเร็จ |
-| `review_needed` | `PENDING` | ⏳ รอการตรวจสอบ |
+Delivery เป็น at-least-once; unique event key, conditional updates และ notification status ทำให้ duplicate ปลอดภัยขึ้น Durable inbox เป็น recovery source หาก Vercel Queue publish ล้ม
 
----
+## 5. Events และ mapping
 
-## 📱 LINE Notifications
+รองรับ `submit_form`, `update_status`, `drop_off`, `ekyc_front_card_reached_max_attempts` และ `ekyc_liveness_reached_max_attempt` ค่า eKYC `pass` เปลี่ยนเป็น `VERIFIED`, `fail` หรือ max-attempt เป็น `REJECTED`, `need_review` เป็น `PENDING`, และ `drop_off` เป็น `NOT_VERIFIED` การ transition ย้อนจาก terminal state ต้องถูกปฏิเสธตาม policy ใน processor
 
-Webhook จะส่งการแจ้งเตือนผ่าน LINE อัตโนมัติตามสถานะ:
+## 6. Deployment verification
 
-### ✅ Verified
-```
-🎉 ยืนยันตัวตนสำเร็จ!
+1. รัน migration และตรวจ privileges/RLS
+2. ตั้ง role-specific API credentials, form slugs, Basic Auth และ host allowlists ใน Production scope
+3. ตั้ง Basic Auth ชุดเดียวกันใน UpPass Dashboard และเปิด HTTPS endpoints ทั้งสอง
+4. deploy แล้วตรวจ queue trigger `ekyc-webhook-events` และ cron reconciliation ใน `vercel.json`
+5. ส่ง test event ที่ signed ถูก, credential ผิด, duplicate, payload ใหญ่, event out-of-order และจำลอง queue/LINE outage
+6. เฝ้าดู age/count ของ `RECEIVED`, `FAILED`, `DEAD_LETTER`, notification `FAILED`, webhook 401/413/503 และ reconciliation failure โดยห้าม log raw payload หรือ PII
 
-คุณ[ชื่อ] [นามสกุล]
-สามารถเริ่มใช้งานระบบจำนำ P2P ได้แล้ว
+## Operational cautions
 
-กดที่นี่เพื่อเริ่มจำนำสินค้า
-```
-
-### ❌ Rejected
-```
-❌ การยืนยันตัวตนไม่สำเร็จ
-
-เหตุผล: [rejection_reason]
-
-กรุณาลองใหม่อีกครั้ง
-```
-
-### ⏳ Pending
-```
-⏳ รอการตรวจสอบ
-
-ข้อมูลการยืนยันตัวตนของคุณอยู่ระหว่างการตรวจสอบ
-เราจะแจ้งให้ทราบเมื่อเสร็จสิ้น
-```
-
----
-
-## 🔒 Security Features
-
-### 1. Webhook Signature Verification
-Webhook จะตรวจสอบ signature ด้วย HMAC-SHA256:
-
-```typescript
-// Header: x-uppass-signature
-const signature = crypto
-  .createHmac('sha256', UPPASS_WEBHOOK_SECRET)
-  .update(rawBody)
-  .digest('hex');
-```
-
-### 2. HTTPS Only
-Webhook endpoint ต้องใช้ HTTPS เสมอใน production
-
-### 3. Idempotency
-Webhook สามารถถูกเรียกซ้ำได้โดยไม่เกิดปัญหา (ใช้ `slug` เป็น unique key)
-
----
-
-## 🧪 Testing Webhook Locally
-
-### 1. ใช้ ngrok
-```bash
-# Terminal 1: Start Next.js
-npm run dev
-
-# Terminal 2: Start ngrok
-ngrok http 3000
-
-# Use: https://abc123.ngrok.io/api/ekyc/webhook
-```
-
-### 2. ทดสอบด้วย cURL
-```bash
-curl -X POST https://your-domain.com/api/ekyc/webhook \
-  -H "Content-Type: application/json" \
-  -d '{
-    "event": {"type": "submit_form", "created_at": "2024-01-01T00:00:00Z"},
-    "application": {
-      "slug": "test-slug-123",
-      "status": "accepted"
-    }
-  }'
-```
-
-### 3. ดู Logs
-```bash
-# Check webhook logs
-tail -f .next/server.log
-
-# Or check Vercel logs if deployed
-vercel logs --follow
-```
-
----
-
-## 🚀 Deployment Checklist
-
-- [ ] ตั้งค่า environment variables ใน production
-- [ ] อัพเดท webhook URL ใน UpPass Dashboard เป็น production URL
-- [ ] ทดสอบ webhook ด้วย test event จาก UpPass
-- [ ] ตรวจสอบ LINE notification ทำงานถูกต้อง
-- [ ] ตรวจสอบ database updates
-- [ ] Setup monitoring/alerts สำหรับ webhook failures
-
----
-
-## 📊 Monitoring
-
-### Database Checks
-```sql
--- Check KYC status distribution
-SELECT kyc_status, COUNT(*) 
-FROM pawners 
-GROUP BY kyc_status;
-
--- Check recent KYC verifications
-SELECT customer_id, firstname, lastname, kyc_status, kyc_verified_at
-FROM pawners
-WHERE kyc_verified_at > NOW() - INTERVAL '7 days'
-ORDER BY kyc_verified_at DESC;
-
--- Check failed verifications
-SELECT customer_id, firstname, lastname, kyc_rejection_reason
-FROM pawners
-WHERE kyc_status = 'REJECTED'
-ORDER BY updated_at DESC;
-```
-
-### API Logs
-```bash
-# Check webhook success rate
-grep "eKYC Webhook" logs/*.log | wc -l
-
-# Check errors
-grep "Webhook Handler Error" logs/*.log
-```
-
----
-
-## ❓ Troubleshooting
-
-### Webhook ไม่ทำงาน
-1. ✅ ตรวจสอบ URL ใน UpPass Dashboard
-2. ✅ ตรวจสอบ HTTPS certificate
-3. ✅ ตรวจสอบ environment variables
-4. ✅ ดู error logs
-
-### LINE notification ไม่ส่ง
-1. ✅ ตรวจสอบ LINE_CHANNEL_ACCESS_TOKEN
-2. ✅ ตรวจสอบว่า user เป็นเพื่อนกับ LINE OA
-3. ✅ ตรวจสอบ quota ของ LINE Messaging API
-
-### Database ไม่อัพเดท
-1. ✅ ตรวจสอบ `uppass_slug` mapping
-2. ✅ ตรวจสอบ Supabase connection
-3. ✅ ตรวจสอบ RLS policies
-
----
-
-## 📞 Support
-
-- UpPass Documentation: https://docs.uppass.io
-- LINE Messaging API: https://developers.line.biz
-- Supabase Docs: https://supabase.com/docs
-
+- การ hardening นี้ลดความเสี่ยง แต่ไม่ใช่ security certification; ต้องทำ penetration test, rotate secrets และยืนยัน DPA/retention กับ UpPass ก่อน production launch
+- Vercel WAF/rate limit เป็นชั้นเสริมเท่านั้น ห้ามใช้แทน Basic Auth
+- อย่าทดสอบ production ด้วย `curl` ที่ไม่มี Authorization หรือ payload ที่มีข้อมูลบุคคลจริง

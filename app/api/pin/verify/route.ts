@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeRole, verifyPinAndIssueToken } from '@/lib/security/pin';
+import { pinAccessErrorResponse, requirePinActor } from '@/lib/security/pin-access';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,12 @@ export async function POST(request: NextRequest) {
         { error: 'Role, LINE ID, and PIN are required' },
         { status: 400 }
       );
+    }
+
+    try {
+      await requirePinActor(request, role, lineId, 'verify', 20, 10 * 60);
+    } catch (error) {
+      return pinAccessErrorResponse(error);
     }
 
     const result = await verifyPinAndIssueToken(role, lineId, pin);
@@ -31,10 +38,12 @@ export async function POST(request: NextRequest) {
       pinToken: result.token,
       expiresAt: result.expiresAt,
     });
-  } catch (error: any) {
-    console.error('Error verifying PIN:', error);
+  } catch (error) {
+    console.error('[pin:verify] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to verify PIN', code: 'PIN_VERIFY_FAILED' },
       { status: 500 }
     );
   }

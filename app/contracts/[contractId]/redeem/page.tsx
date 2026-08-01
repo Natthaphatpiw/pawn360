@@ -118,10 +118,11 @@ export default function RedemptionPaymentPage() {
   const DROPPOINT_NEXT_DAY_FEE = 100;
 
   useEffect(() => {
+    if (!usePost15Preview && contractId !== 'mock-contract-001' && !profile?.userId) return;
     if (contractId) {
       fetchContractDetail();
     }
-  }, [contractId, usePost15Preview]);
+  }, [contractId, usePost15Preview, profile?.userId]);
 
   const fetchContractDetail = async () => {
     try {
@@ -147,7 +148,6 @@ export default function RedemptionPaymentPage() {
       const penaltyResponse = await axios.get('/api/penalties/status', {
         params: {
           contractId,
-          lineId: profile?.userId,
         },
       });
 

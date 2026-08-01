@@ -60,6 +60,21 @@ R = Responsible, A = Accountable, C = Consulted, I = Informed.
 - **Monitoring & logs** - platform, infrastructure and access logs across Vercel/Blob, Supabase, MongoDB Atlas and Upstash; anomalous access to private databases (server-side privileged access only) or Blob signed-URL abuse.
 - **Processor notification** - a processor reports a breach to Astly (see Section 9).
 - **Staff or user report** - a borrower, investor, drop-point operator, or staff member reports suspected exposure via [incident hotline] or [dpo@astly.co].
+- **Application-layer security signals** - several controls fail closed and emit a distinctive signal when they do. A sustained rise in any of the following should be treated as a potential incident indicator, not merely as noise:
+
+| Signal | What it may indicate |
+|---|---|
+| LINE ID-token verification failures (`401`) or subject-mismatch rejections (`403`) | Credential replay, or an attempt to act as another user by asserting their account id |
+| Job-ownership `403`s on AI job polling | Enumeration of other users' valuation jobs |
+| UpPass webhook `401`s | Someone attempting to forge an identity-verification outcome |
+| `503` from an eKYC webhook | Missing credentials - the endpoint is failing closed, which is correct, but it means real results are being deferred |
+| PIN lockouts or `/reset` rate-limit hits | Credential-guessing against the step-up factor |
+| Slip-fingerprint collisions | Attempted reuse of one payment proof across obligations |
+| Estimate-attestation verification failures | Tampering with a server-signed valuation before loan submission |
+| Blob-source validation rejections on AI jobs | Attempted SSRF / use of the vision workers as an open proxy |
+| Sudden AI budget-guard or provider-capacity exhaustion | Automated abuse of an authenticated account, or a compromised credential being used at scale |
+
+Because none of these paths log prompts, images, request bodies or secrets, the signal can be shared with the incident team without itself creating a second exposure.
 
 **Internal reporting channel.** Any suspected incident must be reported **immediately** to the DPO via [dpo@astly.co] and [incident hotline]. Do not investigate informally or attempt fixes before logging. The reporter records: what was observed, when, systems/data involved, and any actions already taken.
 
@@ -131,13 +146,17 @@ Under **PDPA Sec 40**, each processor must maintain appropriate security measure
 
 | Processor | Data / role | Breach-relevant note |
 |---|---|---|
-| **UPPASS** | eKYC - **biometric / sensitive** identity verification | Highest exposure; biometric data minimized at vendor. |
-| **Anthropic, Google, OpenAI** | AI on item photos and bank slips | May transiently process images containing personal/financial data. |
-| **Vercel** | Application hosting | Compute/log exposure surface. |
-| **Supabase** | Database (investor/finance, drop-point, PIN/`user_security`) | Private DB; server-side privileged access only. |
+| **UPPASS** | eKYC - **biometric / sensitive** identity verification | Highest exposure; biometric data minimized at vendor. Astly holds only normalized outcome status, so a breach of Astly's own eKYC tables does not expose biometric or document data. ISO 27001 (BSI IS773635); obtain the contractual breach-notification SLA. |
+| **OpenAI** | Primary AI on item photos and bank slips | May transiently process images containing personal/financial data. Confirm ZDR and keep `OPENAI_STORE_RESPONSES=false` so no second copy exists provider-side. |
+| **Anthropic** | AI fallback, incident path only | Same exposure class, but reached only when OpenAI fails - a breach window that is materially smaller and observable in fallback telemetry. |
+| **SlipOK** | Bank-slip verification | Receives financial PII; **no published certification and no DPA yet** - treat as the least-assured processor in the payment path. |
+| **Parallel / Exa** | Web search for market prices | **Receives no personal data** - canonical product strings only. A breach at either provider is not, on current evidence, an Astly personal-data breach; confirm against the DPA before relying on this in an assessment. |
+| **Vercel** | Application hosting and Queues | Compute/log exposure surface. Queue messages carry only opaque job/event ids, so the queue itself is not a personal-data store. |
+| **Supabase** | Database (investor/finance, drop-point, PIN/`user_security`, eKYC inbox) | Private DB; server-side privileged access only; RLS enabled with browser roles revoked on the eKYC tables. |
 | **MongoDB Atlas** | Database (customer lending flow) | Private DB; server-side privileged access only. |
-| **Vercel Blob** | Object storage (contracts, item/verification photos, slips) | Private store, pathname/operation-scoped signed-URL access. |
-| **Upstash** | Redis estimate cache | Cache of derived data. |
+| **Vercel Blob** | Object storage (contracts, item/verification photos, slips) | Private store, pathname/operation-scoped signed-URL access. **Signed-URL default lifetime is currently 7 days** - an open hardening item that lengthens the exposure window if a URL leaks. |
+| **Upstash** | Redis cache, job state, locks, budget counters, usage telemetry | Holds derived data, job payloads and identifiers - but no prompts, images or response bodies. Also the platform's fail-closed dependency for AI admission control. |
+| **LINE** | Message delivery and login channel | Compromise of a channel access token would allow message spoofing to users; rotate immediately and treat as a security incident even if no Astly store is affected. |
 | **Payment PSP (planned)** | Payment processing | Financial data; add on onboarding. |
 
 Cross-reference `DATA_PROCESSING_AGREEMENTS.md` for the contractual clauses and per-processor notification timelines.

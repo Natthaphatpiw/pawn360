@@ -1,6 +1,6 @@
 <svg viewBox="0 0 1500 660" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
 <title>Astly - Sequence: Condition Scoring</title>
-<desc>Sequence diagram of POST /api/analyze-condition: Claude Haiku vision precheck, Gemini rubric scoring with guards, and how the resulting aiCondition is blended downstream in the estimate, plus the current design-phase self-hosted model integration point.</desc>
+<desc>Queued condition analysis: OpenAI Luna vision precheck and rubric scoring, Anthropic incident fallback, and downstream aiCondition blending.</desc>
 <defs>
 <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#334155"/></marker>
 <marker id="arA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#64748b"/></marker>
@@ -26,7 +26,7 @@
 </defs>
 <rect x="0" y="0" width="1500" height="660" fill="#ffffff"/>
 <text class="title" x="40" y="40">Astly  -  Sequence: Condition Scoring</text>
-<text class="sub" x="40" y="62">POST /api/analyze-condition    -    produces the aiCondition consumed by the estimate pricing pipeline</text>
+<text class="sub" x="40" y="62">POST /api/analyze-condition/jobs + Vercel Queue    -    produces the aiCondition used by pricing</text>
 
 <!-- lifelines -->
 <line class="life" x1="180" y1="120" x2="180" y2="560"/>
@@ -37,19 +37,19 @@
 
 <!-- participants -->
 <rect class="client" x="80" y="82" width="200" height="38" rx="5"/><text class="ph" x="180" y="106" text-anchor="middle">Borrower (LIFF)</text>
-<rect class="plat" x="365" y="82" width="200" height="38" rx="5"/><text class="ph" x="465" y="106" text-anchor="middle">/api/analyze-condition</text>
-<rect class="ext" x="650" y="82" width="200" height="38" rx="5"/><text class="ph" x="750" y="106" text-anchor="middle">Claude Haiku 4.5</text>
-<rect class="ext" x="935" y="82" width="200" height="38" rx="5"/><text class="ph" x="1035" y="106" text-anchor="middle">Google Gemini</text>
-<rect class="plat" x="1220" y="82" width="200" height="38" rx="5"/><text class="ph" x="1320" y="106" text-anchor="middle">/api/estimate</text>
+<rect class="plat" x="365" y="82" width="200" height="38" rx="5"/><text class="ph" x="465" y="106" text-anchor="middle">Condition Queue Worker</text>
+<rect class="ext" x="650" y="82" width="200" height="38" rx="5"/><text class="ph" x="750" y="106" text-anchor="middle">OpenAI Luna Precheck</text>
+<rect class="ext" x="935" y="82" width="200" height="38" rx="5"/><text class="ph" x="1035" y="106" text-anchor="middle">OpenAI Luna Scoring</text>
+<rect class="plat" x="1220" y="82" width="200" height="38" rx="5"/><text class="ph" x="1320" y="106" text-anchor="middle">Estimate Queue</text>
 
 <!-- messages -->
-<line class="msg" x1="180" y1="152" x2="465" y2="152"/><text class="ml" x="322" y="145" text-anchor="middle">1. POST {images[1-6], itemType, brand, model}</text>
-<path class="self" d="M465,184 h46 v22 h-46"/><text class="ml" x="525" y="190">2. validate (&lt;=10MB, &lt;=6 imgs) + normalize</text>
-<line class="msg" x1="465" y1="234" x2="750" y2="234"/><text class="ml" x="607" y="227" text-anchor="middle">3. precheckImages (Haiku 4.5 vision, tool-use)</text>
+<line class="msg" x1="180" y1="152" x2="465" y2="152"/><text class="ml" x="322" y="145" text-anchor="middle">1. enqueue {private images[1-4], itemType, brand, model}</text>
+<path class="self" d="M465,184 h46 v22 h-46"/><text class="ml" x="525" y="190">2. owner auth + bounded input + idempotent claim</text>
+<line class="msg" x1="465" y1="234" x2="750" y2="234"/><text class="ml" x="607" y="227" text-anchor="middle">3. image/type/same-item precheck (Luna, none effort)</text>
 <line class="ret" x1="750" y1="266" x2="465" y2="266"/><text class="ml" x="607" y="259" text-anchor="middle">4. {pass, detectedType, matchesExpected}</text>
 <rect class="note" x="560" y="278" width="520" height="26" rx="4"/><text class="nt" x="570" y="295">If wrong item type / not the same item -> 400 reject (fail fast).</text>
 
-<line class="msg" x1="465" y1="330" x2="1035" y2="330"/><text class="ml" x="750" y="323" text-anchor="middle">5. analyzeConditionWithGemini (gemini-3-flash-preview)</text>
+<line class="msg" x1="465" y1="330" x2="1035" y2="330"/><text class="ml" x="750" y="323" text-anchor="middle">5. condition rubric scoring (Luna, low effort)</text>
 <line class="ret" x1="1035" y1="362" x2="465" y2="362"/><text class="ml" x="750" y="355" text-anchor="middle">6. rubric: screen 35 / body 30 / buttons 20 / camera 10 / overall 5  ->  [0,1]</text>
 <rect class="note" x="560" y="374" width="620" height="26" rx="4"/><text class="nt" x="570" y="391">Guard: totalScore &lt;= 30 or score &lt;= 0.3 is treated as an unusable photo (400), not a real low score.</text>
 
@@ -61,5 +61,5 @@
 
 <rect class="fut" x="40" y="588" width="1420" height="48" rx="5"/>
 <text class="ft" x="56" y="609">CURRENT DESIGN PHASE:  a self-hosted open-source vision model (image encoder + multi-task heads: condition, rubric sub-scores, defects, item-type) is being designed</text>
-<text class="ft" x="56" y="627">to replace the Claude precheck and Gemini scoring behind the same provider abstraction. Rollout: shadow -> canary -> primary, with automatic LLM fallback.</text>
+<text class="ft" x="56" y="627">to replace Luna behind the same provider abstraction. Rollout: shadow -> canary -> primary, with Anthropic incident fallback.</text>
 </svg>

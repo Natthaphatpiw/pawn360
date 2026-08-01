@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Noto_Sans_Thai } from 'next/font/google';
+import { useLiff } from '@/lib/liff/liff-provider';
+import { getLiffAuthorizationHeaders } from '@/lib/liff/auth-header';
 
 const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
@@ -23,14 +25,7 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
   const [isDrawing, setIsDrawing] = useState(false);
   const [name, setName] = useState(initialName || '');
 
-  useEffect(() => {
-    if (isOpen) {
-      setName(initialName || '');
-      clearCanvas();
-    }
-  }, [isOpen, initialName]);
-
-  const clearCanvas = () => {
+  function clearCanvas() {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -40,7 +35,19 @@ function SignatureModal({ isOpen, onClose, onSave, title, placeholder, initialNa
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    clearCanvas();
+    queueMicrotask(() => {
+      if (!cancelled) setName(initialName || '');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, initialName]);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsDrawing(true);
@@ -227,11 +234,18 @@ interface Customer {
 interface ContractFormProps {
   item: Item;
   customer: Customer;
+  storeId: string;
   onComplete: (contractData: any) => void;
   onClose: () => void;
 }
 
-export default function ContractForm({ item, customer, onComplete, onClose }: ContractFormProps) {
+export default function ContractForm({ item, customer, storeId, onComplete, onClose }: ContractFormProps) {
+  const { liffObject } = useLiff();
+  const authorizationHeaders = () => (
+    process.env.NEXT_PUBLIC_LIFF_MOCK === 'true'
+      ? {}
+      : getLiffAuthorizationHeaders(liffObject)
+  );
   // Contract steps: 'contract' -> 'signatures' -> 'photo' -> 'complete' -> 'waiting'
   const [currentStep, setCurrentStep] = useState<'contract' | 'signatures' | 'photo' | 'complete' | 'waiting'>('contract');
 
@@ -352,7 +366,6 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>สัญญาซื้อขายทรัพย์ (TH)</title>
-        <link href="https://fonts.googleapis.com/css2?family=Noto_Sans_Thai:wght@400;700&display=swap" rel="stylesheet">
         <style>
             body {
                 font-family: 'Noto_Sans_Thai', 'Arial', sans-serif;
@@ -532,6 +545,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...authorizationHeaders(),
         },
         body: JSON.stringify({
           lineId: customer.lineId,
@@ -545,6 +559,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
             interest: calculateInterest(),
             total: parseFloat(contractDetails.pawnPrice) + calculateInterest(),
             item: `${item.brand} ${item.model}`,
+            storeId,
           },
         }),
       });
@@ -646,6 +661,7 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...authorizationHeaders(),
           },
           body: JSON.stringify({
             itemId: item._id,
@@ -704,11 +720,16 @@ export default function ContractForm({ item, customer, onComplete, onClose }: Co
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...authorizationHeaders(),
             },
             body: JSON.stringify({
               itemId: item._id,
-              lineId: customer.lineId,
-              contractData: contractData
+              contractData: {
+                contractNumber: saveResult.contractNumber,
+                price: contractData.price,
+                interestRate: parseFloat(contractDetails.interestRate),
+                periodDays: contractData.periodDays,
+              }
             })
           });
           console.log('Notification sent successfully');

@@ -1,286 +1,202 @@
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db/mongodb';
-import { putPrivateBlob } from '@/lib/storage/blob';
 import { ObjectId } from 'mongodb';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+import { connectToDatabase } from '@/lib/db/mongodb';
+import { putPrivateBlob } from '@/lib/storage/blob';
+import { requireStoreMembership } from '@/lib/security/contract-access';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  sanitizedServerError,
+  TransactionRequestError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const CONTRACTS_FOLDER = 'contracts/';
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const MAX_CONTRACT_IMAGE_BYTES = 3 * 1024 * 1024;
+const MAX_CONTRACT_HTML_CHARS = 512 * 1024;
 
-// Configure route for larger payloads
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-// Helper to estimate base64 size
-function estimateBase64Size(base64String: string): number {
-  const base64Data = base64String.includes(',') ? base64String.split(',')[1] : base64String;
-  return Math.ceil(base64Data.length * 0.75);
-}
+type DecodedImage = { buffer: Buffer; contentType: string; extension: string };
 
-// Helper to reduce image quality
-function reduceImageQuality(base64Image: string, targetSizeKB: number = 800): string {
-  const targetBytes = targetSizeKB * 1024;
-  const currentSize = estimateBase64Size(base64Image);
-
-  if (currentSize <= targetBytes) {
-    return base64Image;
+function decodeImageDataUrl(value: unknown, maxBytes: number, pngOnly = false): DecodedImage | null {
+  if (value === null || value === undefined || value === '') return null;
+  const maxChars = Math.ceil(maxBytes * 4 / 3) + 128;
+  const dataUrl = boundedText(value, maxChars, true) || '';
+  const match = dataUrl.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match || (pngOnly && match[1] !== 'png')) {
+    throw new TransactionRequestError('INVALID_IMAGE', 400, 'ไฟล์รูปไม่ถูกต้อง');
   }
 
-  const ratio = targetBytes / currentSize;
-  const [prefix, base64Data] = base64Image.includes(',') ? base64Image.split(',') : ['', base64Image];
-  const newLength = Math.floor(base64Data.length * ratio);
-  const reducedData = base64Data.substring(0, newLength);
+  const buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length === 0 || buffer.length > maxBytes) {
+    throw new TransactionRequestError('IMAGE_TOO_LARGE', 413, 'รูปภาพมีขนาดใหญ่เกินไป');
+  }
 
-  return prefix ? `${prefix},${reducedData}` : reducedData;
+  const jpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  const png = buffer.length >= 8 && buffer.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+  const webp = buffer.length >= 12
+    && buffer.subarray(0, 4).toString('ascii') === 'RIFF'
+    && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  if ((match[1] === 'jpeg' && !jpeg) || (match[1] === 'png' && !png) || (match[1] === 'webp' && !webp)) {
+    throw new TransactionRequestError('INVALID_IMAGE', 400, 'ไฟล์รูปไม่ถูกต้อง');
+  }
+
+  if (match[1] === 'jpeg') return { buffer, contentType: 'image/jpeg', extension: 'jpg' };
+  if (match[1] === 'webp') return { buffer, contentType: 'image/webp', extension: 'webp' };
+  return { buffer, contentType: 'image/png', extension: 'png' };
+}
+
+function validateContractHtml(value: unknown): string | null {
+  const html = boundedText(value, MAX_CONTRACT_HTML_CHARS);
+  if (!html) return null;
+  if (
+    /<(script|iframe|object|embed|link|base)\b/i.test(html)
+    || /<meta\b[^>]*http-equiv/i.test(html)
+    || /(?:src|href)\s*=\s*["']?\s*(?:https?:|file:|ftp:|\/\/)/i.test(html)
+    || /(?:url\s*\(|@import)[^)]*(?:https?:|file:|ftp:|\/\/)/i.test(html)
+  ) {
+    throw new TransactionRequestError(
+      'UNSAFE_CONTRACT_HTML',
+      400,
+      'เอกสารมีทรัพยากรภายนอกที่ไม่อนุญาต',
+    );
+  }
+  return html;
+}
+
+async function renderPdf(html: string): Promise<Buffer> {
+  const browser = await puppeteer.launch({
+    args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: await chromium.executablePath(),
+    headless: true,
+  });
+  try {
+    const page = await browser.newPage();
+    page.setDefaultTimeout(30_000);
+    await page.setJavaScriptEnabled(false);
+    await page.setRequestInterception(true);
+    page.on('request', (resourceRequest) => {
+      const resourceUrl = resourceRequest.url();
+      if (resourceUrl.startsWith('data:') || resourceUrl === 'about:blank') {
+        void resourceRequest.continue();
+      } else {
+        void resourceRequest.abort();
+      }
+    });
+    await page.setViewport({ width: 794, height: 1123 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '2cm', right: '2cm', bottom: '2cm', left: '2cm' },
+      preferCSSPageSize: true,
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close().catch(() => {});
+  }
 }
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    console.log('Received save contract image request');
-
-    const body = await request.json();
-    console.log('Request body keys:', Object.keys(body));
-
-    const { itemId, contractHTML } = body;
-    let verificationPhoto = body.verificationPhoto;
-
-    console.log('Parsed data:', {
-      itemId: itemId?.substring(0, 10) + '...',
-      hasContractHTML: !!contractHTML,
-      hasVerificationPhoto: !!verificationPhoto,
-      contractHTMLLength: contractHTML?.length,
-      verificationPhotoLength: verificationPhoto?.length
-    });
-
-    // 🔥 Reduce verification photo size if too large (target 800KB max)
-    let photoWasCompressed = false;
-    if (verificationPhoto) {
-      const photoSize = estimateBase64Size(verificationPhoto);
-      const photoSizeKB = photoSize / 1024;
-      console.log(`📸 Verification photo size: ${photoSizeKB.toFixed(2)}KB`);
-
-      if (photoSizeKB > 800) {
-        console.log('⚠️ Photo too large, reducing quality...');
-        verificationPhoto = reduceImageQuality(verificationPhoto, 800);
-        const newSize = estimateBase64Size(verificationPhoto) / 1024;
-        console.log(`✅ Reduced to ${newSize.toFixed(2)}KB`);
-        photoWasCompressed = true;
-      }
+    // Reject unauthenticated callers before buffering and decoding a large
+    // document body. Membership is checked after the item identifies a store.
+    await requireLiffIdentity(request, 'STORE');
+    const body = await readBoundedJsonObject(request, 8 * 1024 * 1024);
+    const itemId = String(body.itemId || '').trim();
+    if (!ObjectId.isValid(itemId)) {
+      return NextResponse.json({ error: 'รหัสรายการไม่ถูกต้อง', code: 'INVALID_ITEM_ID' }, { status: 400 });
     }
 
-    if (!itemId) {
-      console.error('Missing itemId');
-      return NextResponse.json(
-        { error: 'กรุณาระบุ itemId' },
-        { status: 400 }
-      );
+    const contractHtml = validateContractHtml(body.contractHTML);
+    const contractImage = decodeImageDataUrl(body.contractImageData, MAX_CONTRACT_IMAGE_BYTES, true);
+    const verificationPhoto = decodeImageDataUrl(body.verificationPhoto, MAX_PHOTO_BYTES);
+    if (!contractHtml && !contractImage) {
+      return NextResponse.json({ error: 'ไม่พบเอกสารสัญญา', code: 'CONTRACT_DOCUMENT_REQUIRED' }, { status: 400 });
     }
 
-    console.log('Connecting to database...');
     const { db } = await connectToDatabase();
-    console.log('Database connected successfully');
-
     const itemsCollection = db.collection('items');
     const contractsCollection = db.collection('contracts');
-
-    // Find the item
-    console.log('Looking for item with id:', itemId);
-    const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
-    console.log('Item found:', !!item);
-
-    if (!item) {
-      console.error('Item not found for id:', itemId);
-      return NextResponse.json(
-        { error: 'ไม่พบรายการขอสินเชื่อ' },
-        { status: 404 }
-      );
+    const item = await itemsCollection.findOne(
+      { _id: new ObjectId(itemId) },
+      { projection: { _id: 1, storeId: 1 } },
+    );
+    if (!item || !item.storeId) {
+      return NextResponse.json({ error: 'ไม่พบรายการขอสินเชื่อ', code: 'ITEM_NOT_FOUND' }, { status: 404 });
     }
 
-    console.log('Item found, proceeding with Vercel Blob upload');
+    await requireStoreMembership(request, db, item.storeId);
+    releaseLock = await acquireFinancialLock(`mongo-contract:save-document:${itemId}`, 180);
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const contractFilename = `contract-${itemId}-${timestamp}.png`;
-    const photoFilename = verificationPhoto ? `verification-${itemId}-${timestamp}.jpg` : null;
-
-    console.log('Generated filenames:', { contractFilename, photoFilename });
-
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      console.error('BLOB_READ_WRITE_TOKEN is not set');
-      return NextResponse.json(
-        { error: 'ระบบยังไม่ได้ตั้งค่า Vercel Blob กรุณาติดต่อผู้ดูแลระบบ' },
-        { status: 500 }
-      );
+    const uniqueId = crypto.randomUUID();
+    let contractPath: string;
+    if (contractHtml) {
+      const pdfBuffer = await renderPdf(contractHtml);
+      contractPath = `${CONTRACTS_FOLDER}contract-${itemId}-${uniqueId}.pdf`;
+      await putPrivateBlob(contractPath, pdfBuffer, 'application/pdf');
+    } else {
+      contractPath = `${CONTRACTS_FOLDER}contract-${itemId}-${uniqueId}.png`;
+      await putPrivateBlob(contractPath, contractImage!.buffer, 'image/png');
     }
 
-    let contractUploadResult = null;
-    let photoUploadResult = null;
-
-    // Generate PDF from HTML if provided (with fallback to PNG)
-    if (contractHTML) {
-      console.log('Generating contract document...');
-      try {
-        let documentBuffer: Buffer;
-        let filename: string;
-        let contentType: string;
-
-        try {
-          // Try to generate PDF with puppeteer
-          console.log('Attempting PDF generation with puppeteer...');
-          const browser = await puppeteer.launch({
-            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
-            executablePath: await chromium.executablePath(),
-            headless: true,
-          });
-
-          const page = await browser.newPage();
-          page.setDefaultTimeout(30000);
-          await page.setViewport({ width: 794, height: 1123 });
-
-          await page.setContent(contractHTML, { waitUntil: 'domcontentloaded' });
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: {
-              top: '2cm',
-              right: '2cm',
-              bottom: '2cm',
-              left: '2cm'
-            },
-            preferCSSPageSize: true
-          });
-
-          await browser.close();
-
-          documentBuffer = Buffer.from(pdfBuffer);
-          filename = `contract-${itemId}-${timestamp}.pdf`;
-          contentType = 'application/pdf';
-          console.log('PDF generated successfully, size:', pdfBuffer.length);
-
-        } catch (pdfError) {
-          console.warn('PDF generation failed, falling back to PNG:', pdfError);
-
-          // Fallback: Save HTML as text file or generate PNG from client
-          // For now, save HTML as text file
-          const htmlBuffer = Buffer.from(contractHTML, 'utf-8');
-          documentBuffer = htmlBuffer;
-          filename = `contract-${itemId}-${timestamp}.html`;
-          contentType = 'text/html';
-          console.log('Falling back to HTML file, size:', htmlBuffer.length);
-        }
-
-        await putPrivateBlob(
-          `${CONTRACTS_FOLDER}${filename}`,
-          documentBuffer,
-          contentType,
-        );
-        contractUploadResult = filename;
-        console.log('Contract document uploaded successfully as', contentType);
-
-      } catch (error) {
-        console.error('Error generating/uploading contract document:', error);
-        console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-        throw new Error(`Document generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-
-    // Upload verification photo to Vercel Blob if provided
+    let verificationPhotoPath: string | null = null;
     if (verificationPhoto) {
-      console.log('Uploading verification photo...');
-      try {
-        // Clean base64 string and validate
-        let cleanBase64 = verificationPhoto;
-        if (verificationPhoto.startsWith('data:image/jpeg;base64,')) {
-          cleanBase64 = verificationPhoto.replace(/^data:image\/jpeg;base64,/, '');
-        } else if (verificationPhoto.startsWith('data:image/jpg;base64,')) {
-          cleanBase64 = verificationPhoto.replace(/^data:image\/jpg;base64,/, '');
-        }
-
-        console.log('Clean base64 length:', cleanBase64.length);
-
-        // Validate base64 format
-        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
-          throw new Error('Invalid base64 format for verification photo');
-        }
-
-        const photoBuffer = Buffer.from(cleanBase64, 'base64');
-        console.log('Photo buffer created, size:', photoBuffer.length);
-
-        if (photoBuffer.length === 0) {
-          throw new Error('Empty photo buffer');
-        }
-
-        await putPrivateBlob(
-          `${CONTRACTS_FOLDER}${photoFilename}`,
-          photoBuffer,
-          'image/jpeg',
-        );
-        photoUploadResult = photoFilename;
-        console.log('Verification photo uploaded successfully');
-      } catch (error) {
-        console.error('Error uploading verification photo:', error);
-        console.error('Photo data preview:', verificationPhoto?.substring(0, 100));
-        throw new Error(`Verification photo upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      verificationPhotoPath = `${CONTRACTS_FOLDER}verification-${itemId}-${uniqueId}.${verificationPhoto.extension}`;
+      await putPrivateBlob(verificationPhotoPath, verificationPhoto.buffer, verificationPhoto.contentType);
     }
 
-    // Update the contract document with image URLs
-    console.log('Updating contract document...');
-
-    // Generate unique contract number if this is a new contract
-    const contractNumber = `C${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-
-    const contractUpdate: any = {
-      contractNumber: contractNumber,
-      signedAt: new Date(),
-      status: 'signed'
-    };
-
-    if (contractUploadResult) {
-      contractUpdate.contractImages = {
-        ...contractUpdate.contractImages,
-        signedContract: `contracts/${contractUploadResult}`
-      };
-    }
-
-    if (photoUploadResult) {
-      contractUpdate.contractImages = {
-        ...contractUpdate.contractImages,
-        verificationPhoto: `contracts/${photoUploadResult}`
-      };
-    }
-
-    console.log('Contract update data:', contractUpdate);
+    const existingContract = await contractsCollection.findOne(
+      { itemId: item._id },
+      { projection: { contractNumber: 1 } },
+    );
+    const contractNumber = typeof existingContract?.contractNumber === 'string'
+      ? existingContract.contractNumber
+      : `C${Date.now()}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const contractImages: Record<string, string> = { signedContract: contractPath };
+    if (verificationPhotoPath) contractImages.verificationPhoto = verificationPhotoPath;
 
     await contractsCollection.updateOne(
-      { itemId: new ObjectId(itemId) },
-      { $set: contractUpdate },
-      { upsert: true }
+      { itemId: item._id },
+      {
+        $set: {
+          contractNumber,
+          signedAt: new Date(),
+          status: 'signed',
+          contractImages,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: { itemId: item._id, createdAt: new Date() },
+      },
+      { upsert: true },
     );
 
-    console.log('Contract document updated successfully');
-
-    const response: any = {
+    return NextResponse.json({
       success: true,
       message: 'บันทึกสัญญาเรียบร้อยแล้ว',
-      contractImageUrl: contractUploadResult ? `contracts/${contractUploadResult}` : null,
-      verificationPhotoUrl: photoUploadResult ? `contracts/${photoUploadResult}` : null
-    };
-
-    if (photoWasCompressed) {
-      response.warning = 'รูปภาพยืนยันตัวตนมีขนาดใหญ่เกินไป ระบบได้ลดคุณภาพรูปภาพเพื่อให้สามารถอัปโหลดได้';
-    }
-
-    return NextResponse.json(response);
-
-  } catch (error) {
-    console.error('Error saving contract image:', error);
-    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-    return NextResponse.json(
-      { error: 'เกิดข้อผิดพลาดในการบันทึกสัญญา' },
-      { status: 500 }
-    );
+      contractNumber,
+      contractImageUrl: contractPath,
+      verificationPhotoUrl: verificationPhotoPath,
+    });
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract:save-document] failed');
+    return sanitizedServerError('เกิดข้อผิดพลาดในการบันทึกสัญญา กรุณาลองใหม่');
+  } finally {
+    await releaseLock?.();
   }
 }

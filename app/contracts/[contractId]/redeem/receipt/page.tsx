@@ -73,8 +73,11 @@ export default function RedemptionReceiptPage() {
         formData.append('file', file);
         formData.append('folder', 'redemption-receipts');
 
-        const uploadRes = await axios.post('/api/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+        const uploadRes = await axios.post('/api/upload/image', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'X-LIFF-Role': 'PAWNER',
+          }
         });
 
         return uploadRes.data.url;

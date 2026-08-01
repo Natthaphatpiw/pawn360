@@ -2,139 +2,161 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import { sendConfirmationMessage } from '@/lib/line/client';
 import { ObjectId } from 'mongodb';
-import bcrypt from 'bcrypt';
+import { requireStoreMembership } from '@/lib/security/contract-access';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
+function safePositiveNumber(value: unknown, fallback: number, maximum: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= maximum ? parsed : fallback;
+}
 export async function POST(request: NextRequest) {
   try {
-    const { itemId, storeId, password } = await request.json();
-
-    if (!itemId || !storeId || !password) {
+    const body = await readBoundedJsonObject(request, 8 * 1024);
+    const itemId = boundedText(body.itemId, 24, true) || '';
+    const storeId = boundedText(body.storeId, 24, true) || '';
+    if (!ObjectId.isValid(itemId) || !ObjectId.isValid(storeId)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'รหัสรายการไม่ถูกต้อง', code: 'INVALID_ID' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
     const { db } = await connectToDatabase();
-    const storesCollection = db.collection('stores');
+    let store;
+    try {
+      ({ store } = await requireStoreMembership(request, db, storeId));
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
+
     const itemsCollection = db.collection('items');
-    const customersCollection = db.collection('customers');
-
-    // 1. ดึงข้อมูลร้านค้าและตรวจสอบรหัสผ่าน
-    const store = await storesCollection.findOne({ _id: new ObjectId(storeId) });
-
-    if (!store) {
-      return NextResponse.json(
-        { error: 'ไม่พบร้านค้า' },
-        { status: 404 }
-      );
-    }
-
-    // ตรวจสอบรหัสผ่าน
-    const passwordMatch = await bcrypt.compare(password, store.passwordHash);
-    if (!passwordMatch) {
-      return NextResponse.json(
-        { error: 'รหัสผ่านไม่ถูกต้อง' },
-        { status: 401 }
-      );
-    }
-
-    // 2. ดึงข้อมูลรายการขอสินเชื่อ
-    const item = await itemsCollection.findOne({ _id: new ObjectId(itemId) });
-
+    const itemObjectId = new ObjectId(itemId);
+    const storeObjectId = new ObjectId(storeId);
+    const item = await itemsCollection.findOne({ _id: itemObjectId });
     if (!item) {
       return NextResponse.json(
-        { error: 'ไม่พบรายการขอสินเชื่อ' },
-        { status: 404 }
+        { error: 'ไม่พบรายการ', code: 'ITEM_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
-
-    if (item.status !== 'pending') {
+    if (item.status !== 'pending' || item.confirmationStatus === 'pending') {
       return NextResponse.json(
-        { error: 'รายการนี้ถูกประมวลผลแล้ว' },
-        { status: 400 }
+        { error: 'รายการนี้ถูกดำเนินการแล้ว', code: 'ITEM_ALREADY_PROCESSED' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
       );
     }
-
-    // 3. ดึงข้อมูลลูกค้า
-    const customer = await customersCollection.findOne({ lineId: item.lineId });
-
-    if (!customer) {
+    if (typeof item.lineId !== 'string' || !item.lineId) {
       return NextResponse.json(
-        { error: 'ไม่พบข้อมูลลูกค้า' },
-        { status: 404 }
+        { error: 'ข้อมูลเจ้าของรายการไม่สมบูรณ์', code: 'ITEM_OWNER_MISSING' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    // 4. เตรียมข้อมูลสัญญาและส่งการยืนยันเสมอ
     const startDate = new Date();
+    const pawnedPrice = safePositiveNumber(
+      item.confirmationNewContract?.pawnPrice ?? item.negotiatedAmount ?? item.desiredAmount,
+      0,
+      100_000_000,
+    );
+    const interestRate = safePositiveNumber(
+      item.confirmationNewContract?.interestRate ?? item.negotiatedInterestRate ?? item.interestRate,
+      10,
+      100,
+    );
+    const periodDays = Math.round(safePositiveNumber(
+      item.confirmationNewContract?.loanDays ?? item.negotiatedDays ?? item.loanDays,
+      30,
+      3650,
+    ));
+    if (pawnedPrice <= 0) {
+      return NextResponse.json(
+        { error: 'ยอดเงินในรายการไม่ถูกต้อง', code: 'ITEM_AMOUNT_INVALID' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
-    // แปลงค่าให้เป็น number เพื่อป้องกัน string concatenation
-    const pawnedPrice = parseFloat(String(item.confirmationNewContract?.pawnPrice || item.negotiatedAmount || item.desiredAmount || 0));
-    const interestRate = parseFloat(String(item.confirmationNewContract?.interestRate || item.negotiatedInterestRate || item.interestRate || 10));
-    const periodDays = parseInt(String(item.confirmationNewContract?.loanDays || item.negotiatedDays || item.loanDays || 30));
-
-    // คำนวณ dueDate อย่างถูกต้อง
-    const dueDate = new Date(startDate.getTime());
+    const dueDate = new Date(startDate);
     dueDate.setDate(dueDate.getDate() + periodDays);
-
-    // คำนวณดอกเบี้ยและยอดรวม (ใช้ตัวเลขที่แปลงแล้ว)
     const interestAmount = (pawnedPrice * interestRate * (periodDays / 30)) / 100;
-    const remainingAmount = pawnedPrice + interestAmount;
-
-    console.log(`💰 Contract preparation - Price: ${pawnedPrice}, Rate: ${interestRate}%, Days: ${periodDays}`);
-    console.log(`💰 Interest calculation: ${pawnedPrice} × ${interestRate}% × (${periodDays}/30) / 100 = ${interestAmount}`);
-    console.log(`💰 Remaining amount: ${pawnedPrice} + ${interestAmount} = ${remainingAmount}`);
-    console.log(`📅 Due date: Start ${startDate.toISOString()} + ${periodDays} days = ${dueDate.toISOString()}`);
-
-    // เตรียมข้อมูลสัญญาสำหรับการยืนยัน
     const proposedContract = {
-      itemId: itemId, // เพิ่ม itemId สำหรับ LINE message
+      itemId,
       pawnedPrice,
       interestRate,
       periodDays,
       interestAmount,
-      remainingAmount,
-      storeName: store.storeName,
-      storeId: storeId,
+      remainingAmount: pawnedPrice + interestAmount,
+      storeName: String(store.storeName || 'ร้านค้า'),
+      storeId,
+      dueDate: dueDate.toISOString(),
     };
-
-    // สร้างข้อมูลการแก้ไข (แม้จะไม่มีการแก้ไขจริง ก็ส่งเป็นการยืนยัน)
     const modifications = {
-      type: 'contract_creation', // แสดงว่าเป็นการสร้างสัญญาใหม่ ไม่ใช่การแก้ไข
+      type: 'contract_creation',
       originalValues: null,
       newValues: proposedContract,
-      changes: [] // ไม่มีการเปลี่ยนแปลง เพราะเป็นการสร้างใหม่
+      changes: [],
     };
 
-    // บันทึกข้อมูลการยืนยันใน item และอัปเดต storeId
-    await itemsCollection.updateOne(
-      { _id: new ObjectId(itemId) },
+    const updateResult = await itemsCollection.updateOne(
+      {
+        _id: itemObjectId,
+        status: 'pending',
+        confirmationStatus: { $ne: 'pending' },
+      },
       {
         $set: {
           confirmationStatus: 'pending',
           confirmationModifications: modifications,
           confirmationProposedContract: proposedContract,
           confirmationTimestamp: new Date(),
-          storeId: new ObjectId(storeId), // 🔥 อัปเดต storeId ให้ตรงกับร้านที่แสกน
-          updatedAt: new Date()
-        }
-      }
+          storeId: storeObjectId,
+          updatedAt: new Date(),
+        },
+      },
     );
+    if (updateResult.modifiedCount !== 1) {
+      return NextResponse.json(
+        { error: 'รายการนี้กำลังถูกดำเนินการ', code: 'ITEM_CONCURRENT_UPDATE' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
-    // ส่งการยืนยันให้ user เสมอ
-    await sendConfirmationMessage(item.lineId, modifications, proposedContract);
+    try {
+      await sendConfirmationMessage(item.lineId, modifications, proposedContract);
+    } catch (error) {
+      console.error('[stores:verify-contract] LINE delivery failed', {
+        type: error instanceof Error ? error.name : 'unknown',
+      });
+      return NextResponse.json(
+        {
+          success: true,
+          warning: 'บันทึกรายการแล้ว แต่การแจ้งเตือนล่าช้า กรุณาตรวจสอบอีกครั้ง',
+          code: 'CONFIRMATION_NOTIFICATION_DELAYED',
+          status: 'confirmation_pending',
+        },
+        { status: 202, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'ส่งการยืนยันให้ลูกค้าเรียบร้อยแล้ว',
-      status: 'confirmation_sent'
-    });
-  } catch (error: any) {
-    console.error('Error creating contract:', error);
     return NextResponse.json(
-      { error: 'Failed to create contract' },
-      { status: 500 }
+      { success: true, message: 'ส่งคำขอยืนยันเรียบร้อยแล้ว', status: 'confirmation_sent' },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    console.error('[stores:verify-contract] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถดำเนินรายการได้', code: 'CONTRACT_CONFIRMATION_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

@@ -1,6 +1,6 @@
 <svg viewBox="0 0 1600 880" xmlns="http://www.w3.org/2000/svg" role="img" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
 <title>Astly - Sequence: Estimate Pricing</title>
-<desc>Sequence diagram of POST /api/estimate: cache check, Claude input normalization, parallel Claude web-search pricing and SerpAPI shopping with Claude filter, representative price estimation, 60 percent LTV and condition blend, cache store, and response.</desc>
+<desc>Queued estimate sequence: cache check, OpenAI Terra normalization, Parallel or Exa market evidence, optional SerpAPI, deterministic validation and representative price estimation.</desc>
 <defs>
 <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#334155"/></marker>
 <marker id="arA" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#64748b"/></marker>
@@ -25,7 +25,7 @@
 </defs>
 <rect x="0" y="0" width="1600" height="880" fill="#ffffff"/>
 <text class="title" x="40" y="40">Astly  -  Sequence: Estimate Pricing</text>
-<text class="sub" x="40" y="62">POST /api/estimate    -    representative market price (ราคากลาง) to loan principal (ราคาจำนำ)</text>
+<text class="sub" x="40" y="62">POST /api/estimate/jobs + Vercel Queue    -    market evidence to server-attested estimate</text>
 
 <!-- lifelines -->
 <line class="life" x1="160" y1="118" x2="160" y2="800"/>
@@ -37,9 +37,9 @@
 
 <!-- participants -->
 <rect class="client" x="70" y="80" width="180" height="38" rx="5"/><text class="ph" x="160" y="104" text-anchor="middle">Borrower (LIFF)</text>
-<rect class="plat" x="325" y="80" width="180" height="38" rx="5"/><text class="ph" x="415" y="104" text-anchor="middle">/api/estimate (Fn)</text>
+<rect class="plat" x="325" y="80" width="180" height="38" rx="5"/><text class="ph" x="415" y="104" text-anchor="middle">Estimate Queue Worker</text>
 <rect class="data" x="580" y="80" width="180" height="38" rx="5"/><text class="ph" x="670" y="104" text-anchor="middle">Redis / Vercel KV</text>
-<rect class="ext" x="835" y="80" width="180" height="38" rx="5"/><text class="ph" x="925" y="104" text-anchor="middle">Claude Sonnet 4.6</text>
+<rect class="ext" x="835" y="80" width="180" height="38" rx="5"/><text class="ph" x="925" y="104" text-anchor="middle">Terra + Parallel/Exa</text>
 <rect class="ext" x="1090" y="80" width="180" height="38" rx="5"/><text class="ph" x="1180" y="104" text-anchor="middle">SerpAPI</text>
 <rect class="lib" x="1345" y="80" width="180" height="38" rx="5"/><text class="ph" x="1435" y="104" text-anchor="middle">Price Estimator</text>
 
@@ -49,12 +49,12 @@
 <line class="ret" x1="670" y1="224" x2="415" y2="224"/><text class="ml" x="542" y="217" text-anchor="middle">3. miss</text>
 <rect class="note" x="600" y="236" width="520" height="26" rx="4"/><text class="nt" x="610" y="253">On cache hit: short-circuit and return the cached EstimateResponse.</text>
 
-<line class="msg" x1="415" y1="290" x2="925" y2="290"/><text class="ml" x="670" y="283" text-anchor="middle">4. normalizeInput (Claude Sonnet 4.6, structured tool-use)</text>
+<line class="msg" x1="415" y1="290" x2="925" y2="290"/><text class="ml" x="670" y="283" text-anchor="middle">4. normalizeInput (Terra structured output, none effort)</text>
 <line class="ret" x1="925" y1="322" x2="415" y2="322"/><text class="ml" x="670" y="315" text-anchor="middle">5. productName (color and serial stripped)</text>
 
 <!-- parallel frame -->
 <rect class="frame" x="385" y="348" width="830" height="210"/><text class="ft" x="395" y="364">par  [web search and shopping run in parallel]</text>
-<line class="msg" x1="415" y1="392" x2="925" y2="392"/><text class="ml" x="670" y="385" text-anchor="middle">6. web_search prices (Thai used-market listings)</text>
+<line class="msg" x1="415" y1="392" x2="925" y2="392"/><text class="ml" x="670" y="385" text-anchor="middle">6. Parallel search -&gt; Exa fallback; Terra extracts verified evidence</text>
 <line class="ret" x1="925" y1="424" x2="415" y2="424"/><text class="ml" x="670" y="417" text-anchor="middle">7. 4-8 listings in THB</text>
 <line class="msg" x1="415" y1="456" x2="1180" y2="456"/><text class="ml" x="797" y="449" text-anchor="middle">8. google_shopping_light query</text>
 <line class="ret" x1="1180" y1="488" x2="415" y2="488"/><text class="ml" x="797" y="481" text-anchor="middle">9. raw shopping candidates</text>
@@ -72,5 +72,5 @@
 <line class="ret" x1="415" y1="748" x2="160" y2="748"/><text class="ml" x="287" y="741" text-anchor="middle">15. 200 { estimatedPrice, marketPrice, principal, condition }</text>
 
 <rect class="note" x="40" y="772" width="1520" height="26" rx="4" fill="#eef4fb" stroke="#3b6aa0"/>
-<text class="nt" x="52" y="789" fill="#1e3a5f">All LLM calls route through the provider abstraction (lib/services/anthropic-llm). The web-search provider is switchable via PRICE_SEARCH_PROVIDER (anthropic default | openai). If no KV credentials are set, the cache steps are skipped.</text>
+<text class="nt" x="52" y="789" fill="#1e3a5f">OpenAI is primary; Anthropic is emergency fallback. Search order is fresh Redis -&gt; Parallel -&gt; Exa -&gt; stale Redis. Queue, budget and evidence guards fail closed in production.</text>
 </svg>

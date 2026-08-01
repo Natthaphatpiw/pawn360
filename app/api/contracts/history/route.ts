@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  sanitizedServerError,
+} from '@/lib/security/transaction-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { lineId } = body;
-
-    // Validation
-    if (!lineId) {
-      return NextResponse.json(
-        { error: 'Missing lineId' },
-        { status: 400 }
-      );
-    }
+    const { lineId } = await requireLiffIdentity(request, 'PAWNER');
 
     const { db } = await connectToDatabase();
     const contractsCollection = db.collection('contracts');
@@ -20,18 +16,29 @@ export async function POST(request: NextRequest) {
     // Get all contracts for this customer (all statuses)
     const contracts = await contractsCollection
       .find({ lineId })
+      .project({
+        _id: 1,
+        contractNumber: 1,
+        status: 1,
+        item: 1,
+        pawnDetails: 1,
+        dates: 1,
+        transactionHistory: 1,
+        storeId: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
       .sort({ createdAt: -1 })
+      .limit(100)
       .toArray();
 
     return NextResponse.json({
       success: true,
       contracts,
     });
-  } catch (error) {
-    console.error('Error fetching contract history:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    console.error('[contracts:history] failed');
+    return sanitizedServerError();
   }
 }

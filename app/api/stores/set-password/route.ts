@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db/mongodb';
 import bcrypt from 'bcrypt';
+import {
+  internalAuthErrorResponse,
+  requireInternalRequest,
+} from '@/lib/security/request-auth';
 
 export async function POST(request: NextRequest) {
+  try {
+    requireInternalRequest(request);
+  } catch (error) {
+    return internalAuthErrorResponse(error);
+  }
+
   try {
     const { storeId, password, confirmPassword } = await request.json();
 

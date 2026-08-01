@@ -33,6 +33,8 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) (applica
 
 Astly is a fully serverless, managed-cloud platform. The team operates no virtual machines, containers, Kubernetes clusters, or self-managed load balancers. All compute is stateless and event-driven; all stateful systems are managed third-party services consumed over the network. This minimizes operational surface area and headcount but concentrates availability and compliance dependencies on the providers below.
 
+> **Deep dive.** `PRODUCTION_READINESS_LLM_SEARCH_QUEUE_EKYC.md` (Thai) is the implementation-level companion to this document, covering the queue topology, provider-capacity limiter, measured AI/search cost, eKYC recovery design, error taxonomy, and the deploy checklist with its current pass/fail state.
+
 | Layer | Provider / Service | Plan | Role | Underlying cloud |
 |---|---|---|---|---|
 | Web hosting, edge, compute | Vercel | Pro | Edge network (CDN, TLS, WAF, DDoS), serverless Functions, cron, CI/CD | AWS (Vercel-managed, ~20 regions) |
@@ -40,11 +42,13 @@ Astly is a fully serverless, managed-cloud platform. The team operates no virtua
 | Operational document DB | MongoDB Atlas | Dedicated (ACCOUNT-SPECIFIC - confirm M10+) | Customer-facing operational store | AWS |
 | Object storage | Vercel Blob | Private store | Item photos, bank slips, contracts, tickets, QR | Configured Blob store region (confirm) |
 | Cache | Upstash Redis (via Vercel KV / Marketplace) | Pay-as-you-go / Fixed (confirm) | Estimate and image-hash cache | AWS |
+| Durable work delivery | Vercel Queues | Public beta (account eligibility confirm) | At-least-once delivery for estimates, condition analysis, and eKYC callbacks | Vercel-managed |
 | Messaging / channel | LINE (Messaging API + LIFF) | Official Accounts | Customer/investor/drop-point/store channels and mini-app auth | LINE Corp |
-| AI - text | Anthropic Claude | Commercial API | Pricing normalization, search filtering, web-search pricing | Anthropic |
-| AI - vision | Anthropic Claude (Haiku) + Google Gemini | Commercial API / paid tier | Item-condition image analysis, bank-slip OCR | Anthropic / Google |
-| AI - alternate search | OpenAI | Commercial API | Optional alternate web-search price provider (text only) | OpenAI |
-| Price data | SerpAPI | Commercial API | Google Shopping price candidates | SerpAPI |
+| AI - primary | OpenAI Luna + Terra | Commercial API | Pricing normalization/search/filtering, item-condition analysis, missing notebook specs, bank-slip OCR fallback | OpenAI |
+| AI - fallback | Anthropic Claude | Commercial API | Automatic text and vision fallback | Anthropic |
+| Market search - primary | Parallel Search | Marketplace / usage based | Web evidence for second-hand pricing | Parallel |
+| Market search - fallback | Exa Search | Marketplace / usage based | Search fallback when Parallel has no usable result | Exa |
+| Price data - optional | SerpAPI | Commercial API | Independent Google Shopping candidates | SerpAPI |
 | eKYC | UPPASS | Commercial API | Identity verification (national ID) | UPPASS |
 | Payment-slip verification | SlipOK | Commercial API | Bank-transfer slip validation | SlipOK |
 
@@ -71,7 +75,7 @@ The entire application (frontend, API, webhooks, cron) is a single Next.js proje
 All backend handlers are Next.js Route Handlers compiled to Vercel Functions on the Node.js runtime. Relevant Pro characteristics (source: vercel.com/docs/functions/limitations, vercel.com/docs/fluid-compute):
 
 - Fluid compute (default for new projects): an instance can serve multiple concurrent invocations (in-function concurrency), with Active CPU billed only while code executes (paused during I/O waits) and automatic cold-start mitigation (bytecode caching on Node 20+, production pre-warming, per-request error isolation).
-- Execution duration: Pro default 300 s, maximum 800 s (generally available), extended maximum 1800 s (30 min, beta, per-function configuration). The application sets `maxDuration = 60` on its three heaviest handlers (condition analysis, loan-ticket rendering, contract-image rendering) which perform headless-Chromium document rendering or multi-image vision plus live web search.
+- Execution duration: Pro default 300 s, maximum 800 s (generally available), extended maximum 1800 s (30 min, beta, per-function configuration). AI queue consumers use `maxDuration = 300`; the eKYC consumer uses 60 seconds. Interactive enqueue/poll requests remain short.
 - Memory / CPU: Pro can configure up to 4 GB memory / 2 vCPU (default 2 GB / 1 vCPU).
 - Concurrency / auto-scaling: functions auto-scale up to 30,000 concurrent executions on Pro, with no provisioning required.
 - Payload limit: request/response body max 4.5 MB. The app currently permits up to 10 MB in its server-upload handlers, so uploads above the platform limit must move to Vercel Blob client uploads.
@@ -88,7 +92,7 @@ All backend handlers are Next.js Route Handlers compiled to Vercel Functions on 
 
 - Pro allows up to 100 cron jobs/project at per-minute scheduling granularity. (Hobby is limited to once/day, so the platform's 5-minute crons require Pro.) Source: vercel.com/docs/cron-jobs/usage-and-pricing.
 - Crons are invoked over HTTP GET and should be secured with a `CRON_SECRET` bearer token. Delivery is best-effort (occasional missed or duplicate runs are possible) with no automatic retry - handlers must be idempotent.
-- The platform runs two crons every 5 minutes: the loan-ticket queue drain and the 48-hour redemption auto-confirm (see [`vercel.json`](vercel.json)).
+- The platform runs two five-minute business crons and a one-minute, `CRON_SECRET`-protected eKYC inbox/outbox reconciler (see [`vercel.json`](vercel.json)).
 
 ### 2.5 Edge security on Vercel (the WAF / DDoS layer)
 
@@ -97,9 +101,32 @@ There is no Cloudflare or external WAF; Vercel's platform provides this layer (s
 - DDoS mitigation: automatic L3/L4/L7 mitigation included free on all plans; traffic blocked by mitigation is not billed.
 - Attack Challenge Mode: free on all plans; challenges browser visitors while allowing verified bots and the platform's own functions/cron.
 - Vercel WAF (Pro): up to 40 custom rules, up to 100 project-level IP blocks, and rate limiting (Fixed Window algorithm, up to 40 rules, keyed by IP or JA4). WAF Managed Rulesets (e.g. OWASP CRS) are Enterprise-only and not available on Pro. WAF changes propagate globally within ~300 ms with instant rollback.
-- Application-layer authenticity for inbound machine traffic (LINE webhooks, Shop System callbacks, eKYC callbacks) is enforced in code via HMAC signature verification, independent of the edge firewall.
+- Application-layer authenticity remains independent of the edge firewall: LINE and Shop System use their signature schemes, while UpPass uses role-specific Basic Auth and rejects missing/misconfigured credentials. Legacy LINE webhook enforcement is still being standardized and must not be described as uniformly strict.
 
-### 2.6 Vercel compliance and SLA
+### 2.6 Vercel Queues (public beta)
+
+The production AI/eKYC dispatcher uses four queue topics defined in `vercel.json`. Queue delivery is at least once and currently has no built-in dead-letter queue, so the application adds idempotency keys, Redis/database claims and leases, bounded retry with jitter/`Retry-After`, and a seven-day Redis DLQ index. Queue messages carry only opaque ids. Because the service and trigger schema are beta, production rollout requires account eligibility confirmation, preview deployment verification, duplicate/crash/load tests, and an operational rollback path.
+
+| Topic | Consumer route | `maxDuration` | Retry-after | Default worker concurrency |
+|---|---|---:|---:|---:|
+| `pawnline-estimate-generic-v1` | `app/api/queues/estimate-generic` | 300 s | 30 s | 6 (`JOB_CONCURRENCY_ESTIMATE_GENERIC`) |
+| `pawnline-estimate-notebook-v1` | `app/api/queues/estimate-notebook` | 300 s | 45 s | 2 (`JOB_CONCURRENCY_ESTIMATE_NOTEBOOK`) |
+| `pawnline-condition-v1` | `app/api/queues/analyze-condition` | 300 s | 30 s | 8 (`JOB_CONCURRENCY_CONDITION`) |
+| `ekyc-webhook-events` | `app/api/queues/process-ekyc-webhook` | 60 s | 30 s | bounded by generation lease |
+
+Queue billing is per API operation (send, receive, delete, visibility change) metered in 4 KiB chunks. Because every message carries only a job/event id rather than the request payload or image bytes, each job costs a small constant number of operations regardless of item size - the large payloads live in Redis and private Blob instead. This is a deliberate cost and privacy decision, not only a size workaround.
+
+### 2.6.1 Provider capacity admission control
+
+Sitting between the queue workers and the model/search providers is a Redis-backed admission limiter (`lib/services/provider-capacity.ts`) that enforces requests-per-minute, tokens-per-minute, and concurrency **before** a billable call is made, at both provider and provider+model granularity. It is the mechanism that makes "wait for the provider's token-per-minute window to reset" a first-class, user-visible state rather than a cascade of 429s.
+
+- Counters and leases are updated in one atomic Lua script, so concurrent Vercel Functions across regions cannot oversubscribe a limit.
+- Tokens are reserved as an upper bound before the call and reconciled against reported usage afterwards. If a call times out with an ambiguous outcome, the reservation is deliberately **retained** until the minute bucket expires rather than refunded, because the provider may already have billed it.
+- Exhaustion produces a retryable typed error with a bounded `retryAfterMs`; the job returns to `RETRYING` with a Thai user message, and the platform's own limit never triggers API-key rotation (only a genuine provider 429 does).
+- In production the limiter is **fail-closed**: if Redis is unreachable the platform declines to call the provider rather than risk uncontrolled spend. This makes Upstash Redis a hard availability dependency of the AI path, which is recorded in the risk register.
+- Defaults are OpenAI 240 rpm / 1,000,000 tpm / 16 concurrent and Anthropic 120 / 500,000 / 8; search providers are limited by rpm and concurrency only. All are overridable per provider and per model via `PROVIDER_CAPACITY_*` environment variables and must be set to match the actual account tier.
+
+### 2.7 Vercel compliance and SLA
 
 - Certifications (platform-wide): SOC 2 Type 2; ISO/IEC 27001:2022; GDPR with DPA and EU SCCs/UK Addendum; EU-U.S. Data Privacy Framework; TISAX AL2; PCI DSS v4.0 (SAQ-D service provider and SAQ-A merchant AOCs, shared responsibility). HIPAA requires a signed BAA, available on Pro as a USD 350/month add-on. (Source: vercel.com/docs/security/compliance.)
 - Encryption: AES-256 at rest; TLS 1.3 in transit.
@@ -126,8 +153,8 @@ There is no Cloudflare or external WAF; Vercel's platform provides this layer (s
 - Stateless horizontal scale: the compute tier scales automatically and instantly with request volume; there is no capacity to pre-provision and no scaling configuration to manage. Cost scales with usage (invocations, Active CPU, memory-time, transfer).
 - Connection-bound scaling is the real constraint: serverless functions can fan out far wider than a database accepts direct connections. This is mitigated by (a) Supabase's Supavisor connection pooler, and (b) MongoDB driver connection reuse via a cached client across warm invocations. The Supabase compute size dictates the connection ceiling (Section 5.3); this is the primary scaling bottleneck to monitor under load.
 - Cache offload: the estimate pipeline caches whole responses and image content-hashes in Upstash Redis, reducing both latency and per-request AI/database cost at scale.
-- AI provider rate limits: each LLM client rotates across up to four API keys and degrades gracefully on rate-limit/quota errors, decoupling burst capacity from a single key's limit.
-- Known ceilings to watch: Supabase direct/pooled connection caps per compute size; AI provider per-minute token/request limits; SerpAPI and eKYC/slip provider quotas; Vercel function concurrency (30,000) and the 4.5 MB function payload limit.
+- AI/search rate limits: Vercel Queue topics absorb bursts while Redis semaphores cap concurrent generic estimates (6), notebook estimates (2), and condition jobs (8) by default. Typed 429/5xx/timeouts are retried durably; multi-key rotation is not used to bypass account billing quota.
+- Known ceilings to watch: Supabase connections; Redis availability; OpenAI TPM/RPM; Parallel, Exa, SerpAPI, UpPass, SlipOK and LINE quotas; queue age/DLQ depth; function concurrency and payload limits. Auto-scaling does not remove these downstream limits.
 
 ---
 
@@ -213,15 +240,15 @@ This section is emphasized for diligence because the platform transmits personal
 
 | Provider | Data sent | Default training posture | Default retention | Controls to confirm |
 |---|---|---|---|---|
-| Anthropic Claude (text + vision: condition photos, bank slips) | Product text; item photos; bank-slip images | Not used for training without express permission; standard Messages API does not retain content by default | None by default on standard models; certain newer models require 30-day retention | Zero Data Retention (ZDR) arrangement and/or HIPAA BAA in force for the organization |
-| Google Gemini (vision: condition scoring) | Item photos | Paid tier / Vertex AI: not used for training. Free tier: may be used to improve products | Paid tier: limited logging for policy/abuse only | That all usage is on the paid tier (or Vertex AI), never the free quota |
-| OpenAI (optional alternate web-search provider) | Product text only (no images in current architecture) | Not used for training since March 2023 unless opted in | Up to 30 days by default; ZDR for eligible accounts | Whether ZDR is enabled if used |
-| SerpAPI | Product-name search queries (no PII) | n/a | Provider-defined | Standard DPA |
+| OpenAI (primary text + vision) | Product text; item photos; bank-slip images when SlipOK is unavailable | Confirm against the account and API data-control settings | Responses are configured by the application; actual retention and eligible data controls are account-specific | DPA, storage/retention policy, and production storage setting |
+| Anthropic Claude (fallback) | The same product text or media only when an OpenAI path fails | Confirm against the account contract | Provider/account-specific | DPA and fallback retention terms |
+| Parallel / Exa | Canonical product/spec search queries and normalized excerpts (no intentional PII) | n/a | Provider-defined | DPA, retention, quota, and marketplace billing |
+| SerpAPI (optional) | Canonical product-name search text (no intentional PII) | n/a | Provider-defined | Standard DPA |
 | LINE (Messaging API + LIFF) | User identity (LINE userId), message content, Flex payloads | Platform processor | Provider-defined | LINE OA data terms; LIFF login scope |
 | UPPASS (eKYC) | National ID, identity documents, liveness/biometric artifacts | Identity-verification processor (highly sensitive) | Provider-defined | Executed DPA, retention/deletion terms, breach notification |
 | SlipOK | Bank-transfer slip images / references | Slip-verification processor | Provider-defined | Executed DPA, retention terms |
 
-Architecture note relevant to diligence: after the platform's migration to Claude, the PII-bearing image traffic (item photos and bank slips) is sent to Anthropic and Google; OpenAI receives only product-name text in the optional web-search path; SerpAPI receives only search text. The most sensitive identity data (national ID) flows to UPPASS, and bank slips to SlipOK and/or Anthropic. Each provider's contractual posture (ZDR, BAA, paid-tier, DPA) is the controlling control and is account-specific (Section 15).
+Architecture note relevant to diligence: OpenAI is the primary recipient of LLM product text and item photos; bank-slip images reach it only when SlipOK is not configured. Anthropic receives the same payload only on model fallback. Parallel, then Exa, receive canonical product/spec search text without user ids, serial numbers, or image URLs; optional SerpAPI receives the same class of query. National-ID data flows to UpPass. Each provider's contractual storage and processing posture is account-specific (Section 15).
 
 ---
 
@@ -265,7 +292,7 @@ Diligence summary: MongoDB Atlas (if dedicated M10+) has the stronger built-in r
 Application-level controls (detailed in [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md) Section 10):
 - All database access is server-side with privileged credentials; the Supabase anonymous key is unused; Row-Level Security is enabled on every table as a backstop (service role bypasses RLS, so the API layer is the true authorization boundary).
 - Sensitive mutations are gated by a six-digit PIN: bcrypt-hashed (cost 10) in Supabase, with a short-lived (two-minute) opaque server-side session token; escalating lockout.
-- Inbound machine-to-machine traffic is authenticated by HMAC signatures (LINE base64 HMAC; Shop System HMAC-hex over a notification id and timestamp with a five-minute replay window). Note: signature handling is currently inconsistent across actors (some endpoints log-and-continue or skip verification) - a hardening item flagged in the application architecture document.
+- Inbound machine traffic is provider-specific: LINE uses base64 HMAC, Shop System uses HMAC-hex with a five-minute replay window, and UpPass uses role-specific Basic Auth that fails closed. Some legacy LINE endpoints still have inconsistent enforcement and remain a hardening item.
 - Secrets are Vercel environment variables, encrypted at rest, scoped per environment; only `NEXT_PUBLIC_*` reaches the browser; AI provider keys are rotated (four per provider).
 - Object storage is private with time-limited, pathname-scoped signed URLs.
 
@@ -305,12 +332,57 @@ Fixed monthly minimums (representative; verify live):
 - Vercel Blob: storage, operations, Blob Data Transfer, and Function transfer for private reads; typically low at current media volumes.
 
 Primary variable drivers as the business scales:
-- AI inference (Anthropic, Gemini, OpenAI) per estimate and per condition analysis - the largest variable cost, mitigated by the Redis cache and by model tiering (Sonnet for text, Haiku for high-volume vision).
-- SerpAPI, eKYC (UPPASS), and slip-verification (SlipOK) per-call fees.
+- AI inference (OpenAI primary, Anthropic fallback) per estimate and condition analysis - mitigated by none/low-first task policies, one-level quality escalation, prompt/result caching, and Redis-backed job/month budgets.
+- Parallel primary search, Exa fallback search, optional SerpAPI, eKYC (UpPass), and SlipOK per-call fees. Fresh/stale search caching prevents repeated provider spend.
+- Vercel Queue operations and the function/Redis/Blob work surrounding each job; monitor queue retries because at-least-once delivery can multiply work if idempotency regresses.
 - Vercel Active CPU + Provisioned Memory + invocations + transfer (offset by the USD 20 credit, then on-demand).
 - Supabase compute upgrades (driven by connection demand) and egress; MongoDB Atlas tier upgrades.
 
-A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/day, contracts/day, and media volume should be prepared for diligence; the architecture makes per-transaction unit economics straightforward to compute.
+### 14.1 Measured AI and search unit economics
+
+The AI/search layer is the only cost driver that scales directly with user activity, so it is modelled bottom-up from measured calls rather than estimated. Rates below are the official published prices used by the in-app cost telemetry as of 1 August 2026; THB uses 32 THB/USD.
+
+| Model / provider | Input / 1M | Cached input / 1M | Cache write / 1M | Output / 1M |
+|---|---:|---:|---:|---:|
+| `gpt-5.6-luna` (vision, high-volume) | $0.20 | $0.02 | $0.25 | $1.20 |
+| `gpt-5.6-terra` (normalization, evidence) | $2.00 | $0.20 | $2.50 | $12.00 |
+| Claude Haiku 4.5 (fallback only) | $1.00 | - | - | $5.00 |
+| Claude Sonnet 4.6 (fallback only) | $3.00 | - | - | $15.00 |
+| Parallel search, `turbo` mode | $0.001 per search | | | |
+| Exa search, `instant` (fallback) | ~$0.007 per search | | | |
+
+Per-workflow cost, measured against live provider calls with synthetic test data:
+
+| Workflow | USD | THB | Note |
+|---|---:|---:|---|
+| Generic estimate, cache miss, first pass | 0.00822 | 0.263 | normalize + Parallel search + evidence extraction |
+| Generic or notebook estimate, cache hit | 0 | 0 | no provider call at all |
+| Notebook estimate, full spec, first pass | 0.01154 | 0.369 | adds canonicalization |
+| Notebook estimate requiring one quality retry | 0.02581 | 0.826 | includes the single Terra `medium` escalation |
+| Missing-spec extraction from photos (add-on) | 0.00039 | 0.012 | up to 4 photos |
+| Condition precheck + scoring | 0.00164 | 0.052 | Luna low-detail then high-detail |
+| Bank-slip OCR fallback (only when SlipOK is unavailable) | 0.00043 | 0.014 | does not auto-authorize a payment |
+| Anthropic fallback increment | 0.00083 - 0.00260 | 0.027 - 0.083 | incident path only |
+
+### 14.2 Monthly AI + search run-rate by traffic tier
+
+Mix assumption: 60% generic cache-miss, 20% cache hit, 15% notebook first pass, 5% notebook with quality retry, and one condition analysis per flow.
+
+| Estimate flows / month | AI + search USD | AI + search THB | Per-flow THB |
+|---:|---:|---:|---:|
+| 1,000 | $9.59 | ~฿307 | ~฿0.31 |
+| 10,000 | $95.86 | ~฿3,068 | ~฿0.31 |
+| 100,000 | $958.62 | ~฿30,676 | ~฿0.31 |
+| 1,000,000 | ~$9,586 | ~฿306,758 | ~฿0.31 |
+
+Sensitivities a DD reader should test:
+
+- **Cache hit rate is the dominant variable.** Every 10 points of additional cache hit removes roughly 10% of this line. The market cache is keyed on canonical brand/family/spec rather than on the user's photos, so two users pricing the same model share one search.
+- **Search-provider failover.** If Parallel were unavailable for an entire period and all traffic fell through to Exa, search cost rises by about $0.006 (฿0.19) per cache miss - roughly a 70% increase on the search component, but still under ฿0.5 per flow.
+- **Effort policy.** The pre-optimization configuration (`xhigh`/`max` everywhere) cost roughly ฿4.2 per generic flow and ฿9.8 per notebook flow. The current policy is a 90%+ reduction, and the ceiling is enforced in code, not convention: an unpriced model is rejected at call time and per-job/per-owner-per-day/per-month budget guards abort before the provider is called.
+- **Excluded from this table:** SlipOK, UpPass eKYC, LINE messaging, Supabase, Redis, Blob, and Vercel compute/egress. eKYC in particular is a per-verification vendor fee negotiated in contract, not a token cost, and it is incurred once per actor rather than per transaction.
+
+A full run-rate model should combine this table with the fixed minimums above plus per-verification eKYC pricing; the architecture makes per-transaction unit economics straightforward to compute because every provider call is already recorded with token counts, latency, cache status, and derived cost.
 
 ---
 
@@ -323,7 +395,7 @@ A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/d
 | R1 | No contractual uptime SLA on either core platform | High | Vercel and Supabase SLAs are Enterprise-only; the production financial platform runs on Pro on both | Upgrade path to Supabase Team/Enterprise and Vercel Enterprise for SLAs; or accept and document the risk |
 | R2 | Supabase has no automatic HA failover on Pro | High | A primary/single-AZ failure is recovered by restore, not automatic promotion; RTO depends on runbook | Enable PITR + read-replica add-ons; plan Enterprise upgrade for automatic failover; document and test restore runbook |
 | R3 | PITR may not be enabled on Supabase | High | Without the PITR add-on, RPO is up to 24 h (last daily backup) for the finance store | Confirm and enable PITR on the production project |
-| R4 | AI provider no-training / retention posture unconfirmed | High | Item photos and bank slips are sent to Anthropic/Google; defaults vary; Gemini free tier can train | Confirm ZDR (Anthropic/OpenAI), paid-tier/Vertex (Gemini), and executed DPAs; never use Gemini free tier |
+| R4 | AI provider storage / retention posture unconfirmed | High | Item photos and fallback bank slips are sent to OpenAI; Anthropic may receive them on fallback | Confirm the OpenAI production storage setting, retention window, and DPA; confirm Anthropic fallback terms |
 | R5 | eKYC and slip data processor terms | High | National ID (UPPASS) and bank slips (SlipOK) are highly sensitive PII | Execute DPAs with explicit retention/deletion and breach terms |
 | R6 | Webhook signature verification inconsistent | Medium | Some inbound webhooks log-and-continue or skip signature checks | Enforce strict verification (reject on mismatch) on all actor webhooks |
 | R7 | Cross-region data split | Medium | Blob store vs databases vs function region | Confirm region map; co-locate compute with databases; consolidate region where feasible |
@@ -332,6 +404,10 @@ A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/d
 | R10 | SOC 2 report not obtainable on Supabase Pro | Low | The report is Team/Enterprise gated | Upgrade tier if the data room requires the Supabase SOC 2 report |
 | R11 | Instant Rollback does not revert crons | Low | Operational footgun during incident rollback | Document in the incident runbook |
 | R12 | No automated test suite | Medium | Regression risk on a financial codebase | Introduce CI tests around pricing, calculations, and state machines |
+| R13 | Vercel Queues and trigger schema are beta | Medium | Availability/behavior may change and built-in DLQ is unavailable | Keep application DLQ/idempotency, load-test preview, monitor release notes, and maintain a legacy dispatcher rollback path |
+| R14 | **Upstash Redis is a hard availability dependency of the AI path** | High | The provider-capacity limiter is fail-closed in production, and job state, idempotency, locks, budget counters and caches all live in Redis. A Redis outage stops estimate/condition processing rather than degrading it | Deliberate trade (uncontrolled provider spend is worse than a queued job). Monitor Upstash health, size the plan for headroom, and keep `PROVIDER_CAPACITY_FAIL_CLOSED` documented as a conscious break-glass switch |
+| R15 | **Hardening migrations are not yet applied to the production database** | High | Verified by schema probe on 1 Aug 2026: `ekyc_attempts`, `ekyc_webhook_events`, the estimate-attestation columns and the price-evidence columns do not exist yet. Deploying the code without them makes every UpPass webhook return 503 and disables the market-observation cache | Run the five 2026-08-01 migrations in order, then re-run `npm run preflight:production`, which now fails closed on an unapplied migration |
+| R16 | Provider account quota is not yet aligned with `PROVIDER_CAPACITY_*` | Medium | Defaults are conservative placeholders, not the negotiated account limits | Confirm OpenAI/Anthropic/Parallel/Exa tier limits and set the env values to match before load testing |
 
 ### 15.2 Verification checklist (data-room items to request / confirm)
 
@@ -340,7 +416,7 @@ A bottoms-up monthly run-rate model keyed to estimates/day, condition analyses/d
 - MongoDB Atlas: cluster tier (confirm M10+); region pin; replica-set topology and any multi-region config; PITR window value; BYOK/KMS configuration; Backup Compliance Policy.
 - Vercel Blob: confirm private-store mode, connected-project scope, token rotation, signed-URL TTLs, region, and independent backup/export posture.
 - Upstash: plan, region, Regional vs Global; SOC 2 (Prod Pack) / HIPAA add-on state; TLS and IP allow-list.
-- AI/identity providers: executed DPAs; Anthropic ZDR and/or BAA; OpenAI ZDR; Gemini paid-tier/Vertex confirmation; UPPASS and SlipOK retention/deletion and breach-notification terms.
+- AI/identity providers: executed DPAs; OpenAI storage/retention confirmation for `store: true`; Anthropic fallback terms; UPPASS and SlipOK retention/deletion and breach-notification terms.
 - DR: documented and tested restore/failover runbooks for Supabase and MongoDB Atlas, with measured RTO.
 - Compliance: PDPA records of processing, consent records, cross-border transfer safeguards, and the SOC 2 reports of Vercel and MongoDB Atlas (and Supabase if upgraded) for the data room.
 

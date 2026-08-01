@@ -103,9 +103,9 @@ Connect Zone 3 (API + Domain Services) to each datastore with solid arrows. Labe
 Nodes (hexagons, muted grey):
 
 - "LINE Messaging API (4 Official Accounts)"
-- "Anthropic Claude API (Sonnet 4.6 text; Haiku 4.5 vision)"
-- "Google Gemini API (condition scoring)"
-- "OpenAI API (optional alternate web-search provider)"
+- "OpenAI API (Luna vision/classification; Terra structured extraction)"
+- "Anthropic Claude API (Sonnet/Haiku emergency fallback)"
+- "Parallel Search API + Exa fallback (market evidence)"
 - "SerpAPI (Google Shopping price candidates)"
 - "UPPASS (eKYC)"
 - "SlipOK (bank-slip verification)"
@@ -113,7 +113,7 @@ Nodes (hexagons, muted grey):
 
 Connections:
 
-- Solid arrows from "Anthropic LLM Client" and the API layer to Claude, Gemini, OpenAI, SerpAPI, SlipOK, UPPASS, labeled with the call purpose (for example "x-api-key, structured/vision", "condition scoring", "shopping search", "slip OCR", "eKYC initiate").
+- Solid arrows from the shared AI/search clients and API layer to OpenAI, Anthropic, Parallel/Exa, SerpAPI, SlipOK and UPPASS, labeled with the call purpose (for example "structured/vision", "fallback", "market evidence", "shopping search", "slip verification", "eKYC initiate").
 - Dashed arrows from LINE Messaging API, Shop System, and UPPASS back into the Zone 3 webhook handlers, labeled "signed webhook (HMAC)" for LINE/Shop and "eKYC result callback" for UPPASS.
 - Dashed arrow from "Shop System" to "/api/webhooks/shop-notification" labeled "HMAC over notificationId-timestamp, 5-min replay window".
 - Solid arrow from Zone 3 to "Shop System" labeled "signed negotiation/payment request".

@@ -1,205 +1,193 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { FlexMessage } from '@line/bot-sdk';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { Client, FlexMessage } from '@line/bot-sdk';
+import { lineRetryKeyFromMaterial, pushLineMessage } from '@/lib/line/push-text';
 import { requirePinToken } from '@/lib/security/pin';
-import { getInvestorRateForTier, resolveInvestorTier } from '@/lib/services/investor-tier';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
+import {
+  getInvestorRateForTier,
+  refreshInvestorTierAndTotals,
+  resolveInvestorTier,
+} from '@/lib/services/investor-tier';
 
-const pawnerLineClient = new Client({
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-  channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-});
+const relationOne = <T,>(value: T | T[] | null | undefined): T | null => (
+  Array.isArray(value) ? value[0] || null : value || null
+);
 
 export async function POST(request: NextRequest) {
+  const releaseLocks: Array<() => Promise<void>> = [];
   try {
-    const body = await request.json();
-    const { action, contractId, lineId, pinToken } = body; // Changed from investorId to lineId
-
-    if (!action || !contractId || !lineId) {
+    const body = await readBoundedJsonObject(request, 8 * 1024);
+    const action = boundedText(body.action, 16, true);
+    const contractId = requireUuid(body.contractId);
+    const pinToken = boundedText(body.pinToken, 256);
+    if (action !== 'accept' && action !== 'decline') {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'ประเภทรายการไม่ถูกต้อง', code: 'ACTION_INVALID' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
+    const identity = await requireLiffIdentity(request, 'INVESTOR');
     const supabase = supabaseAdmin();
-
-    // Get investor ID from LINE ID
     const { data: investor, error: investorError } = await supabase
       .from('investors')
       .select('investor_id, kyc_status, investor_tier, total_active_principal')
-      .eq('line_id', lineId)
+      .eq('line_id', identity.lineId)
       .single();
-
     if (investorError || !investor) {
       return NextResponse.json(
-        { error: 'Investor not found' },
-        { status: 404 }
+        { error: 'ไม่พบบัญชี Asset Funding', code: 'INVESTOR_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
+    if (action === 'decline') {
+      return NextResponse.json(
+        { success: true, message: 'ปฏิเสธข้อเสนอแล้ว' },
+        { headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    if (investor.kyc_status !== 'VERIFIED') {
+      return NextResponse.json({
+        error: 'ต้องยืนยันตัวตน (eKYC) ก่อนจึงจะรับข้อเสนอได้',
+        code: 'INVESTOR_KYC_REQUIRED',
+        kycRequired: true,
+        redirectTo: '/ekyc-invest',
+      }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
+    }
+    const checkedPin = await requirePinToken('INVESTOR', identity.lineId, pinToken || '');
+    if (!checkedPin.ok) {
+      return NextResponse.json(checkedPin.payload, {
+        status: checkedPin.status,
+        headers: { 'Cache-Control': 'no-store' },
+      });
+    }
 
-    const investorId = investor.investor_id;
+    releaseLocks.push(await acquireFinancialLock(`investor-funding:${investor.investor_id}`, 120));
+    releaseLocks.push(await acquireFinancialLock(`contract-funding:${contractId}`, 120));
 
-    // Get contract details
-    const { data: contract, error: contractError } = await supabase
+    const { data: rawContract, error: contractError } = await supabase
       .from('contracts')
       .select(`
-        *,
-        items:item_id (*),
-        pawners:customer_id (*),
-        drop_points:drop_point_id (*)
+        contract_id,
+        contract_number,
+        contract_status,
+        funding_status,
+        investor_id,
+        loan_request_id,
+        contract_end_date,
+        contract_duration_days,
+        loan_principal_amount,
+        interest_amount,
+        platform_fee_amount,
+        total_amount,
+        items:item_id (brand, model, image_urls),
+        pawners:customer_id (line_id),
+        drop_points:drop_point_id (google_maps_link)
       `)
       .eq('contract_id', contractId)
       .single();
-
-    if (contractError || !contract) {
+    if (contractError || !rawContract) {
       return NextResponse.json(
-        { error: 'Contract not found' },
-        { status: 404 }
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    const contract: any = rawContract;
+    if (contract.investor_id === investor.investor_id) {
+      return NextResponse.json({
+        success: true,
+        alreadyAccepted: true,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+    if (
+      contract.investor_id
+      || contract.funding_status !== 'PENDING'
+      || !['PENDING', 'PENDING_SIGNATURE'].includes(contract.contract_status)
+    ) {
+      return NextResponse.json(
+        { error: 'ข้อเสนอนี้มีผู้รับแล้ว', code: 'CONTRACT_NOT_AVAILABLE' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    const { data: loanRequest } = await supabase
-      .from('loan_requests')
-      .select('delivery_method, delivery_fee')
-      .eq('request_id', contract.loan_request_id)
-      .single();
-
-    if (action === 'accept') {
-      const pinCheck = await requirePinToken('INVESTOR', lineId, pinToken);
-      if (!pinCheck.ok) {
-        return NextResponse.json(pinCheck.payload, { status: pinCheck.status });
-      }
-
-      if (investor.kyc_status !== 'VERIFIED') {
-        return NextResponse.json(
-          {
-            error: 'ต้องยืนยันตัวตน (eKYC) ก่อนจึงจะรับข้อเสนอได้',
-            kycRequired: true,
-            kycStatus: investor.kyc_status,
-            redirectTo: '/ekyc-invest'
-          },
-          { status: 403 }
-        );
-      }
-
-      if (contract.investor_id) {
-        if (contract.investor_id === investorId) {
-          return NextResponse.json({
-            success: true,
-            message: 'Offer already accepted by this investor',
-            alreadyAccepted: true
-          });
-        }
-        return NextResponse.json(
-          { error: 'Contract already assigned to another investor' },
-          { status: 409 }
-        );
-      }
-
-      if (contract.funding_status && contract.funding_status !== 'PENDING') {
-        return NextResponse.json(
-          { error: 'Contract is no longer available for funding' },
-          { status: 409 }
-        );
-      }
-
-      const allowedStatuses = ['PENDING', 'PENDING_SIGNATURE'];
-      if (!allowedStatuses.includes(contract.contract_status)) {
-        return NextResponse.json(
-          { error: 'Contract is not available for acceptance' },
-          { status: 409 }
-        );
-      }
-
-      const currentTotal = Number(investor.total_active_principal || 0);
-      const projectedTotal = currentTotal + Number(contract.loan_principal_amount || 0);
-      const projectedTier = resolveInvestorTier(projectedTotal);
-      const investorRate = getInvestorRateForTier(projectedTier);
-
-      // Update contract with investor (guard against stale/closed contracts)
-      const { data: updatedContracts, error: updateError } = await supabase
-        .from('contracts')
-        .update({
-          investor_id: investorId,
-          contract_status: 'ACTIVE',
-          funding_status: 'FUNDED',
-          funded_at: new Date().toISOString(),
-          investor_rate: investorRate
-        })
-        .eq('contract_id', contractId)
-        .is('investor_id', null)
-        .in('contract_status', ['PENDING', 'PENDING_SIGNATURE'])
-        .eq('funding_status', 'PENDING')
-        .select('contract_id');
-
-      if (updateError) {
-        console.error('Error updating contract:', updateError);
-        return NextResponse.json(
-          { error: 'Failed to accept offer' },
-          { status: 500 }
-        );
-      }
-
-      if (!updatedContracts || updatedContracts.length === 0) {
-        return NextResponse.json(
-          { error: 'Contract is no longer available for acceptance' },
-          { status: 409 }
-        );
-      }
-
-      await supabase
-        .from('investors')
-        .update({
-          total_active_principal: projectedTotal,
-          investor_tier: projectedTier,
-          updated_at: new Date().toISOString()
-        })
-        .eq('investor_id', investorId);
-
-      // Update loan request
-      const { error: loanRequestError } = await supabase
-        .from('loan_requests')
-        .update({ request_status: 'FUNDED' })
-        .eq('request_id', contract.loan_request_id);
-
-      if (loanRequestError) {
-        console.error('Error updating loan request:', loanRequestError);
-      }
-
-      // Send confirmation message to pawner
-      const confirmationCard = createAcceptedCard(contract, loanRequest || null);
-      try {
-        await pawnerLineClient.pushMessage(contract.pawners.line_id, confirmationCard);
-        console.log(`Sent confirmation to pawner ${contract.pawners.line_id}`);
-      } catch (msgError) {
-        console.error('Failed to send confirmation to pawner:', msgError);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Offer accepted successfully'
-      });
-
-    } else if (action === 'decline') {
-      // For decline, we don't update the contract
-      // The contract remains pending for other investors
-      return NextResponse.json({
-        success: true,
-        message: 'Offer declined'
-      });
+    const projectedTotal = Number(investor.total_active_principal || 0)
+      + Number(contract.loan_principal_amount || 0);
+    const investorRate = getInvestorRateForTier(resolveInvestorTier(projectedTotal));
+    const { data: updatedContracts, error: updateError } = await supabase
+      .from('contracts')
+      .update({
+        investor_id: investor.investor_id,
+        contract_status: 'ACTIVE',
+        funding_status: 'FUNDED',
+        funded_at: new Date().toISOString(),
+        investor_rate: investorRate,
+      })
+      .eq('contract_id', contractId)
+      .is('investor_id', null)
+      .in('contract_status', ['PENDING', 'PENDING_SIGNATURE'])
+      .eq('funding_status', 'PENDING')
+      .select('contract_id');
+    if (updateError) throw updateError;
+    if (!updatedContracts?.length) {
+      return NextResponse.json(
+        { error: 'ข้อเสนอนี้มีผู้รับแล้ว', code: 'CONTRACT_NOT_AVAILABLE' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
     }
 
-    return NextResponse.json(
-      { error: 'Invalid action' },
-      { status: 400 }
-    );
+    if (contract.loan_request_id) {
+      const requestUpdate = await supabase
+        .from('loan_requests')
+        .update({ request_status: 'FUNDED' })
+        .eq('request_id', contract.loan_request_id)
+        .in('request_status', ['OFFER_ACCEPTED', 'MATCHING', 'PENDING']);
+      if (requestUpdate.error) throw requestUpdate.error;
+    }
+    await refreshInvestorTierAndTotals(investor.investor_id).catch(() => {});
 
-  } catch (error: any) {
-    console.error('Error in investor action:', error);
+    const { data: loanRequest } = contract.loan_request_id
+      ? await supabase
+        .from('loan_requests')
+        .select('delivery_method, delivery_fee')
+        .eq('request_id', contract.loan_request_id)
+        .maybeSingle()
+      : { data: null };
+    contract.items = relationOne<any>(contract.items);
+    contract.pawners = relationOne<any>(contract.pawners);
+    contract.drop_points = relationOne<any>(contract.drop_points);
+    await pushLineMessage({
+      channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+      to: contract.pawners?.line_id,
+      messages: createAcceptedCard(contract, loanRequest || null),
+      retryKey: lineRetryKeyFromMaterial(`contract-funded:${contractId}`),
+    }).catch(() => {});
+
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { success: true, message: 'รับข้อเสนอเรียบร้อยแล้ว' },
+      { headers: { 'Cache-Control': 'no-store' } },
     );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract:investor-action] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return sanitizedServerError('ไม่สามารถดำเนินรายการได้ชั่วคราว กรุณาตรวจสอบสถานะแล้วลองใหม่');
+  } finally {
+    for (const release of releaseLocks.reverse()) await release();
   }
 }
 

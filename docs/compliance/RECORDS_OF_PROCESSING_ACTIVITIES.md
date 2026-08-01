@@ -83,6 +83,9 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Cross-border + safeguard | UPPASS in SE Asia - DPA required; explicit consent + SCC-equivalent safeguards; Sec 28-29 |
 | Retention | **Shortest viable** - vendor deletion per DPA once verification outcome is recorded; Astly retains only the pass/fail status |
 | Storage location | Biometric held at UPPASS vendor; verification status in Supabase (borrower / investor records) |
+| What Astly persists from the callback | **Normalized status fields only**: event type, application status, eKYC status, provider event timestamp, an opaque `uppass_slug`, and a hashed event key. Raw UpPass answers, document images, biometric payloads, hosted form URLs and LINE IDs are **not** persisted from the webhook. This is enforced in code at `lib/ekyc/webhook-ingress.ts`, and the two server-only tables (`ekyc_attempts`, `ekyc_webhook_events`) have RLS enabled with `anon`/`authenticated` privileges revoked |
+| Integrity of the outcome | Status transitions are **monotonic**: a `VERIFIED` or `REJECTED` record cannot be re-opened by a later, replayed, or out-of-order event, and each transition is watermarked by provider timestamp with a deterministic hash tie-break. A duplicate callback is suppressed by the hashed event key |
+| Vendor assurance | ISO/IEC 27001 by BSI, cert. **IS773635**; **no published ISO/IEC 30107-3 or iBeta PAD liveness certification** - see `DATA_PROCESSING_AGREEMENTS.md` Section 5 |
 
 ### (d) Item photo capture & AI valuation / condition scoring
 
@@ -92,8 +95,8 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | Personal-data categories | Item photographs (general); derived cache (normalised inputs, image content hashes) |
 | Purpose | Value the collateral and score its condition to derive a loan offer |
 | Lawful basis | Contract necessity (Sec 24(3)); legitimate interest in accurate valuation (Sec 24(5)) |
-| Recipients / processors | Vercel Blob (image storage); Anthropic (Claude - image precheck, condition/valuation vision, slip fallback); Google (Gemini - condition scoring); Upstash (cache) |
-| Cross-border + safeguard | Blob region (confirm); Anthropic/Google in US - DPA with **no-training** and (for Anthropic) **zero-data-retention** terms; Sec 28-29 |
+| Recipients / processors | Vercel Blob (image storage); OpenAI (primary item analysis); Anthropic (emergency fallback); Upstash (cache) |
+| Cross-border + safeguard | Blob/provider regions (confirm); OpenAI/Anthropic DPA with **no-training** and minimum/zero-retention terms; Sec 28-29 |
 | Retention | Blob media retention window (see Section 4); cache TTL ~30 days |
 | Storage location | Vercel Blob (configured region); transient AI-provider processing (no retention where ZDR/no-training applies); Upstash cache |
 
@@ -200,7 +203,7 @@ One row per processing activity. "SENSITIVE" flags Sec 26 special-category data.
 | eKYC face-match / liveness | **SENSITIVE - biometric (Sec 26)** | UPPASS vendor | UPPASS |
 | Bank slips | General (financial) | Vercel Blob | Vercel, SlipOK, Anthropic (fallback) |
 | Bank account, loan / financial records | General (financial) | Supabase / MongoDB | Supabase, MongoDB Atlas |
-| Item photographs | General | Vercel Blob | Vercel, Anthropic, Google (Gemini) |
+| Item photographs | General | Vercel Blob | Vercel, OpenAI; Anthropic only on fallback |
 | Contracts, transactions, custody records, notifications | General | MongoDB / Supabase | MongoDB Atlas, Supabase |
 | PIN hash + session token | Authentication data (PIN one-way hashed) | Supabase `user_security` | Supabase |
 | Cache (normalised inputs, image hashes) | Derived, low sensitivity | Upstash | Upstash |
@@ -214,9 +217,9 @@ Cross-reference `DATA_PROCESSING_AGREEMENTS.md` for executed-DPA status and clau
 | Processor | Function | Region | DPA status |
 | --- | --- | --- | --- |
 | UPPASS | eKYC incl. **biometric** (Sec 26) | SE Asia | DPA required - retention/deletion terms; ISO 27001 / PDPA claims to confirm |
-| Anthropic (Claude) | AI on item photos + bank slips | US | DPA required - **no-training + zero-data-retention critical** |
-| Google (Gemini) | AI condition scoring | US (paid / Vertex) | DPA required - **no-training** |
-| OpenAI | Optional web-search (product text only) | US | DPA required |
+| OpenAI | Primary AI on product text, item photos, and slip OCR fallback | US (confirm) | DPA required - **no-training + minimum-retention critical** |
+| Anthropic (Claude) | Emergency AI fallback on minimized text/images | US (confirm) | DPA required - **no-training + zero-data-retention critical** |
+| Parallel / Exa | Canonical product/spec web search | Region (confirm) | DPA required - retention/sub-processors to confirm |
 | Vercel | Hosting / compute / logs | US-default (configurable) | DPA required |
 | Supabase | Primary database | AWS region (confirm) | DPA required |
 | MongoDB Atlas | Operational database | AWS region (confirm) | DPA required |
@@ -226,7 +229,7 @@ Cross-reference `DATA_PROCESSING_AGREEMENTS.md` for executed-DPA status and clau
 
 ### Cross-border transfer basis (Sec 28-29)
 
-Several processors host or process data outside Thailand: US processors (Anthropic, Google, OpenAI, Vercel, MongoDB Atlas, Upstash), plus the configured Blob store region. There is **no PDPC adequacy finding** for the United States. Astly relies on:
+Several processors host or process data outside Thailand: US or region-to-confirm processors (OpenAI, Anthropic, Parallel, Exa, Vercel, MongoDB Atlas, Upstash), plus the configured Blob store region. There is **no PDPC adequacy finding** for the United States. Astly relies on:
 
 - **Contract-necessity derogation** (Sec 28) where the transfer is necessary to perform the contract with the data subject; and/or
 - **Informed consent** to the cross-border transfer where necessity does not apply; and
@@ -286,6 +289,13 @@ Sec 37 requires appropriate technical and organisational safeguards. Cross-refer
 | Object storage | Vercel Blob store private; access via signed URLs or server-side reads only |
 | Sensitive-data minimisation | Biometric data minimised and held at the eKYC vendor; Astly retains only pass/fail status |
 | Processor controls | Written DPAs with no-training / ZDR / deletion terms (Section 5) |
+| Identity verification | LINE ID tokens verified **server-side against LINE** per actor role (issuer, audience, subject, expiry); a client-supplied user id is never accepted as identity |
+| Authorization | Ownership of every record resolved from the database against the verified token subject; sensitive mutations additionally require a 6-digit PIN step-up with a 2-minute opaque server-stored token |
+| Inbound machine authenticity | All LINE webhooks verify HMAC and reject `401`; the Shop System callback signs the full body with a replay window; UpPass callbacks require role-scoped Basic Auth and return `503` when unconfigured - **no endpoint fails open** |
+| Asynchronous-path minimisation | Queue messages carry **only an opaque job or event id**; request payloads live in Redis and private Blob, and image bytes never transit a queue. Image references must resolve to Astly's own private Blob store and path prefix, blocking SSRF and unbounded payloads |
+| AI telemetry minimisation | Provider usage records hold token counts, latency, cache status and derived cost only - never prompts, images or response bodies. `OPENAI_STORE_RESPONSES=false` prevents a second copy of item photographs and slips being retained provider-side |
+| Value integrity | AI valuations, confidence scores and condition scores are bound to the server by HMAC attestation, so an authenticated user cannot alter a financially material value before submitting a loan request |
+| Abuse and cost bounding | Per-subject job rate limits plus per-job, per-owner-per-day and per-month AI spend ceilings; a Redis provider-capacity limiter that is **fail-closed in production** |
 
 ---
 

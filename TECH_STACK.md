@@ -36,17 +36,18 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md), [`INFRA
 | Layer | Technology | Version | Notes |
 |---|---|---|---|
 | Language | TypeScript | ^5 | Strict mode enabled |
-| Web framework | Next.js (App Router) | ^16.0.7 | Frontend + API routes in one project |
+| Web framework | Next.js (App Router) | ^16.2.12 | Frontend + API routes in one project |
 | UI runtime | React / React DOM | 19.1.0 (pinned) | Latest major |
 | Styling | Tailwind CSS v4 | ^4 | CSS-first config (no `tailwind.config.js`) |
-| Server runtime | Node.js (Vercel Functions) | Node 20+ on Vercel | Serverless; not Edge runtime |
+| Server runtime | Node.js (Vercel Functions) | `>=22` (`engines`) | Serverless; not Edge runtime |
 | Primary DB client | `@supabase/supabase-js` | ^2.86.0 | PostgreSQL via PostgREST, service role |
 | Operational DB driver | `mongodb` | ^6.20.0 | Native MongoDB driver |
-| Cache client | `@upstash/redis` | ^1.36.3 | REST-based Redis |
-| Object storage | `@vercel/blob` | ^2.6.1 | Private Vercel Blob storage + signed URLs |
-| AI - primary | Anthropic Claude | direct REST (no SDK) | Text + vision |
-| AI - vision scoring | `@google/generative-ai` | ^0.24.1 | Gemini |
-| AI - optional | `openai` | `latest` (unpinned) | Alternate web-search provider |
+| Cache client | `@upstash/redis` | 1.36.3 | REST-based Redis |
+| Object storage | `@vercel/blob` | 2.6.1 | Private Vercel Blob storage + signed URLs |
+| AI - primary | OpenAI Responses API | `openai` 6.16.0 | Luna/Terra text, vision, and structured extraction |
+| AI - fallback | Anthropic Claude | direct REST (no SDK) | Text and vision fallback |
+| Market search | Parallel / Exa | `parallel-web` 1.1.0 / `exa-js` 2.16.3 | Parallel primary, Exa fallback, Redis fresh/stale cache |
+| Durable queue | Vercel Queues | `@vercel/queue` 0.4.0 | At-least-once AI and eKYC work delivery; beta trigger API |
 | Channel | `@line/bot-sdk`, `@line/liff` | ^10.3.0 / ^2.27.2 | Messaging + mini-app |
 | Document rendering | `puppeteer` + `@sparticuz/chromium` | ^24.25.0 / ^141.0.0 | Serverless headless Chrome |
 | Auth | `bcrypt` + Node `crypto` | ^6.0.0 | PIN hashing + tokens |
@@ -55,7 +56,7 @@ Companion documents: [`SYSTEM_ARCHITECTURE.md`](SYSTEM_ARCHITECTURE.md), [`INFRA
 | Linting | ESLint 9 + `eslint-config-next` | ^9 / ^16.0.7 | Flat config, relaxed rules |
 | Automated tests | None | - | No test framework in manifest (see Section 17) |
 
-Headline: a modern, current-generation TypeScript stack (Next.js 16, React 19, Tailwind v4, Node 20+) with no legacy framework debt, deployed serverless, integrating best-in-class managed services for data, storage, messaging, and AI.
+Headline: a current-generation TypeScript stack (Next.js 16, React 19, Tailwind v4, Node >=22) deployed serverless with managed data, storage, messaging, search, queue, and AI services.
 
 ---
 
@@ -63,7 +64,7 @@ Headline: a modern, current-generation TypeScript stack (Next.js 16, React 19, T
 
 - Primary language: TypeScript (`typescript` ^5), compiled to ES2017 target with `module: esnext`, `moduleResolution: bundler`, `strict: true`, and `jsx: react-jsx`. Path alias `@/*` maps to the project root.
 - Secondary languages: SQL (PostgreSQL DDL/DML, captured in `DATABASE_CHANGES.sql` / `database.sql`); JSX/TSX for React components; CSS (Tailwind v4 utility layer).
-- Runtime: Node.js on Vercel Functions (Node 20+ on the platform; the local development environment observed is Node 24). No `engines` field is declared in `package.json` (see Section 17). The application uses the Node.js runtime, not the Edge runtime, because of Node-only dependencies (MongoDB driver, Puppeteer/Chromium, bcrypt).
+- Runtime: Node.js on Vercel Functions, constrained by `package.json` to `>=22` (local development observed on Node 24). The application uses the Node.js runtime, not Edge, because of Node-only dependencies (MongoDB, Puppeteer/Chromium, bcrypt, and queue consumers).
 - Package management: npm, with a committed `package-lock.json` as the reproducibility source of truth. A single lockfile per app; note the repository's nested-directory layout is documented in the project guide.
 
 ---
@@ -72,7 +73,7 @@ Headline: a modern, current-generation TypeScript stack (Next.js 16, React 19, T
 
 | Package | Version | Role |
 |---|---|---|
-| `next` | ^16.0.7 | Full-stack framework (App Router): server-rendered pages, Route Handlers (API), middleware-free routing, image handling, build pipeline |
+| `next` | ^16.2.12 | Full-stack framework (App Router): server-rendered pages, Route Handlers (API), image handling, build pipeline |
 | `react` | 19.1.0 | UI component runtime |
 | `react-dom` | 19.1.0 | DOM renderer |
 | `tailwindcss` | ^4 | Utility-first CSS (v4, configured via PostCSS plugin and CSS, no JS config file) |
@@ -85,7 +86,7 @@ The frontend is delivered as a set of LINE LIFF mini-apps (one route tree per ac
 
 ## 4. Backend and Server Runtime
 
-The backend is implemented as Next.js Route Handlers (~115 API endpoints) running as Vercel Functions on the Node.js runtime. There is no separate backend framework (no Express/Nest/Fastify); the Next.js Route Handler model is the server framework. Cross-cutting server logic lives in `lib/` modules (database access, LINE clients, security, pricing, AI client, Blob storage). Background processing runs as two Vercel Cron jobs declared in `vercel.json`.
+The backend is implemented as Next.js Route Handlers (~115 API endpoints) running as Vercel Functions on the Node.js runtime. There is no separate backend framework (no Express/Nest/Fastify); the Next.js Route Handler model is the server framework. Cross-cutting server logic lives in `lib/` modules. Background processing uses four Vercel Queue triggers plus three cron schedules declared in `vercel.json`.
 
 ---
 
@@ -95,8 +96,8 @@ The backend is implemented as Next.js Route Handlers (~115 API endpoints) runnin
 |---|---|---|
 | `@supabase/supabase-js` | ^2.86.0 | PostgreSQL access (investor/finance/logistics store) via the service-role key; PostgREST + realtime-capable client |
 | `mongodb` | ^6.20.0 | Native MongoDB driver for the customer-facing operational store; client cached across warm invocations |
-| `@upstash/redis` | ^1.36.3 | REST client for the estimate-response and image-hash cache (Vercel KV / Upstash) |
-| `@vercel/blob` | ^2.6.1 | Private object storage for images, contracts, tickets, QR codes, and time-limited signed read URLs |
+| `@upstash/redis` | 1.36.3 | REST client for the estimate-response and image-hash cache (Vercel KV / Upstash) |
+| `@vercel/blob` | 2.6.1 | Private object storage for images, contracts, tickets, QR codes, and time-limited signed read URLs |
 
 The platform runs a deliberate dual datastore (PostgreSQL via Supabase + MongoDB Atlas), described in `SYSTEM_ARCHITECTURE.md`. All database access is server-side with privileged credentials.
 
@@ -106,11 +107,41 @@ The platform runs a deliberate dual datastore (PostgreSQL via Supabase + MongoDB
 
 | Provider | Integration | Version | Role |
 |---|---|---|---|
-| Anthropic Claude | Direct REST to the Messages API (`lib/services/anthropic-llm.ts`) - no SDK dependency | n/a (native `fetch`) | Primary LLM: input normalization, search-result filtering, web-search pricing (Sonnet 4.6); image precheck and bank-slip OCR (Haiku 4.5). Four-key rotation, structured output via tool-use |
-| Google Gemini | `@google/generative-ai` SDK | ^0.24.1 | Item-condition image scoring (Gemini Flash); four-key rotation |
-| OpenAI | `openai` SDK | `latest` (unpinned) | Optional alternate web-search price provider (text only), selected by configuration |
+| OpenAI | `openai` SDK through `lib/services/openai-llm.ts` | 6.16.0 | Primary LLM. Luna handles vision/classification; Terra handles normalization/canonicalization/evidence extraction. Task defaults are none/low with one-level quality escalation, typed errors, usage/cost telemetry and Redis budget guards |
+| Anthropic Claude | Direct REST to Messages API (`lib/services/anthropic-llm.ts`) | n/a (native `fetch`) | Automatic Sonnet 4.6 text / Haiku 4.5 vision fallback after the OpenAI path |
+| Parallel Search | `parallel-web` through `lib/services/market-search.ts` | 1.1.0 | Primary bounded market search; no user identifiers, serials, or image URLs in queries |
+| Exa Search | `exa-js` through `lib/services/market-search.ts` | 2.16.3 | Search fallback before stale Redis evidence |
 
-Architecturally significant point for diligence: the primary AI provider (Anthropic) is integrated via a direct, dependency-free REST client rather than a vendor SDK. This was a deliberate choice for build stability and version control and means the Anthropic integration adds no third-party SDK to the supply chain. All AI access is mediated by thin provider abstractions, enabling model/vendor substitution (and a future in-house model) by configuration.
+LLM and search are separate abstractions: OpenAI Responses is attempted first for model work, Anthropic is the model fallback, while Parallel -> Exa -> stale cache supplies web evidence. Queue-level backpressure/retry owns transient-provider recovery so SDK retries do not create hidden duplicate spend.
+
+### 6.1 Model and reasoning-effort policy (the cost-control surface)
+
+Reasoning effort is the single largest cost lever in this stack. An earlier configuration ran every call at `xhigh`/`max`; a single notebook price search then burned ~11,200 reasoning tokens and ~123 seconds. The current policy assigns the lowest effort that passes the task's quality gate and escalates **once**, only when a deterministic gate fails.
+
+| Pipeline step | Model | Default effort | Escalation trigger | Env override |
+|---|---|---|---|---|
+| Image precheck (type / same-item) | Luna (vision, low detail) | `none` | none - unclear photos are returned to the user | `OPENAI_LUNA_REASONING_EFFORT` |
+| Condition scoring (<= 4 photos) | Luna (vision, high detail) | `low` | none - unassessable results go to manual review | `OPENAI_LUNA_REASONING_EFFORT` |
+| Product-name normalization | Terra | `none` | `low` on schema/quality-gate failure | `OPENAI_TERRA_REASONING_EFFORT` |
+| Notebook spec canonicalization | Terra | `low` | `medium` when family cannot be resolved | `OPENAI_NOTEBOOK_REASONING_EFFORT` |
+| Missing notebook specs from photos | Luna (vision) | `none` | user correction, not a retry | `OPENAI_LUNA_REASONING_EFFORT` |
+| Used-price evidence extraction (generic) | Terra | `low` | `medium` once when comparables are insufficient | `OPENAI_TERRA_REASONING_EFFORT` |
+| Used-price evidence extraction (notebook) | Terra | `low` | `medium` once when exact/family/anchor evidence is short | `OPENAI_NOTEBOOK_REASONING_EFFORT` |
+| Bank-slip OCR (SlipOK unavailable) | Luna (vision) | `low` | none - low confidence routes to manual review | `OPENAI_LUNA_REASONING_EFFORT` |
+| Representative price, LTV, ladder, penalty, interest | **no LLM** | - | - | deterministic code in `lib/services/` |
+
+`xhigh` and `max` are no longer used on any production path. They are reserved for offline investigation.
+
+### 6.2 Model pricing used for in-app cost accounting
+
+`OPENAI_MODEL_PRICING` in `lib/services/openai-llm.ts` is the single source of truth for cost telemetry and the budget guards. A model with no entry is **rejected at call time** rather than being billed silently, so adding a model requires a reviewed price entry.
+
+| Model | Input / 1M | Cached input / 1M | Cache write / 1M | Output / 1M |
+|---|---:|---:|---:|---:|
+| `gpt-5.6-luna` | $0.20 | $0.02 | $0.25 | $1.20 |
+| `gpt-5.6-terra` | $2.00 | $0.20 | $2.50 | $12.00 |
+
+Cost figures per workflow and per traffic tier are in `SCALABILITY_AND_DEPLOYMENT.md` and `INFRASTRUCTURE.md`.
 
 ---
 
@@ -142,10 +173,33 @@ Architecturally significant point for diligence: the primary AI provider (Anthro
 | Package | Version | Role |
 |---|---|---|
 | `bcrypt` | ^6.0.0 | One-way hashing of the six-digit user PIN (cost factor 10), stored in Supabase `user_security` |
-| Node `crypto` (built-in) | runtime | Opaque PIN-session token generation (`randomBytes`) and HMAC signature verification for inbound webhooks |
+| Node `crypto` (built-in) | runtime | Opaque tokens, event/safety hashes, constant-time Basic Auth comparison, and provider-specific HMAC verification |
 | `@types/bcrypt` | ^6.0.0 | Type definitions for bcrypt |
 
-Authentication and webhook-signature logic is custom and lives in `lib/security/` (PIN, PIN session, LINE signature, webhook signature). End-user identity is delegated to LINE Login via LIFF; there is no separate user-credential framework (no NextAuth/Passport).
+Authentication and webhook-signature logic is custom and lives in `lib/security/`. End-user identity is delegated to LINE Login via LIFF; there is no separate user-credential framework (no NextAuth/Passport).
+
+### 9.1 `lib/security/` module inventory
+
+Every control below is a server-side module with no browser counterpart. A DD reviewer can read this directory as the platform's complete trust boundary.
+
+| Module | Responsibility |
+|---|---|
+| `liff-auth.ts` | Verifies the LINE ID token server-side against LINE (issuer, audience, subject, expiry) per actor role. A `lineId` in a request body is never treated as identity |
+| `request-auth.ts` | Shared role/identity resolution for API handlers |
+| `job-owner.ts` | Binds an async AI job to the LINE subject that created it; polling another user's job is 403 |
+| `contract-access.ts` / `drop-point-access.ts` | Database-derived ownership checks for contract and drop-point routes - no trust in `viewer`/`lineId` query parameters |
+| `pin.ts` / `pin-access.ts` / `pin-session.ts` | Six-digit PIN step-up: bcrypt cost 10, opaque server-stored session token, lockout ladder |
+| `estimate-attestation.ts` | HMAC attestation binding owner, item fingerprint, photos, price, condition, confidence and expiry, so a browser cannot alter an AI estimate before submitting a loan request |
+| `payment-evidence.ts` | Slip fingerprint lookup across every payment-evidence store, preventing one slip from settling two workflows |
+| `financial-lock.ts` / `transaction-lock.ts` | Distributed Redis locks around money-moving mutations |
+| `transaction-request.ts` | Bounded JSON reader plus sanitized error mapping for transactional routes |
+| `bounded-upload.ts` | Streaming multipart limits and magic-byte file-type validation |
+| `queued-images.ts` | Rejects `data:` URLs and enforces that image references belong to the project's own private Blob store and path prefix (anti-SSRF) |
+| `ai-job-input.ts` | Schema/size validation of AI job payloads before anything is enqueued |
+| `actor-rate-limit.ts` / `job-rate-limit.ts` | Per-authenticated-subject admission control, so one logged-in account cannot drain the AI budget or the queue |
+| `line.ts` / `webhook.ts` / `webhook-replay.ts` | LINE HMAC verification, Shop System HMAC scheme, and replay-window/nonce suppression |
+
+Adjacent enforcement lives in `lib/services/provider-capacity.ts` (provider RPM/TPM/concurrency admission, fail-closed in production) and `lib/services/ai-usage.ts` (per-job, per-owner-per-day, and per-month spend ceilings).
 
 ---
 
@@ -153,7 +207,7 @@ Authentication and webhook-signature logic is custom and lives in `lib/security/
 
 | Package | Version | Role |
 |---|---|---|
-| `axios` | ^1.12.2 | HTTP client for several outbound third-party calls (alongside native `fetch` used elsewhere, e.g. the Anthropic and Shop System integrations) |
+| `axios` | ^1.19.0 | HTTP client for several outbound third-party calls (alongside bounded native `fetch` integrations) |
 | `dotenv` | ^17.2.3 | Environment-variable loading for the ad-hoc `tsx` scripts |
 | `lucide-react` | ^0.555.0 | Icon components |
 
@@ -184,10 +238,10 @@ Testing: there is no automated test framework in the manifest (no Jest, Vitest, 
 | `package.json` | Dependency manifest and npm scripts |
 | `package-lock.json` | Exact, reproducible dependency tree (bill of materials) |
 | `tsconfig.json` | TypeScript config: ES2017 target, esnext modules, bundler resolution, strict, `@/*` path alias |
-| `next.config.ts` | Next.js config (currently minimal/default) |
+| `next.config.ts` | Next.js config and production security headers |
 | `eslint.config.mjs` | ESLint flat config; relaxes `no-explicit-any` (off), `no-require-imports` (off), and downgrades `no-unused-vars` and `no-img-element` to warnings |
 | `postcss.config.mjs` | PostCSS pipeline (Tailwind v4 plugin) |
-| `vercel.json` | Deployment config: two cron jobs at 5-minute cadence |
+| `vercel.json` | Four Vercel Queue triggers plus eKYC reconciliation and business crons |
 | `.env` / `.env.example` | Environment variables (secrets are not committed; `.env.example` documents the shape) |
 | `tailwind` | v4 CSS-first configuration (no `tailwind.config.js`) |
 
@@ -204,11 +258,12 @@ The runtime stack is as much about managed services as about libraries. Full inf
 | Document database | MongoDB Atlas | Customer-facing operational store |
 | Object storage | Vercel Blob (private store) | Images, contracts, tickets, QR (signed URLs) |
 | Cache | Upstash Redis (via Vercel KV) | Estimate + image-hash cache |
+| Durable queue | Vercel Queues (beta) | AI/eKYC at-least-once delivery; app idempotency, leases, retry and DLQ |
 | Messaging / identity | LINE (Messaging API + LIFF) | Channels and mini-app auth |
-| AI - text | Anthropic Claude | Pricing pipeline reasoning |
-| AI - vision | Anthropic Claude (Haiku) + Google Gemini | Condition image analysis, slip OCR |
-| AI - optional search | OpenAI | Alternate web-search pricing |
-| Price data | SerpAPI | Google Shopping price candidates |
+| AI - primary | OpenAI Luna + Terra | Structured pricing reasoning, item-image analysis, missing notebook specs, slip OCR fallback |
+| AI - fallback | Anthropic Claude | Automatic text and vision fallback |
+| Market search | Parallel -> Exa -> stale Redis cache | Web evidence for pricing |
+| Price data | SerpAPI (optional) | Independent Google Shopping candidates |
 | eKYC | UPPASS | Identity verification |
 | Slip verification | SlipOK | Bank-transfer slip validation |
 | Adjacent system | Shop System (separate Vercel app) | Negotiation and payment verification (signed HTTP) |
@@ -217,22 +272,22 @@ The runtime stack is as much about managed services as about libraries. Full inf
 
 ## 14. Full Dependency Manifest
 
-Production dependencies (23):
+Production dependencies (25):
 
 | Package | Version | Category | Role |
 |---|---|---|---|
-| `next` | ^16.0.7 | Framework | Full-stack web framework |
+| `next` | ^16.2.12 | Framework | Full-stack web framework |
 | `react` | 19.1.0 | Frontend | UI runtime |
 | `react-dom` | 19.1.0 | Frontend | DOM renderer |
-| `tailwindcss` | ^4 | Styling | Utility CSS |
-| `@tailwindcss/postcss` | ^4.2.2 | Styling | Tailwind PostCSS plugin (listed under devDependencies) |
 | `lucide-react` | ^0.555.0 | UI | Icons |
 | `@supabase/supabase-js` | ^2.86.0 | Data | PostgreSQL client |
 | `mongodb` | ^6.20.0 | Data | MongoDB driver |
-| `@upstash/redis` | ^1.36.3 | Data | Redis cache client |
-| `@vercel/blob` | ^2.6.1 | Storage | Private Blob uploads, reads, and signed URLs |
-| `@google/generative-ai` | ^0.24.1 | AI | Gemini SDK |
-| `openai` | `latest` | AI | OpenAI SDK (unpinned) |
+| `@upstash/redis` | 1.36.3 | Data | Redis cache client |
+| `@vercel/blob` | 2.6.1 | Storage | Private Blob uploads, reads, and signed URLs |
+| `@vercel/queue` | 0.4.0 | Queue | Vercel Queue producer/consumer and retry callbacks (beta) |
+| `openai` | `6.16.0` | AI | OpenAI Responses SDK (exactly pinned) |
+| `parallel-web` | 1.1.0 | Search | Primary market-search SDK |
+| `exa-js` | 2.16.3 | Search | Fallback market-search SDK |
 | `@line/bot-sdk` | ^10.3.0 | Messaging | LINE Messaging API |
 | `@line/liff` | ^2.27.2 | Messaging | LINE LIFF SDK |
 | `puppeteer` | ^24.25.0 | Media | Headless Chromium |
@@ -242,7 +297,7 @@ Production dependencies (23):
 | `react-signature-canvas` | ^1.1.0-alpha.2 | Media | Signature capture (alpha) |
 | `browser-image-compression` | ^2.0.2 | Media | Client image compression |
 | `bcrypt` | ^6.0.0 | Security | PIN hashing |
-| `axios` | ^1.12.2 | Utility | HTTP client |
+| `axios` | ^1.19.0 | Utility | HTTP client |
 | `dotenv` | ^17.2.3 | Utility | Env loading (scripts) |
 | `@types/bcrypt` | ^6.0.0 | Types | Type defs (belongs in dev) |
 | `@types/html2canvas` | ^0.5.35 | Types | Type defs (belongs in dev) |
@@ -292,11 +347,13 @@ Ad-hoc scripts (run directly with `tsx`/`node`, not wired to npm): pricing/bench
 
 - Single full-stack codebase: frontend and API in one Next.js project, simplifying deployment and type sharing.
 - Serverless-only runtime: no servers/containers; the Route Handler + Vercel Function model is the backend framework.
-- Provider-abstracted AI: a thin internal abstraction over Anthropic (REST), Gemini (SDK), and OpenAI (SDK), enabling model/vendor swaps and the future in-house model via configuration.
-- Anthropic via REST, intentionally: the primary AI vendor adds no SDK to the supply chain.
+- Provider-abstracted AI: a shared OpenAI Responses client plus an Anthropic REST fallback, enabling model/vendor swaps and the future in-house model via configuration.
+- Anthropic remains dependency-free via direct REST and is invoked only after the OpenAI primary path fails.
+- Search-provider abstraction: Parallel is primary, Exa fallback, with bounded normalized evidence and a fresh/stale Redis cache.
+- Durable backpressure: Vercel Queue messages carry only opaque ids; Redis supplies idempotency, leases, provider concurrency and an application DLQ because delivery is at least once.
 - Dual datastore by design: PostgreSQL (Supabase) and MongoDB (Atlas) used together, each as a system of record for its domain.
-- Custom, lightweight auth: LINE Login for identity plus a custom bcrypt PIN and HMAC webhook-signature layer - no heavy auth framework.
-- Modern versions: Next 16, React 19, Tailwind v4, TypeScript 5, Node 20+ - a current-generation stack with no legacy framework debt.
+- Custom, lightweight auth: server-verified LINE ID tokens plus bcrypt PIN; machine authentication is provider-specific (including fail-closed Basic Auth for UpPass).
+- Modern versions: Next 16, React 19, Tailwind v4, TypeScript 5, Node >=22 - a current-generation stack with no legacy framework debt.
 - Tailwind v4 CSS-first config: no `tailwind.config.js`; theme tokens are expressed in CSS.
 
 ---
@@ -307,10 +364,10 @@ Presented transparently; none are architecturally serious, and each has a low-ef
 
 | # | Observation | Severity | Remediation |
 |---|---|---|---|
-| 1 | `openai` is pinned to `latest` (unpinned) | Medium | Pin to an exact/caret version for reproducible builds and to avoid silent breaking changes; the lockfile mitigates but the manifest should be explicit |
+| 1 | Model/provider SDK release drift | Low | `openai` is pinned to 6.16.0; upgrade deliberately with Responses API contract and cost smoke tests |
 | 2 | `react-signature-canvas` is a pre-release (`1.1.0-alpha.2`) in a production signing flow | Medium | Evaluate stability; pin exactly; have a fallback signature component |
 | 3 | No automated test framework in the manifest | Medium | Add Vitest/Jest + Playwright with CI coverage for pricing, calculations, and state machines (also flagged in the scalability plan) |
-| 4 | No `engines` field (Node version not pinned in `package.json`) | Low | Declare `engines.node` to pin the Node major version for reproducibility across Vercel and local |
+| 4 | `engines.node` permits any version >=22 rather than one Node major | Low | Align Vercel project runtime and CI to one tested Node major if stricter reproducibility is required |
 | 5 | A few `@types/*` packages are under `dependencies` rather than `devDependencies` | Low | Move type-only packages to `devDependencies` |
 | 6 | ESLint is relaxed (`no-explicit-any` off, unused-vars as warnings) | Low | Tighten rules incrementally; treat the lint step as a CI gate |
 | 7 | Both `axios` and native `fetch` are used for outbound HTTP | Low | Standardize on one client for consistency in retries/timeouts/observability |
@@ -325,7 +382,7 @@ Strengths a reviewer should weigh against the above: the stack is current and ma
 |---|---|---|
 | Exact pin | `react` 19.1.0, `react-dom` 19.1.0 | Deterministic |
 | Caret range (`^`) | Majority of dependencies | Latest compatible minor/patch at install; locked by `package-lock.json` |
-| Unpinned (`latest`) | `openai` | Non-deterministic across fresh installs; should be pinned |
+| Exact pin | `openai` 6.16.0 | Reproducible Responses API behavior; upgrade deliberately |
 | Pre-release | `react-signature-canvas` (alpha) | Stability risk; should be evaluated/pinned |
 
 Definitive bill of materials: the committed `package-lock.json` resolves all of the above to exact versions and integrity hashes and is the authoritative artifact for a precise dependency audit. All version figures here reflect the manifest as of writing and should be reconciled against the lockfile at diligence time.

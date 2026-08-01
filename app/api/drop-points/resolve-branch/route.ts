@@ -1,24 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { haversineDistanceMeters } from '@/lib/services/geo';
-
-type ResolveBranchRequest = {
-  latitude: number;
-  longitude: number;
-};
+import {
+  ActorRateLimitError,
+  enforceActorRateLimit,
+} from '@/lib/security/actor-rate-limit';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  finiteNumber,
+  readBoundedJsonObject,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as Partial<ResolveBranchRequest>;
-    const latitude = Number(body.latitude);
-    const longitude = Number(body.longitude);
-
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return NextResponse.json(
-        { error: 'Invalid latitude/longitude' },
-        { status: 400 }
-      );
+    let lineId = 'local-mock';
+    if (!(process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_LIFF_MOCK === 'true')) {
+      const identity = await requireLiffIdentity(request, 'PAWNER');
+      lineId = identity.lineId;
     }
+    await enforceActorRateLimit({
+      scope: 'resolve-drop-point',
+      actor: lineId,
+      limit: 30,
+      windowSeconds: 10 * 60,
+    });
+
+    const body = await readBoundedJsonObject(request, 8 * 1024);
+    const latitude = finiteNumber(body.latitude, { min: -90, max: 90, required: true }) || 0;
+    const longitude = finiteNumber(body.longitude, { min: -180, max: 180, required: true }) || 0;
 
     const supabase = supabaseAdmin();
     const { data, error } = await supabase
@@ -32,31 +43,30 @@ export async function POST(request: NextRequest) {
       .not('longitude', 'is', null);
 
     if (error) {
-      console.error('Error resolving branch:', error);
+      console.error('[drop-points:resolve] database failure', { code: error.code || 'unknown' });
       return NextResponse.json(
-        { error: 'Failed to resolve branch' },
-        { status: 500 }
+        { error: 'ไม่สามารถค้นหาจุดรับสินค้าได้', code: 'BRANCH_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
       );
     }
 
     if (!data || data.length === 0) {
       return NextResponse.json(
         { success: false, reason: 'NO_ACTIVE_BRANCHES' },
-        { status: 200 }
+        { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
     const origin = { latitude, longitude };
     let best: (typeof data)[number] | null = null;
     let bestDistance = Number.POSITIVE_INFINITY;
-
     for (const branch of data) {
       if (branch.latitude == null || branch.longitude == null) continue;
       const distance = haversineDistanceMeters(origin, {
         latitude: Number(branch.latitude),
         longitude: Number(branch.longitude),
       });
-      if (distance < bestDistance) {
+      if (Number.isFinite(distance) && distance < bestDistance) {
         bestDistance = distance;
         best = branch;
       }
@@ -65,26 +75,49 @@ export async function POST(request: NextRequest) {
     if (!best) {
       return NextResponse.json(
         { success: false, reason: 'NO_VALID_COORDS' },
-        { status: 200 }
+        { headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      branch: {
-        branch_id: best.drop_point_id,
-        branch_name: best.drop_point_name,
-        district: best.addr_district,
-        province: best.addr_province,
-        postcode: best.addr_postcode,
-      },
-      distance_m: Math.round(bestDistance),
-    });
-  } catch (error: any) {
-    console.error('Error in resolve-branch:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      {
+        success: true,
+        branch: {
+          branch_id: best.drop_point_id,
+          branch_name: best.drop_point_name,
+          district: best.addr_district,
+          province: best.addr_province,
+          postcode: best.addr_postcode,
+        },
+        distance_m: Math.round(bestDistance),
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if (error instanceof ActorRateLimitError) {
+      return NextResponse.json(
+        {
+          error: error.status === 429
+            ? 'ค้นหาจุดรับสินค้าถี่เกินไป กรุณารอสักครู่'
+            : 'ระบบค้นหาจุดรับสินค้ายังไม่พร้อม',
+          code: error.code,
+          retryable: true,
+        },
+        {
+          status: error.status,
+          headers: { 'Cache-Control': 'no-store', 'Retry-After': String(error.retryAfterSeconds) },
+        },
+      );
+    }
+    console.error('[drop-points:resolve] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถค้นหาจุดรับสินค้าได้', code: 'BRANCH_LOOKUP_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

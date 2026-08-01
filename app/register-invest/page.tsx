@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
+import { getLiffAuthorizationHeaders } from '@/lib/liff/auth-header';
 import { loadMockInvestor } from '@/lib/mock-investor';
 import pawnlyWelcomeLogo from '@/app/Image-logos/Pawnly logo - No BG,Full - Off-White.png';
 import investorTierSilver from '@/Assets/image-tiers/investortiersilver.png';
@@ -461,8 +462,8 @@ export default function InvestorRegister() {
     setError(null);
 
     try {
-      const response = await axios.post('/api/ekyc/initiate-invest', {
-        investorId: investor.investor_id,
+      const response = await axios.post('/api/ekyc/initiate-invest', {}, {
+        headers: getLiffAuthorizationHeaders(liffObject),
       });
 
       if (response.data.success && response.data.url) {
@@ -474,9 +475,11 @@ export default function InvestorRegister() {
       }
 
       setError('ไม่สามารถเริ่มต้นการยืนยันตัวตนได้');
-    } catch (ekycError: any) {
-      console.error('eKYC start error:', ekycError);
-      setError(ekycError.response?.data?.error || 'ไม่สามารถเริ่มต้นการยืนยันตัวตนได้');
+    } catch (ekycError: unknown) {
+      console.error('Asset Funding registration eKYC start failed', {
+        code: axios.isAxiosError(ekycError) ? ekycError.response?.data?.code || 'EKYC_START_FAILED' : 'EKYC_START_FAILED',
+      });
+      setError(axios.isAxiosError(ekycError) ? ekycError.response?.data?.error || 'ไม่สามารถเริ่มต้นการยืนยันตัวตนได้' : 'ไม่สามารถเริ่มต้นการยืนยันตัวตนได้');
     }
   };
 
@@ -1086,13 +1089,14 @@ function CreditLimitDonutChart({ categories }: { categories: Array<{ key: string
   const circumference = 2 * Math.PI * radius;
   const total = categories.reduce((sum, category) => sum + category.amount, 0);
   const gap = circumference * 0.018;
-  let cursor = 0;
-  const segments = categories.map((category) => {
+  const segments = categories.map((category, index) => {
     const rawLength = total > 0 ? (category.amount / total) * circumference : 0;
     const segmentLength = Math.max(rawLength - gap, 0);
     const dashArray = `${segmentLength} ${circumference}`;
-    const dashOffset = -cursor;
-    cursor += rawLength;
+    const previousLength = categories
+      .slice(0, index)
+      .reduce((sum, item) => sum + (total > 0 ? (item.amount / total) * circumference : 0), 0);
+    const dashOffset = -previousLength;
 
     return {
       ...category,
@@ -1262,9 +1266,14 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
     : formData;
 
   useEffect(() => {
-    if (isJuzmatchReferral && !totalLimitInput) {
-      setTotalLimitInput('500,000');
-    }
+    if (!isJuzmatchReferral || totalLimitInput) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setTotalLimitInput('500,000');
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isJuzmatchReferral, totalLimitInput]);
 
   const computedPayload = buildCategoryLimitPayload(preferenceState, totalLimitInput, divideEqually);

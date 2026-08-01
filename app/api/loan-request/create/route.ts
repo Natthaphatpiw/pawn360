@@ -2,12 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { haversineDistanceMeters } from '@/lib/services/geo';
 import { buildItemNotesWithPasscode } from '@/lib/utils/item-private-notes';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import {
+  EstimateAttestationError,
+  estimateAttestationErrorResponse,
+  verifyEstimateAttestation,
+} from '@/lib/security/estimate-attestation';
+import {
+  acquireTransactionLock,
+  transactionLockErrorResponse,
+} from '@/lib/security/transaction-lock';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const MIN_REQUESTED_AMOUNT = 1000;
+const MAX_JSON_BYTES = 256 * 1024;
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -25,14 +36,6 @@ const normalizeInt = (value: unknown) => {
   return Math.round(num);
 };
 
-const clampInt = (value: unknown, min: number, max: number) => {
-  const num = normalizeInt(value);
-  if (num === null) {
-    return null;
-  }
-  return Math.min(max, Math.max(min, num));
-};
-
 const SERIAL_OPTIONAL_TYPES = new Set([
   'อุปกรณ์เสริมโทรศัพท์',
   'กล้อง',
@@ -45,10 +48,19 @@ const isSerialRequiredForType = (itemType?: string) => {
 };
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_JSON_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const {
-      lineId,
+      lineId: claimedLineId,
       itemData,
       loanAmount,
       deliveryMethod,
@@ -59,18 +71,45 @@ export async function POST(request: NextRequest) {
       draftItemId,
     } = body;
 
+    if (typeof claimedLineId !== 'string' || !claimedLineId.trim() || claimedLineId.length > 80) {
+      return NextResponse.json(
+        { error: 'LINE ID is required', code: 'INVALID_INPUT' },
+        { status: 400 }
+      );
+    }
+
+    if (!itemData || typeof itemData !== 'object' || JSON.stringify(itemData).length > 128 * 1024) {
+      return NextResponse.json(
+        { error: 'Invalid item data', code: 'INVALID_INPUT' },
+        { status: 400 }
+      );
+    }
+
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
+
+    const attestation = verifyEstimateAttestation(itemData.estimateAttestation, {
+      lineId,
+      itemData,
+    });
+    releaseLock = await acquireTransactionLock(
+      'loan-request-create',
+      attestation.referenceId,
+      120,
+    );
+
     // Get customer_id from lineId
-    console.log('🔍 Looking for pawner with lineId:', lineId);
     const { data: pawnerData, error: pawnerError } = await supabase
       .from('pawners')
       .select('customer_id, last_location_lat, last_location_lng')
       .eq('line_id', lineId)
       .single();
 
-    console.log('📋 Pawner query result:', { pawnerData, pawnerError });
-
     if (pawnerError || !pawnerData) {
-      console.error('❌ Pawner not found:', { pawnerError, lineId });
       return NextResponse.json(
         { error: 'Pawner not found' },
         { status: 404 }
@@ -79,7 +118,6 @@ export async function POST(request: NextRequest) {
 
     const customerId = pawnerData.customer_id;
     const resolvedRequestedAmount = normalizeNumber(loanAmount);
-    console.log('✅ Found customerId:', customerId);
 
     if (resolvedRequestedAmount === null || resolvedRequestedAmount < MIN_REQUESTED_AMOUNT) {
       return NextResponse.json(
@@ -89,6 +127,43 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+    if (resolvedRequestedAmount > attestation.estimatedPrice) {
+      return NextResponse.json(
+        {
+          error: `วงเงินสูงสุดตามราคาประเมินคือ ${attestation.estimatedPrice.toLocaleString()} บาท`,
+          code: 'LOAN_AMOUNT_EXCEEDS_ESTIMATE',
+        },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
+    const { data: existingRequest, error: existingRequestError } = await supabase
+      .from('loan_requests')
+      .select('request_id, item_id')
+      .eq('customer_id', customerId)
+      .eq('estimate_reference_id', attestation.referenceId)
+      .maybeSingle();
+    if (existingRequestError) {
+      console.error('[loan-request:create] estimate idempotency lookup failed', {
+        code: existingRequestError.code || 'unknown',
+      });
+      return NextResponse.json(
+        {
+          error: 'ระบบยืนยันราคาประเมินยังไม่พร้อม กรุณาลองใหม่อีกครั้ง',
+          code: 'ESTIMATE_LEDGER_UNAVAILABLE',
+        },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30' } },
+      );
+    }
+    if (existingRequest) {
+      return NextResponse.json({
+        success: true,
+        loanRequestId: existingRequest.request_id,
+        itemId: existingRequest.item_id,
+        message: 'Loan request already created',
+        idempotentReplay: true,
+      });
     }
 
     const branchInput = typeof branchId === 'string' ? branchId.trim() : '';
@@ -194,10 +269,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const itemCondition = clampInt(itemData?.condition, 0, 100);
-    const estimatedValue = normalizeNumber(itemData?.estimatedPrice);
-    const aiConditionScore = normalizeNumber(itemData?.aiConditionScore);
-    const aiConfidence = normalizeNumber(itemData?.aiConfidence);
+    const itemCondition = Math.round(attestation.condition * 100);
+    const estimatedValue = attestation.estimatedPrice;
+    const aiConditionScore = attestation.aiCondition ?? attestation.condition;
+    const aiConfidence = attestation.confidence;
     const conditionChecklist = itemData?.conditionChecklist || null;
 
     // Create item record
@@ -227,6 +302,8 @@ export async function POST(request: NextRequest) {
       notes: buildItemNotesWithPasscode(itemData.notes, itemData.devicePasscode),
       image_urls: itemData.images,
       item_status: 'PENDING',
+      estimate_job_id: attestation.referenceId,
+      estimate_attestation: itemData.estimateAttestation,
     };
 
     const insertItemRecord = async (record: Record<string, unknown>) => (
@@ -254,10 +331,7 @@ export async function POST(request: NextRequest) {
     if (itemError || !item) {
       console.error('Error creating item:', itemError);
       return NextResponse.json(
-        {
-          error: 'Failed to create item record',
-          details: itemError?.message || null,
-        },
+        { error: 'Failed to create item record', code: 'ITEM_CREATE_FAILED' },
         { status: 500 }
       );
     }
@@ -296,26 +370,31 @@ export async function POST(request: NextRequest) {
       delivery_fee: normalizeNumber(deliveryFee),
       request_status: 'PENDING',
       expires_at: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours from now
+      estimate_reference_id: attestation.referenceId,
     };
 
-    console.log('📝 Creating loan request with data:', loanRequestRecord);
     const { data: loanRequest, error: loanRequestError } = await supabase
       .from('loan_requests')
       .insert(loanRequestRecord)
       .select()
       .single();
 
-    console.log('📋 Loan request creation result:', { loanRequest, loanRequestError });
-
     if (loanRequestError || !loanRequest) {
-      console.error('❌ Error creating loan request:', loanRequestError);
+      console.error('[loan-request:create] insert failed', {
+        code: loanRequestError?.code || 'unknown',
+      });
+      // Compensate the item insert so a failed multi-table mutation does not
+      // leave an orphan that can later be mistaken for an active request.
+      await supabase
+        .from('items')
+        .delete()
+        .eq('item_id', item.item_id)
+        .eq('customer_id', customerId);
       return NextResponse.json(
         { error: 'Failed to create loan request' },
         { status: 500 }
       );
     }
-
-    console.log('✅ Loan request created with ID:', loanRequest.request_id);
 
     if (typeof draftItemId === 'string' && draftItemId.trim()) {
       const { error: deleteDraftError } = await supabase
@@ -330,13 +409,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('✅ Loan request created successfully:', {
-      loanRequestId: loanRequest.request_id,
-      itemId: item.item_id,
-      loanRequest: loanRequest,
-      item: item
-    });
-
     return NextResponse.json({
       success: true,
       loanRequestId: loanRequest.request_id,
@@ -344,10 +416,25 @@ export async function POST(request: NextRequest) {
       message: 'Loan request created successfully',
     });
   } catch (error) {
-    console.error('Error in loan-request/create:', error);
+    if (error instanceof EstimateAttestationError) {
+      return NextResponse.json(estimateAttestationErrorResponse(error), {
+        status: error.status,
+        headers: {
+          'Cache-Control': 'no-store',
+          ...(error.status === 503 ? { 'Retry-After': '30' } : {}),
+        },
+      });
+    }
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[loan-request:create] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  } finally {
+    await releaseLock?.();
   }
 }

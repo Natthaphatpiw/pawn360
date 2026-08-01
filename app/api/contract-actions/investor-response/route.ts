@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { Client } from '@line/bot-sdk';
+import { requireContractParty } from '@/lib/security/contract-access';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const getPawnerLineClient = () => {
   const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -18,19 +29,21 @@ const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
 );
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const { requestId, action, reason, investorLineId } = body;
+    const body = await readBoundedJsonObject(request, 16 * 1024);
+    const requestId = requireUuid(body.requestId);
+    const action = boundedText(body.action, 16, true) || '';
+    const normalizedReason = boundedText(body.reason, 500) || '';
 
-    if (!requestId || !action) {
+    if (action !== 'REJECT') {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'รายการไม่ถูกต้อง', code: 'INVALID_ACTION' },
         { status: 400 }
       );
     }
 
-    const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
-    if (action === 'REJECT' && !normalizedReason) {
+    if (!normalizedReason) {
       return NextResponse.json(
         { error: 'กรุณาระบุเหตุผลที่ปฏิเสธคำขอ' },
         { status: 400 }
@@ -56,23 +69,37 @@ export async function POST(request: NextRequest) {
 
     if (requestError || !actionRequest) {
       return NextResponse.json(
-        { error: 'Request not found' },
+        { error: 'ไม่พบคำขอ', code: 'REQUEST_NOT_FOUND' },
         { status: 404 }
       );
     }
 
     const contract = actionRequest.contract;
     const pawner = normalizeRelation<any>(contract?.pawners);
-    const investor = normalizeRelation<any>(contract?.investors);
+    const authenticatedLineId = await requireContractParty(request, contract, 'INVESTOR');
+    releaseLock = await acquireFinancialLock(`contract-action-contract:${actionRequest.contract_id}`);
 
-    if (!investorLineId || investor?.line_id !== investorLineId) {
+    const { data: lockedActionState, error: lockedActionError } = await supabase
+      .from('contract_action_requests')
+      .select('request_status')
+      .eq('request_id', requestId)
+      .single();
+    if (lockedActionError || !lockedActionState) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
+        { error: 'ไม่พบคำขอ', code: 'REQUEST_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
+    actionRequest.request_status = lockedActionState.request_status;
 
     if (action === 'REJECT') {
+      if (actionRequest.request_status === 'INVESTOR_REJECTED') {
+        return NextResponse.json({
+          success: true,
+          alreadyProcessed: true,
+          message: 'คำขอนี้ถูกปฏิเสธเรียบร้อยแล้ว',
+        });
+      }
       if (!['PENDING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_APPROVAL'].includes(actionRequest.request_status)) {
         return NextResponse.json(
           { error: 'คำขอนี้ไม่ได้อยู่ในสถานะที่สามารถปฏิเสธได้' },
@@ -81,7 +108,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Update request status
-      const { error: updateError } = await supabase
+      const { data: updatedRequest, error: updateError } = await supabase
         .from('contract_action_requests')
         .update({
           request_status: 'INVESTOR_REJECTED',
@@ -89,10 +116,19 @@ export async function POST(request: NextRequest) {
           investor_rejected_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('request_id', requestId);
+        .eq('request_id', requestId)
+        .in('request_status', ['PENDING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_APPROVAL'])
+        .select('request_id')
+        .maybeSingle();
 
       if (updateError) {
         throw updateError;
+      }
+      if (!updatedRequest) {
+        return NextResponse.json(
+          { error: 'สถานะคำขอถูกเปลี่ยนแล้ว กรุณารีเฟรชหน้า', code: 'STATE_CONFLICT' },
+          { status: 409 }
+        );
       }
 
       // Log rejection
@@ -101,7 +137,7 @@ export async function POST(request: NextRequest) {
         'INVESTOR_REJECTED',
         'COMPLETED',
         'INVESTOR',
-        investorLineId,
+        authenticatedLineId,
         {
           actionRequestId: requestId,
           rejectionReason: normalizedReason,
@@ -124,27 +160,31 @@ export async function POST(request: NextRequest) {
             type: 'text',
             text: `คำขอเพิ่มเงินต้นถูกปฏิเสธ\n\nจำนวนที่ขอ: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nเหตุผล: ${normalizedReason}\n\nหากมีข้อสงสัย กรุณาติดต่อฝ่ายสนับสนุน`
           });
-        } catch (err) {
-          console.error('Error sending message to pawner:', err);
+        } catch {
+          console.error('[contract-action:investor-response] seller notification delayed');
         }
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Request rejected',
+        message: 'ปฏิเสธคำขอเรียบร้อยแล้ว',
       });
     }
 
     return NextResponse.json(
-      { error: 'Invalid action' },
+      { error: 'รายการไม่ถูกต้อง', code: 'INVALID_ACTION' },
       { status: 400 }
     );
 
-  } catch (error: any) {
-    console.error('Error processing investor response:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract-action:investor-response] failed');
+    return sanitizedServerError();
+  } finally {
+    await releaseLock?.();
   }
 }

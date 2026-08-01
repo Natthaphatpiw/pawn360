@@ -97,7 +97,7 @@ export function computeRepresentativeUsedPriceTHB(
   );
 
   if (dispersionScore > config.dispersionThreshold) {
-    let low = config.hiDispWindowLow;
+    const low = config.hiDispWindowLow;
     let high = config.hiDispWindowHighStart;
 
     let window = selectByPercentileRange(

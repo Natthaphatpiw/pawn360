@@ -1,24 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const deliveryRequestId = searchParams.get('deliveryRequestId')?.trim();
-    const lineId = searchParams.get('lineId')?.trim();
-
-    if (!deliveryRequestId || !lineId) {
-      return NextResponse.json(
-        { error: 'Missing deliveryRequestId or lineId' },
-        { status: 400 }
-      );
-    }
+    const deliveryRequestId = requireUuid(searchParams.get('deliveryRequestId'));
+    const identity = await requireLiffIdentity(request, 'DROP_POINT');
 
     const supabase = supabaseAdmin();
 
     const { data: deliveryRequest, error: requestError } = await supabase
       .from('pawn_delivery_requests')
-      .select('*')
+      .select(`
+        delivery_request_id,
+        contract_id,
+        status,
+        delivery_fee,
+        address_full,
+        contact_phone,
+        driver_assigned_at,
+        item_picked_at,
+        arrived_at,
+        created_at,
+        updated_at
+      `)
       .eq('delivery_request_id', deliveryRequestId)
       .single();
 
@@ -35,7 +47,6 @@ export async function GET(request: NextRequest) {
         contract_id,
         contract_number,
         items:item_id (brand, model),
-        pawners:customer_id (firstname, lastname, phone_number, line_id),
         drop_points:drop_point_id (drop_point_name, line_id)
       `)
       .eq('contract_id', deliveryRequest.contract_id)
@@ -52,7 +63,7 @@ export async function GET(request: NextRequest) {
       ? contract.drop_points[0]
       : contract.drop_points;
 
-    if (dropPoint?.line_id !== lineId) {
+    if (!dropPoint?.line_id || dropPoint.line_id !== identity.lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -66,15 +77,14 @@ export async function GET(request: NextRequest) {
         contract_id: contract.contract_id,
         contract_number: contract.contract_number,
         item: contract.items,
-        pawner: contract.pawners,
-        drop_point: dropPoint,
+        drop_point: dropPoint ? { drop_point_name: dropPoint.drop_point_name } : null,
       },
-    });
-  } catch (error: any) {
-    console.error('Error fetching drop point delivery request:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('[pawn-delivery:drop-point] failed');
+    return sanitizedServerError('ไม่สามารถโหลดงานรับสินค้าได้ กรุณาลองใหม่');
   }
 }

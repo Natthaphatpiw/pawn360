@@ -135,7 +135,7 @@
 <text class="zt" x="58" y="916">5 - INTEGRATION WITH ASTLY</text>
 <rect class="blue" x="60" y="932" width="350" height="78" rx="5"/>
 <text class="tb" x="74" y="954">Provider Abstraction</text>
-<text class="s" x="74" y="973">same seam as Claude / Gemini</text>
+<text class="s" x="74" y="973">same seam as OpenAI / Anthropic fallback</text>
 <text class="s" x="74" y="988">selected by configuration</text>
 <rect class="blue" x="437" y="932" width="350" height="78" rx="5"/>
 <text class="tb" x="451" y="954">Routes</text>

@@ -20,13 +20,7 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      clearCanvas();
-    }
-  }, [isOpen]);
-
-  const clearCanvas = () => {
+  function clearCanvas() {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -36,7 +30,13 @@ function SignatureModal({ isOpen, onClose, onSave, title }: SignatureModalProps)
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
-  };
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      clearCanvas();
+    }
+  }, [isOpen]);
 
   const getCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;

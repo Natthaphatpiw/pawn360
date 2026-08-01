@@ -15,7 +15,7 @@ Astly Co., Ltd. operates **Astly** (Astly.co), a Thailand-based platform for sho
 
 Under PDPA **Section 6**, Astly Co., Ltd. is the **Data Controller**: it determines the purposes and means of processing personal data across the platform. The third parties listed in Section 2 are **Data Processors**: they process personal data **only on Astly's documented instructions** and for the purposes Astly defines, without pursuing purposes of their own.
 
-**Section 40 warning — the "own-purposes" trap.** PDPA Section 40 requires a written controller-processor agreement and obliges the processor to act only within the controller's instruction. A processor that begins to process personal data for **its own purposes** ceases to be a processor and is **deemed a controller** in its own right, acquiring independent controller obligations and undermining Astly's accountability chain. This is precisely why the AI providers' **no-training / zero-data-retention** posture (Section 4) is treated as **both a security control and a role control**: if Anthropic, Google, or OpenAI were to train models on Astly's item photos or bank-slip images, that would be processing for their own purpose and would recharacterise them as controllers. The DPA and the no-training terms together keep them inside the processor role.
+**Section 40 warning — the "own-purposes" trap.** PDPA Section 40 requires a written controller-processor agreement and obliges the processor to act only within the controller's instruction. A processor that begins to process personal data for **its own purposes** ceases to be a processor and is **deemed a controller** in its own right, acquiring independent controller obligations and undermining Astly's accountability chain. This is precisely why the AI providers' **no-training / zero-data-retention** posture (Section 4) is treated as **both a security control and a role control**: if OpenAI or Anthropic were to train models on Astly's item photos or bank-slip images, that would be processing for their own purpose and would recharacterise them as controllers. The DPA and the no-training terms together keep them inside the processor role.
 
 Every processor relationship must therefore be governed by a written DPA meeting the Section 40 clause set (Section 3), backed by onboarding due diligence (Section 7) and tracked to execution (Section 8).
 
@@ -27,10 +27,12 @@ The following table registers every third party to which Astly discloses, or pla
 
 | Processor | Personal data it receives | Processing purpose | Hosting region | Cross-border? | DPA status |
 |---|---|---|---|---|---|
-| **UPPASS** | National ID / document images + biometric face-match & liveness data (**SENSITIVE**, Sec 26) | eKYC identity verification for borrowers and investors | SE Asia (vendor) (confirm) | Yes (from TH) | [status: not started / in review / executed]; retention/deletion terms + ISO 27001 / PDPA claims to confirm |
-| **Anthropic (Claude)** | Item photos + bank-slip images | AI analysis / vision (item precheck, slip OCR) | US | Yes | [status: not started / in review / executed]; **no-training + ZDR critical** |
-| **Google (Gemini)** | Item photos | AI condition scoring | US (paid tier / Vertex) | Yes | [status: not started / in review / executed]; no-training required |
-| **OpenAI** | Product text only (optional web search) | Price / product lookup | US | Yes | [status: not started / in review / executed] |
+| **UPPASS** (Collective Wisdom Co., Ltd.) | National ID / document images + biometric face-match & liveness data (**SENSITIVE**, Sec 26) | eKYC identity verification for borrowers and investors | Not published by the vendor (confirm) | Yes (from TH) | [status: not started / in review / executed]; **ISO/IEC 27001 by BSI, cert. IS773635** - obtain the certificate and Statement of Applicability; retention/deletion terms and hosting region still to confirm |
+| **OpenAI** | Product text, item photos, and bank-slip images only when SlipOK is unavailable | Primary structured AI / vision | US (contract/region to confirm) | Yes | [status: not started / in review / executed]; **no-training + minimum-retention terms critical** |
+| **Anthropic (Claude)** | The same minimized payload only after OpenAI failure | Emergency structured AI / vision fallback | US (contract/region to confirm) | Yes | [status: not started / in review / executed]; **no-training + ZDR critical** |
+| **Parallel Web Systems** | Canonical product/spec search text; **no personal data** - no image, serial, or user identifier | Primary market-search evidence | Provider region (confirm) | Yes (non-personal payload) | [status: not started / in review / executed]; **SOC 2 Type II**, ZDR available on enterprise - request the report and enable ZDR |
+| **Exa** | The same canonical search text, fallback path only; **no personal data** | Market-search fallback | Provider region (confirm) | Yes (non-personal payload) | [status: not started / in review / executed]; **SOC 2 Type II**, ZDR available on enterprise |
+| **SlipOK** | Bank-slip images (**financial PII**: name, bank, account fragment, amount, timestamp) | Authoritative payment-slip verification | TH (confirm) | To confirm | [status: not started / in review / executed]; **no published certification - highest-severity processor gap** |
 | **Vercel** | Request data + application logs | Hosting / compute / logs | US-default (configurable) | Yes | [status: not started / in review / executed] |
 | **Supabase** | Primary personal-data records | Primary database | AWS region (confirm) | Yes (confirm) | [status: not started / in review / executed] |
 | **MongoDB Atlas** | Operational personal-data records | Operational database | AWS region (confirm) | Yes (confirm) | [status: not started / in review / executed] |
@@ -64,14 +66,14 @@ Where a processor's own standard DPA (e.g. a cloud provider's addendum) is used,
 
 ---
 
-## 4. AI-provider specific controls (Anthropic, Google, OpenAI)
+## 4. AI-provider specific controls (OpenAI and Anthropic)
 
-Item photos and bank-slip images are transmitted to Anthropic and Google, and product text (optionally with web search) to OpenAI. Because photos and slips can carry directly and indirectly identifying personal data, the following controls are **the key mitigations** for this data flow and are mandatory in every AI-provider DPA:
+Product text and item photos are transmitted to OpenAI; a bank-slip image is sent only when SlipOK is unavailable. Anthropic receives the same minimized payload only after the OpenAI path fails. Because photos and slips can carry directly and indirectly identifying personal data, the following controls are **the key mitigations** for this data flow and are mandatory in every AI-provider DPA:
 
 - [ ] **No training on Astly data.** The provider must **not** use Astly's inputs or outputs to train, fine-tune, or improve its models. (This is the Section 40 role control — training would recharacterise the provider as a controller.)
 - [ ] **Zero-data-retention (ZDR) / paid-tier terms.** Prefer enterprise / paid-tier configurations offering **ZDR** or minimal, bounded retention; confirm the retention window and that abuse-monitoring copies (if any) are ZDR-exempted or contractually limited.
-- [ ] **Enterprise / BAA-style commercial terms.** Confirm the provider's enterprise / commercial (not consumer) terms apply, including the no-training and confidentiality commitments, for **each** of Anthropic, Google (Vertex / paid tier), and OpenAI.
-- [ ] **Data-flow minimisation.** Continue transmitting **only what each step needs** — OpenAI receives product **text only**, not images; Gemini receives item photos for scoring; Anthropic receives item photos and slip images for vision. Slip images in particular should be minimised where the verification API path (non-AI) can be used instead.
+- [ ] **Enterprise / BAA-style commercial terms.** Confirm the provider's enterprise / commercial (not consumer) terms apply, including no-training, retention and confidentiality commitments, for both OpenAI and Anthropic.
+- [ ] **Data-flow minimisation.** Send only the fields/images needed by the current task, cap item images at four, exclude serial/user identifiers from search, and prefer SlipOK over AI slip OCR. Anthropic receives data only on fallback.
 - [ ] **Sub-processor transparency.** Obtain and review each provider's sub-processor list (Section 9), including underlying cloud hosting.
 
 **Priority:** for the AI providers, the executed DPA **plus** the no-training/ZDR posture together constitute the single most important control in this document, because sensitive item and slip imagery leaves Astly's boundary to reach them.
@@ -84,7 +86,10 @@ UPPASS processes **sensitive biometric data** (face-match, liveness) and governm
 
 - [ ] **Explicit-consent chain.** Confirm the borrower/investor explicit-consent basis for biometric processing is captured before data flows and is reflected in the DPA and `PRIVACY_POLICY.md`.
 - [ ] **Retention / deletion terms.** Obtain UPPASS's documented retention period for raw biometric and ID images and its secure-deletion commitment; align with `DATA_RETENTION_AND_DELETION_POLICY.md` (to confirm with Thai data-protection counsel).
-- [ ] **Certifications.** Verify UPPASS's **ISO 27001** and PDPA-compliance claims with current evidence (certificate scope, validity dates) rather than marketing assertions (to confirm).
+- [ ] **Certifications.** UPPASS publishes **ISO/IEC 27001 certification by BSI, certificate number IS773635**, and states adherence to PDPA and GDPR. Obtain the certificate PDF and the Statement of Applicability and confirm (i) that the certificate is in date and (ii) that its **scope covers the production eKYC environment** rather than a corporate subset. PDPA/GDPR "compliance" is a self-assertion, not a certification, and must be secured contractually through the DPA.
+- [ ] **Liveness / presentation-attack detection - open gap.** UPPASS publishes **no ISO/IEC 30107-3 or iBeta PAD Level 1/2 certification**. Request the PAD test report, the testing laboratory (an NVLAP-accredited lab such as iBeta), the level achieved, and the APCER/BPCER results. Until this is evidenced, the current tier should be characterised internally as *document capture plus selfie match*, and high-value lending decisions should not rely on it alone. The roadmap alternative is an NDID-based Identity Assurance tier (see `../../THIRD_PARTY_INTEGRATIONS.md` Section 3.3).
+- [ ] **Webhook authenticity - vendor limitation.** UPPASS's documented webhook security is **No Auth or Basic Auth only**, on Webhook Version 2; there is no request signature, replay nonce, published source-IP range, or documented retry policy. Astly compensates with fail-closed role-scoped Basic Auth, a hashed event key for replay suppression, a monotonic status machine that cannot re-open a terminal decision, and a policy of persisting only normalized status fields. Ask whether HMAC signing or IP ranges can be contracted; record the compensating controls in the DPA's security schedule either way.
+- [ ] **Sub-processors and breach SLA.** Obtain the sub-processor list (including the underlying cloud host) and a breach-notification SLA short enough to support Astly's 72-hour PDPC duty.
 - [ ] **Raw-biometric locality — a deliberate control.** UPPASS **holds the raw biometric template**, returning to Astly only the **verification result / status**. This is intentional: **Astly does not store raw biometrics**, which materially reduces Astly's sensitive-data attack surface and breach exposure. The DPA must preserve this split (no raw-template return to Astly unless a documented need arises).
 - [ ] **Hosting region.** Confirm the vendor's actual processing region ("SE Asia (vendor) (confirm)") and treat any transfer outside Thailand under Section 6.
 
@@ -92,7 +97,9 @@ UPPASS processes **sensitive biometric data** (face-match, liveness) and governm
 
 ## 6. Cross-border transfer safeguards (Sec 28-29)
 
-Multiple processors are **US-hosted** — Anthropic, Google, OpenAI, Vercel, MongoDB Atlas, and Upstash — while Vercel Blob stores item photos, bank slips, and contracts in the configured store region. There is currently **no PDPC adequacy finding** for the United States; the Blob region and transfer safeguards must be confirmed, so transfers cannot rest on adequacy under Section 28 without that analysis.
+Multiple processors are **US-hosted** — OpenAI, Anthropic, Vercel, MongoDB Atlas, and Upstash — while Vercel Blob stores item photos, bank slips, and contracts in the configured store region. There is currently **no PDPC adequacy finding** for the United States; the Blob region and transfer safeguards must be confirmed, so transfers cannot rest on adequacy under Section 28 without that analysis.
+
+**Scope narrowing.** Parallel, Exa and the optional SerpAPI appear in the register for completeness but receive **no personal data** — only a canonicalized product string such as `Apple MacBook Air M2 13 256GB`, produced by the normalization step. User identifiers, serial numbers, image URLs and eKYC data are excluded by construction. Those transfers therefore fall outside the Sections 28-29 analysis, and a DPA with them is good hygiene rather than a statutory requirement. Counsel should nonetheless confirm this characterisation before it is relied on in the data room.
 
 Astly's practical transfer bases (to confirm with Thai data-protection counsel):
 
@@ -127,8 +134,8 @@ Executing and filing a DPA with **every** processor is a **priority operational 
 |---|---|---|---|---|
 | UPPASS | Yes (sensitive / biometric — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | Anthropic (Claude) | Yes (AI — no-training/ZDR priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
-| Google (Gemini) | Yes (AI — no-training priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
-| OpenAI | Yes | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
+| OpenAI | Yes (AI — no-training/minimum-retention priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
+| Parallel / Exa | Yes (web-search processor terms to confirm) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | Vercel | Yes | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | Supabase | Yes (primary data — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |
 | MongoDB Atlas | Yes (primary data — priority) | [status: not started / in review / executed] | DPO [to be appointed] | [target date] |

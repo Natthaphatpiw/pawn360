@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getPenaltyRequirement, serializePenaltyRequirement } from '@/lib/services/penalty';
+import { requireContractParty } from '@/lib/security/contract-access';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  boundedText,
+  finiteNumber,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 // คำนวณรายละเอียดสำหรับ action ต่างๆ
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { contractId, actionType, amount, reductionAmount, increaseAmount } = body;
+    const body = await readBoundedJsonObject(request, 32 * 1024);
+    const contractId = requireUuid(body.contractId);
+    const actionType = boundedText(body.actionType, 32, true) || '';
+    const amount = finiteNumber(body.amount, { min: 0, max: 100_000_000 });
+    const reductionAmount = finiteNumber(body.reductionAmount, { min: 0, max: 100_000_000 });
+    const increaseAmount = finiteNumber(body.increaseAmount, { min: 0, max: 100_000_000 });
 
-    if (!contractId || !actionType) {
+    if (!['INTEREST_PAYMENT', 'PRINCIPAL_REDUCTION', 'PRINCIPAL_INCREASE'].includes(actionType)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'ประเภทรายการไม่ถูกต้อง', code: 'INVALID_ACTION_TYPE' },
         { status: 400 }
       );
     }
@@ -21,18 +36,30 @@ export async function POST(request: NextRequest) {
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
       .select(`
-        *,
-        items:item_id (*),
-        pawners:customer_id (*),
-        investors:investor_id (*)
+        contract_id, contract_number, customer_id, investor_id,
+        contract_status, funding_status, payment_status,
+        contract_start_date, contract_end_date, contract_duration_days,
+        loan_principal_amount, current_principal_amount, original_principal_amount,
+        interest_rate, platform_fee_rate,
+        items:item_id (item_id, brand, model, estimated_value),
+        pawners:customer_id (line_id)
       `)
       .eq('contract_id', contractId)
       .single();
 
     if (contractError || !contract) {
       return NextResponse.json(
-        { error: 'Contract not found' },
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
         { status: 404 }
+      );
+    }
+
+    await requireContractParty(request, contract, 'PAWNER');
+
+    if (!['CONFIRMED', 'EXTENDED'].includes(String(contract.contract_status || ''))) {
+      return NextResponse.json(
+        { error: 'สัญญานี้ยังไม่อยู่ในสถานะที่ทำรายการได้', code: 'CONTRACT_NOT_ACTIONABLE' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -41,6 +68,7 @@ export async function POST(request: NextRequest) {
     const penaltyAmount = penaltyRequirement.required ? penaltyRequirement.penaltyAmount : 0;
     const overdueInterestAmount = penaltyRequirement.required ? penaltyRequirement.overdueInterestAmount : 0;
     const lateChargeAmount = penaltyRequirement.required ? penaltyRequirement.totalLateChargeAmount : 0;
+    const contractItem = Array.isArray(contract.items) ? contract.items[0] || null : contract.items;
 
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const msPerDay = 1000 * 60 * 60 * 24;
@@ -136,7 +164,7 @@ export async function POST(request: NextRequest) {
 
         if (reductionAmountValue <= 0 || reductionAmountValue > currentPrincipal) {
           return NextResponse.json(
-            { error: 'Invalid reduction amount' },
+            { error: 'จำนวนเงินที่ต้องการลดไม่ถูกต้อง', code: 'INVALID_REDUCTION_AMOUNT' },
             { status: 400 }
           );
         }
@@ -178,14 +206,17 @@ export async function POST(request: NextRequest) {
         const increaseAmountValue = Number(increaseAmount ?? amount ?? 0);
 
         // Check max increase (based on item value)
-        const rawItemValue = Number(contract.items?.estimated_value ?? 0);
+        const rawItemValue = Number(contractItem?.estimated_value ?? 0);
         const fallbackItemValue = currentPrincipal > 0 ? currentPrincipal * 1.5 : 0;
         const itemValue = Number.isFinite(rawItemValue) && rawItemValue > 0 ? rawItemValue : fallbackItemValue;
         const maxIncrease = Math.max(0, itemValue - currentPrincipal);
 
         if (increaseAmountValue <= 0 || increaseAmountValue > maxIncrease) {
           return NextResponse.json(
-            { error: `Invalid increase amount. Maximum allowed: ${maxIncrease.toLocaleString()} บาท` },
+            {
+              error: `จำนวนเงินที่ต้องการเพิ่มไม่ถูกต้อง เพิ่มได้สูงสุด ${maxIncrease.toLocaleString()} บาท`,
+              code: 'INVALID_INCREASE_AMOUNT',
+            },
             { status: 400 }
           );
         }
@@ -233,7 +264,7 @@ export async function POST(request: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action type' },
+          { error: 'ประเภทรายการไม่ถูกต้อง', code: 'INVALID_ACTION_TYPE' },
           { status: 400 }
         );
     }
@@ -246,17 +277,15 @@ export async function POST(request: NextRequest) {
       contract: {
         contract_id: contract.contract_id,
         contract_number: contract.contract_number,
-        item: contract.items,
-        pawner: contract.pawners,
-        investor: contract.investors,
+        item: contractItem,
       },
     });
 
-  } catch (error: any) {
-    console.error('Error calculating action:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    console.error('[contract-action:calculate] failed');
+    return sanitizedServerError('ไม่สามารถคำนวณยอดได้ชั่วคราว กรุณาลองใหม่');
   }
 }

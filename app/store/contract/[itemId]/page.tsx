@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Noto_Sans_Thai } from 'next/font/google';
 import ContractForm from '@/components/ContractForm';
+import { useLiff } from '@/lib/liff/liff-provider';
 
 const sarabun = Noto_Sans_Thai({
   subsets: ['latin'],
@@ -48,9 +49,10 @@ interface Customer {
 
 export default function StoreContractPage({ params }: { params: Promise<{ itemId: string }> }) {
   const { itemId } = use(params);
+  const { isLoading: liffLoading, error: liffError } = useLiff();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<'login' | 'contract'>('login');
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -69,60 +71,26 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
     photoTaken: false
   });
 
-  // Load item and customer data when itemId changes
-  useEffect(() => {
-    if (itemId) {
-      fetchItemData();
-    }
-  }, [itemId]);
-
-  const findStoreByUsername = async (username: string) => {
+  const fetchItemData = async (storeId: string) => {
     try {
-      const response = await axios.get('/api/stores');
-      if (response.data.success) {
-        // Normalize username: trim whitespace
-        const normalizedInputUsername = username.trim().toLowerCase();
-        
-        console.log('🔍 Searching for username:', normalizedInputUsername);
-        console.log('📋 Total stores:', response.data.stores.length);
-        
-        const store = response.data.stores.find((s: any) => {
-          if (!s.username) return false;
-          const normalizedStoreUsername = s.username.trim().toLowerCase();
-          console.log(`  Comparing: "${normalizedInputUsername}" vs "${normalizedStoreUsername}" (${s.storeName})`);
-          return normalizedStoreUsername === normalizedInputUsername;
-        });
-        
-        if (store) {
-          console.log('✅ Store found:', store.storeName);
-        } else {
-          console.log('❌ No store found for username:', normalizedInputUsername);
-        }
-        
-        return store || null;
-      }
-      return null;
-    } catch (err) {
-      console.error('Error fetching stores:', err);
-      return null;
-    }
-  };
-
-  const fetchItemData = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/pawn-requests/${itemId}`);
+      const response = await axios.post(`/api/pawn-requests/${itemId}`, {
+        action: 'claim-preview',
+        storeId,
+      }, {
+        headers: { 'X-LIFF-Role': 'STORE' },
+      });
       if (response.data.success) {
         setItem(response.data.item);
         setCustomer(response.data.customer);
+        return true;
       } else {
         setError('ไม่พบข้อมูลรายการขอสินเชื่อ');
+        return false;
       }
     } catch (err: any) {
       console.error('Error fetching item data:', err);
       setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
-    } finally {
-      setLoading(false);
+      return false;
     }
   };
 
@@ -136,23 +104,15 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
     setError(null);
 
     try {
-      // ค้นหาร้านค้าจาก username
-      const store = await findStoreByUsername(username);
-      
-      if (!store) {
-        setError('ไม่พบร้านค้าที่ใช้ Username นี้');
-        setLoginLoading(false);
-        return;
-      }
-
-      // ตรวจสอบรหัสผ่าน
       const response = await axios.post('/api/stores', {
-        storeId: store._id,
-        password: password
+        username,
+        password,
       });
 
       if (response.data.success) {
-        setSelectedStore(store);
+        const claimed = await fetchItemData(response.data.store._id);
+        if (!claimed) return;
+        setSelectedStore(response.data.store);
         setCurrentStep('contract');
         setError(null);
       } else {
@@ -176,35 +136,18 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
   };
 
   const handleContractComplete = async (contractData: any) => {
-    setLoading(true);
     setError(null);
+    void contractData;
+    setSuccess('สร้างสัญญาสินเชื่อเรียบร้อยแล้ว');
+    setContractSteps({ contractSigned: true, photoTaken: true });
+    setShowContractModal(false);
 
-    try {
-      const response = await axios.post('/api/contracts/create', {
-        itemId: itemId,
-        storeId: selectedStore?._id,
-        contractData: contractData
-      });
-
-      if (response.data.success) {
-        setSuccess('สร้างสัญญาสินเชื่อเรียบร้อยแล้ว');
-        setContractSteps({ contractSigned: true, photoTaken: true });
-        setShowContractModal(false);
-
-        // Redirect to contracts page after 2 seconds
-        setTimeout(() => {
-          router.push('/contracts');
-        }, 2000);
-      }
-    } catch (err: any) {
-      console.error('Error creating contract:', err);
-      setError(err.response?.data?.error || 'เกิดข้อผิดพลาดในการสร้างสัญญา');
-    } finally {
-      setLoading(false);
-    }
+    setTimeout(() => {
+      router.push('/contracts');
+    }, 2000);
   };
 
-  if (loading) {
+  if (loading || liffLoading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${sarabun.className}`} style={{ backgroundColor: '#FAFBFA' }}>
         <div className="text-center">
@@ -215,7 +158,17 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
     );
   }
 
-  if (error && !item) {
+  if (liffError) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${sarabun.className}`}>
+        <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
+          ไม่สามารถยืนยันบัญชี LINE ของร้านค้าได้ กรุณาเปิดลิงก์ผ่าน LINE ใหม่
+        </div>
+      </div>
+    );
+  }
+
+  if (error && currentStep === 'contract' && !item) {
     return (
       <div className={`min-h-screen flex items-center justify-center p-4 ${sarabun.className}`} style={{ backgroundColor: '#FAFBFA' }}>
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
@@ -410,6 +363,7 @@ export default function StoreContractPage({ params }: { params: Promise<{ itemId
         <ContractForm
           item={item}
           customer={customer}
+          storeId={selectedStore?._id || ''}
           onComplete={handleContractComplete}
           onClose={() => setShowContractModal(false)}
         />

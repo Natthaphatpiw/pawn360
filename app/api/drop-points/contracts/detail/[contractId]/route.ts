@@ -2,22 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { refreshBlobUrls } from '@/lib/storage/blob';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import {
+  assertUuidResourceId,
+  dropPointAccessErrorResponse,
+  requireDropPointActor,
+} from '@/lib/security/drop-point-access';
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ contractId: string }> }
 ) {
   try {
-    const { contractId } = await context.params;
+    const { contractId: rawContractId } = await context.params;
+    const contractId = assertUuidResourceId(rawContractId);
     const { searchParams } = new URL(request.url);
-    const lineId = searchParams.get('lineId');
-
-    if (!contractId || !lineId) {
-      return NextResponse.json(
-        { error: 'Contract ID and LINE ID are required' },
-        { status: 400 }
-      );
-    }
+    const lineId = await requireDropPointActor(
+      request,
+      searchParams.get('lineId') || '',
+      'drop-point-contract-detail',
+    );
 
     const supabase = supabaseAdmin();
 
@@ -25,12 +28,22 @@ export async function GET(
       .from('drop_points')
       .select('drop_point_id')
       .eq('line_id', lineId)
-      .single();
+      .eq('is_active', true)
+      .maybeSingle();
 
-    if (dropPointError || !dropPoint) {
+    if (dropPointError) {
+      console.error('[drop-points:contract-detail] drop point lookup failed', {
+        code: dropPointError.code || 'unknown',
+      });
       return NextResponse.json(
-        { error: 'Drop point not found' },
-        { status: 404 }
+        { error: 'ไม่สามารถตรวจสอบข้อมูลจุดรับสินค้าได้', code: 'DROP_POINT_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
+    }
+    if (!dropPoint) {
+      return NextResponse.json(
+        { error: 'ไม่พบจุดรับสินค้าที่เปิดใช้งาน', code: 'DROP_POINT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -52,16 +65,17 @@ export async function GET(
           brand,
           model,
           capacity,
+          color,
           image_urls,
           item_condition,
+          condition_checklist,
           notes,
           defects
         ),
         pawners:customer_id (
           firstname,
           lastname,
-          phone_number,
-          national_id
+          phone_number
         ),
         drop_points:drop_point_id (
           drop_point_id,
@@ -71,12 +85,21 @@ export async function GET(
       `)
       .eq('contract_id', contractId)
       .eq('drop_point_id', dropPoint.drop_point_id)
-      .single();
+      .maybeSingle();
 
-    if (contractError || !contract) {
+    if (contractError) {
+      console.error('[drop-points:contract-detail] contract query failed', {
+        code: contractError.code || 'unknown',
+      });
       return NextResponse.json(
-        { error: 'Contract not found' },
-        { status: 404 }
+        { error: 'ไม่สามารถโหลดรายละเอียดสัญญาได้', code: 'CONTRACT_DETAIL_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
+    }
+    if (!contract) {
+      return NextResponse.json(
+        { error: 'ไม่พบสัญญาหรือคุณไม่มีสิทธิ์เข้าถึง', code: 'CONTRACT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -90,8 +113,13 @@ export async function GET(
       .maybeSingle();
 
     if (storageBoxError && storageBoxError.code !== 'PGRST205') {
-      console.error('Error fetching storage box:', storageBoxError);
-      throw storageBoxError;
+      console.error('[drop-points:contract-detail] storage box query failed', {
+        code: storageBoxError.code || 'unknown',
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดข้อมูลกล่องจัดเก็บได้', code: 'STORAGE_BOX_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
     }
 
     if (storageBoxData) {
@@ -109,8 +137,13 @@ export async function GET(
       .maybeSingle();
 
     if (deliveryRequestError && deliveryRequestError.code !== 'PGRST205') {
-      console.error('Error fetching delivery request:', deliveryRequestError);
-      throw deliveryRequestError;
+      console.error('[drop-points:contract-detail] delivery request query failed', {
+        code: deliveryRequestError.code || 'unknown',
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดสถานะการจัดส่งได้', code: 'DELIVERY_STATUS_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
     }
 
     if (deliveryRequest?.delivery_request_id) {
@@ -126,7 +159,6 @@ export async function GET(
           return {
             ...item,
             notes: notesPayload.publicNotes,
-            device_passcode: notesPayload.devicePasscode,
             image_urls: await refreshBlobUrls(item?.image_urls),
           };
         })
@@ -136,27 +168,33 @@ export async function GET(
       items = {
         ...items,
         notes: notesPayload.publicNotes,
-        device_passcode: notesPayload.devicePasscode,
         image_urls: await refreshBlobUrls(items?.image_urls),
       };
     }
 
-    return NextResponse.json({
-      success: true,
-      contract: {
-        ...contract,
-        items,
-        delivery_request_id: deliveryRequestId,
-        delivery_request_status: deliveryRequestStatus,
-        storage_box_code: storageBox?.box_code || null,
-        storage_box_assigned_at: storageBox?.occupied_at || storageBox?.last_updated_at || null
-      }
-    });
-  } catch (error: any) {
-    console.error('Error fetching drop point contract detail:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      {
+        success: true,
+        contract: {
+          ...contract,
+          items,
+          delivery_request_id: deliveryRequestId,
+          delivery_request_status: deliveryRequestStatus,
+          storage_box_code: storageBox?.box_code || null,
+          storage_box_assigned_at: storageBox?.occupied_at || storageBox?.last_updated_at || null,
+        },
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    const accessResponse = dropPointAccessErrorResponse(error);
+    if (accessResponse) return accessResponse;
+    console.error('[drop-points:contract-detail] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถโหลดรายละเอียดสัญญาได้', code: 'CONTRACT_DETAIL_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

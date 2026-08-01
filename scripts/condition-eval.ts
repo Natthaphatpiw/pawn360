@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import OpenAI from 'openai';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
@@ -13,44 +12,24 @@ const IMAGE_INPUTS = [
 
 const OUTPUT_PATH = path.join('scripts', 'output', 'condition_result.json');
 
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null;
-
-const getResponseText = (response: any): string => {
-  if (typeof response?.output_text === 'string') {
-    return response.output_text;
-  }
-
-  if (!Array.isArray(response?.output)) {
-    return '';
-  }
-
-  return response.output
-    .filter((item: any) => item?.type === 'message')
-    .flatMap((item: any) => item?.content || [])
-    .filter((part: any) => part?.type === 'output_text' && typeof part?.text === 'string')
-    .map((part: any) => part.text)
-    .join('\n');
-};
-
 const toImageInput = async (value: string) => {
   if (value.startsWith('http://') || value.startsWith('https://')) {
-    return { type: 'input_image', image_url: value, detail: 'low' as const };
+    return value;
   }
 
   const filePath = path.resolve(value);
   const buffer = fs.readFileSync(filePath);
   const base64 = buffer.toString('base64');
   const ext = path.extname(filePath).replace('.', '') || 'jpeg';
-  const dataUrl = `data:image/${ext};base64,${base64}`;
-  return { type: 'input_image', image_url: dataUrl, detail: 'low' as const };
+  return `data:image/${ext};base64,${base64}`;
 };
 
 async function main() {
-  if (!openai) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
+  const {
+    getOpenAILunaModel,
+    getOpenAIReasoningEffortForTask,
+    openaiVisionJson,
+  } = await import('../lib/services/openai-llm');
 
   const prompt = `# Phone Condition Assessment Prompt
 
@@ -193,37 +172,23 @@ async function main() {
   "imageQuality": "ภาพไม่เพียงพอ - ต้องการภาพด้านหน้า, ด้านหลัง, ด้านข้าง, พอร์ตชาร์จ, ปุ่มกด"
 }`;
 
-  const input: any[] = [
-    {
-      role: 'user',
-      content: [
-        { type: 'input_text', text: prompt },
-      ],
-    },
-  ];
-
   const maxImages = Math.min(IMAGE_INPUTS.length, 4);
+  const images: string[] = [];
   for (let i = 0; i < maxImages; i += 1) {
-    const imageInput = await toImageInput(IMAGE_INPUTS[i]);
-    input[0].content.push(imageInput);
+    images.push(await toImageInput(IMAGE_INPUTS[i]));
   }
 
-  const response = await openai.responses.create({
-    model: 'gpt-4.1-mini',
-    input,
-    temperature: 0,
-    max_output_tokens: 400,
-    text: { format: { type: 'json_object' } },
+  const parsed = await openaiVisionJson<Record<string, unknown>>({
+    model: getOpenAILunaModel(),
+    userText: prompt,
+    images,
+    imageDetail: 'high',
+    reasoningEffort: getOpenAIReasoningEffortForTask('condition_scoring'),
+    maxOutputTokens: 6000,
+    label: 'script_condition_scoring',
+    promptCacheKey: 'condition_scoring',
   });
-
-  const content = getResponseText(response);
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    parsed = { error: 'Failed to parse JSON', raw: content };
-  }
+  if (!parsed) throw new Error('OpenAI returned no valid condition assessment JSON.');
 
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(parsed, null, 2), 'utf-8');

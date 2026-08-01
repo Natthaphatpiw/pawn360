@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { haversineDistanceMeters } from '@/lib/services/geo';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
 
 type LocationRequest = {
   lineId: string;
@@ -27,7 +28,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    try {
+      await requireLiffOwner(request, 'PAWNER', lineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
+
+    if (
+      !Number.isFinite(latitude)
+      || !Number.isFinite(longitude)
+      || latitude < -90
+      || latitude > 90
+      || longitude < -180
+      || longitude > 180
+    ) {
       return NextResponse.json(
         { error: 'Invalid latitude/longitude' },
         { status: 400 }
@@ -134,10 +148,12 @@ export async function POST(request: NextRequest) {
           }
         : null,
     });
-  } catch (error: any) {
-    console.error('Error saving pawner location:', error);
+  } catch (error) {
+    console.error('[pawners:location] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'Failed to save location', code: 'LOCATION_SAVE_FAILED' },
       { status: 500 }
     );
   }

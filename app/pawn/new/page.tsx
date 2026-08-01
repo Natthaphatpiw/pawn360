@@ -36,6 +36,10 @@ export default function NewPawnPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
+      if (images.length + files.length > 4) {
+        setError('อัปโหลดรูปภาพได้สูงสุด 4 รูป');
+        return;
+      }
       // Convert FileList to Array and create data URLs
       Array.from(files).forEach((file) => {
         const reader = new FileReader();
@@ -70,6 +74,21 @@ export default function NewPawnPage() {
         return;
       }
 
+      const uploadedImages = await Promise.all(images.map(async (dataUrl, index) => {
+        const blob = await fetch(dataUrl).then((result) => result.blob());
+        const formData = new FormData();
+        formData.append('file', new File([blob], `pawn-item-${index + 1}.jpg`, {
+          type: blob.type || 'image/jpeg',
+        }));
+        const upload = await axios.post('/api/upload/image', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'X-LIFF-Role': 'PAWNER',
+          },
+        });
+        return upload.data.url as string;
+      }));
+
       const response = await axios.post('/api/pawn-requests', {
         lineId: profile.userId,
         brand: formData.brand,
@@ -80,7 +99,7 @@ export default function NewPawnPage() {
         defects: formData.defects,
         note: formData.note,
         accessories: formData.accessories,
-        images: images,
+        images: uploadedImages,
         desiredAmount: parseFloat(formData.desiredAmount) || 0,
         estimatedValue: parseFloat(formData.estimatedValue) || 0,
         loanDays: parseInt(formData.loanDays) || 30,

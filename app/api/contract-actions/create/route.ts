@@ -4,6 +4,19 @@ import { logContractAction } from '@/lib/services/slip-verification';
 import { ensurePenaltyPaymentRecord, getPenaltyRequirement } from '@/lib/services/penalty';
 import { pushLineMessageWithRetry } from '@/lib/line/push-with-retry';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { requireContractParty } from '@/lib/security/contract-access';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  boundedText,
+  finiteNumber,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const getInvestorLineClient = () => {
   const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN_INVEST;
@@ -57,24 +70,31 @@ const getResumeStep = (actionType: string, requestStatus: string) => {
 
 // สร้าง action request ใหม่
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const {
-      contractId,
-      actionType,
-      amount,
-      reductionAmount,
-      increaseAmount,
-      quotedTotalAmount,
-      pawnerLineId,
-      termsAccepted,
-      pawnerSignatureUrl,
-      pawnerBankAccount,
-    } = body;
+    const body = await readBoundedJsonObject(request);
+    const contractId = requireUuid(body.contractId);
+    const actionType = boundedText(body.actionType, 32, true) || '';
+    const amount = finiteNumber(body.amount, { min: 0, max: 100_000_000 });
+    const reductionAmount = finiteNumber(body.reductionAmount, { min: 0, max: 100_000_000 });
+    const increaseAmount = finiteNumber(body.increaseAmount, { min: 0, max: 100_000_000 });
+    const quotedTotalAmount = body.quotedTotalAmount === undefined
+      ? undefined
+      : finiteNumber(body.quotedTotalAmount, { min: 0, max: 100_000_000 });
+    const termsAccepted = body.termsAccepted === true;
+    const pawnerSignatureUrl = requireOwnedBlobUrl(body.pawnerSignatureUrl, ['signatures/']);
+    const rawBankAccount = body.pawnerBankAccount;
+    const pawnerBankAccount = rawBankAccount && typeof rawBankAccount === 'object' && !Array.isArray(rawBankAccount)
+      ? {
+        bank_name: boundedText((rawBankAccount as Record<string, unknown>).bank_name, 100),
+        bank_account_no: boundedText((rawBankAccount as Record<string, unknown>).bank_account_no, 50),
+        bank_account_name: boundedText((rawBankAccount as Record<string, unknown>).bank_account_name, 200),
+      }
+      : null;
 
-    if (!contractId || !actionType) {
+    if (!['INTEREST_PAYMENT', 'PRINCIPAL_REDUCTION', 'PRINCIPAL_INCREASE'].includes(actionType)) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'ประเภทรายการไม่ถูกต้อง', code: 'INVALID_ACTION_TYPE' },
         { status: 400 }
       );
     }
@@ -88,8 +108,8 @@ export async function POST(request: NextRequest) {
 
     const supabase = supabaseAdmin();
 
-    // Get contract details
-    const { data: contract, error: contractError } = await supabase
+    // Authenticate from a database-owned relation before acquiring the lock.
+    const { data: initialContract, error: initialContractError } = await supabase
       .from('contracts')
       .select(`
         *,
@@ -100,13 +120,37 @@ export async function POST(request: NextRequest) {
       .eq('contract_id', contractId)
       .single();
 
-    if (contractError || !contract) {
+    if (initialContractError || !initialContract) {
       return NextResponse.json(
-        { error: 'Contract not found' },
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
         { status: 404 }
       );
     }
 
+    await requireContractParty(request, initialContract, 'PAWNER');
+    releaseLock = await acquireFinancialLock(`contract-action-contract:${contractId}`);
+
+    // Re-read all financial inputs after obtaining the contract-level lock.
+    // This prevents a completion in another route from making this quote use
+    // stale principal, dates, or status.
+    const { data: contract, error: contractError } = await supabase
+      .from('contracts')
+      .select(`
+        *,
+        items:item_id (*),
+        pawners:customer_id (*),
+        investors:investor_id (*)
+      `)
+      .eq('contract_id', contractId)
+      .single();
+    if (contractError || !contract) {
+      return NextResponse.json(
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
+    const authenticatedLineId = await requireContractParty(request, contract, 'PAWNER');
     const pawner = normalizeRelation<any>(contract.pawners);
     let investor = normalizeRelation<any>(contract.investors);
     if (!investor?.line_id && contract.investor_id) {
@@ -117,7 +161,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
 
       if (investorLookupError) {
-        console.error('Error resolving contract investor:', investorLookupError);
+        console.error('[contract-action:create] investor relation lookup failed');
       } else {
         investor = investorRecord;
       }
@@ -129,18 +173,17 @@ export async function POST(request: NextRequest) {
       investors: investor,
     };
 
+    if (!['CONFIRMED', 'EXTENDED'].includes(String(contract.contract_status || ''))) {
+      return NextResponse.json(
+        { error: 'สัญญานี้ยังไม่อยู่ในสถานะที่ทำรายการได้', code: 'CONTRACT_NOT_ACTIONABLE' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     if (actionType === 'PRINCIPAL_INCREASE' && (!contract.investor_id || !investor?.line_id)) {
       return NextResponse.json(
         { error: 'ไม่พบ Buyer เจ้าของสัญญาหรือ LINE ID สำหรับรับคำขอ กรุณาติดต่อฝ่ายสนับสนุน' },
         { status: 409 }
-      );
-    }
-
-    // Verify pawner
-    if (pawnerLineId && pawner?.line_id !== pawnerLineId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
       );
     }
 
@@ -323,6 +366,13 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        if (!/^[0-9 -]{6,30}$/.test(pawnerBankAccount.bank_account_no)) {
+          return NextResponse.json(
+            { error: 'เลขบัญชีธนาคารไม่ถูกต้อง', code: 'INVALID_BANK_ACCOUNT' },
+            { status: 400 }
+          );
+        }
+
         const { error: bankUpdateError } = await supabase
           .from('pawners')
           .update({
@@ -334,7 +384,7 @@ export async function POST(request: NextRequest) {
           .eq('customer_id', contract.customer_id);
 
         if (bankUpdateError) {
-          console.error('Error updating pawner bank info:', bankUpdateError);
+          console.error('[contract-action:create] bank update failed');
           return NextResponse.json(
             { error: 'ไม่สามารถบันทึกบัญชีธนาคารได้' },
             { status: 500 }
@@ -366,7 +416,7 @@ export async function POST(request: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action type' },
+          { error: 'ประเภทรายการไม่ถูกต้อง', code: 'INVALID_ACTION_TYPE' },
           { status: 400 }
         );
     }
@@ -406,11 +456,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (createError) {
-      console.error('Error creating action request:', createError);
+      console.error('[contract-action:create] insert failed');
       return NextResponse.json(
         {
           error: 'ไม่สามารถบันทึกคำขอเพิ่มเงินต้นได้ กรุณาลองใหม่อีกครั้ง',
-          code: createError.code || null,
+          code: 'CREATE_REQUEST_FAILED',
         },
         { status: 500 }
       );
@@ -422,7 +472,7 @@ export async function POST(request: NextRequest) {
       actionType,
       'INITIATED',
       'PAWNER',
-      pawnerLineId,
+      authenticatedLineId,
       {
         actionRequestId: actionRequest.request_id,
         amount: requestData.total_amount,
@@ -472,8 +522,8 @@ export async function POST(request: NextRequest) {
             },
           }
         );
-      } catch (err) {
-        console.error('Error sending principal increase notification to buyer:', err);
+      } catch {
+        console.error('[contract-action:create] buyer notification delayed');
         await logContractAction(
           contractId,
           'ERROR_OCCURRED',
@@ -483,7 +533,7 @@ export async function POST(request: NextRequest) {
           {
             actionRequestId: actionRequest.request_id,
             description: 'Failed to send principal increase request notification to contract owner',
-            errorMessage: err instanceof Error ? err.message : 'Unknown LINE notification error',
+            errorMessage: 'LINE_NOTIFICATION_DELAYED',
           }
         );
       }
@@ -498,12 +548,16 @@ export async function POST(request: NextRequest) {
       message: 'สร้างคำขอสำเร็จ',
     });
 
-  } catch (error: any) {
-    console.error('Error creating action request:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract-action:create] failed');
+    return sanitizedServerError('ไม่สามารถสร้างคำขอได้ชั่วคราว กรุณาลองใหม่');
+  } finally {
+    await releaseLock?.();
   }
 }
 

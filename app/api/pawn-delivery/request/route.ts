@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getCompanyBankAccount } from '@/lib/services/slip-verification';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const createLineClient = (channelAccessToken?: string, channelSecret?: string) => {
   if (!channelAccessToken) {
@@ -238,15 +247,10 @@ const buildAddressFull = (address: Record<string, string | undefined>) => {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const contractId = searchParams.get('contractId')?.trim();
-    const lineId = searchParams.get('lineId')?.trim();
+    const contractId = requireUuid(searchParams.get('contractId'));
+    const claimedLineId = boundedText(searchParams.get('lineId'), 128, true) || '';
+    const lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
 
-    if (!contractId || !lineId) {
-      return NextResponse.json(
-        { error: 'Missing contractId or lineId' },
-        { status: 400 }
-      );
-    }
 
     const supabase = supabaseAdmin();
 
@@ -306,7 +310,7 @@ export async function GET(request: NextRequest) {
 
     const { data: deliveryRequest } = await supabase
       .from('pawn_delivery_requests')
-      .select('*')
+      .select('delivery_request_id, contract_id, delivery_fee, status, address_full, contact_phone, notes, slip_attempt_count, created_at, updated_at')
       .eq('contract_id', contractId)
       .maybeSingle();
 
@@ -325,18 +329,19 @@ export async function GET(request: NextRequest) {
       deliveryRequest: deliveryRequest || null,
       bankAccount,
     });
-  } catch (error: any) {
-    console.error('Error fetching pawn delivery request:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error fetching pawn delivery request');
+    return sanitizedServerError('ไม่สามารถโหลดข้อมูลจัดส่งได้ กรุณาลองใหม่');
   }
 }
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
+    const body = await readBoundedJsonObject(request) as any;
     const {
       contractId,
       lineId,
@@ -345,12 +350,27 @@ export async function POST(request: NextRequest) {
       notes,
     } = body || {};
 
-    if (!contractId || !lineId || !address?.houseNo) {
+    const safeContractId = requireUuid(contractId);
+    const claimedLineId = boundedText(lineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    if (!address || typeof address !== 'object' || Array.isArray(address)) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       );
     }
+    const safeAddress = {
+      houseNo: boundedText(address.houseNo, 100, true) || '',
+      village: boundedText(address.village, 100) || undefined,
+      street: boundedText(address.street, 180) || undefined,
+      subDistrict: boundedText(address.subDistrict, 100) || undefined,
+      district: boundedText(address.district, 100) || undefined,
+      province: boundedText(address.province, 100) || undefined,
+      postcode: boundedText(address.postcode, 10) || undefined,
+    };
+    const safeContactPhone = boundedText(contactPhone, 20);
+    const safeNotes = boundedText(notes, 500);
+    releaseLock = await acquireTransactionLock('pawn-delivery-create', safeContractId, 90);
 
     const supabase = supabaseAdmin();
 
@@ -366,7 +386,7 @@ export async function POST(request: NextRequest) {
         pawners:customer_id (line_id),
         drop_points:drop_point_id (line_id)
       `)
-      .eq('contract_id', contractId)
+      .eq('contract_id', safeContractId)
       .single();
 
     if (contractError || !contract) {
@@ -383,7 +403,7 @@ export async function POST(request: NextRequest) {
       ? contract.drop_points[0]
       : contract.drop_points;
 
-    if (pawner?.line_id !== lineId) {
+    if (pawner?.line_id !== verifiedLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -406,7 +426,7 @@ export async function POST(request: NextRequest) {
     const { data: existingRequest } = await supabase
       .from('pawn_delivery_requests')
       .select('delivery_request_id, status, slip_attempt_count')
-      .eq('contract_id', contractId)
+      .eq('contract_id', safeContractId)
       .maybeSingle();
 
     if (
@@ -419,7 +439,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const addressFull = buildAddressFull(address);
+    const addressFull = buildAddressFull(safeAddress);
     const now = new Date().toISOString();
     const inProgressStatuses = ['DRIVER_SEARCH', 'DRIVER_ASSIGNED', 'ITEM_PICKED', 'ARRIVED'];
     const shouldNotify = !existingRequest || !inProgressStatuses.includes(existingRequest.status);
@@ -430,20 +450,20 @@ export async function POST(request: NextRequest) {
       loan_request_id: contract.loan_request_id,
       customer_id: contract.customer_id,
       drop_point_id: contract.drop_point_id,
-      pawner_line_id: lineId,
+      pawner_line_id: verifiedLineId,
       drop_point_line_id: dropPoint?.line_id || null,
       delivery_fee: loanRequest?.delivery_fee ?? 40,
       status: nextStatus,
-      address_house_no: address.houseNo,
-      address_village: address.village || null,
-      address_street: address.street || null,
-      address_sub_district: address.subDistrict || null,
-      address_district: address.district || null,
-      address_province: address.province || null,
-      address_postcode: address.postcode || null,
+      address_house_no: safeAddress.houseNo,
+      address_village: safeAddress.village || null,
+      address_street: safeAddress.street || null,
+      address_sub_district: safeAddress.subDistrict || null,
+      address_district: safeAddress.district || null,
+      address_province: safeAddress.province || null,
+      address_postcode: safeAddress.postcode || null,
       address_full: addressFull || null,
-      contact_phone: contactPhone || null,
-      notes: notes || null,
+      contact_phone: safeContactPhone,
+      notes: safeNotes,
       updated_at: now,
     };
     if (shouldNotify) {
@@ -468,7 +488,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (result.error || !result.data) {
-      console.error('Error saving delivery request:', result.error);
+      console.error('Error saving delivery request');
       return NextResponse.json(
         { error: 'Failed to save delivery request' },
         { status: 500 }
@@ -484,8 +504,8 @@ export async function POST(request: NextRequest) {
             updated_at: now,
           })
           .eq('contract_id', contract.contract_id);
-      } catch (updateError) {
-        console.error('Failed to update contract delivery status:', updateError);
+      } catch {
+        console.error('Failed to update contract delivery status');
       }
 
       const item = Array.isArray(contract.items)
@@ -499,9 +519,9 @@ export async function POST(request: NextRequest) {
             contractNumber: contract.contract_number,
             itemName,
           });
-          await pawnerLineClient.pushMessage(lineId, card);
-        } catch (msgError) {
-          console.error('Error sending delivery status to pawner:', msgError);
+          await pawnerLineClient.pushMessage(verifiedLineId, card);
+        } catch {
+          console.error('Error sending delivery status to pawner');
         }
       }
 
@@ -512,12 +532,12 @@ export async function POST(request: NextRequest) {
             contractNumber: contract.contract_number,
             itemName,
             addressFull: addressFull || '',
-            contactPhone: contactPhone || null,
+            contactPhone: safeContactPhone,
             feeAmount: Number(loanRequest?.delivery_fee ?? 40),
           });
           await dropPointLineClient.pushMessage(dropPoint.line_id, card);
-        } catch (msgError) {
-          console.error('Error sending delivery pickup to drop point:', msgError);
+        } catch {
+          console.error('Error sending delivery pickup to drop point');
         }
       }
     }
@@ -526,11 +546,15 @@ export async function POST(request: NextRequest) {
       success: true,
       deliveryRequestId: result.data.delivery_request_id,
     });
-  } catch (error: any) {
-    console.error('Error creating delivery request:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error creating delivery request');
+    return sanitizedServerError('ไม่สามารถสร้างคำขอจัดส่งได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
   }
 }

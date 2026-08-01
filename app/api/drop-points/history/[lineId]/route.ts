@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import {
+  dropPointAccessErrorResponse,
+  requireDropPointActor,
+} from '@/lib/security/drop-point-access';
 
 const mapPawnStatus = (status: string, contractStatus?: string) => {
   if (['PAWNER_CONFIRMED', 'IN_TRANSIT'].includes(status)) return 'กำลังมา';
@@ -41,14 +45,12 @@ export async function GET(
   context: { params: Promise<{ lineId: string }> }
 ) {
   try {
-    const { lineId } = await context.params;
-
-    if (!lineId) {
-      return NextResponse.json(
-        { error: 'LINE ID is required' },
-        { status: 400 }
-      );
-    }
+    const { lineId: claimedLineId } = await context.params;
+    const lineId = await requireDropPointActor(
+      request,
+      claimedLineId,
+      'drop-point-history',
+    );
 
     const supabase = supabaseAdmin();
 
@@ -56,12 +58,22 @@ export async function GET(
       .from('drop_points')
       .select('drop_point_id')
       .eq('line_id', lineId)
-      .single();
+      .eq('is_active', true)
+      .maybeSingle();
 
-    if (dropPointError || !dropPoint) {
+    if (dropPointError) {
+      console.error('[drop-points:history] drop point lookup failed', {
+        code: dropPointError.code || 'unknown',
+      });
       return NextResponse.json(
-        { error: 'Drop point not found' },
-        { status: 404 }
+        { error: 'ไม่สามารถตรวจสอบข้อมูลจุดรับสินค้าได้', code: 'DROP_POINT_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
+    }
+    if (!dropPoint) {
+      return NextResponse.json(
+        { error: 'ไม่พบจุดรับสินค้าที่เปิดใช้งาน', code: 'DROP_POINT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -85,7 +97,13 @@ export async function GET(
       .order('updated_at', { ascending: false });
 
     if (contractsError) {
-      throw contractsError;
+      console.error('[drop-points:history] contract query failed', {
+        code: contractsError.code || 'unknown',
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดประวัติรายการได้', code: 'DROP_POINT_HISTORY_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
     }
 
     const { data: redemptions, error: redemptionsError } = await supabase
@@ -97,7 +115,7 @@ export async function GET(
         item_return_confirmed_at,
         created_at,
         updated_at,
-        contract:contract_id (
+        contract:contracts!inner (
           contract_id,
           contract_number,
           drop_point_id,
@@ -111,7 +129,13 @@ export async function GET(
       .order('updated_at', { ascending: false });
 
     if (redemptionsError) {
-      throw redemptionsError;
+      console.error('[drop-points:history] redemption query failed', {
+        code: redemptionsError.code || 'unknown',
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดประวัติรายการได้', code: 'DROP_POINT_HISTORY_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
     }
 
     const contractEntries = (contracts || []).map((contract) => {
@@ -148,15 +172,19 @@ export async function GET(
       .filter((entry) => entry.date && VISIBLE_HISTORY_STATUSES.has(entry.status))
       .sort((a, b) => new Date(b.date as string).getTime() - new Date(a.date as string).getTime());
 
-    return NextResponse.json({
-      success: true,
-      entries
-    });
-  } catch (error: any) {
-    console.error('Error fetching drop point history:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { success: true, entries },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch (error) {
+    const accessResponse = dropPointAccessErrorResponse(error);
+    if (accessResponse) return accessResponse;
+    console.error('[drop-points:history] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถโหลดประวัติรายการได้', code: 'DROP_POINT_HISTORY_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

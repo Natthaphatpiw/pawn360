@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import OpenAI from 'openai';
+import { resolveStructuredPriceEvidence } from '../lib/services/price-evidence';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
@@ -16,64 +16,14 @@ const INPUT = {
 const OUTPUT_DIR = path.join('scripts', 'output');
 const RAW_OUTPUT_PATH = path.join(OUTPUT_DIR, 'serpapi_raw.json');
 const OUTPUT_PATH = path.join(OUTPUT_DIR, 'serpapi_prices.json');
-const LLM_DEBUG_PATH = path.join(OUTPUT_DIR, 'serpapi_llm_debug.json');
 const DEFAULT_EXCHANGE_RATE_THB_PER_USD = 32;
-const MODEL = 'gpt-5.2';
-const MAX_OUTPUT_TOKENS = 600;
-
-const openai = process.env.OPENAI_API_KEY ? new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-}) : null;
+const MAX_OUTPUT_TOKENS = 2500;
 
 const buildQuery = () => {
   const parts = [INPUT.brand, INPUT.model, INPUT.capacity, INPUT.storage]
     .map((value) => value.trim())
     .filter(Boolean);
   return `${parts.join(' ')} used`;
-};
-
-const getResponseText = (response: any): string => {
-  if (typeof response?.output_text === 'string') {
-    return response.output_text;
-  }
-
-  if (!Array.isArray(response?.output)) {
-    return '';
-  }
-
-  const chunks: string[] = [];
-
-  for (const item of response.output) {
-    if (item?.type === 'output_text' && typeof item.text === 'string') {
-      chunks.push(item.text);
-      continue;
-    }
-
-    if (item?.type === 'message') {
-      const content = Array.isArray(item.content) ? item.content : [];
-      for (const part of content) {
-        if (part?.type === 'output_text' && typeof part?.text === 'string') {
-          chunks.push(part.text);
-        }
-      }
-    }
-  }
-
-  return chunks.join('\n');
-};
-
-const parseJsonFromText = (text: string) => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    try {
-      return JSON.parse(match[0]);
-    } catch {
-      return null;
-    }
-  }
 };
 
 const getExchangeRate = () => {
@@ -84,26 +34,18 @@ const getExchangeRate = () => {
   return DEFAULT_EXCHANGE_RATE_THB_PER_USD;
 };
 
-const extractUsdPrice = (item: any): number | null => {
-  if (typeof item?.extracted_price === 'number' && Number.isFinite(item.extracted_price)) {
-    return item.extracted_price;
-  }
-
-  const priceStr = String(item?.price || '');
-  const match = priceStr.replace(/,/g, '').match(/(\d+(\.\d+)?)/);
-  if (!match) return null;
-  const num = Number(match[1]);
-  return Number.isFinite(num) ? num : null;
-};
-
-const usdToThb = (usd: number, exchangeRate: number) => Math.round(usd * exchangeRate * 100) / 100;
-
 async function main() {
-  if (!openai) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
+  // Load the shared production client only after .env.local has been loaded.
+  // This keeps the script on the same timeout, typed-error, telemetry, cache,
+  // safety-identifier, and budget path as the application.
+  const {
+    getOpenAIReasoningEffortForTask,
+    getOpenAITerraModel,
+    openaiStructuredJson,
+  } = await import('../lib/services/openai-llm');
+  const { withProviderCapacity } = await import('../lib/services/provider-capacity');
 
-  const apiKey = "43a547c506c8f8e5f8feb979d67081b5e5b2fee59be487d8bd2b79b9d3130e6b";
+  const apiKey = process.env.SERPAPI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error('SERPAPI_API_KEY is not configured');
   }
@@ -116,7 +58,15 @@ async function main() {
     api_key: apiKey,
   });
 
-  const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+  const response = await withProviderCapacity(
+    {
+      provider: 'serpapi',
+      model: 'google_shopping_light',
+      operation: 'price_serpapi_script',
+      leaseMs: 45_000,
+    },
+    () => fetch(`https://serpapi.com/search.json?${params.toString()}`),
+  );
   if (!response.ok) {
     throw new Error(`SerpAPI request failed: ${response.status} ${response.statusText}`);
   }
@@ -135,17 +85,27 @@ async function main() {
   const candidateItems = shoppingResults
     .map((result: any, index: number) => {
       if (!result?.title) return null;
-      const usd = extractUsdPrice(result);
-      if (usd === null) return null;
+      const snippet = result.snippet ?? result.description ?? null;
+      const evidence = resolveStructuredPriceEvidence({
+        extractedPrice: result.extracted_price,
+        priceText: result.price,
+        currencyHint: result.currency,
+        title: result.title,
+        excerpt: snippet,
+        exchangeRate,
+      });
+      if (!evidence) return null;
       return {
         id: `item_${index + 1}`,
         title: result.title ?? null,
         source: result.source ?? result.store ?? result.seller ?? 'Unknown',
         url: result.link ?? result.product_link ?? null,
-        price_usd: usd,
-        price_thb: usdToThb(usd, exchangeRate),
+        price_usd: evidence.currency === 'USD' ? evidence.amount : undefined,
+        price_thb: evidence.priceThb,
+        price_currency: evidence.currency,
+        evidence_fingerprint: evidence.fingerprint,
         condition: result.condition ?? result.product_condition ?? null,
-        snippet: result.snippet ?? result.description ?? null,
+        snippet,
       };
     })
     .filter(Boolean);
@@ -179,48 +139,51 @@ Return JSON only with:
   "keep_item_ids": ["item_1", "item_7"]
 }`;
 
-  const llmResponse = await openai.responses.create({
-    model: MODEL,
-    input: prompt,
-    max_output_tokens: MAX_OUTPUT_TOKENS,
-    temperature: 0,
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'serpapi_cleaned_prices',
-        strict: true,
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: {
-            query: { type: 'string' },
-            exchange_rate_thb_per_usd: { type: 'number' },
-            fetched_at: { type: 'string' },
-            keep_item_ids: {
-              type: 'array',
-              items: {
-                type: 'string',
-              },
-            },
-          },
-          required: ['query', 'exchange_rate_thb_per_usd', 'fetched_at', 'keep_item_ids'],
+  const parsed = await openaiStructuredJson<{
+    query: string;
+    exchange_rate_thb_per_usd: number;
+    fetched_at: string;
+    keep_item_ids: string[];
+  }>({
+    model: getOpenAITerraModel(),
+    userText: prompt,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+    effort: getOpenAIReasoningEffortForTask('notebook_serpapi_filter'),
+    label: 'script_notebook_serpapi_filter',
+    promptCacheKey: 'notebook_serpapi_filter',
+    schemaName: 'serpapi_cleaned_prices',
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        query: { type: 'string' },
+        exchange_rate_thb_per_usd: { type: 'number' },
+        fetched_at: { type: 'string' },
+        keep_item_ids: {
+          type: 'array',
+          items: { type: 'string' },
         },
       },
+      required: ['query', 'exchange_rate_thb_per_usd', 'fetched_at', 'keep_item_ids'],
     },
   });
 
-  const content = getResponseText(llmResponse);
-  const parsed = parseJsonFromText(content);
-
   if (!parsed) {
-    fs.writeFileSync(LLM_DEBUG_PATH, JSON.stringify({ content, response: llmResponse }, null, 2), 'utf-8');
-    throw new Error(`Failed to parse LLM JSON response. Saved debug to ${LLM_DEBUG_PATH}`);
+    throw new Error('OpenAI returned no valid structured SerpAPI filter result.');
   }
 
   const keepIds = new Set(Array.isArray(parsed.keep_item_ids) ? parsed.keep_item_ids : []);
   const cleanedItems = candidateItems
     .filter((item: any) => keepIds.has(item.id))
-    .map(({ id, condition, snippet, ...rest }: any) => rest);
+    .map((item: any) => ({
+      title: item.title,
+      source: item.source,
+      url: item.url,
+      price_usd: item.price_usd,
+      price_thb: item.price_thb,
+      price_currency: item.price_currency,
+      evidence_fingerprint: item.evidence_fingerprint,
+    }));
 
   const cleanedPayload = {
     query,

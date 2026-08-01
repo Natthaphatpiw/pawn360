@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getPenaltyRequirement, toDateString } from '@/lib/services/penalty';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const contractId = typeof body?.contractId === 'string' ? body.contractId.trim() : '';
-    const pawnerLineId = typeof body?.pawnerLineId === 'string' ? body.pawnerLineId.trim() : '';
+    const body = await readBoundedJsonObject(request) as any;
+    const contractId = requireUuid(body?.contractId);
+    const pawnerLineId = boundedText(body?.pawnerLineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', pawnerLineId);
 
-    if (!contractId) {
-      return NextResponse.json(
-        { error: 'contractId is required' },
-        { status: 400 }
-      );
-    }
+    releaseLock = await acquireTransactionLock('penalty-create', contractId, 60);
 
     const supabase = supabaseAdmin();
     const { data: contract, error: contractError } = await supabase
@@ -21,6 +27,7 @@ export async function POST(request: NextRequest) {
       .select(`
         contract_id,
         contract_number,
+        contract_status,
         contract_start_date,
         contract_end_date,
         customer_id,
@@ -41,10 +48,17 @@ export async function POST(request: NextRequest) {
 
     const pawner = Array.isArray(contract.pawners) ? contract.pawners[0] : contract.pawners;
 
-    if (pawnerLineId && pawner?.line_id && pawner.line_id !== pawnerLineId) {
+    if (!pawner?.line_id || pawner.line_id !== verifiedLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
+      );
+    }
+
+    if (!['ACTIVE', 'CONFIRMED'].includes(contract.contract_status)) {
+      return NextResponse.json(
+        { error: 'สัญญาไม่อยู่ในสถานะที่สร้างรายการค่าปรับได้' },
+        { status: 409 },
       );
     }
 
@@ -107,15 +121,32 @@ export async function POST(request: NextRequest) {
         created_at: nowIso,
         updated_at: nowIso,
       })
-      .select()
+      .select('penalty_id, status, penalty_amount, days_overdue, penalty_date')
       .single();
 
     if (createError || !created) {
-      console.error('Error creating penalty payment:', createError);
-      return NextResponse.json(
-        { error: 'Failed to create penalty payment' },
-        { status: 500 }
-      );
+      if (createError?.code === '23505') {
+        const { data: racedExisting } = await supabase
+          .from('penalty_payments')
+          .select('penalty_id, status, penalty_amount, days_overdue, penalty_date')
+          .eq('contract_id', contract.contract_id)
+          .eq('penalty_date', todayIso)
+          .maybeSingle();
+        if (racedExisting) {
+          return NextResponse.json({
+            success: true,
+            penaltyRequired: true,
+            paymentId: racedExisting.penalty_id,
+            status: racedExisting.status,
+            penaltyAmount: racedExisting.penalty_amount,
+            daysOverdue: racedExisting.days_overdue,
+            penaltyDate: racedExisting.penalty_date,
+            resumed: true,
+          });
+        }
+      }
+      console.error('Error creating penalty payment');
+      return sanitizedServerError('ไม่สามารถสร้างรายการค่าปรับได้ กรุณาลองใหม่');
     }
 
     return NextResponse.json({
@@ -127,11 +158,15 @@ export async function POST(request: NextRequest) {
       daysOverdue: created.days_overdue,
       penaltyDate: created.penalty_date,
     });
-  } catch (error: any) {
-    console.error('Error creating penalty payment:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error creating penalty payment');
+    return sanitizedServerError('ไม่สามารถสร้างรายการค่าปรับได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
   }
 }

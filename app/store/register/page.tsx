@@ -48,7 +48,9 @@ export default function StoreRegisterPage() {
 
   const fetchStores = async () => {
     try {
-      const response = await axios.get('/api/stores');
+      const response = await axios.get('/api/stores', {
+        headers: { 'X-LIFF-Role': 'STORE' },
+      });
       if (response.data.success) {
         setStores(response.data.stores);
       }

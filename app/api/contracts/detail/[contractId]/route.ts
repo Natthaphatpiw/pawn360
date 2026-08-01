@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { requireUuid, sanitizedServerError, transactionRequestErrorResponse } from '@/lib/security/transaction-request';
 
 const MAX_OFFER_AGE_MS = 4 * 60 * 60 * 1000;
 
@@ -9,14 +12,9 @@ export async function GET(
   context: { params: Promise<{ contractId: string }> }
 ) {
   try {
-    const { contractId } = await context.params;
-
-    if (!contractId) {
-      return NextResponse.json(
-        { error: 'Contract ID is required' },
-        { status: 400 }
-      );
-    }
+    const { contractId: rawContractId } = await context.params;
+    const contractId = requireUuid(rawContractId);
+    const identity = await requireLiffIdentity(request, 'PAWNER');
 
     const supabase = supabaseAdmin();
 
@@ -24,20 +22,36 @@ export async function GET(
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
       .select(`
-        *,
+        contract_id,
+        contract_number,
+        contract_start_date,
+        contract_end_date,
+        contract_duration_days,
+        loan_principal_amount,
+        original_principal_amount,
+        current_principal_amount,
+        interest_rate,
+        interest_amount,
+        total_amount,
+        platform_fee_rate,
+        amount_paid,
+        interest_paid,
+        principal_paid,
+        contract_status,
+        redemption_status,
+        funding_status,
+        payment_status,
+        item_delivery_status,
+        contract_file_url,
+        created_at,
+        updated_at,
         customer:customer_id (
           customer_id,
+          line_id,
           firstname,
           lastname,
           phone_number,
-          national_id,
-          addr_house_no,
-          addr_village,
-          addr_street,
-          addr_sub_district,
-          addr_district,
-          addr_province,
-          addr_postcode
+          national_id
         ),
         item:item_id (
           item_id,
@@ -75,10 +89,19 @@ export async function GET(
 
     if (contractError || !contract) {
       return NextResponse.json(
-        { error: 'Contract not found' },
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
         { status: 404 }
       );
     }
+
+    const customer = Array.isArray(contract.customer)
+      ? contract.customer[0] || null
+      : contract.customer;
+    if (!customer || customer.line_id !== identity.lineId) {
+      throw new LiffAuthError('CONTRACT_ACCESS_DENIED', 403);
+    }
+    const safeCustomer = { ...customer } as Record<string, unknown>;
+    delete safeCustomer.line_id;
 
     const msPerDay = 1000 * 60 * 60 * 24;
 
@@ -166,7 +189,8 @@ export async function GET(
     const remainingPrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
     const remainingInterest = Math.max(0, interestDue);
     const remainingAmount = Math.max(0, remainingPrincipal + remainingInterest);
-    const itemNotes = splitItemNotesAndPasscode(contract.item?.notes);
+    const item = Array.isArray(contract.item) ? contract.item[0] || null : contract.item;
+    const itemNotes = splitItemNotesAndPasscode(item?.notes);
     const postedAtValue = contract.updated_at || contract.created_at;
     const postedAt = postedAtValue ? new Date(postedAtValue) : null;
     const postedAtMs = postedAt?.getTime();
@@ -182,24 +206,25 @@ export async function GET(
       success: true,
       contract: {
         ...contract,
+        customer: safeCustomer,
         ...offerMetadata,
-        item: contract.item ? {
-          ...contract.item,
+        item: item ? {
+          ...item,
           notes: itemNotes.publicNotes,
-        } : contract.item,
+        } : item,
         remainingDays,
         displayStatus,
         remainingAmount,
         remainingPrincipal,
         remainingInterest
       }
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
 
-  } catch (error: any) {
-    console.error('Error fetching contract detail:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    console.error('[contracts:detail] failed');
+    return sanitizedServerError('ไม่สามารถโหลดข้อมูลสัญญาได้ กรุณาลองใหม่');
   }
 }

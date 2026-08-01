@@ -1,10 +1,49 @@
+import crypto from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { anthropicStructured, hasAnthropicKeys, getAnthropicVisionModel } from '@/lib/services/anthropic-llm';
+import {
+  getOpenAILunaModel,
+  getOpenAIReasoningEffortForTask,
+  hasOpenAIKeys,
+  openaiStructuredJson,
+} from '@/lib/services/openai-llm';
 
-// Internal label for the non-SlipOK (Claude vision) verification path, stored in rawResponse.
+// Internal label for the Anthropic fallback path, stored in rawResponse.
 const LEGACY_MODEL = 'anthropic-vision';
 const SLIPOK_PROVIDER = 'slipok';
 const SLIPOK_BASE_URL = 'https://api.slipok.com/api/line/apikey';
+const MAX_SLIP_IMAGE_BYTES = 4 * 1024 * 1024;
+
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+async function readBoundedResponse(response: Response, maxBytes: number): Promise<Buffer> {
+  if (!response.body) throw new Error('Slip image response has no body');
+  const declared = Number(response.headers.get('content-length') || 0);
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error('Slip image is too large');
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new Error('Slip image is too large');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total);
+}
 
 export interface SlipVerificationResult {
   success: boolean;
@@ -175,11 +214,88 @@ function parseNumericAmount(value: unknown) {
   return null;
 }
 
+function safeProviderName(value: unknown): string {
+  const normalized = String(value || '').trim().slice(0, 100);
+  return /^[a-z0-9:._-]+$/i.test(normalized) ? normalized : 'unknown';
+}
+
+function safeProviderCode(value: unknown): string | number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string') {
+    const normalized = value.trim().slice(0, 50);
+    if (/^[a-z0-9._-]+$/i.test(normalized)) return normalized;
+  }
+  return null;
+}
+
+function providerReferenceHash(data: any): string | null {
+  const value = data?.transRef
+    ?? data?.trans_ref
+    ?? data?.transactionId
+    ?? data?.transaction_id
+    ?? data?.reference;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  return crypto.createHash('sha256').update(value.trim()).digest('hex');
+}
+
 function buildBaseRawResponse(extra: Record<string, any>) {
+  const response: Record<string, unknown> = { provider: SLIPOK_PROVIDER };
+  if (Number.isInteger(extra.httpStatus) && extra.httpStatus >= 100 && extra.httpStatus <= 599) {
+    response.httpStatus = extra.httpStatus;
+  }
+  const code = safeProviderCode(extra.code);
+  if (code !== null) response.code = code;
+  const referenceHash = providerReferenceHash(extra.data);
+  if (referenceHash) response.transactionReferenceHash = referenceHash;
+  if (extra.data && typeof extra.data === 'object') {
+    response.hasReceiverEvidence = Boolean(
+      extra.data?.receiver?.account?.value
+      || extra.data?.receiver?.proxy?.value
+      || extra.data?.receiver?.displayName
+      || extra.data?.receiver?.name
+    );
+  }
+  if (extra.errorKind) response.errorKind = safeProviderCode(extra.errorKind);
+  return response;
+}
+
+function buildAiRawResponse(provider: string, parsed: any, requiresManualReview = false) {
   return {
-    provider: SLIPOK_PROVIDER,
-    ...extra,
+    provider: safeProviderName(provider),
+    isValidSlip: parsed?.is_valid_slip === true,
+    confidence: Math.max(0, Math.min(1, Number(parsed?.confidence) || 0)),
+    amountPresent: parseNumericAmount(parsed?.detected_amount) !== null,
+    requiresManualReview,
   };
+}
+
+function sanitizePersistedRawResponse(value: unknown): Record<string, unknown> {
+  const raw = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const output: Record<string, unknown> = {
+    provider: safeProviderName(raw.provider),
+  };
+  const code = safeProviderCode(raw.code);
+  if (code !== null) output.code = code;
+  if (typeof raw.httpStatus === 'number' && Number.isInteger(raw.httpStatus)) {
+    output.httpStatus = Math.min(599, Math.max(100, raw.httpStatus));
+  }
+  if (typeof raw.confidence === 'number' && Number.isFinite(raw.confidence)) {
+    output.confidence = Math.max(0, Math.min(1, raw.confidence));
+  }
+  for (const key of ['isValidSlip', 'amountPresent', 'requiresManualReview', 'hasReceiverEvidence'] as const) {
+    if (typeof raw[key] === 'boolean') output[key] = raw[key];
+  }
+  for (const key of ['transactionReferenceHash', 'evidenceFingerprint'] as const) {
+    const candidate = typeof raw[key] === 'string' ? raw[key].toLowerCase() : '';
+    if (/^[0-9a-f]{64}$/.test(candidate)) output[key] = candidate;
+  }
+  const fingerprint = typeof raw.fingerprint === 'string' ? raw.fingerprint.toLowerCase() : '';
+  if (/^(?:sha256:)?[0-9a-f]{64}$/.test(fingerprint)) output.fingerprint = fingerprint;
+  const errorKind = safeProviderCode(raw.errorKind);
+  if (errorKind !== null) output.errorKind = errorKind;
+  return output;
 }
 
 function buildAmountResult(
@@ -295,18 +411,27 @@ function validateReceiver(
 }
 
 async function buildSlipOkRequestBody(slipUrl: string, expectedAmount: number, useLogCheck: boolean) {
-  const fileResponse = await fetch(slipUrl, { cache: 'no-store' });
+  const timeoutMs = positiveNumber(process.env.SLIP_IMAGE_FETCH_TIMEOUT_MS, 8_000);
+  const fileResponse = await fetch(slipUrl, {
+    cache: 'no-store',
+    redirect: 'error',
+    signal: AbortSignal.timeout(timeoutMs),
+  });
 
   if (!fileResponse.ok) {
     throw new Error(`Failed to fetch slip image (${fileResponse.status})`);
   }
 
   const contentType = fileResponse.headers.get('content-type') || 'image/jpeg';
-  const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+  const fileBuffer = await readBoundedResponse(fileResponse, MAX_SLIP_IMAGE_BYTES);
   const formData = new FormData();
   const extension = getFileExtension(contentType);
 
-  formData.append('files', new Blob([fileBuffer], { type: contentType }), `slip.${extension}`);
+  formData.append(
+    'files',
+    new Blob([Uint8Array.from(fileBuffer)], { type: contentType }),
+    `slip.${extension}`,
+  );
   formData.append('log', useLogCheck ? 'true' : 'false');
   formData.append('amount', String(expectedAmount));
 
@@ -332,10 +457,14 @@ async function verifyWithSlipOk(
         'x-authorization': config.apiKey,
       },
       body: requestBody,
+      redirect: 'error',
+      signal: AbortSignal.timeout(
+        positiveNumber(process.env.SLIPOK_REQUEST_TIMEOUT_MS, 15_000),
+      ),
     });
 
     httpStatus = response.status;
-    const responseText = await response.text();
+    const responseText = (await readBoundedResponse(response, 512 * 1024)).toString('utf8');
 
     try {
       payload = responseText ? JSON.parse(responseText) : null;
@@ -355,7 +484,7 @@ async function verifyWithSlipOk(
       confidenceScore: 0,
       message: 'ระบบตรวจสอบสลิปขัดข้อง กรุณาลองใหม่อีกครั้ง',
       rawResponse: buildBaseRawResponse({
-        error: error?.message || 'SlipOK request failed',
+        errorKind: error?.name || 'SLIPOK_REQUEST_FAILED',
       }),
     };
   }
@@ -473,13 +602,13 @@ async function verifyWithSlipOk(
   };
 }
 
-async function verifyWithLegacyVision(
+async function verifyWithAIVision(
   slipUrl: string,
   expectedAmount: number,
   tolerance: number,
 ): Promise<SlipVerificationResult> {
   try {
-    if (!hasAnthropicKeys()) {
+    if (!hasOpenAIKeys() && !hasAnthropicKeys()) {
       return {
         success: false,
         result: 'UNREADABLE',
@@ -487,8 +616,8 @@ async function verifyWithLegacyVision(
         expectedAmount,
         difference: null,
         confidenceScore: 0,
-        message: 'Anthropic API key not configured',
-        rawResponse: { error: 'ANTHROPIC_API_KEY not set' },
+        message: 'AI provider is not configured',
+        rawResponse: { provider: 'unknown', errorKind: 'CONFIGURATION' },
       };
     }
 
@@ -514,15 +643,8 @@ Return ONLY a JSON object with this exact structure:
   "notes": "<any relevant notes>"
 }`;
 
-    const parsed: any = await anthropicStructured<any>({
-      system: systemPrompt,
-      userText: `Please analyze this bank transfer slip and extract the transfer amount. Expected amount is ${expectedAmount.toLocaleString()} THB.`,
-      images: [slipUrl],
-      model: getAnthropicVisionModel(),
-      toolName: 'slip_verification',
-      toolDescription: 'Return the extracted bank-slip details.',
-      maxTokens: 700,
-      schema: {
+    const userText = `Please analyze this bank transfer slip and extract the transfer amount. Expected amount is ${expectedAmount.toLocaleString()} THB.`;
+    const schema = {
         type: 'object',
         additionalProperties: false,
         properties: {
@@ -561,8 +683,44 @@ Return ONLY a JSON object with this exact structure:
           'transaction_date',
           'notes',
         ],
-      },
-    });
+      };
+
+    let parsed: any = null;
+    let provider = LEGACY_MODEL;
+    if (hasOpenAIKeys()) {
+      try {
+        parsed = await openaiStructuredJson<any>({
+          system: systemPrompt,
+          userText,
+          images: [slipUrl],
+          imageDetail: 'high',
+          model: getOpenAILunaModel(),
+          effort: getOpenAIReasoningEffortForTask('slip_verification'),
+          schemaName: 'slip_verification',
+          maxOutputTokens: 4000,
+          schema,
+          label: 'slip_verification',
+          promptCacheKey: 'slip_verification',
+        });
+        if (parsed) provider = `openai:${getOpenAILunaModel()}`;
+      } catch (error) {
+        console.warn('🔁 OpenAI slip verification failed — falling back to Claude:', error);
+      }
+    }
+
+    if (!parsed && hasAnthropicKeys()) {
+      parsed = await anthropicStructured<any>({
+        system: systemPrompt,
+        userText,
+        images: [slipUrl],
+        model: getAnthropicVisionModel(),
+        toolName: 'slip_verification',
+        toolDescription: 'Return the extracted bank-slip details.',
+        maxTokens: 700,
+        schema,
+      });
+      provider = LEGACY_MODEL;
+    }
 
     if (!parsed) {
       console.error('Failed to parse AI slip response');
@@ -574,17 +732,11 @@ Return ONLY a JSON object with this exact structure:
         difference: null,
         confidenceScore: 0,
         message: 'ไม่สามารถอ่านข้อมูลจากสลิปได้ กรุณาถ่ายรูปใหม่ให้ชัดเจน',
-        rawResponse: {
-          provider: LEGACY_MODEL,
-          content: null,
-        },
+        rawResponse: buildAiRawResponse(provider, null, true),
       };
     }
 
-    const rawResponse = {
-      provider: LEGACY_MODEL,
-      data: parsed,
-    };
+    const rawResponse = buildAiRawResponse(provider, parsed);
 
     if (!parsed.is_valid_slip) {
       return {
@@ -614,10 +766,40 @@ Return ONLY a JSON object with this exact structure:
       };
     }
 
+    const confidenceScore = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
+    const minConfidence = Math.max(
+      0,
+      Math.min(1, positiveNumber(process.env.AI_SLIP_MIN_CONFIDENCE, 0.85)),
+    );
+    if (confidenceScore < minConfidence) {
+      return {
+        success: false,
+        result: 'UNREADABLE',
+        detectedAmount,
+        expectedAmount,
+        difference: toRoundedAmount(detectedAmount - expectedAmount),
+        confidenceScore,
+        message: 'ระบบอ่านข้อมูลจากสลิปได้ไม่ชัดเจน กรุณาอัปโหลดรูปใหม่หรือรอเจ้าหน้าที่ตรวจสอบ',
+        rawResponse: buildAiRawResponse(provider, parsed, true),
+      };
+    }
+
     const amountResult = buildAmountResult(detectedAmount, expectedAmount, tolerance, rawResponse);
+    const production = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+    const allowAiAutoApproval = !production && process.env.ALLOW_AI_SLIP_AUTO_APPROVAL === 'true';
+    if (amountResult.result === 'MATCHED' && !allowAiAutoApproval) {
+      return {
+        ...amountResult,
+        success: false,
+        result: 'UNREADABLE',
+        confidenceScore,
+        message: 'ระบบอ่านยอดเงินได้แล้ว แต่ AI ไม่สามารถยืนยันความแท้จริงของสลิปได้ กรุณารอเจ้าหน้าที่ตรวจสอบ',
+        rawResponse: buildAiRawResponse(provider, parsed, true),
+      };
+    }
     return {
       ...amountResult,
-      confidenceScore: parsed.confidence || amountResult.confidenceScore,
+      confidenceScore,
     };
   } catch (error: any) {
     console.error('Slip verification error:', error);
@@ -631,7 +813,7 @@ Return ONLY a JSON object with this exact structure:
       message: 'เกิดข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่อีกครั้ง',
       rawResponse: {
         provider: LEGACY_MODEL,
-        error: error.message,
+        errorKind: safeProviderCode(error?.name) || 'AI_PROVIDER_FAILURE',
       },
     };
   }
@@ -656,7 +838,7 @@ export async function verifyPaymentSlip(
       message: 'ข้อมูลสลิปไม่ครบถ้วน',
       rawResponse: {
         provider: getSlipOkConfig().enabled ? SLIPOK_PROVIDER : LEGACY_MODEL,
-        error: 'Missing slip url or expected amount',
+        errorKind: 'INVALID_REQUEST',
       },
     };
   }
@@ -666,7 +848,7 @@ export async function verifyPaymentSlip(
     return verifyWithSlipOk(slipUrl, normalizedExpectedAmount, options);
   }
 
-  return verifyWithLegacyVision(slipUrl, normalizedExpectedAmount, options.tolerance);
+  return verifyWithAIVision(slipUrl, normalizedExpectedAmount, options.tolerance);
 }
 
 // Save slip verification to database
@@ -679,19 +861,11 @@ export async function saveSlipVerification(
   attemptNumber: number = 1
 ) {
   const supabase = supabaseAdmin();
-  const provider = typeof result.rawResponse?.provider === 'string'
-    ? result.rawResponse.provider
+  const persistedRawResponse = sanitizePersistedRawResponse(result.rawResponse);
+  const provider = typeof persistedRawResponse.provider === 'string'
+    ? persistedRawResponse.provider
     : (getSlipOkConfig().enabled ? SLIPOK_PROVIDER : LEGACY_MODEL);
-  const rawResponseText = (() => {
-    if (typeof result.rawResponse === 'string') {
-      return result.rawResponse;
-    }
-    try {
-      return JSON.stringify(result.rawResponse ?? null);
-    } catch {
-      return null;
-    }
-  })();
+  const rawResponseText = JSON.stringify(persistedRawResponse);
 
   const { data, error } = await supabase
     .from('slip_verifications')
@@ -705,7 +879,7 @@ export async function saveSlipVerification(
       verification_result: result.result,
       confidence_score: result.confidenceScore,
       ai_model: provider,
-      ai_response: result.rawResponse,
+      ai_response: persistedRawResponse,
       ai_raw_response: rawResponseText,
       attempt_number: attemptNumber,
     })

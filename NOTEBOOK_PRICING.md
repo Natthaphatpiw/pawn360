@@ -43,7 +43,7 @@
 
 `extractNotebookSpec(input)` ใน `notebook-spec.ts`:
 
-1. **LLM canonicalization** (Claude ผ่าน `anthropicStructured`): รับ brand/model/cpu/ram/storage/gpu/
+1. **LLM canonicalization** (OpenAI Terra เป็นหลัก; Claude ผ่าน `anthropicStructured` เป็น fallback): รับ brand/model/cpu/ram/storage/gpu/
    note จากฟอร์ม → ตอบ JSON: `family` (ชื่อตระกูลไม่รวม SKU เช่น "IdeaPad 3 15"), `variant`,
    `cpuModel` แบบ canonical ("Intel Core i5-12450H"), `ramGb`, `storageGb`, `storageType`
    (`nvme|sata|hdd`), `gpuModel`, `screenSizeIn`, `panel` (`tn|ips|oled`), `releaseYear`,
@@ -54,16 +54,16 @@
    - ถ้าไม่เจอในตาราง → heuristic ประมาณจาก family/gen (เช่น "i7 gen 12 H-series")
      และ mark `cpuScoreSource: 'heuristic'` (ไปหักคะแนน confidence)
 3. `releaseYear` fallback = ปีของ CPU จากตาราง benchmark
-4. ถ้าไม่มี Anthropic key → ใช้ heuristic parser ล้วน (regex จับ i5-12450H, Ryzen 5 5500U,
+4. ถ้าไม่มีทั้ง OpenAI และ Anthropic key → ใช้ heuristic parser ล้วน (regex จับ i5-12450H, Ryzen 5 5500U,
    ขนาด RAM/SSD ฯลฯ)
 
 ---
 
 ## 3. ขั้นที่ 2 — เก็บเกี่ยว listing (harvest)
 
-`fetchNotebookListings()` ใน `app/api/estimate/route.ts` ยิง **web search 1 ครั้ง**
-(ผ่าน provider เดิมตาม `PRICE_SEARCH_PROVIDER` — OpenAI `gpt-4.1` + `web_search` หรือ
-Claude + `web_search`/`web_fetch`) ด้วยพรอมป์ตที่สั่งให้ **ค้นหลายมุมภายใน call เดียว**:
+`fetchNotebookListings()` ใน `lib/services/estimate-pipeline.ts` ยิง **market search 1 ครั้ง**
+ผ่าน fresh Redis cache → Parallel Search → Exa fallback → stale cache แล้วใช้ OpenAI Terra
+สกัด structured evidence (Claude เป็น LLM fallback) โดยค้นหลายมุมภายใน request เดียว:
 
 1. ราคามือสองไทยของ **รุ่นตรง** (Kaidee, Facebook Marketplace ฯลฯ)
 2. ถ้าตรงรุ่นได้ไม่ถึง 4 รายการ → ราคามือสองของ **รุ่นพี่น้องใน family เดียวกัน** (config ต่างได้)

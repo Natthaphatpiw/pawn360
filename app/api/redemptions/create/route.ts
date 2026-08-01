@@ -1,25 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { ensurePenaltyPaymentRecord, getPenaltyRequirement } from '@/lib/services/penalty';
+import { ensurePenaltyPaymentRecord, getPenaltyRequirement, roundCurrency } from '@/lib/services/penalty';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import {
+  boundedText,
+  readBoundedJsonObject,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
+
+const ACTIVE_REDEMPTION_STATUSES = [
+  'PENDING',
+  'SLIP_UPLOADED',
+  'AMOUNT_VERIFIED',
+  'AMOUNT_MISMATCH',
+  'PREPARING_ITEM',
+  'IN_TRANSIT',
+  'DELIVERED',
+  'PAWNER_CONFIRMED',
+  'INVESTOR_CONFIRMED',
+];
+
+const PRE_CENTRAL_METHODS = new Set(['DROPPOINT_SELF_PICKUP', 'DROPPOINT_SELF_RIDER']);
+const CENTRAL_METHODS = new Set([
+  'CENTRAL_SCHEDULE_7D',
+  'CENTRAL_SELF_PICKUP_TODAY',
+  'DROPPOINT_NEXT_DAY_PICKUP',
+]);
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
+    const body = await readBoundedJsonObject(request) as any;
     const {
       contractId,
       requestType,
       deliveryMethod,
       deliveryAddress,
-      deliveryFee,
       pawnerLineId,
     } = body;
 
-    if (!contractId || !requestType || !deliveryMethod) {
+    const safeContractId = requireUuid(contractId);
+    const safeRequestType = boundedText(requestType, 50, true) || '';
+    const safeDeliveryMethod = boundedText(deliveryMethod, 50, true) || '';
+    const claimedLineId = boundedText(pawnerLineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    if (safeRequestType !== 'FULL_REDEMPTION') {
       return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+        { error: 'ประเภทรายการไถ่ถอนไม่ถูกต้อง' },
+        { status: 400 },
       );
     }
+    releaseLock = await acquireTransactionLock('redemption-create', safeContractId, 90);
 
     const supabase = supabaseAdmin();
 
@@ -27,12 +61,23 @@ export async function POST(request: NextRequest) {
     const { data: contract, error: contractError } = await supabase
       .from('contracts')
       .select(`
-        *,
-        pawners:customer_id (*),
-        investors:investor_id (*),
-        drop_points:drop_point_id (*)
+        contract_id,
+        contract_status,
+        contract_start_date,
+        contract_end_date,
+        contract_duration_days,
+        customer_id,
+        investor_id,
+        loan_principal_amount,
+        current_principal_amount,
+        original_principal_amount,
+        principal_paid,
+        interest_rate,
+        interest_paid,
+        platform_fee_rate,
+        pawners:customer_id (line_id)
       `)
-      .eq('contract_id', contractId)
+      .eq('contract_id', safeContractId)
       .single();
 
     if (contractError || !contract) {
@@ -43,18 +88,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if pawner LINE ID matches
-    if (pawnerLineId && contract.pawners?.line_id !== pawnerLineId) {
+    const pawner = Array.isArray(contract.pawners) ? contract.pawners[0] : contract.pawners;
+    if (!pawner?.line_id || pawner.line_id !== verifiedLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
       );
-    }
-
-    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
-    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
-    if (penaltyRequirement.required) {
-      await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
     }
 
     // Check if contract is in valid status for redemption
@@ -65,15 +104,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
+    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
+    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+    if (
+      !Number.isFinite(penaltyAmount)
+      || penaltyAmount < 0
+      || !Number.isFinite(overdueInterestAmount)
+      || overdueInterestAmount < 0
+    ) {
+      return NextResponse.json(
+        { error: 'ไม่สามารถคำนวณยอดค้างชำระได้ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 },
+      );
+    }
+    if (penaltyRequirement.required) {
+      await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
+    }
+
     // Check for existing pending redemption
-    const activeStatuses = ['PENDING', 'SLIP_UPLOADED', 'AMOUNT_VERIFIED', 'PREPARING_ITEM', 'IN_TRANSIT'];
-    const { data: existingRedemptions } = await supabase
+    const { data: existingRedemptions, error: existingRedemptionsError } = await supabase
       .from('redemption_requests')
       .select('redemption_id, request_status, created_at')
-      .eq('contract_id', contractId)
-      .in('request_status', activeStatuses)
+      .eq('contract_id', safeContractId)
+      .in('request_status', ACTIVE_REDEMPTION_STATUSES)
       .order('created_at', { ascending: false })
       .limit(1);
+
+    if (existingRedemptionsError) {
+      return sanitizedServerError('ไม่สามารถตรวจสอบคำขอไถ่ถอนเดิมได้ กรุณาลองใหม่');
+    }
 
     const existingRedemption = existingRedemptions?.[0];
     if (existingRedemption) {
@@ -87,17 +147,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Build delivery address string
-    let deliveryAddressFull = null;
-    if (deliveryAddress) {
+    let deliveryAddressFull: string | null = null;
+    const safeDeliveryAddress = deliveryAddress && typeof deliveryAddress === 'object' && !Array.isArray(deliveryAddress)
+      ? deliveryAddress
+      : null;
+    if (safeDeliveryAddress) {
       const parts = [
-        deliveryAddress.houseNo,
-        deliveryAddress.village,
-        deliveryAddress.street,
-        deliveryAddress.subDistrict,
-        deliveryAddress.district,
-        deliveryAddress.province,
-        deliveryAddress.postcode,
-      ].filter(Boolean);
+        boundedText(safeDeliveryAddress.houseNo, 100),
+        boundedText(safeDeliveryAddress.village, 100),
+        boundedText(safeDeliveryAddress.street, 180),
+        boundedText(safeDeliveryAddress.subDistrict, 100),
+        boundedText(safeDeliveryAddress.district, 100),
+        boundedText(safeDeliveryAddress.province, 100),
+        boundedText(safeDeliveryAddress.postcode, 10),
+      ].filter((value): value is string => Boolean(value));
       deliveryAddressFull = parts.join(' ');
     }
 
@@ -109,69 +172,137 @@ export async function POST(request: NextRequest) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) {
+      return NextResponse.json(
+        { error: 'ข้อมูลวันที่สัญญาไม่สมบูรณ์ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 },
+      );
+    }
+
     const rawDurationDays = Number(contract.contract_duration_days || 0)
       || Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay);
     const daysInContract = Math.max(1, rawDurationDays);
     const rawDaysElapsed = Math.floor((today.getTime() - startDate.getTime()) / msPerDay) + 1;
     const daysElapsed = Math.min(daysInContract, Math.max(1, rawDaysElapsed));
 
+    const centralStage = rawDaysElapsed > 15;
+    const allowedMethods = centralStage ? CENTRAL_METHODS : PRE_CENTRAL_METHODS;
+    if (!allowedMethods.has(safeDeliveryMethod)) {
+      return NextResponse.json(
+        { error: 'วิธีรับสินค้าคืนไม่สอดคล้องกับสถานะสัญญา' },
+        { status: 409 },
+      );
+    }
+
     const rawRate = Number(contract.interest_rate || 0);
     const monthlyInterestRate = rawRate > 1 ? rawRate / 100 : rawRate;
     const feeRate = Number(contract.platform_fee_rate ?? 0.015);
     const dailyInterestRate = monthlyInterestRate / 30;
 
-    const currentPrincipal = contract.current_principal_amount || contract.loan_principal_amount;
-    const feeBase = contract.original_principal_amount || contract.loan_principal_amount || currentPrincipal;
-    const feeAmount = Math.round(feeBase * feeRate * (daysInContract / 30) * 100) / 100;
-    const interestAccrued = Math.round(currentPrincipal * dailyInterestRate * daysElapsed * 100) / 100;
-    const interestDue = Math.max(0, interestAccrued + feeAmount - (contract.interest_paid || 0));
+    const currentPrincipal = Number(contract.current_principal_amount ?? contract.loan_principal_amount);
+    const feeBase = Number(contract.original_principal_amount ?? contract.loan_principal_amount ?? currentPrincipal);
+    const interestPaid = Number(contract.interest_paid || 0);
+    const principalPaid = Number(contract.principal_paid || 0);
+    if (
+      !Number.isFinite(currentPrincipal)
+      || currentPrincipal <= 0
+      || !Number.isFinite(feeBase)
+      || feeBase <= 0
+      || !Number.isFinite(rawRate)
+      || rawRate < 0
+      || rawRate > 100
+      || !Number.isFinite(feeRate)
+      || feeRate < 0
+      || feeRate > 1
+      || !Number.isFinite(interestPaid)
+      || interestPaid < 0
+      || !Number.isFinite(principalPaid)
+      || principalPaid < 0
+    ) {
+      return NextResponse.json(
+        { error: 'ข้อมูลยอดเงินในสัญญาไม่สมบูรณ์ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 },
+      );
+    }
+    const feeAmount = roundCurrency(feeBase * feeRate * (daysInContract / 30));
+    const interestAccrued = roundCurrency(currentPrincipal * dailyInterestRate * daysElapsed);
+    const interestDue = roundCurrency(Math.max(0, interestAccrued + feeAmount - interestPaid));
 
-    const basePrincipal = Math.max(0, currentPrincipal - (contract.principal_paid || 0));
-    const deliveryFeeAmount = deliveryFee || 0;
-    const totalAmount = basePrincipal + interestDue + deliveryFeeAmount + penaltyAmount + overdueInterestAmount;
+    const basePrincipal = roundCurrency(Math.max(0, currentPrincipal - principalPaid));
+    const deliveryFeeAmount = safeDeliveryMethod === 'DROPPOINT_NEXT_DAY_PICKUP' ? 100 : 0;
+    const totalAmount = roundCurrency(
+      basePrincipal + interestDue + deliveryFeeAmount + penaltyAmount + overdueInterestAmount,
+    );
 
     // Create redemption request
     const { data: redemption, error: redemptionError } = await supabase
       .from('redemption_requests')
       .insert({
-        contract_id: contractId,
-        request_type: requestType,
+        contract_id: safeContractId,
+        request_type: safeRequestType,
         principal_amount: basePrincipal,
         interest_amount: interestDue,
         delivery_fee: deliveryFeeAmount,
         total_amount: totalAmount,
-        delivery_method: deliveryMethod,
+        delivery_method: safeDeliveryMethod,
         delivery_address_full: deliveryAddressFull,
-        delivery_addr_house_no: deliveryAddress?.houseNo,
-        delivery_addr_village: deliveryAddress?.village,
-        delivery_addr_street: deliveryAddress?.street,
-        delivery_addr_sub_district: deliveryAddress?.subDistrict,
-        delivery_addr_district: deliveryAddress?.district,
-        delivery_addr_province: deliveryAddress?.province,
-        delivery_addr_postcode: deliveryAddress?.postcode,
-        delivery_contact_phone: deliveryAddress?.contactPhone,
-        delivery_notes: deliveryAddress?.notes,
+        delivery_addr_house_no: safeDeliveryAddress ? boundedText(safeDeliveryAddress.houseNo, 100) : null,
+        delivery_addr_village: safeDeliveryAddress ? boundedText(safeDeliveryAddress.village, 100) : null,
+        delivery_addr_street: safeDeliveryAddress ? boundedText(safeDeliveryAddress.street, 180) : null,
+        delivery_addr_sub_district: safeDeliveryAddress ? boundedText(safeDeliveryAddress.subDistrict, 100) : null,
+        delivery_addr_district: safeDeliveryAddress ? boundedText(safeDeliveryAddress.district, 100) : null,
+        delivery_addr_province: safeDeliveryAddress ? boundedText(safeDeliveryAddress.province, 100) : null,
+        delivery_addr_postcode: safeDeliveryAddress ? boundedText(safeDeliveryAddress.postcode, 10) : null,
+        delivery_contact_phone: safeDeliveryAddress ? boundedText(safeDeliveryAddress.contactPhone, 20) : null,
+        delivery_notes: safeDeliveryAddress ? boundedText(safeDeliveryAddress.notes, 500) : null,
         request_status: 'PENDING',
       })
-      .select()
+      .select('redemption_id')
       .single();
 
     if (redemptionError) {
-      console.error('Error creating redemption:', redemptionError);
-      return NextResponse.json(
-        { error: 'Failed to create redemption request' },
-        { status: 500 }
-      );
+      if (redemptionError.code === '23505') {
+        const { data: racedRedemption } = await supabase
+          .from('redemption_requests')
+          .select('redemption_id, request_status')
+          .eq('contract_id', safeContractId)
+          .in('request_status', ACTIVE_REDEMPTION_STATUSES)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (racedRedemption) {
+          return NextResponse.json({
+            success: true,
+            resumed: true,
+            redemptionId: racedRedemption.redemption_id,
+            requestStatus: racedRedemption.request_status,
+          });
+        }
+      }
+      console.error('Error creating redemption');
+      return sanitizedServerError('ไม่สามารถสร้างคำขอไถ่ถอนได้ กรุณาลองใหม่');
     }
 
     // Update contract redemption status
-    await supabase
+    const { data: contractUpdated, error: contractUpdateError } = await supabase
       .from('contracts')
       .update({
         redemption_status: 'PENDING',
         updated_at: new Date().toISOString(),
       })
-      .eq('contract_id', contractId);
+      .eq('contract_id', safeContractId)
+      .in('contract_status', ['ACTIVE', 'CONFIRMED'])
+      .select('contract_id')
+      .maybeSingle();
+
+    if (contractUpdateError || !contractUpdated) {
+      await supabase
+        .from('redemption_requests')
+        .update({ request_status: 'CANCELLED', updated_at: new Date().toISOString() })
+        .eq('redemption_id', redemption.redemption_id)
+        .eq('request_status', 'PENDING');
+      return sanitizedServerError('ไม่สามารถบันทึกสถานะสัญญาได้ กรุณาลองใหม่');
+    }
 
     return NextResponse.json({
       success: true,
@@ -182,11 +313,15 @@ export async function POST(request: NextRequest) {
       message: 'Redemption request created successfully',
     });
 
-  } catch (error: any) {
-    console.error('Error creating redemption:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error creating redemption');
+    return sanitizedServerError('ไม่สามารถสร้างคำขอไถ่ถอนได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
   }
 }

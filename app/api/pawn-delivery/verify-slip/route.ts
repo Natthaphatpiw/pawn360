@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { getCompanyBankAccount, verifyPaymentSlip } from '@/lib/services/slip-verification';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+import { acquireTransactionLock, transactionLockErrorResponse } from '@/lib/security/transaction-lock';
+import { paymentEvidenceWasUsed } from '@/lib/security/payment-evidence';
+import {
+  boundedText,
+  fingerprintOwnedBlob,
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const createLineClient = (channelAccessToken?: string, channelSecret?: string) => {
   if (!channelAccessToken) {
@@ -223,18 +235,16 @@ const buildPawnerStatusCard = (payload: {
 };
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
+  let releaseEvidenceLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const deliveryRequestId = typeof body?.deliveryRequestId === 'string' ? body.deliveryRequestId.trim() : '';
-    const slipUrl = typeof body?.slipUrl === 'string' ? body.slipUrl.trim() : '';
-    const pawnerLineId = typeof body?.pawnerLineId === 'string' ? body.pawnerLineId.trim() : '';
+    const body = await readBoundedJsonObject(request) as any;
+    const deliveryRequestId = requireUuid(body?.deliveryRequestId);
+    const slipUrl = requireOwnedBlobUrl(body?.slipUrl, ['pawn-items/', 'slips/']);
+    const pawnerLineId = boundedText(body?.pawnerLineId, 128, true) || '';
+    const verifiedLineId = await requireLiffOwner(request, 'PAWNER', pawnerLineId);
 
-    if (!deliveryRequestId || !slipUrl) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    releaseLock = await acquireTransactionLock('pawn-delivery-slip', deliveryRequestId, 300);
 
     const supabase = supabaseAdmin();
 
@@ -281,10 +291,28 @@ export async function POST(request: NextRequest) {
       ? contract.items[0]
       : contract.items;
 
-    if (pawnerLineId && pawner?.line_id !== pawnerLineId) {
+    if (!pawner?.line_id || pawner.line_id !== verifiedLineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
+      );
+    }
+
+    if (deliveryRequest.slip_verification_result === 'MATCHED') {
+      return NextResponse.json({
+        success: true,
+        alreadyVerified: true,
+        result: 'MATCHED',
+      });
+    }
+
+    const slipFingerprint = `sha256:${await fingerprintOwnedBlob(slipUrl)}`;
+    releaseEvidenceLock = await acquireTransactionLock('payment-evidence', slipFingerprint.slice(7), 300);
+
+    if (await paymentEvidenceWasUsed(supabase, slipFingerprint)) {
+      return NextResponse.json(
+        { error: 'สลิปนี้ถูกใช้แล้ว กรุณาใช้สลิปใหม่' },
+        { status: 409 },
       );
     }
 
@@ -298,13 +326,26 @@ export async function POST(request: NextRequest) {
 
     const attemptCount = (deliveryRequest.slip_attempt_count || 0) + 1;
     if (attemptCount > 2) {
-      await supabase
+      const { data: rejected, error: rejectError } = await supabase
         .from('pawn_delivery_requests')
         .update({
           status: 'PAYMENT_REJECTED',
           updated_at: new Date().toISOString(),
         })
-        .eq('delivery_request_id', deliveryRequestId);
+        .eq('delivery_request_id', deliveryRequestId)
+        .in('status', validStatuses)
+        .select('delivery_request_id')
+        .maybeSingle();
+
+      if (rejectError) {
+        return sanitizedServerError('ไม่สามารถบันทึกสถานะสลิปได้ กรุณาลองใหม่');
+      }
+      if (!rejected) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
 
       return NextResponse.json(
         { error: 'เกินจำนวนครั้งที่อนุญาต กรุณาติดต่อฝ่าย Support' },
@@ -312,7 +353,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const expectedAmount = Number(deliveryRequest.delivery_fee || 40);
+    const expectedAmount = Number(deliveryRequest.delivery_fee ?? 40);
+    if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) {
+      return NextResponse.json(
+        { error: 'ไม่สามารถตรวจสอบยอดค่าจัดส่งได้ กรุณาติดต่อฝ่ายสนับสนุน' },
+        { status: 409 },
+      );
+    }
     const companyBank = await getCompanyBankAccount();
     const verificationResult = await verifyPaymentSlip(slipUrl, expectedAmount, {
       receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
@@ -326,7 +373,10 @@ export async function POST(request: NextRequest) {
       slip_uploaded_at: new Date().toISOString(),
       slip_amount_detected: verificationResult.detectedAmount,
       slip_verification_result: verificationResult.result,
-      slip_verification_details: verificationResult.rawResponse,
+      slip_verification_details: {
+        provider: verificationResult.rawResponse?.provider || null,
+        fingerprint: slipFingerprint,
+      },
       slip_attempt_count: attemptCount,
       updated_at: new Date().toISOString(),
     };
@@ -335,18 +385,62 @@ export async function POST(request: NextRequest) {
       updatePayload.status = 'DRIVER_SEARCH';
       updatePayload.payment_verified_at = new Date().toISOString();
 
-      await supabase
+      const { data: updatedDelivery, error: deliveryUpdateError } = await supabase
         .from('pawn_delivery_requests')
         .update(updatePayload)
-        .eq('delivery_request_id', deliveryRequestId);
+        .eq('delivery_request_id', deliveryRequestId)
+        .in('status', validStatuses)
+        .select('delivery_request_id')
+        .maybeSingle();
 
-      await supabase
+      if (deliveryUpdateError) {
+        return sanitizedServerError('ไม่สามารถบันทึกผลตรวจสลิปได้ กรุณาลองใหม่');
+      }
+      if (!updatedDelivery) {
+        return NextResponse.json(
+          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
+
+      let contractUpdateQuery = supabase
         .from('contracts')
         .update({
           item_delivery_status: 'PENDING',
           updated_at: new Date().toISOString(),
         })
         .eq('contract_id', deliveryRequest.contract_id);
+      contractUpdateQuery = contract.item_delivery_status === null
+        ? contractUpdateQuery.is('item_delivery_status', null)
+        : contractUpdateQuery.eq('item_delivery_status', contract.item_delivery_status);
+      const { data: updatedContract, error: contractUpdateError } = await contractUpdateQuery
+        .select('contract_id')
+        .maybeSingle();
+
+      if (contractUpdateError || !updatedContract) {
+        await supabase
+          .from('pawn_delivery_requests')
+          .update({
+            status: deliveryRequest.status,
+            slip_url: deliveryRequest.slip_url,
+            slip_uploaded_at: deliveryRequest.slip_uploaded_at,
+            slip_amount_detected: deliveryRequest.slip_amount_detected,
+            slip_verification_result: deliveryRequest.slip_verification_result,
+            slip_verification_details: deliveryRequest.slip_verification_details,
+            slip_attempt_count: deliveryRequest.slip_attempt_count,
+            payment_verified_at: deliveryRequest.payment_verified_at,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('delivery_request_id', deliveryRequestId)
+          .eq('status', 'DRIVER_SEARCH');
+        if (contractUpdateError) {
+          return sanitizedServerError('ไม่สามารถบันทึกสถานะสัญญาได้ กรุณาลองใหม่');
+        }
+        return NextResponse.json(
+          { error: 'สถานะสัญญาเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          { status: 409 },
+        );
+      }
 
       if (pawner?.line_id && pawnerLineClient) {
         try {
@@ -356,8 +450,8 @@ export async function POST(request: NextRequest) {
             itemName: itemName || '-',
           });
           await pawnerLineClient.pushMessage(pawner.line_id, card);
-        } catch (msgError) {
-          console.error('Error sending delivery status to pawner:', msgError);
+        } catch {
+          console.error('Error sending delivery status to pawner');
         }
       }
 
@@ -373,8 +467,8 @@ export async function POST(request: NextRequest) {
             feeAmount: expectedAmount,
           });
           await dropPointLineClient.pushMessage(dropPoint.line_id, card);
-        } catch (msgError) {
-          console.error('Error sending delivery pickup to drop point:', msgError);
+        } catch {
+          console.error('Error sending delivery pickup to drop point');
         }
       }
 
@@ -392,10 +486,23 @@ export async function POST(request: NextRequest) {
       updatePayload.status = 'SLIP_UPLOADED';
     }
 
-    await supabase
+    const { data: updatedDelivery, error: deliveryUpdateError } = await supabase
       .from('pawn_delivery_requests')
       .update(updatePayload)
-      .eq('delivery_request_id', deliveryRequestId);
+      .eq('delivery_request_id', deliveryRequestId)
+      .in('status', validStatuses)
+      .select('delivery_request_id')
+      .maybeSingle();
+
+    if (deliveryUpdateError) {
+      return sanitizedServerError('ไม่สามารถบันทึกผลตรวจสลิปได้ กรุณาลองใหม่');
+    }
+    if (!updatedDelivery) {
+      return NextResponse.json(
+        { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+        { status: 409 },
+      );
+    }
 
     return NextResponse.json({
       success: false,
@@ -404,11 +511,16 @@ export async function POST(request: NextRequest) {
       expectedAmount,
       detectedAmount: verificationResult.detectedAmount,
     });
-  } catch (error: any) {
-    console.error('Error verifying delivery slip:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = transactionLockErrorResponse(error);
+    if (lockError) return lockError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('Error verifying delivery slip');
+    return sanitizedServerError('ไม่สามารถตรวจสอบสลิปได้ กรุณาลองใหม่');
+  } finally {
+    if (releaseLock) await releaseLock();
+    if (releaseEvidenceLock) await releaseEvidenceLock();
   }
 }

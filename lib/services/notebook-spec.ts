@@ -7,6 +7,13 @@
 
 import benchmarksJson from '@/lib/data/notebook-benchmarks.json';
 import { anthropicStructured, getAnthropicVisionModel, hasAnthropicKeys } from '@/lib/services/anthropic-llm';
+import {
+  getOpenAILunaModel,
+  getOpenAIReasoningEffortForTask,
+  getOpenAITerraModel,
+  hasOpenAIKeys,
+  openaiStructuredJson,
+} from '@/lib/services/openai-llm';
 
 export type StorageType = 'nvme' | 'sata' | 'hdd';
 export type PanelType = 'tn' | 'ips' | 'oled';
@@ -475,8 +482,7 @@ const MAX_VISION_SPEC_IMAGES = 4;
 // pages, spec stickers, chassis labels. Nulls for anything not actually
 // visible — never guesses from the laptop's appearance alone.
 export async function extractNotebookSpecFromImages(images: string[]): Promise<NotebookVisionSpec | null> {
-  return anthropicStructured<NotebookVisionSpec>({
-    userText: `These are photos of a laptop being pawned. Extract ONLY specs you can actually read in the images (system "About" screens, BIOS screens, spec stickers, chassis labels, retail boxes):
+  const userText = `These are photos of a laptop being pawned. Extract ONLY specs you can actually read in the images (system "About" screens, BIOS screens, spec stickers, chassis labels, retail boxes):
 - brand (e.g. Dell, Lenovo, ASUS)
 - model: the model/series shown (e.g. "Precision 5680", "IdeaPad Gaming 3 15ACH6") — NOT a random Windows device name unless it clearly states the model
 - cpu (e.g. "Intel Core i7-13800H", "AMD Ryzen 5 5600H")
@@ -484,8 +490,33 @@ export async function extractNotebookSpecFromImages(images: string[]): Promise<N
 - storageGb (number, in GB; 1TB = 1024)
 - storageType ("nvme" | "sata" | "hdd") only if explicitly indicated
 - gpu (discrete GPU model if shown)
-Use null for anything not visible. Do NOT guess.`,
-    images: images.slice(0, MAX_VISION_SPEC_IMAGES),
+Use null for anything not visible. Do NOT guess.`;
+  const boundedImages = images.slice(0, MAX_VISION_SPEC_IMAGES);
+
+  if (hasOpenAIKeys()) {
+    try {
+      const parsed = await openaiStructuredJson<NotebookVisionSpec>({
+        userText,
+        images: boundedImages,
+        imageDetail: 'high',
+        model: getOpenAILunaModel(),
+        effort: getOpenAIReasoningEffortForTask('notebook_vision_spec'),
+        schemaName: 'notebook_vision_spec',
+        maxOutputTokens: 4000,
+        schema: VISION_SPEC_SCHEMA,
+        label: 'notebook_vision_spec',
+        promptCacheKey: 'notebook_vision_spec',
+      });
+      if (parsed) return parsed;
+    } catch (error) {
+      console.warn('🔁 OpenAI notebook vision extraction failed — falling back to Claude:', error);
+    }
+  }
+
+  if (!hasAnthropicKeys()) return null;
+  return anthropicStructured<NotebookVisionSpec>({
+    userText,
+    images: boundedImages,
     model: getAnthropicVisionModel(),
     toolName: 'notebook_vision_spec',
     toolDescription: 'Return the specs readable in the photos.',
@@ -552,11 +583,20 @@ export async function extractNotebookSpec(input: NotebookSpecInput, productName?
   const needVision =
     (input.images?.length ?? 0) > 0 &&
     (!cleaned.model || !cleaned.cpu || !cleaned.ram || !cleaned.storage);
-  if (needVision && hasAnthropicKeys()) {
+  if (needVision && (hasOpenAIKeys() || hasAnthropicKeys())) {
     try {
       const vision = await extractNotebookSpecFromImages(input.images!);
       if (vision) {
-        console.log('💻 Vision spec extraction:', vision);
+        console.log('💻 Vision spec extraction completed:', {
+          fieldsRecovered: [
+            vision.brand,
+            vision.model,
+            vision.cpu,
+            vision.ramGb,
+            vision.storageGb,
+            vision.gpu,
+          ].filter(Boolean).length,
+        });
         if (!cleaned.brand && vision.brand) cleaned.brand = vision.brand.trim();
         if (!cleaned.model && vision.model) cleaned.model = vision.model.trim();
         if (!cleaned.cpu && vision.cpu) cleaned.cpu = vision.cpu.trim();
@@ -584,10 +624,7 @@ export async function extractNotebookSpec(input: NotebookSpecInput, productName?
   const heuristicScreen = parseScreen(cleaned.screenSize || cleaned.model || '');
 
   let llm: LlmCanonicalSpec | null = null;
-  if (hasAnthropicKeys()) {
-    try {
-      llm = await anthropicStructured<LlmCanonicalSpec>({
-        userText: `Canonicalize this laptop's specs for a Thai used-laptop price-estimation system.
+  const canonicalPrompt = `Canonicalize this laptop's specs for a Thai used-laptop price-estimation system.
 Input (free text typed by a pawner; photo-extracted values may be merged in):
 - Brand: ${brandFinal}
 - Model: ${cleaned.model || '-'}
@@ -603,14 +640,36 @@ Rules:
 - Canonicalize sloppy CPU strings ("i5 gen12 12450h" -> "Intel Core i5-12450H").
 - If the model name implies specs the user omitted (e.g. MacBook, ROG), fill what you are confident about; otherwise null.
 - releaseYear: the laptop model's release year if you know it, else the CPU generation's typical year, else null.
-- segment: gaming/ultrabook/workstation/office by product line.`,
+- segment: gaming/ultrabook/workstation/office by product line.`;
+
+  if (hasOpenAIKeys()) {
+    try {
+      llm = await openaiStructuredJson<LlmCanonicalSpec>({
+        userText: canonicalPrompt,
+        model: getOpenAITerraModel(),
+        effort: getOpenAIReasoningEffortForTask('notebook_canonical_spec'),
+        schemaName: 'canonical_notebook_spec',
+        maxOutputTokens: 8000,
+        schema: LLM_SPEC_SCHEMA as unknown as Record<string, any>,
+        label: 'notebook_canonical_spec',
+        promptCacheKey: 'notebook_canonical_spec',
+      });
+    } catch (error) {
+      console.warn('🔁 OpenAI notebook canonicalization failed — falling back to Claude:', error);
+    }
+  }
+
+  if (!llm && hasAnthropicKeys()) {
+    try {
+      llm = await anthropicStructured<LlmCanonicalSpec>({
+        userText: canonicalPrompt,
         toolName: 'canonical_notebook_spec',
         toolDescription: 'Return the canonicalized laptop spec.',
         maxTokens: 700,
         schema: LLM_SPEC_SCHEMA as unknown as Record<string, any>,
       });
     } catch (error) {
-      console.warn('⚠️ Notebook spec LLM canonicalization failed, using heuristics:', error);
+      console.warn('⚠️ Claude notebook canonicalization failed, using heuristics:', error);
     }
   }
 

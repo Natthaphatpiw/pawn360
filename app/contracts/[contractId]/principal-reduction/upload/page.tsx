@@ -22,7 +22,7 @@ export default function PrincipalReductionUploadPage() {
   const contractId = params.contractId as string;
   const requestId = searchParams.get('requestId');
   const previewMode = isPreviewMode(searchParams);
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -38,11 +38,11 @@ export default function PrincipalReductionUploadPage() {
   useEffect(() => {
     if (previewMode) {
       setRequestDetails(getMockPrincipalReductionRequest(requestId || `preview-reduction-${contractId}`, contractId));
-    } else if (requestId) {
+    } else if (!liffLoading && profile?.userId && requestId) {
       fetchRequestDetails();
     }
     fetchCompanyBank();
-  }, [requestId, previewMode, contractId]);
+  }, [requestId, previewMode, contractId, profile?.userId, liffLoading]);
 
   const fetchRequestDetails = async () => {
     try {

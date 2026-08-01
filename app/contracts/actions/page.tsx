@@ -207,7 +207,7 @@ export default function ActionStatusListPage() {
         setRequests(mockRequests);
         return;
       }
-      const response = await axios.get(`/api/contract-actions/by-pawner?lineId=${profile?.userId}`);
+      const response = await axios.get('/api/contract-actions/by-pawner');
       if (response.data.success) {
         setRequests(response.data.requests);
       }

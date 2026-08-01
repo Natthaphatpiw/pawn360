@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
 import { useSearchParams } from 'next/navigation';
@@ -12,7 +12,6 @@ interface Store {
 
 interface PawnRequest {
   _id: string;
-  lineId: string;
   brand: string;
   model: string;
   type: string;
@@ -46,7 +45,7 @@ function StoreVerifyPawnContent() {
 
   const [pawnRequest, setPawnRequest] = useState<PawnRequest | null>(null);
   const [username, setUsername] = useState('');
-  const [, setSelectedStore] = useState<Store | null>(null);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -56,28 +55,25 @@ function StoreVerifyPawnContent() {
   const [editedDays, setEditedDays] = useState<number>(0);
   const [editedInterestRate, setEditedInterestRate] = useState<number>(0);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // ดึงข้อมูลรายการขอสินเชื่อ
-  useEffect(() => {
-    if (itemId) {
-      fetchPawnRequest();
-    }
-  }, [itemId]);
-
-  const fetchPawnRequest = async () => {
+  const fetchPawnRequest = async (storeId: string) => {
     try {
       setIsLoading(true);
-      const response = await axios.get(`/api/pawn-requests/${itemId}`);
+      const response = await axios.post(`/api/pawn-requests/${itemId}`, {
+        action: 'claim-preview',
+        storeId,
+      }, {
+        headers: { 'X-LIFF-Role': 'STORE' },
+      });
       if (response.data.success && response.data.item && response.data.customer) {
         // รวม item และ customer เป็น pawnRequest object
         const item = response.data.item;
         setPawnRequest({
           _id: item._id,
-          lineId: response.data.customer.lineId || '',
           brand: item.brand,
           model: item.model,
           type: item.type,
@@ -108,47 +104,18 @@ function StoreVerifyPawnContent() {
         setEditedAmount(item.negotiatedAmount || item.desiredAmount || 0);
         setEditedDays(item.negotiatedDays || item.loanDays || 30);
         setEditedInterestRate(item.negotiatedInterestRate || item.interestRate || 3);
+        return true;
       }
+      return false;
     } catch (err: any) {
       setError(err.response?.data?.error || 'ไม่พบรายการขอสินเชื่อ');
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const findStoreByUsername = async (username: string): Promise<Store | null> => {
-    try {
-      const response = await axios.get('/api/stores');
-      if (response.data.success) {
-        // Normalize username: trim whitespace
-        const normalizedInputUsername = username.trim().toLowerCase();
-        
-        console.log('🔍 Searching for username:', normalizedInputUsername);
-        console.log('📋 Total stores:', response.data.stores.length);
-        
-        const store = response.data.stores.find((s: any) => {
-          if (!s.username) return false;
-          const normalizedStoreUsername = s.username.trim().toLowerCase();
-          console.log(`  Comparing: "${normalizedInputUsername}" vs "${normalizedStoreUsername}" (${s.storeName})`);
-          return normalizedStoreUsername === normalizedInputUsername;
-        });
-        
-        if (store) {
-          console.log('✅ Store found:', store.storeName);
-        } else {
-          console.log('❌ No store found for username:', normalizedInputUsername);
-        }
-        
-        return store || null;
-      }
-      return null;
-    } catch (err) {
-      console.error('Error fetching stores:', err);
-      return null;
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!username) {
@@ -165,19 +132,13 @@ function StoreVerifyPawnContent() {
     setError(null);
 
     try {
-      // ค้นหาร้านค้าจาก username
-      const store = await findStoreByUsername(username);
-      
-      if (!store) {
-        setError('ไม่พบร้านค้าที่ใช้ Username นี้');
-        setIsSubmitting(false);
+      if (!itemId) {
+        setError('ไม่พบรหัสรายการ กรุณาสแกน QR Code ใหม่');
         return;
       }
-
-      // ตรวจสอบรหัสผ่าน
       const verifyResponse = await axios.post('/api/stores', {
-        storeId: store._id,
-        password: password
+        username,
+        password,
       });
 
       if (!verifyResponse.data.success) {
@@ -186,8 +147,28 @@ function StoreVerifyPawnContent() {
         return;
       }
 
+      const store = verifyResponse.data.store as Store;
+      const claimed = await fetchPawnRequest(store._id);
+      if (!claimed) return;
       setSelectedStore(store);
-      // กำหนดค่าที่จะใช้ในการสร้างสัญญา (ใช้ค่าที่แก้ไขแล้ว)
+      setPassword('');
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'เกิดข้อผิดพลาด');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStore || !pawnRequest || !itemId) {
+      setError('กรุณาเข้าสู่ระบบร้านค้าใหม่');
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+    try {
       const finalAmount = editedAmount;
       const finalDays = editedDays;
       const finalRate = editedInterestRate;
@@ -204,13 +185,7 @@ function StoreVerifyPawnContent() {
         finalRate !== originalRate;
 
       // ส่งคำขอยืนยันให้ลูกค้าเสมอ
-      if (!pawnRequest) {
-        setError('ไม่พบข้อมูลรายการขอสินเชื่อ');
-        return;
-      }
-
       const confirmResponse = await axios.post('/api/contracts/send-confirmation', {
-        lineId: pawnRequest.lineId,
         itemId,
         modifications: {
           original: {
@@ -230,8 +205,8 @@ function StoreVerifyPawnContent() {
           interestRate: finalRate,
           loanDays: finalDays,
           item: `${pawnRequest.brand} ${pawnRequest.model}`,
-          storeId: store._id,
-          storeName: store.storeName
+          storeId: selectedStore._id,
+          storeName: selectedStore.storeName
         }
       });
 
@@ -264,12 +239,12 @@ function StoreVerifyPawnContent() {
     );
   }
 
-  if (liffError || error) {
+  if (liffError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
           <h2 className="text-red-800 font-semibold text-lg mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-red-600">{liffError || error}</p>
+          <p className="text-red-600">{liffError}</p>
         </div>
       </div>
     );
@@ -277,11 +252,46 @@ function StoreVerifyPawnContent() {
 
   if (!pawnRequest) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-yellow-800 font-semibold text-lg mb-2">ไม่พบข้อมูล</h2>
-          <p className="text-yellow-600">ไม่พบรายการขอสินเชื่อที่ต้องการ</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <form onSubmit={handleLogin} className="w-full max-w-md space-y-4 rounded-lg bg-white p-6 shadow-md">
+          <h1 className="text-xl font-bold text-gray-800">เข้าสู่ระบบร้านค้า</h1>
+          <p className="text-sm text-gray-600">เข้าสู่ระบบก่อน ระบบจึงจะรับและแสดงข้อมูลรายการจาก QR Code</p>
+          <input
+            type="text"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="Username ร้านค้า"
+            autoComplete="username"
+            className="w-full rounded-md border border-gray-300 px-3 py-2"
+            required
+          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="รหัสผ่าน"
+              autoComplete="current-password"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 pr-12"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+            >
+              {showPassword ? 'ซ่อน' : 'แสดง'}
+            </button>
+          </div>
+          {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+          <button
+            type="submit"
+            disabled={isSubmitting || !itemId}
+            className="w-full rounded-md bg-blue-600 py-3 font-semibold text-white disabled:bg-gray-400"
+          >
+            {isSubmitting ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบและรับรายการ'}
+          </button>
+        </form>
       </div>
     );
   }
@@ -531,41 +541,10 @@ function StoreVerifyPawnContent() {
           )}
         </div>
 
-        {/* Store Login Form */}
+        {/* Submit terms after the authenticated store has claimed the item. */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username ร้านค้า</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="กรอก Username ร้านค้า"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              autoComplete="username"
-            />
-            <p className="text-xs text-gray-500 mt-1">กรอก Username ที่ลงทะเบียนกับร้านค้า</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">รหัสผ่าน</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="กรอกรหัสผ่านร้านค้า"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-              >
-                {showPassword ? '🙈' : '👁️'}
-              </button>
-            </div>
+          <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-700">
+            ร้านค้าที่รับรายการ: <span className="font-semibold">{selectedStore?.storeName}</span>
           </div>
 
           {error && (

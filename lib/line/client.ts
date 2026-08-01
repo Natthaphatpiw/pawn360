@@ -1,5 +1,8 @@
 import { Client, ClientConfig, FlexMessage } from '@line/bot-sdk';
 
+const LINE_PUSH_ENDPOINT = 'https://api.line.me/v2/bot/message/push';
+const LINE_PUSH_TIMEOUT_MS = 10_000;
+
 // Lazy initialization of LINE client
 let lineClient: Client | null = null;
 
@@ -20,6 +23,46 @@ export function getLineClient(): Client {
     lineClient = new Client(config);
   }
   return lineClient;
+}
+
+async function pushFlexMessage(
+  userId: string,
+  message: FlexMessage,
+  retryKey?: string,
+): Promise<void> {
+  if (!retryKey) {
+    await getLineClient().pushMessage(userId, message);
+    return;
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(retryKey)) {
+    throw new Error('LINE_RETRY_KEY_INVALID');
+  }
+
+  const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!channelAccessToken) throw new Error('LINE_CHANNEL_NOT_CONFIGURED');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LINE_PUSH_TIMEOUT_MS);
+  try {
+    const response = await fetch(LINE_PUSH_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${channelAccessToken}`,
+        'Content-Type': 'application/json',
+        'X-Line-Retry-Key': retryKey,
+      },
+      body: JSON.stringify({ to: userId, messages: [message] }),
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal,
+    });
+    // LINE returns 409 for a retry key it already accepted. Treating that as
+    // success closes the crash window between provider delivery and DB update.
+    const alreadyAccepted = response.status === 409
+      && Boolean(response.headers.get('x-line-accepted-request-id'));
+    if (!response.ok && !alreadyAccepted) throw new Error('LINE_PUSH_FAILED');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Link Rich Menu to User
@@ -362,13 +405,10 @@ export async function sendQRCodeImage(userId: string, itemId: string, s3Url: str
 export async function sendContractCompletionNotification(
   userId: string,
   contractData: any,
-  itemData: any
+  itemData: any,
+  retryKey?: string,
 ) {
   try {
-    const client = getLineClient();
-
-    console.log('Sending contract notification for item:', itemData._id, 'user:', userId);
-
     // คำนวณวันครบกำหนด
     const startDate = new Date();
     const dueDate = new Date(startDate);
@@ -383,10 +423,7 @@ export async function sendContractCompletionNotification(
     // ใช้เลขที่สัญญาจาก contractData (ไม่สร้างใหม่)
     const contractNumber = contractData.contractNumber || `PW${Date.now()}`;
 
-    // สร้าง LIFF URL สำหรับรายละเอียดสัญญา
     const itemId = itemData._id.toString();
-    const contractDetailsUrl = `https://liff.line.me/2008216710-gn6BwQjo/contract/${itemId}/details`;
-    console.log('Contract details URL:', contractDetailsUrl);
 
     const flexMessage = {
       type: 'flex',
@@ -588,31 +625,28 @@ export async function sendContractCompletionNotification(
       }
     };
 
-    await client.pushMessage(userId, flexMessage as FlexMessage);
+    await pushFlexMessage(userId, flexMessage as FlexMessage, retryKey);
     return { success: true, contractNumber };
-  } catch (error) {
-    console.error('Error sending contract completion notification:', error);
-    throw error;
+  } catch {
+    console.error('[line:contract-completion] send failed');
+    throw new Error('LINE_CONTRACT_COMPLETION_FAILED');
   }
 }
 
 // Send Contract Modification Confirmation
-export async function sendConfirmationMessage(lineId: string, modifications: any, newContract: any) {
+export async function sendConfirmationMessage(
+  lineId: string,
+  modifications: any,
+  newContract: any,
+  retryKey?: string,
+) {
   try {
-    const client = getLineClient();
-
-    console.log('Sending contract confirmation to:', lineId);
-    console.log('Modifications:', modifications);
-    console.log('New contract:', newContract);
-
     // 🔥 Calculate interest and total amount
     const pawnPrice = parseFloat(String(newContract.pawnPrice || newContract.pawnedPrice || 0));
     const interestRate = parseFloat(String(newContract.interestRate || 10));
     const loanDays = parseInt(String(newContract.periodDays || newContract.loanDays || 30));
     const interestAmount = (pawnPrice * interestRate * loanDays) / (100 * 30);
     const totalAmount = pawnPrice + interestAmount;
-
-    console.log(`💰 Calculated: Price=${pawnPrice}, Rate=${interestRate}%, Days=${loanDays}, Interest=${interestAmount}, Total=${totalAmount}`);
 
     // ตรวจสอบประเภทการยืนยัน และรูปแบบของ modifications
     const isContractCreation = modifications?.type === 'contract_creation';
@@ -791,12 +825,10 @@ export async function sendConfirmationMessage(lineId: string, modifications: any
       }
     };
 
-    await client.pushMessage(lineId, flexMessage as FlexMessage);
-    console.log('Contract confirmation sent successfully');
+    await pushFlexMessage(lineId, flexMessage as FlexMessage, retryKey);
     return { success: true };
   } catch (error) {
-    console.error('Error sending contract confirmation:', error);
-    console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('[line:contract-confirmation] send failed');
     throw error;
   }
 }

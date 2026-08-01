@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { Clock, CheckCircle, X, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
+import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../../_components/TransactionHeader';
 import { getMockPrincipalIncreaseRequest, isPreviewMode, withPreview } from '../../_lib/preview';
 
@@ -15,8 +16,10 @@ export default function PrincipalIncreaseWaitingPage() {
   const requestId = searchParams.get('requestId');
   const selectedStatus = searchParams.get('status');
   const previewMode = isPreviewMode(searchParams);
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [requestDetails, setRequestDetails] = useState<any>(null);
   const [status, setStatus] = useState<string>('PENDING_INVESTOR_APPROVAL');
 
@@ -50,13 +53,17 @@ export default function PrincipalIncreaseWaitingPage() {
       return;
     }
 
-    if (requestId) {
+    if (!liffLoading && profile?.userId && requestId) {
       fetchRequestDetails();
       // Poll for status updates every 10 seconds
       const interval = setInterval(fetchRequestDetails, 10000);
       return () => clearInterval(interval);
     }
-  }, [requestId, previewMode, contractId, selectedStatus]);
+    if (!liffLoading && (liffError || !profile?.userId)) {
+      setError('กรุณาเปิดหน้านี้ผ่าน LINE และเข้าสู่ระบบใหม่');
+      setLoading(false);
+    }
+  }, [requestId, previewMode, contractId, selectedStatus, profile?.userId, liffLoading, liffError]);
 
   useEffect(() => {
     if ((status === 'AWAITING_PAYMENT' || status === 'SLIP_REJECTED') && requestId) {
@@ -72,8 +79,9 @@ export default function PrincipalIncreaseWaitingPage() {
         setRequestDetails(response.data.request);
         setStatus(response.data.request.request_status);
       }
-    } catch (error) {
-      console.error('Error fetching request:', error);
+    } catch {
+      console.error('[principal-increase:waiting] status unavailable');
+      setError('ไม่สามารถโหลดสถานะคำขอได้ กรุณาลองใหม่');
     } finally {
       setLoading(false);
     }
@@ -106,6 +114,14 @@ export default function PrincipalIncreaseWaitingPage() {
     return (
       <div className="min-h-screen bg-background-white font-sans flex items-center justify-center">
         <div className="dot-bricks" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background-white font-sans flex items-center justify-center p-6 text-center">
+        <p className="text-error">{error}</p>
       </div>
     );
   }

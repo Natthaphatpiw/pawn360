@@ -93,7 +93,7 @@ function InvestorDashboardContent() {
       setInvestor(investorRes.data.investor);
 
       // Fetch contracts for this investor
-      const contractsRes = await axios.get(`/api/contracts/by-investor/${profile?.userId}`);
+      const contractsRes = await axios.get('/api/contracts/by-investor/me');
       console.log('Contracts response:', contractsRes.data);
       setMyContracts(contractsRes.data.contracts || []);
 

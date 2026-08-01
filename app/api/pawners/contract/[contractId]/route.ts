@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
+import { requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  ActorRateLimitError,
+  enforceActorRateLimit,
+} from '@/lib/security/actor-rate-limit';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
   request: NextRequest,
@@ -8,24 +16,55 @@ export async function GET(
   try {
     const { contractId } = await context.params;
 
-    if (!contractId) {
+    if (!UUID_PATTERN.test(String(contractId || ''))) {
       return NextResponse.json(
-        { error: 'Contract ID is required' },
-        { status: 400 }
+        { error: 'รหัสสัญญาไม่ถูกต้อง', code: 'CONTRACT_ID_INVALID' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
-    const supabase = supabaseAdmin();
+    let lineId: string;
+    try {
+      const identity = await requireLiffIdentity(request, 'PAWNER');
+      lineId = identity.lineId;
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
+    await enforceActorRateLimit({
+      scope: 'pawner-contract-detail',
+      actor: lineId,
+      limit: 60,
+      windowSeconds: 10 * 60,
+    });
 
-    // Get contract with related data
+    const supabase = supabaseAdmin();
+    const { data: pawner, error: pawnerError } = await supabase
+      .from('pawners')
+      .select('customer_id, firstname, lastname')
+      .eq('line_id', lineId)
+      .maybeSingle();
+
+    if (pawnerError) {
+      console.error('[pawners:contract-detail] owner lookup failed', {
+        code: pawnerError.code || 'unknown',
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถตรวจสอบข้อมูลผู้ขายได้', code: 'PAWNER_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
+    }
+    if (!pawner) {
+      return NextResponse.json(
+        { error: 'ไม่พบข้อมูลผู้ขาย', code: 'PAWNER_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
     const { data: contractData, error } = await supabase
       .from('contracts')
       .select(`
         contract_id,
         contract_number,
-        customer_id,
-        investor_id,
-        item_id,
         contract_start_date,
         contract_end_date,
         contract_duration_days,
@@ -38,22 +77,25 @@ export async function GET(
           item_type,
           brand,
           model
-        ),
-        pawners (
-          firstname,
-          lastname,
-          national_id,
-          phone_number
         )
       `)
       .eq('contract_id', contractId)
-      .single();
+      .eq('customer_id', pawner.customer_id)
+      .maybeSingle();
 
-    if (error || !contractData) {
-      console.error('Contract fetch error:', error);
+    if (error) {
+      console.error('[pawners:contract-detail] contract query failed', {
+        code: error.code || 'unknown',
+      });
       return NextResponse.json(
-        { error: 'Contract not found' },
-        { status: 404 }
+        { error: 'ไม่สามารถโหลดรายละเอียดสัญญาได้', code: 'CONTRACT_DETAIL_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '15' } },
+      );
+    }
+    if (!contractData) {
+      return NextResponse.json(
+        { error: 'ไม่พบสัญญาหรือคุณไม่มีสิทธิ์เข้าถึง', code: 'CONTRACT_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
       );
     }
 
@@ -67,15 +109,9 @@ export async function GET(
       contract_id: contractData.contract_id,
       contract_number: contractData.contract_number,
       customer: {
-        name: contractData.pawners && contractData.pawners.length > 0
-          ? `${contractData.pawners[0].firstname} ${contractData.pawners[0].lastname}`
-          : 'ไม่พบข้อมูล',
-        idCard: contractData.pawners && contractData.pawners.length > 0
-          ? contractData.pawners[0].national_id || 'X-XXXX-XXXXX-XX-X'
-          : 'X-XXXX-XXXXX-XX-X',
-        phone: contractData.pawners && contractData.pawners.length > 0
-          ? contractData.pawners[0].phone_number || '000-000-0000'
-          : '000-000-0000'
+        name: `${pawner.firstname || ''} ${pawner.lastname || ''}`.trim() || 'ไม่พบข้อมูล',
+        idCard: 'ข้อมูลถูกปกปิด',
+        phone: 'ข้อมูลถูกปกปิด',
       },
       details: {
         contractId: contractData.contract_number,
@@ -83,8 +119,8 @@ export async function GET(
           ? `${contractData.items[0].brand} ${contractData.items[0].model}`.trim()
           : 'ไม่พบข้อมูลสินค้า',
         status: contractData.contract_status === 'ACTIVE' ? 'ปกติ' : contractData.contract_status,
-        value: contractData.loan_principal_amount.toLocaleString(),
-        interest: `${contractData.interest_amount.toLocaleString()} (${(contractData.interest_rate * 100).toFixed(1)}%)`,
+        value: Number(contractData.loan_principal_amount || 0).toLocaleString('th-TH'),
+        interest: `${Number(contractData.interest_amount || 0).toLocaleString('th-TH')} (${(Number(contractData.interest_rate || 0) * 100).toFixed(1)}%)`,
         duration: `${contractData.contract_duration_days} วัน`,
         startDate: new Date(contractData.contract_start_date).toLocaleDateString('th-TH'),
         endDate: new Date(contractData.contract_end_date).toLocaleDateString('th-TH'),
@@ -94,16 +130,36 @@ export async function GET(
       remainingDays: remainingDays
     };
 
-    return NextResponse.json({
-      success: true,
-      contract: formattedContract
-    });
-
-  } catch (error: any) {
-    console.error('Error fetching contract detail:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { success: true, contract: formattedContract },
+      { headers: { 'Cache-Control': 'no-store, private' } },
+    );
+
+  } catch (error) {
+    if (error instanceof ActorRateLimitError) {
+      return NextResponse.json(
+        {
+          error: error.status === 429
+            ? 'เรียกดูข้อมูลถี่เกินไป กรุณารอสักครู่'
+            : 'ระบบควบคุมการใช้งานยังไม่พร้อม กรุณาลองใหม่',
+          code: error.code,
+          retryable: true,
+        },
+        {
+          status: error.status,
+          headers: {
+            'Cache-Control': 'no-store',
+            'Retry-After': String(error.retryAfterSeconds),
+          },
+        },
+      );
+    }
+    console.error('[pawners:contract-detail] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'ไม่สามารถโหลดรายละเอียดสัญญาได้', code: 'CONTRACT_DETAIL_FAILED' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

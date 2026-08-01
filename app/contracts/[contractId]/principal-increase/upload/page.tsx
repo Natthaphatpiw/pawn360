@@ -22,7 +22,7 @@ export default function PrincipalIncreaseUploadPage() {
   const contractId = params.contractId as string;
   const requestId = searchParams.get('requestId');
   const previewMode = isPreviewMode(searchParams);
-  const { profile } = useLiff();
+  const { profile, isLoading: liffLoading } = useLiff();
 
   const [slipImage, setSlipImage] = useState<string | null>(null);
   const [slipFile, setSlipFile] = useState<File | null>(null);
@@ -39,11 +39,11 @@ export default function PrincipalIncreaseUploadPage() {
   useEffect(() => {
     if (previewMode) {
       setRequestDetails(getMockPrincipalIncreaseRequest(requestId || `preview-increase-${contractId}`, contractId));
-    } else if (requestId) {
+    } else if (!liffLoading && profile?.userId && requestId) {
       fetchRequestDetails();
     }
     fetchCompanyBank();
-  }, [requestId, previewMode, contractId]);
+  }, [requestId, previewMode, contractId, profile?.userId, liffLoading]);
 
   const fetchRequestDetails = async () => {
     try {

@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { buildPenaltyLiffUrl, getPenaltyRequirement, toDateString } from '@/lib/services/penalty';
+import { requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const contractId = searchParams.get('contractId');
-    const lineId = searchParams.get('lineId');
-
-    if (!contractId) {
-      return NextResponse.json(
-        { error: 'contractId is required' },
-        { status: 400 }
-      );
-    }
+    const contractId = requireUuid(searchParams.get('contractId'));
+    const identity = await requireLiffIdentity(request, 'PAWNER');
 
     const supabase = supabaseAdmin();
     const { data: contract, error: contractError } = await supabase
@@ -23,17 +23,12 @@ export async function GET(request: NextRequest) {
         contract_number,
         contract_start_date,
         contract_end_date,
+        current_principal_amount,
+        loan_principal_amount,
         customer_id,
         investor_id,
         pawners:customer_id (
-          line_id,
-          firstname,
-          lastname
-        ),
-        investors:investor_id (
-          line_id,
-          firstname,
-          lastname
+          line_id
         )
       `)
       .eq('contract_id', contractId)
@@ -48,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     const pawner = Array.isArray(contract.pawners) ? contract.pawners[0] : contract.pawners;
 
-    if (lineId && pawner?.line_id && pawner.line_id !== lineId) {
+    if (!pawner?.line_id || pawner.line_id !== identity.lineId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 403 }
@@ -58,7 +53,13 @@ export async function GET(request: NextRequest) {
     const requirement = await getPenaltyRequirement(supabase, contract);
     const todayIso = toDateString(requirement.today);
 
-    let payment: any = null;
+    let payment: {
+      penalty_id: string;
+      status: string;
+      penalty_amount: number;
+      days_overdue: number;
+      penalty_date: string;
+    } | null = null;
     if (requirement.daysOverdue > 0) {
       const { data: existingPayments, error: paymentError } = await supabase
         .from('penalty_payments')
@@ -98,12 +99,12 @@ export async function GET(request: NextRequest) {
         penaltyDate: payment.penalty_date,
       } : null,
       penaltyLiffUrl: buildPenaltyLiffUrl(contract.contract_id),
-    });
-  } catch (error: any) {
-    console.error('Error fetching penalty status:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
+    console.error('[penalty:status] failed');
+    return sanitizedServerError('ไม่สามารถโหลดข้อมูลค่าปรับได้ กรุณาลองใหม่');
   }
 }

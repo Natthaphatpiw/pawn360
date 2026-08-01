@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Home, SearchX } from 'lucide-react';
 import axios from 'axios';
 import { getMockPawnTicket, isInvestorPreviewMode } from '@/lib/mock-investment';
+import { useLiff } from '@/lib/liff/liff-provider';
 
 const SignatureImage = ({ src, alt }: { src?: string | null; alt: string }) => {
   if (!src) return null;
@@ -39,15 +40,19 @@ export default function InvestorPawnTicketPage() {
   const params = useParams();
   const contractId = params.contractId as string;
   const previewMode = isInvestorPreviewMode();
+  const { profile, isLoading: liffLoading, error: liffError } = useLiff();
 
   const [loading, setLoading] = useState(true);
   const [ticketData, setTicketData] = useState<any>(null);
 
   useEffect(() => {
-    if (contractId) {
+    if (liffLoading) return;
+    if (contractId && (previewMode || profile?.userId)) {
       fetchTicketData();
+    } else {
+      setLoading(false);
     }
-  }, [contractId, previewMode]);
+  }, [contractId, previewMode, liffLoading, profile?.userId]);
 
   const fetchTicketData = async () => {
     try {
@@ -57,7 +62,9 @@ export default function InvestorPawnTicketPage() {
         return;
       }
 
-      const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}?viewer=investor`);
+      const response = await axios.get(`/api/contracts/pawn-ticket/${contractId}?viewer=investor`, {
+        headers: { 'X-LIFF-Role': 'INVESTOR' },
+      });
       setTicketData(response.data.ticketData);
     } catch (error) {
       console.error('Error fetching ticket data:', error);
@@ -71,10 +78,18 @@ export default function InvestorPawnTicketPage() {
     router.push('/investor-dashboard');
   };
 
-  if (loading) {
+  if (liffLoading || loading) {
     return (
       <div className="page-investor min-h-screen bg-background-white flex items-center justify-center">
         <div className="dot-bricks" />
+      </div>
+    );
+  }
+
+  if (liffError) {
+    return (
+      <div className="page-investor min-h-screen bg-background-white flex items-center justify-center p-4 text-error">
+        ไม่สามารถยืนยันบัญชี LINE ได้ กรุณาเปิดลิงก์ผ่าน LINE ใหม่
       </div>
     );
   }

@@ -2,35 +2,42 @@
   "name": "pawnline",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "cost:llm-smoke": "tsx scripts/llm-cost-smoke.ts",
+    "preflight:production": "tsx scripts/production-preflight.ts",
     "setup-richmenu": "tsx scripts/setup-richmenu.ts",
     "setup-richmenu-prod": "tsx scripts/create-richmenu-production.ts",
     "setup-richmenu-6": "tsx scripts/create-richmenu-6-buttons.ts",
     "test-blob": "tsx scripts/test-blob.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@line/bot-sdk": "^10.3.0",
     "@line/liff": "^2.27.2",
     "@sparticuz/chromium": "^141.0.0",
     "@supabase/supabase-js": "^2.86.0",
     "@types/bcrypt": "^6.0.0",
     "@types/html2canvas": "^0.5.35",
-    "@upstash/redis": "^1.36.3",
-    "@vercel/blob": "^2.6.1",
-    "axios": "^1.12.2",
+    "@upstash/redis": "1.36.3",
+    "@vercel/blob": "2.6.1",
+    "@vercel/queue": "0.4.0",
+    "axios": "^1.19.0",
     "bcrypt": "^6.0.0",
     "browser-image-compression": "^2.0.2",
     "dotenv": "^17.2.3",
+    "exa-js": "2.16.3",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",
     "mongodb": "^6.20.0",
-    "next": "^16.0.7",
-    "openai": "latest",
+    "next": "^16.2.12",
+    "openai": "6.16.0",
+    "parallel-web": "1.1.0",
     "puppeteer": "^24.25.0",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
@@ -51,5 +58,9 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.25",
+    "sharp": "0.35.3"
   }
 }

@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { VALID_BANK_ACCOUNT_TYPES } from '@/lib/utils/bank-account-types';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
+
+const MAX_JSON_BYTES = 64 * 1024;
+
+function isBoundedText(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLength;
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_JSON_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const {
-      lineId,
+      lineId: claimedLineId,
       firstname,
       lastname,
       phoneNumber,
@@ -16,11 +31,26 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validation
-    if (!lineId || !firstname || !lastname || !phoneNumber || !nationalId) {
+    if (
+      !isBoundedText(claimedLineId, 80)
+      || !isBoundedText(firstname, 120)
+      || !isBoundedText(lastname, 120)
+      || !isBoundedText(phoneNumber, 32)
+      || !isBoundedText(nationalId, 32)
+      || (address && JSON.stringify(address).length > 8_192)
+      || (bankInfo && JSON.stringify(bankInfo).length > 4_096)
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Invalid or missing fields', code: 'INVALID_INPUT' },
         { status: 400 }
       );
+    }
+
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
     }
 
     const supabase = supabaseAdmin();
@@ -74,7 +104,7 @@ export async function POST(request: NextRequest) {
         is_active: true,
         is_blocked: false,
       }])
-      .select()
+      .select('customer_id, kyc_status')
       .single();
 
     if (error) {
@@ -83,13 +113,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      pawner
-    });
+      pawner: {
+        customer_id: pawner.customer_id,
+        kyc_status: pawner.kyc_status,
+      }
+    }, { headers: { 'Cache-Control': 'no-store, private' } });
 
-  } catch (error: any) {
-    console.error('Error registering pawner:', error);
+  } catch (error) {
+    console.error('[pawners:register] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: 'ไม่สามารถลงทะเบียนได้ชั่วคราว', code: 'REGISTRATION_FAILED' },
       { status: 500 }
     );
   }

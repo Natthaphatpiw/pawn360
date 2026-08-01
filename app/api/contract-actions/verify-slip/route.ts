@@ -10,6 +10,17 @@ import {
   type PenaltyRequirement,
 } from '@/lib/services/penalty';
 import { Client, FlexMessage } from '@line/bot-sdk';
+import { requireContractParty } from '@/lib/security/contract-access';
+import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
+import { LiffAuthError } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import {
+  readBoundedJsonObject,
+  requireOwnedBlobUrl,
+  requireUuid,
+  sanitizedServerError,
+  transactionRequestErrorResponse,
+} from '@/lib/security/transaction-request';
 
 const createLineClient = (channelAccessToken?: string, channelSecret?: string) => {
   if (!channelAccessToken) return null;
@@ -24,6 +35,8 @@ const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
   Array.isArray(value) ? value[0] || null : value || null
 );
 
+class ActionStateConflictError extends Error {}
+
 const resolveContractInvestor = async (supabase: any, contract: any) => {
   const relatedInvestor = normalizeRelation<any>(contract?.investors);
   if (relatedInvestor?.line_id || !contract?.investor_id) {
@@ -37,7 +50,7 @@ const resolveContractInvestor = async (supabase: any, contract: any) => {
     .maybeSingle();
 
   if (error) {
-    console.error('Error resolving contract investor:', error);
+    console.error('[contract-action:verify-slip] investor relation lookup failed');
     return relatedInvestor;
   }
 
@@ -70,28 +83,32 @@ const updateActionRequest = async (
   supabase: any,
   requestId: string,
   updateData: Record<string, unknown>,
+  expectedStatuses: string[],
 ) => {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('contract_action_requests')
     .update(updateData)
-    .eq('request_id', requestId);
+    .eq('request_id', requestId)
+    .in('request_status', expectedStatuses)
+    .select('request_id')
+    .maybeSingle();
 
   if (error) {
     throw error;
   }
+  if (!data) throw new ActionStateConflictError('ACTION_STATE_CONFLICT');
 };
 
 export async function POST(request: NextRequest) {
+  let releaseLock: (() => Promise<void>) | null = null;
   try {
-    const body = await request.json();
-    const { requestId, slipUrl, pawnerLineId } = body;
-
-    if (!requestId || !slipUrl) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    const body = await readBoundedJsonObject(request, 32 * 1024);
+    const requestId = requireUuid(body.requestId);
+    const slipUrl = requireOwnedBlobUrl(body.slipUrl, [
+      'payment-slips/',
+      'contract-action-slips/',
+      'uploads/pawner/',
+    ]);
 
     const supabase = supabaseAdmin();
 
@@ -112,18 +129,41 @@ export async function POST(request: NextRequest) {
 
     if (requestError || !actionRequest) {
       return NextResponse.json(
-        { error: 'Request not found' },
+        { error: 'ไม่พบคำขอ', code: 'REQUEST_NOT_FOUND' },
         { status: 404 }
       );
     }
+
+    const contract = actionRequest.contract;
+    const authenticatedLineId = await requireContractParty(request, contract, 'PAWNER');
+    releaseLock = await acquireFinancialLock(`contract-action-contract:${actionRequest.contract_id}`, 300);
+
+    const { data: lockedActionState, error: lockedActionError } = await supabase
+      .from('contract_action_requests')
+      .select('request_status, slip_attempt_count')
+      .eq('request_id', requestId)
+      .single();
+    if (lockedActionError || !lockedActionState) {
+      return NextResponse.json(
+        { error: 'ไม่พบคำขอ', code: 'REQUEST_NOT_FOUND' },
+        { status: 404, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    actionRequest.request_status = lockedActionState.request_status;
+    actionRequest.slip_attempt_count = lockedActionState.slip_attempt_count;
 
     // Check if request is in a valid state for slip verification
     const validStatuses = ['AWAITING_PAYMENT', 'SLIP_REJECTED'];
     if (!validStatuses.includes(actionRequest.request_status)) {
       if (actionRequest.request_status === 'SLIP_VERIFIED' || actionRequest.request_status === 'COMPLETED') {
         return NextResponse.json(
-          { error: 'คำขอนี้ได้รับการยืนยันแล้ว', alreadyVerified: true },
-          { status: 400 }
+          {
+            success: true,
+            message: 'คำขอนี้ได้รับการยืนยันแล้ว',
+            alreadyVerified: true,
+            nextStep: actionRequest.request_status === 'COMPLETED' ? 'COMPLETED' : 'SIGN_CONTRACT',
+          },
+          { status: 200 }
         );
       }
       if (actionRequest.request_status === 'SLIP_REJECTED_FINAL' || actionRequest.request_status === 'VOIDED') {
@@ -148,7 +188,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contract = actionRequest.contract;
     const pawner = normalizeRelation<any>(contract?.pawners);
     const investor = await resolveContractInvestor(supabase, contract);
 
@@ -159,13 +198,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'ไม่พบ Buyer เจ้าของสัญญาหรือ LINE ID สำหรับรับคำขอ กรุณาติดต่อฝ่ายสนับสนุน' },
         { status: 409 }
-      );
-    }
-
-    if (pawnerLineId && pawner?.line_id !== pawnerLineId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
       );
     }
 
@@ -212,14 +244,14 @@ export async function POST(request: NextRequest) {
       const isPrincipalIncrease = actionRequest.request_type === 'PRINCIPAL_INCREASE';
       updateData.request_status = isPrincipalIncrease ? 'PENDING_INVESTOR_APPROVAL' : 'SLIP_VERIFIED';
 
-      await updateActionRequest(supabase, requestId, updateData);
+      await updateActionRequest(supabase, requestId, updateData, validStatuses);
 
       await logContractAction(
         actionRequest.contract_id,
         'SLIP_VERIFIED',
         'COMPLETED',
         'PAWNER',
-        pawnerLineId,
+        authenticatedLineId,
         {
           actionRequestId: requestId,
           slipUrl,
@@ -267,8 +299,8 @@ export async function POST(request: NextRequest) {
               },
             }
           );
-        } catch (err) {
-          console.error('Error sending approval notification to buyer:', err);
+        } catch {
+          console.error('[contract-action:verify-slip] buyer notification delayed');
           await logContractAction(
             actionRequest.contract_id,
             'ERROR_OCCURRED',
@@ -278,7 +310,7 @@ export async function POST(request: NextRequest) {
             {
               actionRequestId: requestId,
               description: 'Failed to send principal increase approval notification to contract owner',
-              errorMessage: err instanceof Error ? err.message : 'Unknown LINE notification error',
+              errorMessage: 'LINE_NOTIFICATION_DELAYED',
             }
           );
         }
@@ -302,7 +334,7 @@ export async function POST(request: NextRequest) {
         updateData.voided_at = new Date().toISOString();
         updateData.void_reason = 'โอนเงินไม่ครบจำนวน 2 ครั้ง';
 
-        await updateActionRequest(supabase, requestId, updateData);
+        await updateActionRequest(supabase, requestId, updateData, validStatuses);
 
         // Log voided
         await logContractAction(
@@ -335,8 +367,8 @@ export async function POST(request: NextRequest) {
               type: 'text',
               text: `การดำเนินการเป็นโมฆะ\n\nเนื่องจากคุณโอนเงินไม่ตรงตามจำนวนถึง 2 ครั้ง\n\nกรุณาติดต่อฝ่าย Support\nโทร: 0626092941\n\nแจ้งปัญหา: การ${getActionTypeName(actionRequest.request_type)}ไม่สำเร็จ\nหมายเลขสัญญา: ${contract?.contract_number}`
             });
-          } catch (err) {
-            console.error('Error sending message to pawner:', err);
+          } catch {
+            console.error('[contract-action:verify-slip] seller notification delayed');
           }
         }
 
@@ -351,7 +383,7 @@ export async function POST(request: NextRequest) {
         // First attempt failed - allow retry
         updateData.request_status = 'SLIP_REJECTED';
 
-        await updateActionRequest(supabase, requestId, updateData);
+        await updateActionRequest(supabase, requestId, updateData, validStatuses);
 
         // Log rejected
         await logContractAction(
@@ -392,7 +424,7 @@ export async function POST(request: NextRequest) {
         updateData.voided_at = new Date().toISOString();
         updateData.void_reason = 'ไม่สามารถอ่านสลิปได้ 2 ครั้ง';
 
-        await updateActionRequest(supabase, requestId, updateData);
+        await updateActionRequest(supabase, requestId, updateData, validStatuses);
 
         return NextResponse.json({
           success: false,
@@ -404,7 +436,7 @@ export async function POST(request: NextRequest) {
 
       updateData.request_status = 'SLIP_REJECTED';
 
-      await updateActionRequest(supabase, requestId, updateData);
+      await updateActionRequest(supabase, requestId, updateData, validStatuses);
 
       return NextResponse.json({
         success: false,
@@ -415,12 +447,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-  } catch (error: any) {
-    console.error('Error verifying slip:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof ActionStateConflictError) {
+      return NextResponse.json(
+        { error: 'สถานะคำขอมีการเปลี่ยนแปลง กรุณาตรวจสอบใหม่', code: 'ACTION_STATE_CONFLICT' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    const lockError = financialLockErrorResponse(error);
+    if (lockError) return lockError;
+    console.error('[contract-action:verify-slip] failed');
+    return sanitizedServerError('ไม่สามารถตรวจสอบสลิปได้ชั่วคราว กรุณาลองใหม่');
+  } finally {
+    await releaseLock?.();
   }
 }
 

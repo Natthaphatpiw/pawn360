@@ -1,5 +1,6 @@
 import {
   del,
+  get,
   issueSignedToken,
   presignUrl,
   put,
@@ -29,6 +30,7 @@ const BLOB_PATH_PREFIXES = [
   'redemption-receipts/',
   'payment-slips/',
   'bank/',
+  'queue-payloads/',
 ];
 
 export interface PrivateBlobUploadResult extends PutBlobResult {
@@ -130,6 +132,53 @@ export async function putPrivateBlob(
   });
 
   return { ...blob, signedUrl };
+}
+
+/**
+ * Store an internal Queue payload without minting a browser-readable URL.
+ * Only an opaque pathname is persisted in Redis; workers fetch it with the
+ * server-side Blob token. This keeps large or sensitive payloads out of both
+ * Queue messages and job status responses.
+ */
+export async function putPrivateQueuePayload(
+  pathname: string,
+  body: string,
+): Promise<PutBlobResult> {
+  const normalizedPathname = normalizePathname(pathname);
+  if (!normalizedPathname.startsWith('queue-payloads/')) {
+    throw new Error('Queue payloads must use the queue-payloads/ prefix.');
+  }
+
+  return put(normalizedPathname, body, {
+    access: PRIVATE_ACCESS,
+    contentType: 'application/json',
+    addRandomSuffix: false,
+    allowOverwrite: false,
+    token: getBlobToken(),
+  });
+}
+
+export async function readPrivateQueuePayload(pathname: string): Promise<string> {
+  const normalizedPathname = normalizePathname(pathname);
+  if (!normalizedPathname.startsWith('queue-payloads/')) {
+    throw new Error('Invalid Queue payload pathname.');
+  }
+
+  const result = await get(normalizedPathname, {
+    access: PRIVATE_ACCESS,
+    token: getBlobToken(),
+    useCache: false,
+  });
+  if (!result || !result.stream) {
+    throw new Error('Queue payload Blob was not found.');
+  }
+  return new Response(result.stream).text();
+}
+
+export async function deletePrivateQueuePayload(pathname: string): Promise<void> {
+  const normalizedPathname = normalizePathname(pathname);
+  if (!normalizedPathname.startsWith('queue-payloads/')) return;
+  await del(normalizedPathname, { token: getBlobToken() });
 }
 
 export async function refreshBlobUrls(urls?: string[]): Promise<string[]> {

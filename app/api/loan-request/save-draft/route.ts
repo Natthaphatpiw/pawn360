@@ -1,20 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { buildItemNotesWithPasscode } from '@/lib/utils/item-private-notes';
+import { liffAuthErrorResponse, requireLiffOwner } from '@/lib/security/request-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const MAX_JSON_BYTES = 256 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (contentLength > MAX_JSON_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body is too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     const body = await request.json();
     const {
-      lineId,
+      lineId: claimedLineId,
       itemData,
       branchId,
     } = body;
+
+    if (
+      typeof claimedLineId !== 'string'
+      || !claimedLineId.trim()
+      || claimedLineId.length > 80
+      || !itemData
+      || typeof itemData !== 'object'
+      || JSON.stringify(itemData).length > 128 * 1024
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid draft data', code: 'INVALID_INPUT' },
+        { status: 400 }
+      );
+    }
+
+    let lineId: string;
+    try {
+      lineId = await requireLiffOwner(request, 'PAWNER', claimedLineId);
+    } catch (error) {
+      return liffAuthErrorResponse(error);
+    }
 
     // Get customer_id from lineId (optional for drafts)
     const { data: pawnerData, error: pawnerError } = await supabase
@@ -82,10 +113,7 @@ export async function POST(request: NextRequest) {
     if (itemError || !item) {
       console.error('Error creating item draft:', itemError);
       return NextResponse.json(
-        {
-          error: 'Failed to save draft',
-          details: itemError?.message || null,
-        },
+        { error: 'Failed to save draft', code: 'DRAFT_SAVE_FAILED' },
         { status: 500 }
       );
     }
@@ -96,7 +124,9 @@ export async function POST(request: NextRequest) {
       message: 'Draft saved successfully',
     });
   } catch (error) {
-    console.error('Error in loan-request/save-draft:', error);
+    console.error('[loan-request:save-draft] failed', {
+      type: error instanceof Error ? error.name : 'unknown',
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

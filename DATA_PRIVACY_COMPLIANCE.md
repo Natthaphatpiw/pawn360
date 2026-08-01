@@ -49,7 +49,8 @@ Companion documents: [`DATA_SECURITY.md`](DATA_SECURITY.md), [`AUTHENTICATION_AN
 |---|---|---|
 | UPPASS | eKYC identity verification (incl. biometric/liveness) | SE Asia (vendor) |
 | Anthropic (Claude) | AI analysis of item photos and bank slips | US |
-| Google (Gemini) | AI condition scoring of item photos | US (paid tier / Vertex) |
+| OpenAI | Primary AI analysis of product text, item photos and fallback slip OCR | US (contract/region to confirm) |
+| Anthropic | Emergency AI fallback for the same minimized text/image payloads | US (contract/region to confirm) |
 | OpenAI | Optional web-search (product text only) | US |
 | Vercel | Hosting / compute / logs | US-default (configurable) |
 | Supabase | Primary database | AWS region (confirm) |
@@ -152,7 +153,23 @@ Summary: access is controlled by credential isolation (server-side only), applic
 
 ## 8. Cross-Border Data Transfer (Sec 28-29)
 
-Several processors are hosted outside Thailand (Anthropic, Google, OpenAI, Vercel, MongoDB Atlas, and Upstash), engaging the cross-border rules. The configured region of the connected Blob store must be included in the production data-location register.
+Several processors are hosted outside Thailand (OpenAI, Anthropic, Vercel, MongoDB Atlas, and Upstash), engaging the cross-border rules. The configured region of the connected Blob store must be included in the production data-location register.
+
+**Scoping note that materially narrows the analysis.** Not every foreign provider in the technology stack receives personal data. The web-search providers used for market pricing (Parallel, with Exa as fallback, and the optional SerpAPI) receive **only a canonicalized product string** produced by the normalization step - for example `Apple MacBook Air M2 13 256GB`. LINE user identifiers, national IDs, serial numbers, contract data, eKYC media and Blob image URLs are excluded by construction, not by policy, so this leg is **out of scope** for Sec 28-29. The transfers that *are* in scope are:
+
+| Transfer | Personal data involved | In scope |
+|---|---|---|
+| OpenAI (primary model) | Item photographs; bank-slip images on the OCR fallback path | **Yes** - photographs of a person's property, and slips that carry names, account numbers and amounts |
+| Anthropic (model fallback) | The same payloads, on the incident path only | **Yes** |
+| UpPass (eKYC) | National ID, document images, biometric/liveness data | **Yes - sensitive personal data (Sec 26)** |
+| SlipOK (slip verification) | Bank-slip images | **Yes** |
+| Vercel / Supabase / MongoDB Atlas / Upstash | Hosting and storage of the full dataset | **Yes** |
+| Parallel / Exa / SerpAPI (search) | Canonical product strings only | **No** |
+
+Two configuration facts belong in the register because they bound what the AI providers retain:
+
+- `OPENAI_STORE_RESPONSES` controls whether responses are persisted on OpenAI's side and must be `false` in production, so the platform does not create a second copy of item photographs and slips in a foreign provider's storage.
+- Zero Data Retention should be applied for on the OpenAI account and enabled on the Parallel and Exa accounts (both publish SOC 2 Type II and offer ZDR on enterprise plans). ZDR on the search providers is hygiene rather than exposure reduction, because no personal data is sent there today.
 
 - Sec 28 permits transfer to a foreign country only if it has adequate protection per PDPC criteria, except where one of the derogations applies: legal compliance; consent after being informed of inadequacy; contract necessity; contract in the data subject's interest; vital interest; or substantial public interest.
 - Sec 29 allows intra-group transfers under PDPC-certified binding-corporate-rules-style policies or suitable safeguards.
@@ -167,14 +184,18 @@ Sec 40 requires a written controller-processor agreement governing each processo
 
 DPA status to establish/confirm for the data room:
 
-| Processor | DPA required | No-training / retention control |
-|---|---|---|
-| UPPASS (eKYC, biometric) | Yes | Retention/deletion terms; ISO 27001/PDPA claims to confirm |
-| Anthropic, Google, OpenAI (AI) | Yes | No-training + ZDR/BAA/paid-tier (critical for media) |
-| Vercel, Supabase, AWS, MongoDB Atlas, Upstash (cloud) | Yes (each offers a DPA) | Standard cloud DPA + SCC-equivalent |
-| Payment PSP (planned) | Yes | Per PSP terms |
+| Processor | Personal data received | DPA required | Vendor assurance position | Control to secure |
+|---|---|---|---|---|
+| UPPASS (eKYC, biometric) | National ID, document images, liveness/biometric data | **Yes - highest priority** | ISO/IEC 27001 certified by BSI, certificate **IS773635**; states PDPA and GDPR adherence; **no published liveness/PAD certification**; data-centre region not published | Executed DPA; retention/deletion window and SLA; data-centre region; sub-processor list; breach-notification SLA; PAD test report |
+| OpenAI (primary AI) | Item photographs; bank slips on the fallback path | **Yes** | SOC 2 Type 2 / CSA STAR; API business data not used for training by default; ZDR available on approval | Executed DPA; **apply for ZDR**; keep `OPENAI_STORE_RESPONSES=false` |
+| Anthropic (AI fallback) | The same payloads, incident path only | **Yes** | SOC 2 Type 2; commercial API data not used for training by default | Executed DPA covering the fallback path |
+| SlipOK (slip verification) | Bank-slip images (financial PII) | **Yes** | No published certification | **Largest processor gap in the payment stack** - execute a DPA or migrate to PSP settlement reconciliation |
+| Vercel, Supabase, MongoDB Atlas, Upstash (cloud) | Hosting/storage of the full dataset | Yes (each offers a DPA) | Vercel: SOC 2 Type 2, ISO 27001:2022, GDPR DPA + SCCs, EU-US DPF, PCI DSS v4.0 | Standard cloud DPA + SCC-equivalent; record the region of each |
+| Parallel, Exa (web search) | **None** - canonical product strings only | Recommended, not required | Both SOC 2 Type II; both offer ZDR on enterprise | Request SOC 2 reports and enable ZDR as hygiene |
+| SerpAPI (optional price source) | **None** - canonical product query only | Recommended | No published certification | Keep disabled (`SERPAPI_ENABLED=false`) unless a coverage need is proven |
+| Payment PSP (planned) | Payment instructions and settlement data | Yes | Per PSP terms | Negotiate with the custody design (`THIRD_PARTY_INTEGRATIONS.md` Section 8) |
 
-This is a priority operational task: execute and file a DPA with every processor; for the AI providers, the DPA plus the no-training/ZDR posture is the key control because item photos and bank slips are transmitted to them.
+This is a priority operational task: execute and file a DPA with every processor that receives personal data. For UpPass the DPA plus a documented retention/deletion window is the key control because sensitive data under Sec 26 is involved; for the AI providers the DPA plus the no-training/ZDR posture is the key control because item photographs and bank slips are transmitted to them; for SlipOK there is currently neither a certification nor a DPA, which makes it the highest-severity open processor item.
 
 ---
 

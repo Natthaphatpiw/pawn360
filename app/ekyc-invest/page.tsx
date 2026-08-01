@@ -4,15 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLiff } from '@/lib/liff/liff-provider';
 import axios from 'axios';
+import { getLiffAuthorizationHeaders } from '@/lib/liff/auth-header';
 
 export default function EKYCInvestPage() {
   const router = useRouter();
-  const { profile, isLoading: liffLoading } = useLiff();
+  const { profile, isLoading: liffLoading, liffObject } = useLiff();
 
   const [loading, setLoading] = useState(false);
   const [checkingInvestor, setCheckingInvestor] = useState(true); // New state for initial check
   const [error, setError] = useState<string | null>(null);
-  const [investorId, setInvestorId] = useState<string | null>(null);
+  const [accountExists, setAccountExists] = useState(false);
   const [kycStatus, setKycStatus] = useState<string | null>(null);
 
   // Get investor ID and check KYC status
@@ -26,17 +27,20 @@ export default function EKYCInvestPage() {
 
       setCheckingInvestor(true);
       try {
-        const response = await axios.get(`/api/investors/check?lineId=${profile.userId}`);
+        const headers = getLiffAuthorizationHeaders(liffObject);
+        const response = await axios.get('/api/ekyc/status?role=INVESTOR', { headers });
         if (response.data.exists) {
-          const investor = response.data.investor;
-          setInvestorId(investor.investor_id);
-          setKycStatus(investor.kyc_status);
+          setAccountExists(true);
+          setKycStatus(response.data.status);
 
           // Redirect based on KYC status
-          if (investor.kyc_status === 'VERIFIED') {
+          if (response.data.status === 'VERIFIED') {
             // Already verified - go to register-invest page
             router.push('/register-invest');
-          } else if (investor.kyc_status === 'PENDING') {
+          } else if (response.data.status === 'PENDING' && response.data.resumeAvailable) {
+            const resumed = await axios.post('/api/ekyc/initiate-invest', {}, { headers });
+            if (resumed.data.success && resumed.data.url) window.location.href = resumed.data.url;
+          } else if (response.data.status === 'PENDING') {
             // Waiting for verification - go to waiting page
             router.push('/ekyc-invest/waiting');
           }
@@ -46,8 +50,11 @@ export default function EKYCInvestPage() {
           router.push('/register-invest');
         }
       } catch (error) {
-        console.error('Error getting investor ID:', error);
-        setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        const publicError = axios.isAxiosError(error) ? error.response?.data?.error : null;
+        console.error('Asset Funding eKYC status check failed', {
+          code: axios.isAxiosError(error) ? error.response?.data?.code || 'EKYC_STATUS_FAILED' : 'EKYC_STATUS_FAILED',
+        });
+        setError(publicError || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');
       } finally {
         setCheckingInvestor(false);
       }
@@ -56,10 +63,10 @@ export default function EKYCInvestPage() {
     if (!liffLoading && profile?.userId) {
       checkInvestor();
     }
-  }, [profile?.userId, router, liffLoading]);
+  }, [profile?.userId, router, liffLoading, liffObject]);
 
   const handleStartKYC = async () => {
-    if (!investorId) {
+    if (!accountExists) {
       setError('ไม่พบข้อมูลนักลงทุน กรุณาลงทะเบียนก่อน');
       return;
     }
@@ -69,8 +76,8 @@ export default function EKYCInvestPage() {
 
     try {
       // 1. Call API to initiate eKYC for investor
-      const response = await axios.post('/api/ekyc/initiate-invest', {
-        investorId
+      const response = await axios.post('/api/ekyc/initiate-invest', {}, {
+        headers: getLiffAuthorizationHeaders(liffObject),
       });
 
       if (response.data.success && response.data.url) {
@@ -80,9 +87,11 @@ export default function EKYCInvestPage() {
       } else {
         throw new Error('Failed to get verification URL');
       }
-    } catch (error: any) {
-      console.error('eKYC error:', error);
-      setError(error.response?.data?.error || 'เกิดข้อผิดพลาดในการเริ่มต้นการยืนยันตัวตน');
+    } catch (error: unknown) {
+      console.error('Asset Funding eKYC start failed', {
+        code: axios.isAxiosError(error) ? error.response?.data?.code || 'EKYC_START_FAILED' : 'EKYC_START_FAILED',
+      });
+      setError(axios.isAxiosError(error) ? error.response?.data?.error || 'เกิดข้อผิดพลาดในการเริ่มต้นการยืนยันตัวตน' : 'เกิดข้อผิดพลาดในการเริ่มต้นการยืนยันตัวตน');
       setLoading(false);
     }
   };
@@ -100,7 +109,7 @@ export default function EKYCInvestPage() {
   }
 
   // Show error state if no investor ID after loading completes
-  if (!investorId && error) {
+  if (!accountExists && error) {
     return (
       <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
         <div className="w-full max-w-md">
@@ -118,8 +127,8 @@ export default function EKYCInvestPage() {
     );
   }
 
-  // If still no investorId after all checks, redirect to register-invest
-  if (!investorId) {
+  // If there is still no account after all checks, redirect to registration.
+  if (!accountExists) {
     router.push('/register-invest');
     return null;
   }

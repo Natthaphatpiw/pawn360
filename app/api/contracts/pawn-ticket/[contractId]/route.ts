@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase/client';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { splitItemNotesAndPasscode } from '@/lib/utils/item-private-notes';
+import { extractBlobPathname } from '@/lib/storage/blob';
+import { LiffAuthError, requireLiffIdentity } from '@/lib/security/liff-auth';
+import { liffAuthErrorResponse } from '@/lib/security/request-auth';
+import { requireUuid, sanitizedServerError, transactionRequestErrorResponse } from '@/lib/security/transaction-request';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -20,7 +24,8 @@ const normalizeSignatureUrl = (...values: unknown[]) => {
   if (typeof value !== 'string') return null;
 
   const trimmed = value.trim();
-  return /^(https?:\/\/|data:image\/|\/)/i.test(trimmed) ? trimmed : null;
+  if (/^data:image\/(?:png|jpeg|webp);base64,/i.test(trimmed)) return trimmed;
+  return extractBlobPathname(trimmed) ? trimmed : null;
 };
 
 const buildInitials = (...names: unknown[]) => {
@@ -354,17 +359,24 @@ export async function GET(
   context: { params: Promise<{ contractId: string }> }
 ) {
   try {
-    const { contractId } = await context.params;
+    const { contractId: rawContractId } = await context.params;
+    const contractId = requireUuid(rawContractId);
     const { searchParams } = new URL(request.url);
-    const viewer = searchParams.get('viewer') || 'public';
+    const viewer = searchParams.get('viewer');
     const format = (searchParams.get('format') || 'json').toLowerCase();
-
-    if (!contractId) {
+    if (viewer !== 'pawner' && viewer !== 'investor') {
       return NextResponse.json(
-        { error: 'Contract ID is required' },
+        { error: 'ประเภทผู้ดูเอกสารไม่ถูกต้อง', code: 'INVALID_VIEWER' },
         { status: 400 }
       );
     }
+    if (format !== 'json' && format !== 'pdf') {
+      return NextResponse.json(
+        { error: 'รูปแบบเอกสารไม่ถูกต้อง', code: 'INVALID_FORMAT' },
+        { status: 400 },
+      );
+    }
+    const identity = await requireLiffIdentity(request, viewer === 'investor' ? 'INVESTOR' : 'PAWNER');
 
     const supabase = supabaseAdmin();
 
@@ -375,6 +387,7 @@ export async function GET(
         *,
         pawner:pawners!customer_id (
           customer_id,
+          line_id,
           firstname,
           lastname,
           phone_number,
@@ -390,6 +403,7 @@ export async function GET(
         ),
         investor:investors!investor_id (
           investor_id,
+          line_id,
           firstname,
           lastname,
           phone_number,
@@ -441,11 +455,24 @@ export async function GET(
       .single();
 
     if (contractError || !contract) {
-      console.error('Contract not found:', contractError);
       return NextResponse.json(
-        { error: 'Contract not found' },
+        { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
         { status: 404 }
       );
+    }
+
+    const relationOne = <T,>(value: T | T[] | null | undefined): T | null => (
+      Array.isArray(value) ? value[0] || null : value || null
+    );
+    const pawner = relationOne<any>(contract.pawner);
+    const investor = relationOne<any>(contract.investor);
+    const item = relationOne<any>(contract.items);
+    const dropPoint = relationOne<any>(contract.drop_points);
+    if (viewer === 'pawner' && pawner?.line_id !== identity.lineId) {
+      throw new LiffAuthError('CONTRACT_ACCESS_DENIED', 403);
+    }
+    if (viewer === 'investor' && investor?.line_id !== identity.lineId) {
+      throw new LiffAuthError('CONTRACT_ACCESS_DENIED', 403);
     }
 
     // Format Thai date
@@ -555,31 +582,31 @@ export async function GET(
 
     const pawnerSignatureUrl = normalizeSignatureUrl(
       contract.signed_contract_url,
-      contract.pawner?.signature_url
+      pawner?.signature_url
     );
-    const investorSignatureUrl = normalizeSignatureUrl(contract.investor?.investor_signature_id);
+    const investorSignatureUrl = normalizeSignatureUrl(investor?.investor_signature_id);
     const investorSignatureInitials = buildInitials(
-      contract.investor?.firstname,
-      contract.investor?.lastname
+      investor?.firstname,
+      investor?.lastname
     );
 
     // Prepare ticket data
     const pawnerFull = {
-      name: `${contract.pawner?.firstname || ''} ${contract.pawner?.lastname || ''}`,
-      idCard: formatNationalId(contract.pawner?.national_id || ''),
-      address: formatAddress(contract.pawner || {}),
-      phone: contract.pawner?.phone_number || '',
+      name: `${pawner?.firstname || ''} ${pawner?.lastname || ''}`,
+      idCard: formatNationalId(pawner?.national_id || ''),
+      address: formatAddress(pawner || {}),
+      phone: pawner?.phone_number || '',
       signatureUrl: pawnerSignatureUrl
     };
 
     const investorFull = {
-      name: `${contract.investor?.firstname || ''} ${contract.investor?.lastname || ''}`,
-      idCard: formatNationalId(contract.investor?.national_id || ''),
-      address: formatAddress(contract.investor || {}),
-      phone: contract.investor?.phone_number || '',
-      bankName: contract.investor?.bank_name || '',
-      bankAccountNo: contract.investor?.bank_account_no || '',
-      bankAccountName: contract.investor?.bank_account_name || '',
+      name: `${investor?.firstname || ''} ${investor?.lastname || ''}`,
+      idCard: formatNationalId(investor?.national_id || ''),
+      address: formatAddress(investor || {}),
+      phone: investor?.phone_number || '',
+      bankName: investor?.bank_name || '',
+      bankAccountNo: investor?.bank_account_no || '',
+      bankAccountName: investor?.bank_account_name || '',
       signatureUrl: investorSignatureUrl,
       signatureInitials: investorSignatureInitials
     };
@@ -589,7 +616,7 @@ export async function GET(
       idCard: '-',
       address: '-',
       phone: '',
-      signatureUrl: pawnerSignatureUrl
+      signatureUrl: null
     };
 
     const redactedInvestor = {
@@ -597,8 +624,8 @@ export async function GET(
       idCard: '-',
       address: '-',
       phone: '',
-      signatureUrl: investorSignatureUrl,
-      signatureInitials: investorSignatureInitials,
+      signatureUrl: null,
+      signatureInitials: '',
       bankName: '',
       bankAccountNo: '',
       bankAccountName: ''
@@ -626,22 +653,22 @@ export async function GET(
     const feeAmount = Math.round(principalBase * feeRate * durationMonths * 100) / 100;
     const totalInterest = interestOnly + feeAmount;
 
-    const notesPayload = splitItemNotesAndPasscode(contract.items?.notes);
+    const notesPayload = splitItemNotesAndPasscode(item?.notes);
 
     const ticketData = {
       shopName: 'Pawnly',
-      branch: contract.drop_points?.drop_point_name || 'สำนักงานใหญ่',
+      branch: dropPoint?.drop_point_name || 'สำนักงานใหญ่',
       ticketNo: contract.contract_number || contract.contract_id.substring(0, 6).toUpperCase(),
       bookNo: contract.contract_id.substring(0, 2).toUpperCase(),
       date: formatThaiDate(contract.contract_start_date),
       dueDate: formatThaiDate(contract.contract_end_date),
       pawner: pawnerData,
       investor: investorData,
-      items: contract.items ? [
+      items: item ? [
         {
           seq: 1,
-          description: formatItemDescription(contract.items),
-          serial: contract.items.serial_number ? `S/N: ${contract.items.serial_number}` : ''
+          description: formatItemDescription(item),
+          serial: item.serial_number ? `S/N: ${item.serial_number}` : ''
         }
       ] : [],
       amount: contract.loan_principal_amount?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
@@ -651,7 +678,7 @@ export async function GET(
       interestAmount: totalInterest?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
       interestAmountInterest: interestOnly?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
       interestAmountFee: feeAmount?.toLocaleString('th-TH', { minimumFractionDigits: 2 }) || '0.00',
-      itemNotes: notesPayload.publicNotes || contract.items?.defects || '',
+      itemNotes: notesPayload.publicNotes || item?.defects || '',
       contractDuration: contract.contract_duration_days || 0,
       contractStatus: contract.contract_status,
       pawnTicketUrl: contract.pawn_ticket_url || null
@@ -669,6 +696,20 @@ export async function GET(
 
         try {
           const page = await browser.newPage();
+          await page.setJavaScriptEnabled(false);
+          await page.setRequestInterception(true);
+          page.on('request', (resourceRequest) => {
+            const resourceUrl = resourceRequest.url();
+            if (
+              resourceUrl === 'about:blank'
+              || resourceUrl.startsWith('data:')
+              || extractBlobPathname(resourceUrl)
+            ) {
+              void resourceRequest.continue();
+            } else {
+              void resourceRequest.abort();
+            }
+          });
           await page.setViewport({ width: 1240, height: 1754 });
           await page.setContent(html, { waitUntil: 'domcontentloaded' });
           pdfBuffer = await page.pdf({
@@ -694,8 +735,8 @@ export async function GET(
             'Cache-Control': 'no-store',
           },
         });
-      } catch (pdfError: any) {
-        console.error('Error generating loan contract PDF:', pdfError);
+      } catch {
+        console.error('[contract:pawn-ticket] PDF generation failed');
         return NextResponse.json(
           { error: 'ไม่สามารถสร้างไฟล์ PDF ได้' },
           { status: 500 }
@@ -707,13 +748,13 @@ export async function GET(
       success: true,
       ticketData,
       contractId: contract.contract_id
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
 
-  } catch (error: any) {
-    console.error('Error fetching loan contract data:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    if (error instanceof LiffAuthError) return liffAuthErrorResponse(error);
+    const requestError = transactionRequestErrorResponse(error);
+    if (requestError) return requestError;
+    console.error('[contract:pawn-ticket] failed');
+    return sanitizedServerError('ไม่สามารถโหลดเอกสารสัญญาได้ กรุณาลองใหม่');
   }
 }

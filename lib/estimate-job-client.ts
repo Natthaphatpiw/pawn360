@@ -4,7 +4,11 @@
 import type { EstimateResponse } from '@/lib/services/estimate-pipeline';
 import { runJob } from '@/lib/job-poll-client';
 
-export async function runEstimateJob(estimateData: unknown, signal?: AbortSignal): Promise<EstimateResponse> {
+export async function runEstimateJob(
+  estimateData: unknown,
+  signal?: AbortSignal,
+  onStatus?: (status: any) => void
+): Promise<EstimateResponse> {
   return runJob<EstimateResponse>({
     enqueueUrl: '/api/estimate/jobs',
     statusUrl: (id) => `/api/estimate/jobs/${id}`,
@@ -12,5 +16,6 @@ export async function runEstimateJob(estimateData: unknown, signal?: AbortSignal
     syncUrl: '/api/estimate',
     payload: estimateData,
     signal,
+    onStatus,
   });
 }

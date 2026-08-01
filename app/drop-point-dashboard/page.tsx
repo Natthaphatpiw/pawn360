@@ -144,14 +144,14 @@ function DonutBreakdownChart({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const gap = circumference * 0.018;
-  let cursor = 0;
-
-  const segments = categories.map((category) => {
+  const segments = categories.map((category, index) => {
     const rawLength = total > 0 ? (category.count / total) * circumference : 0;
     const segmentLength = Math.max(rawLength - gap, 0);
     const dashArray = `${segmentLength} ${circumference}`;
-    const dashOffset = -cursor;
-    cursor += rawLength;
+    const previousLength = categories
+      .slice(0, index)
+      .reduce((sum, item) => sum + (total > 0 ? (item.count / total) * circumference : 0), 0);
+    const dashOffset = -previousLength;
 
     return {
       ...category,

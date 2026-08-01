@@ -9,9 +9,9 @@ For the full written architecture, see [`../../SYSTEM_ARCHITECTURE.md`](../../SY
 | File | Type | Description |
 |---|---|---|
 | `00-system-architecture.svg` | System (C4 container) | Full platform: client LIFF apps, Vercel edge and functions, data plane, external integrations, asynchronous lifecycle engine, trust boundaries, and the planned self-hosted condition-assessment model. |
-| `01-sequence-estimate-pricing.svg` | Sequence | `POST /api/estimate`: cache check, Claude input normalization, parallel Claude web-search pricing and SerpAPI (with Claude filter), representative-price estimation, 60% LTV and condition blend, and response. |
+| `01-sequence-estimate-pricing.svg` | Sequence | Queued estimate: cache check, Terra normalization, Parallel/Exa evidence plus optional SerpAPI, deterministic representative-price estimation, 60% LTV and condition blend, and response. |
 | `02-sequence-redemption.svg` | Sequence | Redemption and settlement (Supabase `redemption_requests`): create with penalty check, pay and verify slip, drop-point physical return with investor settlement, and borrower confirmation or 48-hour auto-confirm cron. |
-| `03-sequence-condition-scoring.svg` | Sequence | `POST /api/analyze-condition`: Claude Haiku vision precheck, Gemini rubric scoring with guards, downstream blend into the estimate, and the future self-hosted-model integration point. |
+| `03-sequence-condition-scoring.svg` | Sequence | Queued condition analysis: OpenAI Luna vision precheck and rubric scoring, Anthropic incident fallback, downstream blend, and the future self-hosted-model integration point. |
 
 ## Conventions
 
