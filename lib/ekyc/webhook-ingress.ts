@@ -92,6 +92,23 @@ async function readBoundedBody(request: Request): Promise<string> {
   return rawBody;
 }
 
+/**
+ * The UpPass console "Test" button posts a synthetic event with
+ * `event.type === "__test__"`, a non-existent application slug, and placeholder
+ * answers. It is a connectivity/credential probe, not a verification result.
+ * Detected only after authentication, and deliberately not persisted or queued:
+ * treating it as a real event would create an inbox row for a slug that matches
+ * no actor and dead-letter it.
+ */
+function isConnectivityProbe(rawBody: string): boolean {
+  try {
+    const event = object(object(JSON.parse(rawBody) as unknown).event);
+    return typeof event.type === 'string' && event.type.trim().toLowerCase() === '__test__';
+  } catch {
+    return false;
+  }
+}
+
 function normalizePayload(rawBody: string, actorType: EkycActorType): NormalizedWebhookEvent {
   let payload: Record<string, unknown>;
   try {
@@ -167,6 +184,13 @@ export async function ingestUpPassWebhook(request: Request, actorType: EkycActor
       return json({ error: 'Webhook unavailable' }, 503, 60);
     }
     return json({ error: 'Unauthorized' }, 401);
+  }
+
+  // Answered only once the credentials above have been accepted, so an
+  // unauthenticated caller can never get a 200 by sending a probe payload.
+  if (isConnectivityProbe(rawBody)) {
+    console.log('UpPass webhook connectivity probe acknowledged', { actorType });
+    return json({ received: true, test: true });
   }
 
   let normalized: NormalizedWebhookEvent;
@@ -281,5 +305,8 @@ export async function ingestUpPassWebhook(request: Request, actorType: EkycActor
     return json({ error: 'Queue unavailable' }, 503, 30);
   }
 
-  return json({ received: true, queued: true }, 202);
+  // UpPass documents 200 as the success signal and does not document how other
+  // 2xx codes are treated. The event is already durably stored in the inbox at
+  // this point, so 200 is accurate as well as compatible.
+  return json({ received: true, queued: true });
 }
