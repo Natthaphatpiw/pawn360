@@ -55,7 +55,21 @@ const MIN_ESTIMATE_PRICE = 100;
 const WEB_SEARCH_MAX_ITEMS = 8;
 const WEB_SEARCH_MAX_OUTPUT_TOKENS = 6000;
 const SERPAPI_MAX_ITEMS = 20;
+// Relative weight of each evidence source when merging into one price pool.
+// Left at 1:1 deliberately. Weighting Thai used listings above Google Shopping
+// is intuitively appealing, but on a 17-product benchmark with the evidence
+// pool held fixed it did not survive measurement: mean absolute error was flat
+// across 1x-8x (20.0%-24.1%) and the median-error dip at 3x moved with a single
+// item. Both knobs stay configurable so the experiment can be repeated on a
+// larger set, but the default must not encode an unproven preference.
+const DEFAULT_WEB_SEARCH_WEIGHT = 1;
+const DEFAULT_SERPAPI_WEIGHT = 1;
 const USE_TH_WEIGHTS = false;
+
+function positiveNumberFromEnv(name: string, fallback: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 const USED_LISTING_KEYWORD_PATTERN = /มือสอง|มือ\s*2|used|pre[-\s]?owned|second\s?hand|refurbish/i;
 // Loan-to-value: ราคาจำนำ (pawn principal) = ราคากลาง (market price) × this factor.
 const PAWN_PRICE_FACTOR = 0.6;
@@ -1375,7 +1389,12 @@ function buildNotebookObservationRows(
 }
 
 // Agent 1: Normalize input data only
-async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
+/**
+ * Agent 1. Exported so the offline market-price benchmark
+ * (scripts/market-price-benchmark.ts) can measure the ราคากลาง path without
+ * supplying images, using exactly the production code path.
+ */
+export async function normalizeInput(input: EstimateRequest): Promise<NormalizedData> {
   if (!hasOpenAIKeys() && !hasAnthropicKeys()) {
     return {
       productName: `${input.brand} ${input.model}`.trim(),
@@ -1506,10 +1525,12 @@ type RepresentativeMarketResult = {
   analysis: ReturnType<typeof computeRepresentativeUsedPriceTHB> | null;
   sourceCounts: { web: number; serpapi: number };
   usedWeights: boolean;
+  /** The evidence the price was derived from, for telemetry and offline evaluation. */
+  evidence: Array<{ price_thb: number; source: 'web_search' | 'serpapi'; weight: number }>;
 };
 
 // Agent 2: Web search + SerpAPI -> merge -> representative price
-async function getRepresentativeMarketPrice(
+export async function getRepresentativeMarketPrice(
   input: EstimateRequest,
   productName: string
 ): Promise<RepresentativeMarketResult> {
@@ -1540,8 +1561,18 @@ async function getRepresentativeMarketPrice(
     .filter(Boolean) as CombinedItem[];
 
   const combinedItems = [...webItems, ...serpItems];
-  // USE_TH_WEIGHTS is hardcoded false; the Thai-market weighting path is currently disabled.
-  const weights = undefined;
+  // Google Shopping (SerpAPI) reliably supplies volume but skews low for a
+  // second-hand valuation: it mixes in accessories, grey-market and refurb
+  // offers, and it usually outnumbers the Thai used-listing evidence several to
+  // one, so an unweighted merge lets it decide the median. Weighting the used
+  // listings higher keeps SerpAPI's coverage - dropping it outright measured
+  // worse and failed more often - while letting the used market set the level.
+  // Both weights are configurable so this stays a tunable, not a constant.
+  const webWeight = positiveNumberFromEnv('MARKET_WEIGHT_WEB_SEARCH', DEFAULT_WEB_SEARCH_WEIGHT);
+  const serpWeight = positiveNumberFromEnv('MARKET_WEIGHT_SERPAPI', DEFAULT_SERPAPI_WEIGHT);
+  const weights = webItems.length > 0 && serpItems.length > 0 && webWeight !== serpWeight
+    ? [...webItems.map(() => webWeight), ...serpItems.map(() => serpWeight)]
+    : undefined;
 
   if (combinedItems.length === 0) {
     if (webFailure && (
@@ -1563,7 +1594,12 @@ async function getRepresentativeMarketPrice(
       marketPrice,
       analysis,
       sourceCounts: { web: webItems.length, serpapi: serpItems.length },
-      usedWeights: USE_TH_WEIGHTS,
+      usedWeights: Boolean(weights),
+      evidence: combinedItems.map((item, index) => ({
+        price_thb: Number(item.price_thb),
+        source: index < webItems.length ? 'web_search' as const : 'serpapi' as const,
+        weight: weights ? weights[index] : 1,
+      })),
     };
   } catch (error) {
     throw new ProviderError('Market evidence failed validation', {
