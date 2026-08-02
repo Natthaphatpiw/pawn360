@@ -16,6 +16,7 @@ import {
   hasOpenAIKeys,
   getOpenAILunaModel,
   getOpenAIReasoningEffortForTask,
+  type OpenAIReasoningEffort,
   getOpenAIVisionModel,
   openaiStructuredJson,
   openaiVisionJson,
@@ -207,6 +208,18 @@ ${productLine}
 // Image precheck: OpenAI Luna primary, Claude vision fallback
 // ---------------------------------------------------------------------------
 
+/**
+ * The model's own `pass` is not taken at face value: it is ANDed with the
+ * per-image checks, so a model that says "pass" while flagging an image that
+ * does not match still fails. Kept in one place because the escalation path
+ * below and the final verdict must agree on what passing means.
+ */
+function isPrecheckPass(result: ImagePrecheckResult): boolean {
+  const allMatch = result.imageChecks.length > 0
+    && result.imageChecks.every((check) => check.matchesExpected);
+  return Boolean(result.pass && result.consistentItem && allMatch);
+}
+
 async function precheckImages(options: AnalyzeConditionRequest): Promise<ImagePrecheckResult> {
   const expectedType = buildExpectedTypeLabel(options.itemType, options.appleCategory);
   const prompt = `คุณเป็นระบบตรวจสอบความถูกต้องของรูปภาพก่อนประเมินสภาพสินค้า
@@ -267,20 +280,48 @@ expectedType: ${expectedType}
 
   let parsed: ImagePrecheckResult | null = null;
   let openAIFailure: ProviderError | null = null;
+
+  const runOpenAIPrecheck = (effort: OpenAIReasoningEffort) =>
+    openaiStructuredJson<ImagePrecheckResult>({
+      userText: prompt,
+      images: options.images.slice(0, MAX_IMAGE_COUNT),
+      imageDetail: 'low',
+      model: getOpenAILunaModel(),
+      effort,
+      schemaName: 'image_precheck',
+      maxOutputTokens: 4000,
+      schema,
+      label: 'condition_image_precheck',
+      promptCacheKey: 'condition_image_precheck',
+    });
+
   if (hasOpenAIKeys()) {
     try {
-      parsed = await openaiStructuredJson<ImagePrecheckResult>({
-        userText: prompt,
-        images: options.images.slice(0, MAX_IMAGE_COUNT),
-        imageDetail: 'low',
-        model: getOpenAILunaModel(),
-        effort: getOpenAIReasoningEffortForTask('condition_image_precheck'),
-        schemaName: 'image_precheck',
-        maxOutputTokens: 4000,
-        schema,
-        label: 'condition_image_precheck',
-        promptCacheKey: 'condition_image_precheck',
-      });
+      parsed = await runOpenAIPrecheck(getOpenAIReasoningEffortForTask('condition_image_precheck'));
+
+      // The primary effort is deliberately the cheapest setting, which is right
+      // for the common case where the photos obviously match. A rejection is the
+      // expensive outcome though - it is user-visible, blocks the whole request,
+      // and buys no safety, since the item still has to pass condition scoring
+      // and every pricing gate afterwards. So a "fail" from the cheap pass gets
+      // one second look at the task's retry effort before the pawner is turned
+      // away. Only rejections pay for this; a pass costs nothing extra.
+      if (parsed && !isPrecheckPass(parsed)) {
+        const retryEffort = getOpenAIReasoningEffortForTask('condition_image_precheck', 'retry');
+        try {
+          const second = await runOpenAIPrecheck(retryEffort);
+          if (second) {
+            console.log('Image precheck escalated to effort', retryEffort, '->', isPrecheckPass(second) ? 'pass' : 'still fail');
+            parsed = second;
+          }
+        } catch (error) {
+          // The cheap verdict still stands; a failed second look must not turn
+          // a plain rejection into an error the pawner cannot act on.
+          console.warn('Image precheck escalation failed; keeping the first verdict:', {
+            kind: normalizeProviderError('openai', error, 'condition_image_precheck').kind,
+          });
+        }
+      }
     } catch (error) {
       openAIFailure = normalizeProviderError('openai', error, 'condition_image_precheck');
       console.warn('OpenAI image precheck failed; trying Anthropic:', {
@@ -319,10 +360,11 @@ expectedType: ${expectedType}
     };
   }
 
-  const allMatch = parsed.imageChecks.length > 0 && parsed.imageChecks.every((check) => check.matchesExpected);
-  const pass = Boolean(parsed.pass && parsed.consistentItem && allMatch);
-
-  return { ...parsed, pass, expectedType: parsed.expectedType || expectedType };
+  return {
+    ...parsed,
+    pass: isPrecheckPass(parsed),
+    expectedType: parsed.expectedType || expectedType,
+  };
 }
 
 // ---------------------------------------------------------------------------
