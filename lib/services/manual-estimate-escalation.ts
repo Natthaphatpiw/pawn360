@@ -105,18 +105,29 @@ export async function escalateToManualEstimate(
       .from('manual_estimate_requests')
       .insert({
         line_id: input.lineId,
-        item_type: input.itemType,
-        brand: input.brand,
-        model: input.model,
-        capacity: input.capacity ?? null,
         status: 'PENDING',
-        source: 'AUTO_ESCALATION',
-        escalation_reason: input.reason,
+        // The table keeps request details in a JSONB blob rather than columns,
+        // so match the shape the operator UI already reads.
+        item_data: {
+          itemType: input.itemType,
+          brand: input.brand,
+          model: input.model,
+          capacity: input.capacity ?? null,
+          productName: input.productName,
+          source: 'AUTO_ESCALATION',
+          escalationReason: input.reason,
+          tiersAttempted: input.tiersAttempted,
+        },
+        image_urls: [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
-      .select('id')
+      .select('*')
       .maybeSingle();
     if (error) throw error;
-    requestId = data?.id ? String(data.id) : null;
+    const row = data as Record<string, unknown> | null;
+    const id = row?.id ?? row?.request_id ?? row?.manual_estimate_id;
+    requestId = id ? String(id) : null;
   } catch (error) {
     console.error('Manual-estimate escalation could not be recorded', {
       code: (error as { code?: string })?.code || 'DB_ERROR',
