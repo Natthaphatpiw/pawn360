@@ -385,6 +385,31 @@ async function readBoundedExaJson(response: Response): Promise<any> {
   }
 }
 
+/**
+ * Parallel stays primary, Exa stays fallback.
+ *
+ * On raw search yield Exa `auto` looked clearly better - over 55 products it
+ * returned 378 results carrying both a provable price and a used-market marker
+ * against Parallel `basic`'s 171. That metric turned out not to predict the
+ * thing that matters: those extra results are largely marketplace category
+ * pages, and the exact-model extraction step rejects them, so end-to-end
+ * coverage did not improve. Swap the order with MARKET_SEARCH_PROVIDER_ORDER
+ * once there is an end-to-end measurement that justifies it.
+ */
+function searchProviderOrder(): Array<'exa' | 'parallel'> {
+  const configured = process.env.MARKET_SEARCH_PROVIDER_ORDER?.trim().toLowerCase();
+  if (configured === 'exa,parallel' || configured === 'exa') return ['exa', 'parallel'];
+  return ['parallel', 'exa'];
+}
+
+function exaSearchType(): string {
+  const configured = process.env.EXA_SEARCH_TYPE?.trim().toLowerCase();
+  // `instant` is cheaper but returned roughly half the usable evidence.
+  return ['auto', 'neural', 'keyword', 'instant', 'fast'].includes(configured || '')
+    ? configured as string
+    : 'auto';
+}
+
 function parallelMode(): 'turbo' | 'basic' | 'advanced' {
   const configured = process.env.PARALLEL_SEARCH_MODE?.trim().toLowerCase();
   if (configured === 'turbo' || configured === 'advanced') return configured;
@@ -538,7 +563,7 @@ async function searchExa(request: MarketSearchRequest): Promise<MarketSearchResp
   const timeoutMs = positiveInt(process.env.EXA_SEARCH_TIMEOUT_MS, DEFAULT_EXA_TIMEOUT_MS);
   const maxResults = Math.min(
     request.maxResults || DEFAULT_MAX_RESULTS,
-    positiveInt(process.env.EXA_SEARCH_MAX_RESULTS, 5),
+    positiveInt(process.env.EXA_SEARCH_MAX_RESULTS, DEFAULT_MAX_RESULTS),
   );
   const startedAt = Date.now();
   const query = request.searchQueries
@@ -567,7 +592,7 @@ async function searchExa(request: MarketSearchRequest): Promise<MarketSearchResp
           },
           body: JSON.stringify({
             query: query || request.objective,
-            type: 'instant',
+            type: exaSearchType(),
             numResults: maxResults,
             userLocation: 'TH',
             systemPrompt: normalizeText(request.objective, 3_000),
@@ -777,27 +802,20 @@ export async function searchMarket(request: MarketSearchRequest): Promise<Market
 
   try {
     const failures: MarketSearchProviderFailure[] = [];
-    try {
-      const response = await searchParallel(normalizedRequest);
-      await writeCache(cacheKey, response);
-      console.log('Market search usage:', response.metadata);
-      return response;
-    } catch (error) {
-      const normalized = normalizeProviderError('parallel', error, 'market_search');
-      failures.push(publicFailure(normalized));
-      console.warn('Parallel market search failed; trying Exa:', publicFailure(normalized));
-    }
-
-    try {
-      const response = await searchExa(normalizedRequest);
-      response.metadata.providerFailures = failures;
-      await writeCache(cacheKey, response);
-      console.log('Market search usage:', response.metadata);
-      return response;
-    } catch (error) {
-      const normalized = normalizeProviderError('exa', error, 'market_search');
-      failures.push(publicFailure(normalized));
-      console.warn('Exa market search failed:', publicFailure(normalized));
+    for (const provider of searchProviderOrder()) {
+      try {
+        const response = provider === 'exa'
+          ? await searchExa(normalizedRequest)
+          : await searchParallel(normalizedRequest);
+        if (failures.length) response.metadata.providerFailures = failures;
+        await writeCache(cacheKey, response);
+        console.log('Market search usage:', response.metadata);
+        return response;
+      } catch (error) {
+        const normalized = normalizeProviderError(provider, error, 'market_search');
+        failures.push(publicFailure(normalized));
+        console.warn(`${provider} market search failed:`, publicFailure(normalized));
+      }
     }
 
     if (cached) {

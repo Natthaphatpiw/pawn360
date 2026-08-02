@@ -4,6 +4,7 @@
 // lib/services/estimate-jobs.ts). No Next.js request/response types in here.
 import crypto from 'crypto';
 import { Redis } from '@upstash/redis';
+import { escalateToManualEstimate } from '@/lib/services/manual-estimate-escalation';
 import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
 import {
   hasAnthropicKeys,
@@ -685,24 +686,153 @@ SEARCH_DATA=${boundedSearchContext(searchItems)}`;
   return best;
 }
 
+/**
+ * Thai second-hand marketplaces are where the price we lend against is actually
+ * set, and naming them in the query is what pulls listing pages into the result
+ * set instead of spec sheets and price-index articles. Measured over 55 products
+ * this roughly doubled the number of results carrying both a provable price and
+ * a used-market marker, for both search providers.
+ */
+// Bump whenever the search phrasing changes. The explicit cacheKey below
+// overrides market-search's default "hash the queries" behaviour, so without a
+// version marker a query improvement is invisible to anything already cached -
+// which is exactly what happened the first time these queries were changed.
+const MARKET_QUERY_STRATEGY_VERSION = 'v2-th-marketplace';
+
+const TH_MARKETPLACE_DOMAINS = [
+  'kaidee.com',
+  'mac2hand.com',
+  'ennxo.com',
+  'compasia.co.th',
+  'shopee.co.th',
+  'pantipmarket.com',
+];
+
+function buildThaiMarketQueries(productName: string, extra: string[] = []): string[] {
+  const sites = TH_MARKETPLACE_DOMAINS.slice(0, 4).join(' OR ');
+  return [
+    `${productName} มือสอง ราคา`,
+    `${productName} มือสอง ${sites}`,
+    ...extra,
+  ].filter(Boolean).slice(0, 3);
+}
+
+/**
+ * Escalation ladder for market evidence.
+ *
+ * A pawner who gets "no reliable market price" has to fall back to a human, so
+ * the cheap-and-fast configuration is only the first attempt, not the only one.
+ * Each rung costs more and takes longer but widens the net; we stop at the first
+ * rung that produces usable evidence, so the extra cost is only paid on the
+ * queries that need it.
+ */
+interface SearchEscalationTier {
+  name: string;
+  maxResults: number;
+  maxCharsTotal: number;
+  /** Provider order override for this rung; undefined keeps the configured default. */
+  providerOrder?: string;
+  parallelMode?: 'basic' | 'advanced';
+  queries: (productName: string) => string[];
+}
+
+const SEARCH_ESCALATION_TIERS: SearchEscalationTier[] = [
+  {
+    name: 'standard',
+    maxResults: 10,
+    maxCharsTotal: 16_000,
+    // Deliberately the original phrasing. Naming Thai marketplaces raised raw
+    // search yield but LOWERED usable evidence end to end (notebooks 7/13 ->
+    // 1/13), because marketplace category pages carry many models at once and
+    // the exact-model extraction step then rejects them. Raw hit count is not
+    // the metric that matters; survivable evidence is.
+    queries: (name) => [
+      buildWebSearchQuery(name),
+      `${name} มือสอง ราคา`,
+      `"${name}" used Thailand price`,
+    ],
+  },
+  {
+    // Widen the net: more results, more excerpt budget, and query angles that
+    // drop the capacity/variant wording which often has no exact listing.
+    name: 'broadened',
+    maxResults: 20,
+    maxCharsTotal: 28_000,
+    queries: (name) => [
+      `ขาย ${name} มือสอง ราคาเท่าไหร่`,
+      `${name} มือสอง ${TH_MARKETPLACE_DOMAINS.slice(2).join(' OR ')}`,
+      `${name.replace(/\b\d+\s?(GB|TB)\b/gi, '').trim()} มือสอง ราคา`,
+    ],
+  },
+  {
+    // Last rung before a human: the other provider, at its most thorough
+    // setting, with the broadest phrasing.
+    name: 'deep',
+    maxResults: 20,
+    maxCharsTotal: 28_000,
+    providerOrder: 'parallel,exa',
+    parallelMode: 'advanced',
+    queries: (name) => [
+      `${name} มือสอง`,
+      `${name} second hand price Thailand`,
+      `${name} ราคา มือสอง pantip`,
+    ],
+  },
+];
+
+/**
+ * Evidence count below which the ladder keeps climbing. Four is the point at
+ * which computeRepresentativeUsedPriceTHB stops quarantining outliers for lack
+ * of a distribution to judge them against.
+ */
+function minEvidenceItems(): number {
+  const configured = Number(process.env.MARKET_MIN_EVIDENCE_ITEMS);
+  return Number.isFinite(configured) && configured >= 1 ? Math.floor(configured) : 4;
+}
+
+function escalationTiers(): SearchEscalationTier[] {
+  const limit = Number(process.env.MARKET_SEARCH_MAX_ESCALATION_TIERS);
+  const count = Number.isFinite(limit) && limit >= 1
+    ? Math.min(SEARCH_ESCALATION_TIERS.length, Math.floor(limit))
+    : SEARCH_ESCALATION_TIERS.length;
+  return SEARCH_ESCALATION_TIERS.slice(0, count);
+}
+
 // Parallel is the primary web provider, Exa is its fallback, and a stale market
 // cache is the final search fallback. OpenAI Terra extracts structured prices;
 // Anthropic remains the LLM fallback over the exact same normalized evidence.
-async function fetchWebSearchPrices(productName: string): Promise<WebSearchResult | null> {
+async function fetchWebSearchPrices(
+  productName: string,
+  tier: SearchEscalationTier = SEARCH_ESCALATION_TIERS[0],
+): Promise<WebSearchResult | null> {
+  const previousOrder = process.env.MARKET_SEARCH_PROVIDER_ORDER;
+  const previousMode = process.env.PARALLEL_SEARCH_MODE;
+  if (tier.providerOrder) process.env.MARKET_SEARCH_PROVIDER_ORDER = tier.providerOrder;
+  if (tier.parallelMode) process.env.PARALLEL_SEARCH_MODE = tier.parallelMode;
   const query = buildWebSearchQuery(productName);
-  const search = await searchMarket({
-    objective: `Find current Thai second-hand listings and advertised prices for the exact product ${productName}. Exclude accessories and repair listings.`,
-    searchQueries: [
-      query,
-      `${productName} มือสอง ราคา`,
-      `"${productName}" used Thailand price`,
-    ],
-    cacheKey: `generic:${productName.trim().toLowerCase()}`,
-    maxResults: 10,
-    maxCharsTotal: 16_000,
-  });
+  let search;
+  try {
+    search = await searchMarket({
+      objective: `Find current Thai second-hand listings and advertised prices for the exact product ${productName}. Exclude accessories and repair listings.`,
+      searchQueries: tier.queries(productName),
+      // Each rung caches separately; a broadened retry must not be served the
+      // narrow result set that already failed.
+      cacheKey: `generic:${MARKET_QUERY_STRATEGY_VERSION}:${tier.name}:${productName.trim().toLowerCase()}`,
+      maxResults: tier.maxResults,
+      maxCharsTotal: tier.maxCharsTotal,
+    });
+  } finally {
+    if (tier.providerOrder) {
+      if (previousOrder === undefined) delete process.env.MARKET_SEARCH_PROVIDER_ORDER;
+      else process.env.MARKET_SEARCH_PROVIDER_ORDER = previousOrder;
+    }
+    if (tier.parallelMode) {
+      if (previousMode === undefined) delete process.env.PARALLEL_SEARCH_MODE;
+      else process.env.PARALLEL_SEARCH_MODE = previousMode;
+    }
+  }
   const extractionCacheKey = `${MARKET_PRICE_CACHE_KEY_PREFIX}:${hashValue(
-    productName.trim().toLowerCase()
+    `${MARKET_QUERY_STRATEGY_VERSION}:${tier.name}:${productName.trim().toLowerCase()}`
   )}`;
   const redis = getRedisClient();
   if (redis) {
@@ -1168,7 +1298,7 @@ async function fetchNotebookListings(spec: NotebookSpec): Promise<NotebookListin
       `${spec.brand} ${spec.family} used Thailand price`,
       `${specIdentity} ราคาใหม่ launch price Thailand`,
     ],
-    cacheKey: `notebook:${specIdentity.trim().toLowerCase()}`,
+    cacheKey: `notebook:${MARKET_QUERY_STRATEGY_VERSION}:${specIdentity.trim().toLowerCase()}`,
     maxResults: 10,
     maxCharsTotal: 18_000,
   });
@@ -1527,6 +1657,8 @@ type RepresentativeMarketResult = {
   usedWeights: boolean;
   /** The evidence the price was derived from, for telemetry and offline evaluation. */
   evidence: Array<{ price_thb: number; source: 'web_search' | 'serpapi'; weight: number }>;
+  /** Which escalation rung produced the evidence. */
+  searchTier: string;
 };
 
 // Agent 2: Web search + SerpAPI -> merge -> representative price
@@ -1543,22 +1675,56 @@ export async function getRepresentativeMarketPrice(
     });
   }
 
-  const [webOutcome, serpapiOutcome] = await Promise.allSettled([
-    fetchWebSearchPrices(productName),
-    fetchSerpapiShoppingResults(input, productName),
-  ]);
-  const webResults = webOutcome.status === 'fulfilled' ? webOutcome.value : null;
-  const serpapiResults = serpapiOutcome.status === 'fulfilled' ? serpapiOutcome.value : null;
-  const webFailure = webOutcome.status === 'rejected'
-    ? normalizeProviderError('unknown', webOutcome.reason, 'market_search')
-    : null;
+  // Climb the escalation ladder until there is usable evidence. Nothing here
+  // widens what counts as valid evidence - each rung only searches harder - so
+  // a price produced on rung 3 is held to exactly the same proof standard as
+  // one produced on rung 1.
+  const tiers = escalationTiers();
+  let webResults: WebSearchResult | null = null;
+  let serpapiResults: SerpapiShoppingResults | null = null;
+  let webFailure: ProviderError | null = null;
+  let webItems: CombinedItem[] = [];
+  let serpItems: CombinedItem[] = [];
+  let tierUsed = tiers[0]?.name || 'standard';
 
-  const webItems = (webResults?.items || [])
-    .map(toCombinedItemFromWeb)
-    .filter(Boolean) as CombinedItem[];
-  const serpItems = (serpapiResults?.items || [])
-    .map(toCombinedItemFromSerpapi)
-    .filter(Boolean) as CombinedItem[];
+  for (const tier of tiers) {
+    // SerpAPI has no tiers of its own; only query it once, on the first rung.
+    const serpapiAttempt: Promise<SerpapiShoppingResults | null> = tier === tiers[0]
+      ? fetchSerpapiShoppingResults(input, productName)
+      : Promise.resolve(serpapiResults);
+    const [webOutcome, serpapiOutcome] = await Promise.allSettled([
+      fetchWebSearchPrices(productName, tier),
+      serpapiAttempt,
+    ]);
+    webResults = webOutcome.status === 'fulfilled' ? webOutcome.value : null;
+    if (serpapiOutcome.status === 'fulfilled' && serpapiOutcome.value) {
+      serpapiResults = serpapiOutcome.value;
+    }
+    webFailure = webOutcome.status === 'rejected'
+      ? normalizeProviderError('unknown', webOutcome.reason, 'market_search')
+      : null;
+
+    webItems = (webResults?.items || [])
+      .map(toCombinedItemFromWeb)
+      .filter(Boolean) as CombinedItem[];
+    serpItems = (serpapiResults?.items || [])
+      .map(toCombinedItemFromSerpapi)
+      .filter(Boolean) as CombinedItem[];
+    tierUsed = tier.name;
+
+    // A one- or two-item pool is technically "evidence" but a representative
+    // price computed from it is barely better than a guess, so keep climbing
+    // while there are rungs left. Whatever the last rung yields is still used -
+    // thin evidence beats no answer.
+    if (webItems.length + serpItems.length >= minEvidenceItems()) break;
+    if (tier === tiers[tiers.length - 1]) break;
+    // A configuration or budget failure will not improve on the next rung.
+    if (webFailure && ['CONFIGURATION', 'AUTHENTICATION', 'BUDGET_EXHAUSTED'].includes(webFailure.kind)) break;
+    console.warn(
+      `Market evidence thin at tier "${tier.name}" (${webItems.length + serpItems.length} items); escalating.`,
+      { productName },
+    );
+  }
 
   const combinedItems = [...webItems, ...serpItems];
   // Google Shopping (SerpAPI) reliably supplies volume but skews low for a
@@ -1595,6 +1761,7 @@ export async function getRepresentativeMarketPrice(
       analysis,
       sourceCounts: { web: webItems.length, serpapi: serpItems.length },
       usedWeights: Boolean(weights),
+      searchTier: tierUsed,
       evidence: combinedItems.map((item, index) => ({
         price_thb: Number(item.price_thb),
         source: index < webItems.length ? 'web_search' as const : 'serpapi' as const,
@@ -1856,11 +2023,27 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
         operation: error.operation,
       });
       if (error.kind === 'EMPTY_RESULT' || error.kind === 'QUALITY_REJECTED') {
+        // Every search rung came back empty. Hand the request to an operator
+        // rather than telling the pawner their item cannot be priced.
+        const escalation = await escalateToManualEstimate({
+          lineId: body.lineId,
+          itemType: body.itemType,
+          brand: body.brand,
+          model: body.model,
+          productName: `${body.brand} ${body.model}`.trim(),
+          capacity: body.capacity,
+          reason: error.kind === 'EMPTY_RESULT'
+            ? 'ไม่พบหลักฐานราคาตลาดหลังค้นหาครบทุกระดับ'
+            : 'หลักฐานราคาที่พบไม่ผ่านการตรวจสอบ',
+          tiersAttempted: escalationTiers().map((tier) => tier.name),
+        });
         return {
           ok: false,
-          status: 422,
-          error: 'ไม่พบข้อมูลราคาตลาดที่น่าเชื่อถือเพียงพอ กรุณาตรวจสอบชื่อรุ่นและสเปคอีกครั้ง หรือติดต่อเจ้าหน้าที่เพื่อประเมินราคา',
-          code: 'insufficient_market_data',
+          status: 202,
+          error: escalation.requestId
+            ? 'ระบบยังหาราคาตลาดที่เชื่อถือได้ไม่พอ จึงส่งให้เจ้าหน้าที่ประเมินราคาให้แทน เราจะแจ้งผลกลับทาง LINE'
+            : 'ระบบยังหาราคาตลาดที่เชื่อถือได้ไม่พอ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคา',
+          code: 'manual_estimate_escalated',
         };
       }
       if (error.kind === 'INVALID_REQUEST') {
