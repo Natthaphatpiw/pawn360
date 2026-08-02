@@ -6,6 +6,7 @@
 // Method doc: NOTEBOOK_PRICING.md.
 
 import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
+import { anchorSafetyFactor } from '@/lib/services/anchor-pricing';
 import {
   GpuClass,
   NotebookSpec,
@@ -65,9 +66,21 @@ export interface NotebookPricingConfig {
   ladderMinExact: number; // L1
   ladderMinPool: number; // L2/L3
   tierWeights: Record<MatchTier, number>;
-  newCurrentBaseFactor: number;
-  newCurrentPerYearDrop: number;
-  newCurrentMaxAgeYears: number;
+  /**
+   * Applied to a new_current anchor on top of the shared retention curve.
+   * A price for a new unit sold today is usually already below the original
+   * launch MSRP, so it needs slightly less depreciation - but nothing like the
+   * near-flat curve this replaced.
+   *
+   * Calibrated on the 13-notebook benchmark against the p20-p25 design target.
+   * Measured: 1.05 lands 26.7% below target (safe but too low to be useful),
+   * 1.365 centres on it, 1.5 puts an item above the highest real listing and
+   * breaks the never-over-value rule. 1.25 lands ~13% below target and keeps a
+   * deliberate margin, because run-to-run search noise alone moves a price by
+   * ~16% at the median - calibrating to the boundary would cross it on the
+   * next run.
+   */
+  newCurrentRetentionMult: number;
   retentionByAge: number[]; // index = age in years
   retentionLateDecay: number;
   retentionFloor: number;
@@ -132,9 +145,7 @@ export const DEFAULT_NOTEBOOK_PRICING_CONFIG: NotebookPricingConfig = {
   ladderMinExact: 3,
   ladderMinPool: 3,
   tierWeights: { exact: 3, family: 2, same_brand: 1.5, cross_brand: 1 },
-  newCurrentBaseFactor: 0.78,
-  newCurrentPerYearDrop: 0.03,
-  newCurrentMaxAgeYears: 4,
+  newCurrentRetentionMult: 1.25,
   retentionByAge: [0.82, 0.65, 0.52, 0.42, 0.34, 0.28, 0.23],
   retentionLateDecay: 0.85,
   retentionFloor: 0.15,
@@ -460,12 +471,14 @@ function anchorUsedValue(
     12
   );
 
-  if (comp.listing.listing_kind === 'new_current') {
-    const factor = cfg.newCurrentBaseFactor - cfg.newCurrentPerYearDrop * Math.min(age, cfg.newCurrentMaxAgeYears);
-    return comp.adjustedPrice * factor;
-  }
-
-  // launch_msrp
+  // Both anchor kinds depreciate on the same calibrated curve. They used to
+  // differ: new_current ran on a near-flat 0.78 - 0.03*age, which valued a
+  // 4-year-old machine at 66% of new where the launch-MSRP curve gives 34% -
+  // almost 2x apart at the same age. That gap put 5 of 13 benchmark notebooks
+  // above the highest real listing found for them. A current new price is a
+  // usable stand-in for launch MSRP, so the only difference kept is a small
+  // multiplier for the fact that today's retail price is often already
+  // discounted below launch.
   let retention: number;
   if (age < cfg.retentionByAge.length) {
     retention = cfg.retentionByAge[age];
@@ -477,7 +490,8 @@ function anchorUsedValue(
     );
   }
   const segmentAdj = cfg.segmentRetentionAdj[target.segment] ?? 1;
-  return comp.adjustedPrice * retention * segmentAdj;
+  const kindAdj = comp.listing.listing_kind === 'new_current' ? cfg.newCurrentRetentionMult : 1;
+  return comp.adjustedPrice * retention * segmentAdj * kindAdj;
 }
 
 // ---------------------------------------------------------------------------
@@ -545,10 +559,15 @@ export function computeNotebookPrice(
   let clampedByAnchor = false;
 
   if (level === 'L5') {
-    marketPrice = Math.round(anchorValue as number);
+    // Depreciation alone lands ON the market target, so pricing an anchor at
+    // face value put this rung above real resale by up to 102%. The same
+    // lending haircut the generic anchor path uses applies here: never quote
+    // above what the machine would really fetch.
+    const safety = anchorSafetyFactor(anchorComps.length, Boolean(target.releaseYear));
+    marketPrice = Math.round((anchorValue as number) * safety);
     const age = target.releaseYear ? clamp(nowYear - target.releaseYear, 0, 12) : cfg.defaultAgeYears;
     avgUnknowns = anchorComps.reduce((s, c) => s + c.unknowns, 0) / anchorComps.length;
-    notes.push(`อิงราคาของใหม่/ราคาเปิดตัว ${anchorComps.length} รายการ หักค่าเสื่อมตามอายุ ~${age} ปี`);
+    notes.push(`อิงราคาของใหม่/ราคาเปิดตัว ${anchorComps.length} รายการ หักค่าเสื่อมตามอายุ ~${age} ปี และหักเพิ่มเพื่อความปลอดภัย ${Math.round((1 - safety) * 100)}%`);
   } else {
     const weights = pool.map((c) => cfg.tierWeights[c.tier]);
     const analysis = computeRepresentativeUsedPriceTHB(
@@ -570,8 +589,12 @@ export function computeNotebookPrice(
     // Cross-level guardrail: keep the comp-based result inside a generous band
     // around the depreciated-new-price estimate, when we have anchors.
     if (anchorValue !== null && anchorValue > 0) {
-      const lo = cfg.anchorGuardBand[0] * anchorValue;
-      const hi = cfg.anchorGuardBand[1] * anchorValue;
+      // Haircut the reference before banding: an un-haircut anchor raises the
+      // ceiling this clamp pulls comp prices toward, which is how L4 ended up
+      // 84% above real resale on a single-comp machine.
+      const guardAnchor = anchorValue * anchorSafetyFactor(anchorComps.length, Boolean(target.releaseYear));
+      const lo = cfg.anchorGuardBand[0] * guardAnchor;
+      const hi = cfg.anchorGuardBand[1] * guardAnchor;
       if (marketPrice < lo || marketPrice > hi) {
         marketPrice = Math.round(clamp(marketPrice, lo, hi));
         clampedByAnchor = true;

@@ -139,6 +139,26 @@ const SAFETY_UNKNOWN_AGE = 0.90;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
+/**
+ * The lending haircut, shared by every path that prices from a new-price anchor.
+ *
+ * Exported because the notebook ladder computes its own anchor value (L5, and
+ * the cross-level guard band that clamps comp prices against it) and must apply
+ * the same policy. When this lived only in computeAnchorPrice the notebook L5
+ * rung shipped without it and over-valued by up to 102% against real resale.
+ *
+ * @param anchorCount how many independent new-price references were found
+ * @param knownAge    whether the release year is known, or being guessed
+ */
+export function anchorSafetyFactor(anchorCount: number, knownAge: boolean): number {
+  const configuredMax = Number(process.env.ANCHOR_SAFETY_MAX);
+  const ceiling = Number.isFinite(configuredMax) && configuredMax > 0 && configuredMax <= 1
+    ? configuredMax
+    : SAFETY_MAX;
+  const evidenceFactor = Math.min(ceiling, 0.68 + Math.max(0, anchorCount) * 0.05);
+  return clamp(evidenceFactor * (knownAge ? 1 : SAFETY_UNKNOWN_AGE), SAFETY_MIN, ceiling);
+}
+
 const median = (values: number[]): number => {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
@@ -200,16 +220,7 @@ export function computeAnchorPrice(input: AnchorPriceInput): AnchorPriceResult |
   // Conservatism proportional to uncertainty, but capped so the result is
   // always below the market target: one anchor is cut to ~0.73 of the
   // depreciated value, four or more agreeing anchors to the 0.88 ceiling.
-  const configuredMax = Number(process.env.ANCHOR_SAFETY_MAX);
-  const ceiling = Number.isFinite(configuredMax) && configuredMax > 0 && configuredMax <= 1
-    ? configuredMax
-    : SAFETY_MAX;
-  const evidenceFactor = Math.min(ceiling, 0.68 + anchors.length * 0.05);
-  const safetyFactor = clamp(
-    evidenceFactor * (knownAge === null ? SAFETY_UNKNOWN_AGE : 1),
-    SAFETY_MIN,
-    ceiling,
-  );
+  const safetyFactor = anchorSafetyFactor(anchors.length, knownAge !== null);
   const marketPrice = Math.round(anchorMedian * retention * safetyFactor);
 
   // Confidence tracks the four things that actually make an anchor estimate
