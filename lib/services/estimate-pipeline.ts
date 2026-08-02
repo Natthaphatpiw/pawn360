@@ -1783,6 +1783,126 @@ export type EstimatePipelineResult =
   | { ok: true; payload: EstimateResponse }
   | { ok: false; status: number; error: string; code?: string; retryAfterSeconds?: number };
 
+export interface NotebookMarketResult {
+  marketPrice: number;
+  pricing: NonNullable<ReturnType<typeof computeNotebookPrice>>;
+  spec: NotebookSpec;
+  allListings: NotebookListingInput[];
+  quarantinedListings: NotebookListingInput[];
+  sourceCounts: { web: number; serpapi: number; observations: number };
+}
+
+/**
+ * The notebook ladder (NOTEBOOK_PRICING.md): canonical spec -> listing harvest
+ * -> per-comp spec adjustment -> L1..L5. L5 is the spec-only rung: it prices
+ * from a new/launch anchor minus age depreciation, so a laptop with no used
+ * listings at all can still be valued. Returns null only when the harvest
+ * produced neither a used comp nor an anchor.
+ *
+ * Exported so runEstimatePipeline and the offline benchmark share one
+ * implementation - measuring laptops through the generic path instead of this
+ * one produces numbers that do not describe production.
+ */
+export async function computeNotebookMarketPrice(
+  body: EstimateRequest,
+  productName: string,
+): Promise<NotebookMarketResult | null> {
+  const spec = await extractNotebookSpec(
+    {
+      brand: body.brand,
+      model: body.model,
+      cpu: body.cpu,
+      ram: body.ram,
+      storage: body.storage,
+      capacity: body.capacity,
+      gpu: body.gpu,
+      screenSize: body.screenSize,
+      note: body.note,
+      defects: body.defects,
+      images: body.images,
+    },
+    productName,
+  );
+  console.log('💻 Canonical spec completed:', {
+    hasFamily: Boolean(spec.family),
+    hasCpu: Boolean(spec.cpuModel),
+    hasRam: Boolean(spec.ramGb),
+    hasStorage: Boolean(spec.storageGb),
+    hasGpu: Boolean(spec.gpuModel),
+    hasReleaseYear: Boolean(spec.releaseYear),
+  });
+
+  // SerpAPI must search/filter with the CANONICAL spec (incl. anything the
+  // vision extraction read off the photos) — the generic normalized name
+  // can be junk like "Dell Notebook" when the pawner typed "ไม่รู้".
+  const serpapiInput: EstimateRequest = {
+    ...body,
+    brand: spec.brand,
+    model: [spec.family, spec.variant].filter(Boolean).join(' ') || body.model,
+    cpu: spec.cpuModel || body.cpu,
+    ram: spec.ramGb ? `${spec.ramGb}GB` : body.ram,
+    storage: formatNotebookStorage(spec) || body.storage,
+  };
+
+  const observations = dedupeNotebookListings(
+    await fetchRecentNotebookObservations(spec.brand, spec.family, 14, 40)
+  );
+  let webListings: NotebookListingInput[] = [];
+  let serpListings: NotebookListingInput[] = [];
+  let webFailure: ProviderError | null = null;
+  let allListings = observations;
+  let quarantinedListings: NotebookListingInput[] = [];
+  let pricing = computeNotebookPrice(spec, allListings);
+  const observationPoolStrong = Boolean(
+    pricing && pricing.usedCompCount >= 4 && pricing.confidence >= 0.75
+  );
+
+  if (!observationPoolStrong) {
+    const [webOutcome, serpapiOutcome] = await Promise.allSettled([
+      fetchNotebookListings(spec),
+      fetchSerpapiShoppingResults(serpapiInput, spec.productName),
+    ]);
+    webListings = webOutcome.status === 'fulfilled' ? webOutcome.value : [];
+    const serpapiResults = serpapiOutcome.status === 'fulfilled' ? serpapiOutcome.value : null;
+    webFailure = webOutcome.status === 'rejected'
+      ? normalizeProviderError('unknown', webOutcome.reason, 'notebook_market_search')
+      : null;
+    serpListings = mapSerpapiItemsToNotebookListings(serpapiResults, spec);
+    const merged = dedupeNotebookListings([...observations, ...webListings, ...serpListings]);
+    const partitioned = partitionNotebookListingOutliers(merged);
+    allListings = partitioned.accepted;
+    quarantinedListings = partitioned.quarantined;
+    pricing = computeNotebookPrice(spec, allListings);
+  } else {
+    console.log('💻 Recent observation pool is strong; skipped paid market providers.');
+  }
+
+  console.log(
+    `💻 Listings: web=${webListings.length} serpapi=${serpListings.length} observations=${observations.length}`
+  );
+
+  if (!pricing) {
+    if (webFailure && (
+      webFailure.retryable
+      || ['CONFIGURATION', 'AUTHENTICATION', 'BUDGET_EXHAUSTED'].includes(webFailure.kind)
+    )) throw webFailure;
+    return null;
+  }
+
+  return {
+    marketPrice: Math.max(pricing.marketPrice, MIN_ESTIMATE_PRICE),
+    pricing,
+    spec,
+    allListings,
+    quarantinedListings,
+    sourceCounts: {
+      web: webListings.length,
+      serpapi: serpListings.length,
+      observations: observations.length,
+    },
+  };
+}
+
 export async function runEstimatePipeline(body: EstimateRequest): Promise<EstimatePipelineResult> {
   if (body?.lineId && !getAISafetyIdentifier()) {
     return runWithAIUsageContext(
@@ -1829,115 +1949,46 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
     let persistNotebookObservationRows: PriceObservationRow[] | null = null;
 
     if (isNotebookEstimate(body)) {
-      // Notebook ladder pipeline (NOTEBOOK_PRICING.md): structured spec →
-      // multi-angle listing harvest → per-comp adjustment → L1..L5.
       console.log('💻 Notebook pipeline: extracting spec...');
-      const spec = await extractNotebookSpec(
-        {
+      const notebookResult = await computeNotebookMarketPrice(body, normalizedData.productName);
+      if (!notebookResult) {
+        // The ladder already tried exact comps, family, brand, any used comp,
+        // and finally a new-price anchor with depreciation. Nothing left but a
+        // human - and the pawner gets "we are pricing this by hand", not 422.
+        console.warn('💻 Notebook pricing: no usable comps or anchors — escalating to a human');
+        const escalation = await escalateToManualEstimate({
+          lineId: body.lineId,
+          itemType: body.itemType,
           brand: body.brand,
           model: body.model,
-          cpu: body.cpu,
-          ram: body.ram,
-          storage: body.storage,
+          productName: normalizedData.productName,
           capacity: body.capacity,
-          gpu: body.gpu,
-          screenSize: body.screenSize,
-          note: body.note,
-          defects: body.defects,
-          images: body.images,
-        },
-        normalizedData.productName
-      );
-      console.log('💻 Canonical spec completed:', {
-        hasFamily: Boolean(spec.family),
-        hasCpu: Boolean(spec.cpuModel),
-        hasRam: Boolean(spec.ramGb),
-        hasStorage: Boolean(spec.storageGb),
-        hasGpu: Boolean(spec.gpuModel),
-        hasReleaseYear: Boolean(spec.releaseYear),
-      });
-
-      // SerpAPI must search/filter with the CANONICAL spec (incl. anything the
-      // vision extraction read off the photos) — the generic normalized name
-      // can be junk like "Dell Notebook" when the pawner typed "ไม่รู้".
-      const serpapiInput: EstimateRequest = {
-        ...body,
-        brand: spec.brand,
-        model: [spec.family, spec.variant].filter(Boolean).join(' ') || body.model,
-        cpu: spec.cpuModel || body.cpu,
-        ram: spec.ramGb ? `${spec.ramGb}GB` : body.ram,
-        storage: formatNotebookStorage(spec) || body.storage,
-      };
-
-      // A recent, deduplicated observation pool can answer repeated requests
-      // without another paid web/LLM turn. Only fall through to live providers
-      // when the deterministic ladder says the local evidence is weak.
-      const observations = dedupeNotebookListings(
-        await fetchRecentNotebookObservations(spec.brand, spec.family, 14, 40)
-      );
-      let webListings: NotebookListingInput[] = [];
-      let serpListings: NotebookListingInput[] = [];
-      let webFailure: ProviderError | null = null;
-      let allListings = observations;
-      let quarantinedListings: NotebookListingInput[] = [];
-      let pricing = computeNotebookPrice(spec, allListings);
-      const observationPoolStrong = Boolean(
-        pricing
-        && pricing.usedCompCount >= 4
-        && pricing.confidence >= 0.75
-      );
-
-      if (!observationPoolStrong) {
-        const [webOutcome, serpapiOutcome] = await Promise.allSettled([
-          fetchNotebookListings(spec),
-          fetchSerpapiShoppingResults(serpapiInput, spec.productName),
-        ]);
-        webListings = webOutcome.status === 'fulfilled' ? webOutcome.value : [];
-        const serpapiResults = serpapiOutcome.status === 'fulfilled' ? serpapiOutcome.value : null;
-        webFailure = webOutcome.status === 'rejected'
-          ? normalizeProviderError('unknown', webOutcome.reason, 'notebook_market_search')
-          : null;
-        serpListings = mapSerpapiItemsToNotebookListings(serpapiResults, spec);
-        const mergedListings = dedupeNotebookListings([...observations, ...webListings, ...serpListings]);
-        const partitionedListings = partitionNotebookListingOutliers(mergedListings);
-        allListings = partitionedListings.accepted;
-        quarantinedListings = partitionedListings.quarantined;
-        pricing = computeNotebookPrice(spec, allListings);
-      } else {
-        console.log('💻 Recent observation pool is strong; skipped paid market providers.');
-      }
-      console.log(
-        `💻 Listings: web=${webListings.length} serpapi=${serpListings.length} observations=${observations.length}`
-      );
-
-      if (!pricing) {
-        if (webFailure && (
-          webFailure.retryable
-          || ['CONFIGURATION', 'AUTHENTICATION', 'BUDGET_EXHAUSTED'].includes(webFailure.kind)
-        )) throw webFailure;
-        console.warn('💻 Notebook pricing: no usable comps or anchors — returning 422');
+          reason: 'ไม่พบทั้งรายการเทียบเคียงและราคาอ้างอิงของใหม่สำหรับโน้ตบุ๊กรุ่นนี้',
+          tiersAttempted: ['notebook ladder L1-L5'],
+        });
         return {
           ok: false,
-          status: 422,
-          error: 'ไม่พบข้อมูลราคาตลาดของรุ่นนี้เพียงพอสำหรับการประเมิน กรุณาตรวจสอบชื่อรุ่นและสเปคอีกครั้ง หรือติดต่อเจ้าหน้าที่เพื่อประเมินราคา',
-          code: 'insufficient_market_data',
+          status: 202,
+          error: escalation.requestId
+            ? 'ระบบยังหาราคาตลาดของรุ่นนี้ไม่พอ จึงส่งให้เจ้าหน้าที่ประเมินราคาให้แทน เราจะแจ้งผลกลับทาง LINE'
+            : 'ระบบยังหาราคาตลาดของรุ่นนี้ไม่พอ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคา',
+          code: 'manual_estimate_escalated',
         };
       }
 
       console.log(
-        `💻 Notebook price: ${pricing.marketPrice} [${pricing.level}] comps=${pricing.usedCompCount} anchors=${pricing.anchorCount} dropped=${pricing.droppedComps} confidence=${pricing.confidence}`
+        `💻 Notebook price: ${notebookResult.marketPrice} [${notebookResult.pricing.level}] comps=${notebookResult.pricing.usedCompCount} anchors=${notebookResult.pricing.anchorCount} confidence=${notebookResult.pricing.confidence}`
       );
-
-      marketPrice = Math.max(pricing.marketPrice, MIN_ESTIMATE_PRICE);
-      responseConfidence = pricing.confidence;
-      marketCalculationText = `ราคากลางโน้ตบุ๊ก [${pricing.level}] — ${pricing.notes.join(' · ')}`;
+      marketPrice = notebookResult.marketPrice;
+      responseConfidence = notebookResult.pricing.confidence;
+      marketCalculationText = `ราคากลางโน้ตบุ๊ก [${notebookResult.pricing.level}] — ${notebookResult.pricing.notes.join(' · ')}`;
       persistNotebookObservationRows = buildNotebookObservationRows(
-        spec,
+        notebookResult.spec,
         normalizedData.productName,
-        allListings,
-        pricing,
+        notebookResult.allListings,
+        notebookResult.pricing,
         marketPrice,
-        quarantinedListings,
+        notebookResult.quarantinedListings,
       );
     } else {
       console.log('🔄 Agent 2: Fetching web search + SerpAPI prices...');
