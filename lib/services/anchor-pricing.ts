@@ -95,17 +95,17 @@ const CONFIDENCE_FLOOR = 0.15;
  * only costs the pawner some borrowing headroom. The two errors are not
  * symmetric, so the model is not allowed to be unbiased here - it must lean low.
  *
- * Measured on 15 observations, an unhaircut anchor exceeded the conservative
- * market target 6 times. A flat factor that caught all six would have to be
- * ~0.70, costing 34% on every item to contain one outlier. Instead the haircut
- * scales with how much evidence stands behind the anchor: a single retail page
- * with no known release year is cut hard, several agreeing prices with a known
- * year are barely cut at all.
+ * The retention curves are calibrated to land ON the conservative market
+ * target, so depreciation alone is not enough - without a haircut the anchor
+ * exceeded the target on 6 of 15 observations. The haircut therefore has a
+ * hard ceiling that applies no matter how good the evidence is: 0.88 is the
+ * largest factor under which none of the calibration observations came out
+ * above its target, at one, three or ten anchors.
+ *
+ * Below that ceiling the cut still scales with evidence, so accumulating
+ * anchors buys back accuracy (mean margin tightens from -25% to -10%) without
+ * ever buying back the guarantee.
  */
-// The retention curves are fitted to land ON the conservative market target,
-// so even perfect anchor evidence has to be cut to stay strictly below it.
-// 0.88 is the largest factor under which none of the 15 observations exceeded
-// its target; it is a ceiling, never a starting point.
 const SAFETY_MAX = 0.88;
 const SAFETY_MIN = 0.60;
 const SAFETY_UNKNOWN_AGE = 0.90;
