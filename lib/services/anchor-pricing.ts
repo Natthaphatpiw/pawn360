@@ -83,9 +83,36 @@ const RETENTION_FLOOR = 0.12;
 /** Used when the release year is unknown - assumes a mid-life device. */
 const DEFAULT_AGE_YEARS = 3;
 const MAX_AGE_YEARS = 12;
-/** An anchor is weak evidence; this is the ceiling before sample penalties. */
-const ANCHOR_CONFIDENCE_BASE = 0.42;
+/**
+ * Confidence ceiling for an anchor in a category whose retention curve has real
+ * resale observations behind it. The safety haircut - not a confidence cap - is
+ * what protects the investor from over-valuation, so a well-evidenced anchor is
+ * allowed to clear the automatic-loan bar. Everything that genuinely weakens the
+ * estimate is priced in as a factor below.
+ */
+const ANCHOR_CONFIDENCE_BASE = 0.66;
 const CONFIDENCE_FLOOR = 0.15;
+
+/**
+ * Categories whose retention curve is anchored to at least one measured Thai
+ * resale observation. The rest are interpolated from neighbouring categories,
+ * which is a guess about depreciation shape - never good enough to lend on
+ * automatically, however many retail prices agree.
+ */
+const CALIBRATED_CATEGORIES: ReadonlySet<AnchorCategory> = new Set<AnchorCategory>([
+  'phone', 'apple_phone', 'tablet', 'laptop', 'camera', 'accessory',
+]);
+/** Applied when the category's curve has no observation behind it. */
+const UNCALIBRATED_CATEGORY_PENALTY = 0.68;
+/** Age drives the whole depreciation, so guessing it caps the result short. */
+const UNKNOWN_AGE_CONFIDENCE_PENALTY = 0.72;
+/**
+ * Cap on the disagreement penalty. Set so that anchors spanning ~50% of their
+ * median cannot reach the automatic bar however many of them there are: retail
+ * prices that far apart usually mean the search conflated two different
+ * variants, which is exactly when a human should look.
+ */
+const MAX_AGREEMENT_PENALTY = 0.35;
 
 /**
  * Lending safety haircut.
@@ -185,12 +212,26 @@ export function computeAnchorPrice(input: AnchorPriceInput): AnchorPriceResult |
   );
   const marketPrice = Math.round(anchorMedian * retention * safetyFactor);
 
-  // More agreeing anchors is better evidence; an unknown age is worse. Both
-  // stay well under the manual-review threshold on purpose.
-  const sampleFactor = Math.min(1, 0.6 + anchors.length / 10);
-  const agePenalty = knownAge === null ? 0.8 : 1;
+  // Confidence tracks the four things that actually make an anchor estimate
+  // trustworthy: a calibrated depreciation curve, several retail prices, those
+  // prices agreeing with each other, and a known release year. Three agreeing
+  // anchors on a calibrated category with a known year clears 0.5; anything
+  // missing a leg does not.
+  const sampleFactor = Math.min(1, 0.55 + anchors.length * 0.15);
+  const spread = anchorMedian > 0
+    ? (Math.max(...anchors) - Math.min(...anchors)) / anchorMedian
+    : MAX_AGREEMENT_PENALTY;
+  const agreementFactor = 1 - Math.min(MAX_AGREEMENT_PENALTY, spread);
+  const agePenalty = knownAge === null ? UNKNOWN_AGE_CONFIDENCE_PENALTY : 1;
+  const categoryFactor = CALIBRATED_CATEGORIES.has(input.category)
+    ? 1
+    : UNCALIBRATED_CATEGORY_PENALTY;
   const confidence = Math.round(
-    clamp(ANCHOR_CONFIDENCE_BASE * sampleFactor * agePenalty, CONFIDENCE_FLOOR, 0.6) * 100,
+    clamp(
+      ANCHOR_CONFIDENCE_BASE * sampleFactor * agreementFactor * agePenalty * categoryFactor,
+      CONFIDENCE_FLOOR,
+      ANCHOR_CONFIDENCE_BASE,
+    ) * 100,
   ) / 100;
 
   return {

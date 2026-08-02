@@ -171,6 +171,11 @@ export function normalizeProviderError(
     || descriptor.includes('billing_hard_limit_reached')
     || descriptor.includes('budget_exceeded')
     || descriptor.includes('payment required')
+    // Anthropic reports credit exhaustion as a 400 invalid_request_error whose
+    // only distinguishing mark is this wording; without it the failure is
+    // classified as a malformed request and reads like a code bug in the logs.
+    || descriptor.includes('credit balance is too low')
+    || descriptor.includes('credit balance')
   ) {
     kind = 'BUDGET_EXHAUSTED';
   } else if (
