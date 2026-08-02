@@ -6,6 +6,10 @@ import crypto from 'crypto';
 import { Redis } from '@upstash/redis';
 import { escalateToManualEstimate } from '@/lib/services/manual-estimate-escalation';
 import {
+  estimateTooUncertainToQuote,
+  getConfidenceFloorToQuote,
+} from '@/lib/security/estimate-attestation';
+import {
   anchorCategoryFor,
   computeAnchorPrice,
   type AnchorPriceResult,
@@ -2143,8 +2147,8 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
           ok: false,
           status: 202,
           error: escalation.requestId
-            ? 'สินค้านี้ยังประเมินราคาอัตโนมัติไม่ได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE เพื่อประเมินราคาให้ครับ'
-            : 'สินค้านี้ยังประเมินราคาอัตโนมัติไม่ได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคา',
+            ? 'สินค้าไม่สามารถประเมินราคาได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE ครับ'
+            : 'สินค้าไม่สามารถประเมินราคาได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคาครับ',
           code: 'manual_estimate_escalated',
         };
       }
@@ -2201,6 +2205,35 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
       ai: aiCondition,
       final: normalizedCondition,
     });
+
+    // Hard stop before a number is published. Between the floor and the
+    // submission threshold an operator confirms the estimate; below the floor we
+    // do not quote at all - lending against collateral we cannot value is the
+    // investor's risk, not ours to take on their behalf.
+    if (estimateTooUncertainToQuote(responseConfidence)) {
+      console.warn('🚫 Confidence below the quoting floor — declining to price', {
+        confidence: responseConfidence,
+        floor: getConfidenceFloorToQuote(),
+      });
+      const escalation = await escalateToManualEstimate({
+        lineId: body.lineId,
+        itemType: body.itemType,
+        brand: body.brand,
+        model: body.model,
+        productName: normalizedData.productName,
+        capacity: body.capacity,
+        reason: `ความมั่นใจของการประเมิน (${responseConfidence.toFixed(2)}) ต่ำกว่าเกณฑ์ขั้นต่ำ ${getConfidenceFloorToQuote()}`,
+        tiersAttempted: ['market evidence', 'new-price anchor'],
+      });
+      return {
+        ok: false,
+        status: 202,
+        error: escalation.requestId
+          ? 'สินค้าไม่สามารถประเมินราคาได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE ครับ'
+          : 'สินค้าไม่สามารถประเมินราคาได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคาครับ',
+        code: 'manual_estimate_escalated',
+      };
+    }
 
     const estimatedPrice = Math.round(pawnPrice * normalizedCondition);
     console.log('💰 Final estimated price:', estimatedPrice);
@@ -2272,8 +2305,8 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
           ok: false,
           status: 202,
           error: escalation.requestId
-            ? 'สินค้านี้ยังประเมินราคาอัตโนมัติไม่ได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE เพื่อประเมินราคาให้ครับ'
-            : 'สินค้านี้ยังประเมินราคาอัตโนมัติไม่ได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคา',
+            ? 'สินค้าไม่สามารถประเมินราคาได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE ครับ'
+            : 'สินค้าไม่สามารถประเมินราคาได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคาครับ',
           code: 'manual_estimate_escalated',
         };
       }

@@ -7,6 +7,9 @@ import type {
 
 const TOKEN_VERSION = 1;
 const DEFAULT_TTL_SECONDS = 12 * 60 * 60;
+// An anchor-only price with a single reference and no known release year lands
+// just under this, which is exactly the case that should be refused.
+const DEFAULT_CONFIDENCE_FLOOR_TO_QUOTE = 0.25;
 const DEFAULT_MIN_CONFIDENCE = 0.5;
 const MAX_TOKEN_LENGTH = 4_096;
 
@@ -169,6 +172,26 @@ export function getMinimumEstimateConfidence(): number {
 export function estimateRequiresManualReview(confidence: number): boolean {
   return !Number.isFinite(confidence)
     || confidence < getMinimumEstimateConfidence();
+}
+
+/**
+ * Below this the platform declines to quote at all.
+ *
+ * Between this floor and MIN_ESTIMATE_CONFIDENCE_FOR_SUBMISSION the estimate is
+ * shown but needs an operator to confirm it. Below the floor the evidence is so
+ * thin that publishing a number would invite a loan against collateral we
+ * cannot value - the investor carries that risk, so the safe answer is to stop
+ * and hand the item to a human rather than guess.
+ */
+export function getConfidenceFloorToQuote(): number {
+  const parsed = Number(process.env.MIN_ESTIMATE_CONFIDENCE_TO_QUOTE);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1
+    ? parsed
+    : DEFAULT_CONFIDENCE_FLOOR_TO_QUOTE;
+}
+
+export function estimateTooUncertainToQuote(confidence: number): boolean {
+  return !Number.isFinite(confidence) || confidence < getConfidenceFloorToQuote();
 }
 
 export function issueEstimateAttestation(input: {

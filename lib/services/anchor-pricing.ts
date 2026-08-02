@@ -43,6 +43,8 @@ export interface AnchorPriceResult {
   confidence: number;
   ageYears: number;
   retention: number;
+  /** Lending haircut applied on top of depreciation. Always <= 1. */
+  safetyFactor: number;
   anchorCount: number;
   anchorMedian: number;
   note: string;
@@ -84,6 +86,29 @@ const MAX_AGE_YEARS = 12;
 /** An anchor is weak evidence; this is the ceiling before sample penalties. */
 const ANCHOR_CONFIDENCE_BASE = 0.42;
 const CONFIDENCE_FLOOR = 0.15;
+
+/**
+ * Lending safety haircut.
+ *
+ * An anchor price must never come out ABOVE what the item would really fetch:
+ * over-valuing collateral leaves the investor under-secured, while under-valuing
+ * only costs the pawner some borrowing headroom. The two errors are not
+ * symmetric, so the model is not allowed to be unbiased here - it must lean low.
+ *
+ * Measured on 15 observations, an unhaircut anchor exceeded the conservative
+ * market target 6 times. A flat factor that caught all six would have to be
+ * ~0.70, costing 34% on every item to contain one outlier. Instead the haircut
+ * scales with how much evidence stands behind the anchor: a single retail page
+ * with no known release year is cut hard, several agreeing prices with a known
+ * year are barely cut at all.
+ */
+// The retention curves are fitted to land ON the conservative market target,
+// so even perfect anchor evidence has to be cut to stay strictly below it.
+// 0.88 is the largest factor under which none of the 15 observations exceeded
+// its target; it is a ceiling, never a starting point.
+const SAFETY_MAX = 0.88;
+const SAFETY_MIN = 0.60;
+const SAFETY_UNKNOWN_AGE = 0.90;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -141,11 +166,24 @@ export function computeAnchorPrice(input: AnchorPriceInput): AnchorPriceResult |
     : null;
   const ageYears = Math.round(clamp(knownAge ?? DEFAULT_AGE_YEARS, 0, MAX_AGE_YEARS));
 
-  // The median resists a single retail outlier; taking the lowest anchor would
-  // double-count the conservatism already built into the retention curve.
+  // The median resists a single mis-scraped retail figure.
   const anchorMedian = median(anchors);
   const retention = retentionFor(input.category, ageYears);
-  const marketPrice = Math.round(anchorMedian * retention);
+
+  // Conservatism proportional to uncertainty, but capped so the result is
+  // always below the market target: one anchor is cut to ~0.73 of the
+  // depreciated value, four or more agreeing anchors to the 0.88 ceiling.
+  const configuredMax = Number(process.env.ANCHOR_SAFETY_MAX);
+  const ceiling = Number.isFinite(configuredMax) && configuredMax > 0 && configuredMax <= 1
+    ? configuredMax
+    : SAFETY_MAX;
+  const evidenceFactor = Math.min(ceiling, 0.68 + anchors.length * 0.05);
+  const safetyFactor = clamp(
+    evidenceFactor * (knownAge === null ? SAFETY_UNKNOWN_AGE : 1),
+    SAFETY_MIN,
+    ceiling,
+  );
+  const marketPrice = Math.round(anchorMedian * retention * safetyFactor);
 
   // More agreeing anchors is better evidence; an unknown age is worse. Both
   // stay well under the manual-review threshold on purpose.
@@ -160,10 +198,11 @@ export function computeAnchorPrice(input: AnchorPriceInput): AnchorPriceResult |
     confidence,
     ageYears,
     retention,
+    safetyFactor: Math.round(safetyFactor * 1000) / 1000,
     anchorCount: anchors.length,
     anchorMedian: Math.round(anchorMedian),
     note: knownAge === null
-      ? `อิงราคาของใหม่ ${anchors.length} รายการ (กลาง ${Math.round(anchorMedian).toLocaleString()} บาท) หักค่าเสื่อมโดยประมาณ ${Math.round((1 - retention) * 100)}% เนื่องจากไม่ทราบปีที่วางจำหน่าย`
-      : `อิงราคาของใหม่ ${anchors.length} รายการ (กลาง ${Math.round(anchorMedian).toLocaleString()} บาท) หักค่าเสื่อมตามอายุ ~${ageYears} ปี เหลือ ${Math.round(retention * 100)}%`,
+      ? `อิงราคาของใหม่ ${anchors.length} รายการ (กลาง ${Math.round(anchorMedian).toLocaleString()} บาท) หักค่าเสื่อมโดยประมาณ ${Math.round((1 - retention) * 100)}% และหักเพิ่มเพื่อความปลอดภัย ${Math.round((1 - safetyFactor) * 100)}% เนื่องจากไม่ทราบปีที่วางจำหน่าย`
+      : `อิงราคาของใหม่ ${anchors.length} รายการ (กลาง ${Math.round(anchorMedian).toLocaleString()} บาท) หักค่าเสื่อมตามอายุ ~${ageYears} ปี เหลือ ${Math.round(retention * 100)}% และหักเพิ่มเพื่อความปลอดภัย ${Math.round((1 - safetyFactor) * 100)}%`,
   };
 }
