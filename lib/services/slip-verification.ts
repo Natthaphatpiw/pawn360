@@ -6,7 +6,9 @@ import {
   getOpenAIReasoningEffortForTask,
   hasOpenAIKeys,
   openaiStructuredJson,
+  type OpenAIReasoningEffort,
 } from '@/lib/services/openai-llm';
+import { normalizeProviderError } from '@/lib/services/provider-error';
 
 // Internal label for the Anthropic fallback path, stored in rawResponse.
 const LEGACY_MODEL = 'anthropic-vision';
@@ -212,6 +214,24 @@ function parseNumericAmount(value: unknown) {
   }
 
   return null;
+}
+
+/**
+ * Whether the model actually read the slip, as opposed to returning a verdict
+ * it was not sure about. Mirrors the three checks the caller applies further
+ * down (valid slip, a readable amount, confidence over AI_SLIP_MIN_CONFIDENCE)
+ * so the escalation decision and the returned result cannot disagree about
+ * what counts as a confident read.
+ */
+function isSlipReadConfident(parsed: any): boolean {
+  if (!parsed?.is_valid_slip) return false;
+  if (parseNumericAmount(parsed.detected_amount) === null) return false;
+  const confidence = Math.max(0, Math.min(1, Number(parsed.confidence) || 0));
+  const minConfidence = Math.max(
+    0,
+    Math.min(1, positiveNumber(process.env.AI_SLIP_MIN_CONFIDENCE, 0.85)),
+  );
+  return confidence >= minConfidence;
 }
 
 function safeProviderName(value: unknown): string {
@@ -688,20 +708,45 @@ Return ONLY a JSON object with this exact structure:
     let parsed: any = null;
     let provider = LEGACY_MODEL;
     if (hasOpenAIKeys()) {
-      try {
-        parsed = await openaiStructuredJson<any>({
+      const runOpenAISlip = (effort: OpenAIReasoningEffort) =>
+        openaiStructuredJson<any>({
           system: systemPrompt,
           userText,
           images: [slipUrl],
           imageDetail: 'high',
           model: getOpenAILunaModel(),
-          effort: getOpenAIReasoningEffortForTask('slip_verification'),
+          effort,
           schemaName: 'slip_verification',
           maxOutputTokens: 4000,
           schema,
           label: 'slip_verification',
           promptCacheKey: 'slip_verification',
         });
+
+      try {
+        parsed = await runOpenAISlip(getOpenAIReasoningEffortForTask('slip_verification'));
+
+        // Every one of these outcomes leaves the pawner's money in limbo: the
+        // transfer already happened, but the platform will not record it until
+        // a slip reads cleanly. They are also all "I could not confirm this"
+        // rather than "this is fraud", which is exactly what a more careful
+        // look can resolve - and a higher effort scrutinises the slip MORE, so
+        // escalating cannot be used to sneak a bad slip through.
+        if (parsed && !isSlipReadConfident(parsed)) {
+          const retryEffort = getOpenAIReasoningEffortForTask('slip_verification', 'retry');
+          try {
+            const second = await runOpenAISlip(retryEffort);
+            if (second) {
+              console.log('Slip verification escalated to effort', retryEffort, '->', isSlipReadConfident(second) ? 'readable' : 'still unreadable');
+              parsed = second;
+            }
+          } catch (error) {
+            console.warn('Slip verification escalation failed; keeping the first read:', {
+              kind: normalizeProviderError('openai', error, 'slip_verification').kind,
+            });
+          }
+        }
+
         if (parsed) provider = `openai:${getOpenAILunaModel()}`;
       } catch (error) {
         console.warn('🔁 OpenAI slip verification failed — falling back to Claude:', error);

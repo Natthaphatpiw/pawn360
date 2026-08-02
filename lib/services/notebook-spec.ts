@@ -461,6 +461,14 @@ export interface NotebookVisionSpec {
   gpu: string | null;
 }
 
+/** True when the vision pass read at least one usable field off the photos. */
+function hasAnyVisionSpecField(spec: NotebookVisionSpec): boolean {
+  return Boolean(
+    spec.brand || spec.model || spec.cpu || spec.gpu || spec.storageType
+    || Number.isFinite(spec.ramGb as number) || Number.isFinite(spec.storageGb as number),
+  );
+}
+
 const VISION_SPEC_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -494,22 +502,35 @@ Use null for anything not visible. Do NOT guess.`;
   const boundedImages = images.slice(0, MAX_VISION_SPEC_IMAGES);
 
   if (hasOpenAIKeys()) {
-    try {
-      const parsed = await openaiStructuredJson<NotebookVisionSpec>({
-        userText,
-        images: boundedImages,
-        imageDetail: 'high',
-        model: getOpenAILunaModel(),
-        effort: getOpenAIReasoningEffortForTask('notebook_vision_spec'),
-        schemaName: 'notebook_vision_spec',
-        maxOutputTokens: 4000,
-        schema: VISION_SPEC_SCHEMA,
-        label: 'notebook_vision_spec',
-        promptCacheKey: 'notebook_vision_spec',
-      });
-      if (parsed) return parsed;
-    } catch (error) {
-      console.warn('🔁 OpenAI notebook vision extraction failed — falling back to Claude:', error);
+    // Reading a spec off a photo means picking out small text - a CPU sticker,
+    // an "About this Mac" panel - which is where extra effort actually buys
+    // accuracy. A response where nothing at all was legible is a real miss, not
+    // a laptop with no specs, so it gets one more look; any usable field
+    // returns straight away.
+    for (const stage of ['primary', 'retry'] as const) {
+      try {
+        const parsed = await openaiStructuredJson<NotebookVisionSpec>({
+          userText,
+          images: boundedImages,
+          imageDetail: 'high',
+          model: getOpenAILunaModel(),
+          effort: getOpenAIReasoningEffortForTask('notebook_vision_spec', stage),
+          schemaName: 'notebook_vision_spec',
+          maxOutputTokens: 4000,
+          schema: VISION_SPEC_SCHEMA,
+          label: `notebook_vision_spec_${stage}`,
+          promptCacheKey: 'notebook_vision_spec',
+        });
+        if (parsed && hasAnyVisionSpecField(parsed)) {
+          if (stage === 'retry') console.log('Notebook vision spec recovered at retry effort');
+          return parsed;
+        }
+        // An all-null read at the retry effort is a genuine "cannot see it".
+        if (stage === 'retry' && parsed) return parsed;
+      } catch (error) {
+        console.warn('🔁 OpenAI notebook vision extraction failed — falling back to Claude:', error);
+        break;
+      }
     }
   }
 

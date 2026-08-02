@@ -432,22 +432,49 @@ async function analyzeCondition(
   let parsed: ConditionResult | null = null;
   let openAIFailure: ProviderError | null = null;
 
+  const runOpenAIScoring = (effort: OpenAIReasoningEffort) =>
+    openaiVisionJson<ConditionResult>({
+      userText: buildConditionPrompt(options),
+      images: boundedImages,
+      imageDetail: 'high',
+      model: getOpenAILunaModel(),
+      reasoningEffort: effort,
+      maxOutputTokens: 6000,
+      schema: CONDITION_RESULT_SCHEMA,
+      schemaName: 'condition_assessment',
+      label: 'condition_scoring',
+      promptCacheKey: 'condition_scoring',
+    });
+
   if (canUseOpenAI) {
     try {
       console.log(`🔎 Scoring condition with OpenAI (${getOpenAIVisionModel()})...`);
-      parsed = await openaiVisionJson<ConditionResult>({
-        userText: buildConditionPrompt(options),
-        images: boundedImages,
-        imageDetail: 'high',
-        model: getOpenAILunaModel(),
-        reasoningEffort: getOpenAIReasoningEffortForTask('condition_scoring'),
-        maxOutputTokens: 6000,
-        schema: CONDITION_RESULT_SCHEMA,
-        schemaName: 'condition_assessment',
-        label: 'condition_scoring',
-        promptCacheKey: 'condition_scoring',
-      });
+      parsed = await runOpenAIScoring(getOpenAIReasoningEffortForTask('condition_scoring'));
       if (!parsed) throw new Error('OpenAI returned no parseable condition JSON');
+
+      // Both of these verdicts end the request with a 400 the pawner has to act
+      // on, and both are judgement calls the cheap effort can get wrong: an
+      // "insufficient" reading of a usable photo, or a suspiciously low score
+      // that is really a photo problem rather than a genuinely wrecked device.
+      // Re-score once at the task's retry effort before rejecting. A clean
+      // score - the common case - never pays for this.
+      if (isAssessmentInsufficient(parsed) || isConditionScoreSuspicious(parsed)) {
+        const retryEffort = getOpenAIReasoningEffortForTask('condition_scoring', 'retry');
+        try {
+          const second = await runOpenAIScoring(retryEffort);
+          if (second) {
+            const stillBad = isAssessmentInsufficient(second) || isConditionScoreSuspicious(second);
+            console.log('Condition scoring escalated to effort', retryEffort, '->', stillBad ? 'still rejected' : 'recovered');
+            parsed = second;
+          }
+        } catch (error) {
+          // Keep the first verdict: a failed second opinion must not turn a
+          // clear "please retake the photos" into an opaque error.
+          console.warn('Condition scoring escalation failed; keeping the first verdict:', {
+            kind: normalizeProviderError('openai', error, 'condition_scoring').kind,
+          });
+        }
+      }
     } catch (error) {
       openAIFailure = normalizeProviderError('openai', error, 'condition_scoring');
       if (!canUseClaude) throw openAIFailure;

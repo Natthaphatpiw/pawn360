@@ -709,21 +709,32 @@ SEARCH_DATA=${boundedSearchContext(search.items)}`;
   };
 
   if (hasOpenAIKeys()) {
-    try {
-      const parsed = await openaiStructuredJson<Extraction>({
-        userText: prompt,
-        model: getOpenAITerraModel(),
-        effort: getOpenAIReasoningEffortForTask('generic_market_extract', 'primary'),
-        schemaName: 'generic_new_price_anchors',
-        maxOutputTokens: WEB_SEARCH_MAX_OUTPUT_TOKENS,
-        schema: NEW_PRICE_EXTRACTION_SCHEMA,
-        label: 'generic_new_price_anchor',
-        promptCacheKey: 'generic_new_price_anchor',
-      });
-      const result = collect(parsed);
-      if (result.prices.length > 0) return result;
-    } catch (error) {
-      console.warn('New-price anchor extraction failed:', normalizeProviderError('openai', error, 'anchor_extract').kind);
+    // This is the last rung: no anchor here and the pawner is told the item
+    // cannot be priced at all. Finding zero prices in pages that do contain
+    // them is a plain extraction miss, so it is worth one more pass at the
+    // retry effort before giving up. A first pass that finds anchors - the
+    // normal case - returns immediately and never pays for the second.
+    for (const stage of ['primary', 'retry'] as const) {
+      try {
+        const parsed = await openaiStructuredJson<Extraction>({
+          userText: prompt,
+          model: getOpenAITerraModel(),
+          effort: getOpenAIReasoningEffortForTask('generic_market_extract', stage),
+          schemaName: 'generic_new_price_anchors',
+          maxOutputTokens: WEB_SEARCH_MAX_OUTPUT_TOKENS,
+          schema: NEW_PRICE_EXTRACTION_SCHEMA,
+          label: `generic_new_price_anchor_${stage}`,
+          promptCacheKey: 'generic_new_price_anchor',
+        });
+        const result = collect(parsed);
+        if (result.prices.length > 0) {
+          if (stage === 'retry') console.log('New-price anchor extraction recovered at retry effort');
+          return result;
+        }
+      } catch (error) {
+        console.warn('New-price anchor extraction failed:', normalizeProviderError('openai', error, 'anchor_extract').kind);
+        break;
+      }
     }
   }
   return { prices: [], releaseYear: null };
