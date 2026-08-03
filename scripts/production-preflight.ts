@@ -58,6 +58,38 @@ function requireHttps(name: string): void {
   }
 }
 
+/**
+ * Asserts the invariant lib/ekyc/config.ts enforces at request time: the API
+ * URL's host must be a member of the host allowlist. Checking each variable in
+ * isolation cannot catch this - both can be individually well-formed and still
+ * disagree, which takes the whole eKYC flow down with a 503 that only shows up
+ * once deployed. An allowlist pasted with a scheme, a trailing slash or a
+ * :443 suffix matches nothing and is caught here too, since config.ts only
+ * trims and lowercases the entries.
+ */
+function requireHostAllowlisted(urlName: string, allowlistName: string): void {
+  const rawUrl = value(urlName);
+  const rawAllowlist = value(allowlistName);
+  if (!rawUrl || !rawAllowlist) return; // absence is already reported elsewhere
+
+  let host: string;
+  try {
+    host = new URL(rawUrl).hostname.toLowerCase();
+  } catch {
+    return; // requireHttps already reports an unparseable URL
+  }
+
+  const entries = rawAllowlist.split(',').map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+  const malformed = entries.filter((entry) => entry !== entry.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, ''));
+  if (malformed.length > 0) {
+    errors.push(`${allowlistName}: entries must be bare hostnames (no scheme, path or port) - got ${malformed.join(', ')}`);
+    return;
+  }
+  if (!entries.includes(host)) {
+    errors.push(`${allowlistName}: does not include ${urlName}'s host "${host}" (allowlist: ${entries.join(', ') || 'empty'}) - eKYC will fail with EKYC_PROVIDER_URL_INVALID`);
+  }
+}
+
 [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -149,6 +181,9 @@ requireExact('NEXT_PUBLIC_DROPPOINT_MOCK', 'false');
   'JOB_CALLBACK_BASE_URL',
   'SHOP_SYSTEM_URL',
 ].forEach(requireHttps);
+
+requireHostAllowlisted('UPPASS_API_URL', 'UPPASS_ALLOWED_HOSTS');
+requireHostAllowlisted('UPPASS_API_URL_INVEST', 'UPPASS_ALLOWED_HOSTS');
 
 if (value('UPPASS_API_KEY') === value('UPPASS_API_KEY_INVEST')) {
   errors.push('UPPASS_API_KEY and UPPASS_API_KEY_INVEST must be role-separated');

@@ -39,12 +39,27 @@ export default function EKYCInvestPage() {
             router.push('/register-invest');
           } else if (response.data.status === 'PENDING' && response.data.resumeAvailable) {
             const resumed = await axios.post('/api/ekyc/initiate-invest', {}, { headers });
-            if (resumed.data.success && resumed.data.url) window.location.href = resumed.data.url;
-          } else if (response.data.status === 'PENDING') {
-            // Waiting for verification - go to waiting page
+            if (resumed.data.success && resumed.data.url) {
+              window.location.href = resumed.data.url;
+            } else {
+              // A 200 with no url means there is nothing to resume after all.
+              // Falling through silently used to leave a blank screen with no
+              // way forward, so show the start button instead.
+              setError('ไม่สามารถเปิดหน้ายืนยันตัวตนได้ กรุณาลองใหม่อีกครั้ง');
+            }
+          } else if (
+            response.data.status === 'PENDING'
+            && (response.data.submissionCompleted || response.data.reviewRequired)
+          ) {
+            // Only send users to the countdown when something really was
+            // submitted and a result is genuinely pending. Routing every
+            // PENDING user there was half of the loop: the waiting screen had
+            // no terminal branch, so a user who had not started verification
+            // sat watching a timer for a result that was never coming.
             router.push('/ekyc-invest/waiting');
           }
-          // else stay on this page (NOT_VERIFIED or REJECTED)
+          // else stay on this page and offer to start verification
+          // (NOT_VERIFIED, REJECTED, or PENDING with nothing in flight)
         } else {
           // Not registered - go to register-invest
           router.push('/register-invest');

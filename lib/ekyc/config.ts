@@ -11,22 +11,39 @@ function configuredHosts(name: string, fallbacks: string[]): Set<string> {
 }
 
 function validateHttpsUrl(value: string, allowedHosts: Set<string>, code: string): URL {
+  // Five different misconfigurations used to collapse into one opaque error
+  // code, so a production failure said only "the URL is invalid" - not which
+  // of two similarly-named env vars was wrong, nor how. The public response is
+  // deliberately unchanged (same code, status and message); only the server log
+  // gains the reason.
+  //
+  // The raw value is never logged: it can carry embedded credentials. The
+  // reason is a fixed enum, the host is a vendor DNS name already published in
+  // .env.example and visible in outbound traffic, and the allowlist is reported
+  // only as a size.
+  const reject = (reason: string, host?: string): never => {
+    console.error('eKYC provider URL rejected', {
+      code,
+      reason,
+      ...(host ? { host } : {}),
+      allowlistSize: allowedHosts.size,
+    });
+    throw new EkycPublicError(code, 503, 'ระบบยืนยันตัวตนยังไม่พร้อมใช้งาน', true, 60);
+  };
+
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    throw new EkycPublicError(code, 503, 'ระบบยืนยันตัวตนยังไม่พร้อมใช้งาน', true, 60);
+    // Typically a value stored without a scheme, or pasted into the hosting
+    // dashboard wrapped in quotes.
+    return reject('URL_UNPARSEABLE');
   }
 
-  if (
-    url.protocol !== 'https:'
-    || url.username
-    || url.password
-    || (url.port && url.port !== '443')
-    || !allowedHosts.has(url.hostname.toLowerCase())
-  ) {
-    throw new EkycPublicError(code, 503, 'ระบบยืนยันตัวตนยังไม่พร้อมใช้งาน', true, 60);
-  }
+  if (url.protocol !== 'https:') return reject('NOT_HTTPS', url.hostname);
+  if (url.username || url.password) return reject('EMBEDDED_CREDENTIALS');
+  if (url.port && url.port !== '443') return reject('NON_443_PORT', url.hostname);
+  if (!allowedHosts.has(url.hostname.toLowerCase())) return reject('HOST_NOT_ALLOWLISTED', url.hostname);
   return url;
 }
 

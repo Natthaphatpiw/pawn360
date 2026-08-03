@@ -242,7 +242,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 # UpPass eKYC Configuration
 UPPASS_API_KEY=your-uppass-api-key-here
 UPPASS_FORM_SLUG=your-uppass-form-slug-here
-UPPASS_API_URL=https://api.uppass.io
+UPPASS_API_URL=https://app.uppass.io
 UPPASS_WEBHOOK_SECRET=your-webhook-secret-here
 
 # Application URL

@@ -12,6 +12,9 @@ export default function EKYCInvestWaitingPage() {
 
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes = 300 seconds
   const [dots, setDots] = useState('');
+  // Set when the form was submitted and a person is reviewing it. That decision
+  // has no bounded wait, so the countdown must give way to a terminal screen.
+  const [underReview, setUnderReview] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutOccurred = useRef(false);
@@ -52,6 +55,26 @@ export default function EKYCInvestWaitingPage() {
             router.push('/ekyc-invest');
             return;
           } else if (response.data.resumeAvailable) {
+            stopped = true;
+            router.push('/ekyc-invest');
+            return;
+          } else if (response.data.submissionCompleted || response.data.reviewRequired) {
+            // The form was submitted and a human is reviewing it. There is no
+            // result to poll for within this countdown, so stop and say so
+            // instead of running a 5-minute timer against a decision that can
+            // take much longer.
+            stopped = true;
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            setUnderReview(true);
+            return;
+          } else {
+            // PENDING with nothing to resume and nothing submitted: there is no
+            // verification in flight at all. Without this branch the poll fell
+            // through to scheduleNext() forever, and the timeout button bounced
+            // to /ekyc-invest which sent PENDING users straight back here - the
+            // loop that left this screen waiting for a result that never came.
+            // The pawner flow has had this fallback all along (app/ekyc/waiting/page.tsx).
             stopped = true;
             router.push('/ekyc-invest');
             return;
@@ -124,6 +147,40 @@ export default function EKYCInvestWaitingPage() {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1E3A8A]"></div>
+      </div>
+    );
+  }
+
+  // Submitted and awaiting a human decision - terminal, no countdown.
+  if (underReview) {
+    return (
+      <div className="min-h-screen bg-white font-sans p-4 flex flex-col items-center justify-center">
+        <div className="w-full max-w-md text-center">
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center">
+              <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">ระบบได้รับข้อมูลแล้ว</h1>
+          <p className="text-sm text-gray-500 mb-6">กำลังตรวจสอบโดยเจ้าหน้าที่</p>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+            <p className="text-sm text-blue-700">
+              เราได้รับเอกสารยืนยันตัวตนของคุณเรียบร้อยแล้ว<br />
+              คุณปิดหน้านี้ได้เลย ระบบจะแจ้งผลทาง LINE เมื่อตรวจสอบเสร็จสิ้น
+            </p>
+          </div>
+
+          <button
+            onClick={() => router.push('/register-invest')}
+            className="w-full bg-blue-600 text-white font-semibold py-4 rounded-2xl"
+          >
+            กลับหน้าสมาชิก
+          </button>
+        </div>
       </div>
     );
   }

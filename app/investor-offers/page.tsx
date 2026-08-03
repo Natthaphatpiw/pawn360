@@ -121,15 +121,42 @@ function InvestorOffersContent() {
         return;
       }
 
-      const investorRes = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
-      setInvestor(investorRes.data.investor);
-      setKycStatus(investorRes.data.investor?.kyc_status || null);
+      // Two independent lookups. They used to share one try/catch, so a failure
+      // of either produced the same blanket message and neither the real cause
+      // nor the half that did succeed ever reached the screen.
+      try {
+        const investorRes = await axios.get(`/api/investors/by-line-id/${profile?.userId}`);
+        setInvestor(investorRes.data.investor);
+        setKycStatus(investorRes.data.investor?.kyc_status || null);
+      } catch (profileError) {
+        console.error('Investor profile lookup failed', {
+          code: axios.isAxiosError(profileError)
+            ? profileError.response?.data?.code || profileError.response?.status || 'PROFILE_FAILED'
+            : 'PROFILE_FAILED',
+        });
+        // Not fatal to the offers list - leave the profile unset and carry on.
+      }
 
       const offersRes = await axios.get('/api/contracts/market-offers');
       setMarketOffers(offersRes.data.offers || []);
     } catch (fetchError) {
-      console.error('Error fetching data:', fetchError);
-      setError('ไม่สามารถโหลดข้อเสนอใหม่ได้');
+      const status = axios.isAxiosError(fetchError) ? fetchError.response?.status : undefined;
+      const code = axios.isAxiosError(fetchError) ? fetchError.response?.data?.code : undefined;
+      const serverMessage = axios.isAxiosError(fetchError) ? fetchError.response?.data?.error : undefined;
+      console.error('Market offers fetch failed', { status, code });
+
+      // Tell the investor what to actually do. "ไม่สามารถโหลดข้อเสนอใหม่ได้" for
+      // an eligibility gate sent verified-but-unapproved users chasing a
+      // network problem that did not exist.
+      if (status === 403) {
+        setError('บัญชีของคุณยังไม่ผ่านการอนุมัติให้ลงทุน กรุณายืนยันตัวตนให้เรียบร้อยก่อน');
+      } else if (status === 401) {
+        setError('เซสชันหมดอายุ กรุณาเปิดหน้านี้ผ่านแอป LINE อีกครั้ง');
+      } else if (status === 503) {
+        setError('ระบบข้อเสนอไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่อีกครั้ง');
+      } else {
+        setError(serverMessage || 'ไม่สามารถโหลดข้อเสนอใหม่ได้');
+      }
     } finally {
       setLoading(false);
     }
@@ -168,7 +195,10 @@ function InvestorOffersContent() {
                 </p>
               </div>
               <div className="text-right text-sm font-light text-foreground-subtle">
-                {visibleOffers.length} รายการ
+                {/* Never assert a count for a request that failed - the page was
+                    showing "0 รายการ" next to a load error, which reads as
+                    "there are no offers" when we simply do not know. */}
+                {error ? '—' : `${visibleOffers.length} รายการ`}
               </div>
             </div>
           </div>

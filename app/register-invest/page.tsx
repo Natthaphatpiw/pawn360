@@ -11,7 +11,7 @@ import PinModal from '@/components/PinModal';
 import { getPinSession } from '@/lib/security/pin-session';
 import { getLiffAuthorizationHeaders } from '@/lib/liff/auth-header';
 import { loadMockInvestor } from '@/lib/mock-investor';
-import pawnlyWelcomeLogo from '@/app/Image-logos/Pawnly logo - No BG,Full - Off-White.png';
+import astlyWelcomeLogo from '@/public/assets/astly_logo_light.png';
 import investorTierSilver from '@/Assets/image-tiers/investortiersilver.png';
 import investorTierGold from '@/Assets/image-tiers/investortiergold.png';
 import investorTierPlatinum from '@/Assets/image-tiers/investortierplatinum.png';
@@ -819,7 +819,7 @@ export default function InvestorRegister() {
                   <div className="text-[10px] text-foreground-subtle text-right">ปล่อยสัญญาเพิ่มอีก {remainingToNext.toLocaleString()} บาท เพื่อปลดล็อก</div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span>Liquidated by Pawnly</span>
+                  <span>Liquidated by Astly</span>
                   <span className={`px-2 py-0.5 rounded-full ${autoLiquidationEnabled ? 'bg-success-soft text-success-active' : 'bg-background-subtle text-foreground-subtle'}`}>
                     {autoLiquidationEnabled ? 'เปิดใช้งาน' : 'ปิด'}
                   </span>
@@ -1412,16 +1412,16 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                 <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-md flex-col justify-center">
                   <div className="mb-8 flex justify-center">
                     <Image
-                      src={pawnlyWelcomeLogo}
-                      alt="Pawnly"
+                      src={astlyWelcomeLogo}
+                      alt="Astly"
                       priority
                       className="h-auto w-[180px]"
                     />
                   </div>
                   <div className="register-hero-pill inline-flex w-fit rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em]">
-                    Welcome To Pawnly
+                    Welcome To Astly
                   </div>
-                  <h1 className="mt-4 text-3xl font-semibold leading-tight">เริ่มต้นเป็นสมาชิกนักลงทุนกับ Pawnly</h1>
+                  <h1 className="mt-4 text-3xl font-semibold leading-tight">เริ่มต้นเป็นสมาชิกนักลงทุนกับ Astly</h1>
                   <p className="register-hero-copy mt-3 max-w-sm text-sm">
                     เลือกเส้นทางที่เหมาะกับคุณก่อนเริ่มสมัครสมาชิก ระบบจะพาคุณไปทีละขั้นจนพร้อมเข้าสู่หน้าสมาชิก
                   </p>
@@ -1803,7 +1803,15 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
 
           {error && <div className="register-status-error my-4 rounded-2xl p-3 text-sm">{error}</div>}
 
-          <div className={`${stepKey === 'welcome' ? 'mx-auto mt-[-96px] w-full max-w-md px-6 pb-10' : 'my-4'}`}>
+          {/*
+            The welcome step pulls this bar up by 96px so it sits inside the
+            hero. The hero's content column is `relative z-10` and stretches to
+            min-h-[calc(100vh-80px)], so without a higher stacking order of its
+            own this bar renders UNDER the hero and every tap on "ถัดไป" is
+            swallowed by the hero column. `relative` is required too - z-index
+            has no effect on a static element.
+          */}
+          <div className={`${stepKey === 'welcome' ? 'relative z-20 mx-auto mt-[-96px] w-full max-w-md px-6 pb-10' : 'my-4'}`}>
             {stepKey !== 'success' && (
               <button
                 onClick={() => {

@@ -697,8 +697,8 @@ export default function CreditLimitPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-semibold text-foreground">ขายทอดตลาดโดย Pawnly</div>
-                <div className="text-xs text-foreground-subtle">Liquidated by Pawnly</div>
+                <div className="font-semibold text-foreground">ขายทอดตลาดโดย Astly</div>
+                <div className="text-xs text-foreground-subtle">Liquidated by Astly</div>
               </div>
               <button
                 type="button"
@@ -716,7 +716,7 @@ export default function CreditLimitPage() {
             </div>
             {liquidationInfoOpen && (
               <div className="mt-3 text-xs text-foreground-muted">
-                เมื่อเปิด หากสัญญาเกินกำหนด Pawnly จะดำเนินการขายทอดตลาดให้โดยอัตโนมัติ ลดภาระการจัดการของคุณ
+                เมื่อเปิด หากสัญญาเกินกำหนด Astly จะดำเนินการขายทอดตลาดให้โดยอัตโนมัติ ลดภาระการจัดการของคุณ
               </div>
             )}
           </div>
@@ -726,7 +726,7 @@ export default function CreditLimitPage() {
             <div className="register-shell rounded-xl p-4 space-y-4">
             <div>
               <div className="font-semibold text-foreground">ที่อยู่สำหรับส่งคืนสินค้า</div>
-              <div className="text-xs text-foreground-subtle">ใช้เมื่อปิดการขายทอดตลาดโดย Pawnly</div>
+              <div className="text-xs text-foreground-subtle">ใช้เมื่อปิดการขายทอดตลาดโดย Astly</div>
             </div>
 
             <div className="space-y-2 text-sm">
