@@ -194,15 +194,26 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   const totalRepayment = loanAmountNum + totalInterest + deliveryFee;
   const normalizedSerial = serialNo.trim();
   const isSerialRequired = isSerialRequiredForType(itemData.itemType);
-  const canContinue =
-    isRegistered &&
-    !isSubmitting &&
-    loanAmountNum >= MIN_LOAN_AMOUNT &&
-    Boolean(deliveryMethod) &&
-    Boolean(duration) &&
-    Boolean(selectedBranchId) &&
-    !itemData.requiresManualReview &&
-    (!isSerialRequired || Boolean(normalizedSerial));
+  // What is still missing, in the order the fields appear on the form. The
+  // submit button used to be a bare AND of these checks, so a pawner who had
+  // missed one requirement - often one scrolled off the top of a long form -
+  // saw nothing but a greyed-out button and no way to find out why.
+  // canContinue is derived from this list so the button and the explanation
+  // can never disagree about what is required.
+  const missingRequirements: string[] = [];
+  if (!isRegistered) missingRequirements.push('ลงทะเบียนและยืนยันตัวตนให้เรียบร้อยก่อน');
+  if (itemData.requiresManualReview) {
+    missingRequirements.push('ราคาประเมินนี้ต้องให้เจ้าหน้าที่ตรวจสอบก่อน จึงยังส่งคำขอเองไม่ได้');
+  }
+  if (loanAmountNum < MIN_LOAN_AMOUNT) {
+    missingRequirements.push(`ระบุวงเงินที่ต้องการอย่างน้อย ${MIN_LOAN_AMOUNT.toLocaleString()} บาท`);
+  }
+  if (isSerialRequired && !normalizedSerial) missingRequirements.push('กรอกหมายเลขเครื่อง (Serial No.)');
+  if (!duration) missingRequirements.push('เลือกระยะเวลาสัญญา');
+  if (!deliveryMethod) missingRequirements.push('เลือกวิธีรับสินค้า');
+  if (!selectedBranchId) missingRequirements.push('เลือกจุดรับฝาก');
+
+  const canContinue = missingRequirements.length === 0 && !isSubmitting;
 
   const currentBranch = branches.find(b => b.branch_id === selectedBranchId);
 
@@ -976,6 +987,22 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
               และหากครบกำหนดสัญญาแล้วจะมีค่าปรับเดือนละ 50 บาท
             </p>
           </div>
+
+          {/* Why the submit button is disabled. Without this the form is a dead
+              end: the requirement is often a field scrolled far above, and
+              nothing on screen points at it. */}
+          {missingRequirements.length > 0 && (
+            <div className="rounded-lg border border-primary/40 bg-primary-soft/40 px-4 py-3 text-sm">
+              <div className="mb-1 font-semibold text-primary">
+                กรอกข้อมูลให้ครบก่อนดำเนินการต่อ
+              </div>
+              <ul className="list-disc space-y-1 pl-5 text-foreground-subtle">
+                {missingRequirements.map((requirement) => (
+                  <li key={requirement}>{requirement}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Continue */}
           <button
