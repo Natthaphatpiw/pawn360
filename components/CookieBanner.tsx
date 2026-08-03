@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 
 type ConsentState = {
@@ -74,6 +74,7 @@ const loadScripts = (consent: ConsentState) => {
 export default function CookieBanner() {
   const [isMounted, setIsMounted] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
+  const bannerRef = useRef<HTMLDivElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [consent, setConsent] = useState<ConsentState | null>(null);
   const [draft, setDraft] = useState<ConsentState>(DEFAULT_CONSENT);
@@ -155,12 +156,54 @@ export default function CookieBanner() {
     setShowBanner(false);
   };
 
+  // The banner is `fixed` at the bottom above everything, so on a screen whose
+  // primary action is docked to the bottom it silently covers that action -
+  // taps land on the banner and the button appears dead. Rather than hide the
+  // notice (which is a consent decision, not a layout one), publish its height
+  // so any bottom-docked layout can reserve the space. Consumers read
+  // var(--cookie-banner-inset), which is 0px whenever the banner is not shown.
+  useEffect(() => {
+    const root = document.documentElement;
+    const clear = () => root.style.setProperty('--cookie-banner-inset', '0px');
+
+    if (!showBanner) {
+      clear();
+      return;
+    }
+
+    const element = bannerRef.current;
+    if (!element) return;
+
+    const apply = () => {
+      const height = Math.ceil(element.getBoundingClientRect().height);
+      // Capped at 40% of the viewport. During first paint, before fonts settle,
+      // this measured 804px on a 812px-tall screen; a consumer subtracting that
+      // from its own height would collapse to nothing for a frame. The observer
+      // corrects itself once layout settles, but a banner taller than this is
+      // pathological either way, and a brief partial overlap is a far better
+      // failure than a collapsed layout.
+      const ceiling = Math.round(window.innerHeight * 0.4);
+      root.style.setProperty('--cookie-banner-inset', `${Math.min(height, ceiling)}px`);
+    };
+    apply();
+
+    // The banner reflows between one and two lines across breakpoints and
+    // Thai/English wrapping, so a measured height beats a hard-coded one.
+    const observer = new ResizeObserver(apply);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      clear();
+    };
+  }, [showBanner, isMounted]);
+
   if (!isMounted) return null;
 
   return (
     <>
       {showBanner && (
         <div
+          ref={bannerRef}
           className="fixed inset-x-0 bottom-0 z-30 px-4 pb-4 sm:px-6 sm:pb-6"
           role="region"
           aria-label="Cookie notice"

@@ -1409,7 +1409,19 @@ function RegisterForm({ profileName, formData, handleInputChange, handleSubmit, 
                   <div className="register-star-b absolute left-24 top-24 h-2 w-2 rounded-full" style={{ animation: 'pulse-star 2.7s ease-in-out infinite' }} />
                   <div className="register-star-c absolute bottom-20 right-20 h-3 w-3 rounded-full" style={{ animation: 'pulse-star 3.4s ease-in-out infinite' }} />
                 </div>
-                <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-md flex-col justify-center">
+                {/*
+                  The height is what positions the CTA: the button bar below is
+                  pulled 96px up from this column's bottom edge. The cookie
+                  banner is fixed over the bottom of the viewport at z-30 - above
+                  the CTA - so on a first visit it covered the button entirely.
+                  Shrinking this column by the banner's published height lifts
+                  the CTA clear of it; the variable is 0px once consent is
+                  stored, leaving the original layout untouched.
+                */}
+                <div
+                  className="relative z-10 mx-auto flex w-full max-w-md flex-col justify-center"
+                  style={{ minHeight: 'calc(100vh - 80px - var(--cookie-banner-inset, 0px))' }}
+                >
                   <div className="mb-8 flex justify-center">
                     <Image
                       src={astlyWelcomeLogo}
