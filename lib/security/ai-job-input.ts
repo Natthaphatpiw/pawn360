@@ -4,6 +4,7 @@ import type { EstimateRequest } from '@/lib/services/estimate-pipeline';
 export const AI_JOB_ITEM_TYPES = [
   'Apple',
   'โทรศัพท์มือถือ',
+  'แท็บเล็ต',
   'อุปกรณ์เสริมโทรศัพท์',
   'กล้อง',
   'โน้ตบุค',

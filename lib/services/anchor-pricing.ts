@@ -181,6 +181,11 @@ export function anchorCategoryFor(itemType: string, brand?: string, appleCategor
     if (apple.includes('watch')) return 'accessory';
     return 'apple_phone';
   }
+  // Tablets get the tablet curve, not the phone one. They hold value far
+  // better - 0.60 vs 0.38 of new at three years - and that curve already has a
+  // real Thai resale observation behind it (iPad Air 5). Pricing a tablet on
+  // the phone curve would under-value it by roughly a third on the anchor path.
+  if (type === 'แท็บเล็ต') return 'tablet';
   if (type === 'โทรศัพท์มือถือ') return 'phone';
   return 'default';
 }

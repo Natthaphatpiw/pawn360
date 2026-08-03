@@ -99,6 +99,7 @@ function buildExpectedTypeLabel(itemType: string, appleCategory?: string) {
   const normalized = itemType.trim();
   const labelMap: Record<string, string> = {
     'โทรศัพท์มือถือ': 'Mobile phone / smartphone',
+    'แท็บเล็ต': 'Tablet (iPad, Android tablet)',
     'โน้ตบุค': 'Laptop / notebook',
     'กล้อง': 'Camera (digital camera, DSLR, mirrorless)',
     'อุปกรณ์เสริมโทรศัพท์': 'Phone accessory (charger, cable, case, power bank, earphones)',

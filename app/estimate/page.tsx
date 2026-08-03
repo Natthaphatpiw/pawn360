@@ -30,6 +30,7 @@ import {
 const ITEM_TYPES = [
   { id: 'apple', label: 'สินค้าของ Apple', value: 'Apple' },
   { id: 'mobile', label: 'โทรศัพท์มือถือ(Mobile)', value: 'โทรศัพท์มือถือ' },
+  { id: 'tablet', label: 'แท็บเล็ต(Tablet)', value: 'แท็บเล็ต' },
   { id: 'mobile-accessory', label: 'อุปกรณ์เสริมโทรศัพท์มือถือ(Mobile accessory)', value: 'อุปกรณ์เสริมโทรศัพท์' },
   { id: 'camera', label: 'กล้องถ่ายรูป(Camera)', value: 'กล้อง' },
   { id: 'laptop', label: 'คอมพิวเตอร์แล็ปท็อป(Computer laptop)', value: 'โน้ตบุค' },
@@ -39,6 +40,7 @@ const ITEM_TYPES = [
 // Brand options for each type
 const BRANDS_BY_TYPE: Record<string, string[]> = {
   'โทรศัพท์มือถือ': ['Samsung', 'Huawei', 'Xiaomi', 'OPPO', 'Vivo', 'Realme', 'OnePlus', 'Google', 'Sony', 'Nokia', 'ASUS', 'อื่นๆ'],
+  'แท็บเล็ต': ['Samsung', 'Huawei', 'Xiaomi', 'Lenovo', 'OPPO', 'Honor', 'Microsoft', 'ASUS', 'Acer', 'TCL', 'อื่นๆ'],
   'อุปกรณ์เสริมโทรศัพท์': ['Samsung', 'Anker', 'Baseus', 'Belkin', 'JBL', 'Sony', 'อื่นๆ'],
   'กล้อง': ['Canon', 'Nikon', 'Sony', 'Fujifilm', 'Panasonic', 'GoPro', 'DJI', 'อื่นๆ'],
   'โน้ตบุค': ['Dell', 'HP', 'Lenovo', 'ASUS', 'Acer', 'MSI', 'Samsung', 'Microsoft', 'Razer', 'อื่นๆ'],
@@ -1205,6 +1207,7 @@ function EstimatePageInner() {
     // Note: Serial number is NOT required during estimation - only required at pawn setup
     switch (formData.itemType) {
       case 'โทรศัพท์มือถือ':
+      case 'แท็บเล็ต':
         if (!formData.brand) return 'กรุณาเลือกยี่ห้อ';
         if (!formData.model) return 'กรุณาระบุรุ่น';
         if (!formData.capacity) return 'กรุณาระบุความจุ';
@@ -1522,6 +1525,17 @@ function EstimatePageInner() {
         brand: formData.brand,
         model: formData.model,
         capacity: formData.capacity,
+        // These four are not used for pricing - Agent 1 strips colour from the
+        // search query on purpose - but they ARE part of the estimate
+        // attestation's input fingerprint, and the pawn request sends them.
+        // Leaving them out here made the two fingerprints differ, so every item
+        // with a colour selected (most phones, every Apple product) failed
+        // submission with a 409 ESTIMATE_INPUT_MISMATCH: "ข้อมูลมีการเปลี่ยน
+        // ระหว่างประเมิน". Both payloads must carry the same fingerprint fields.
+        color: formData.color,
+        screenSize: formData.screenSize,
+        watchSize: formData.watchSize,
+        watchConnectivity: formData.watchConnectivity,
         accessories: formData.itemType === 'Apple'
           ? Object.entries(formData.appleAccessories || {})
               .filter(([, value]) => value)
@@ -1956,8 +1970,8 @@ function EstimatePageInner() {
                   </div>
                 )}
 
-                {/* Mobile Specific Fields */}
-                {formData.itemType === 'โทรศัพท์มือถือ' && (
+                {/* Mobile Specific Fields - tablets take the same set */}
+                {(formData.itemType === 'โทรศัพท์มือถือ' || formData.itemType === 'แท็บเล็ต') && (
                   <>
                     <div className="h-px bg-line-soft my-6"></div>
                     <div className="mb-4">
@@ -2069,7 +2083,7 @@ function EstimatePageInner() {
                 )}
 
                 {/* Accessories (for relevant types) */}
-                {(formData.itemType === 'โทรศัพท์มือถือ' || formData.itemType === 'กล้อง' || formData.itemType === 'โน้ตบุค') && (
+                {(formData.itemType === 'โทรศัพท์มือถือ' || formData.itemType === 'แท็บเล็ต' || formData.itemType === 'กล้อง' || formData.itemType === 'โน้ตบุค') && (
                   <div className="mb-6">
                     <FormLabel
                       thai="อุปกรณ์เสริม"
