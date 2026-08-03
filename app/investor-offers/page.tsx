@@ -268,6 +268,27 @@ function InvestorOffersContent() {
                   </div>
 
                   <div className="rounded-lg bg-background-white p-4 shadow-soft">
+                    {/* What secures the loan. Shown only when known - items
+                        predating the market_price column and manual estimates
+                        have no ราคากลาง, and estimated_value is not a stand-in
+                        for it (that field is the loan ceiling, not the item's
+                        worth). */}
+                    {Number(offer.items?.market_price) > 0 && (
+                      <>
+                        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                          <span className="text-foreground-subtle">ราคากลางมือสอง</span>
+                          <span className="font-medium text-foreground">
+                            {Number(offer.items.market_price).toLocaleString()} บาท
+                          </span>
+                        </div>
+                        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+                          <span className="text-foreground-subtle">วงเงินต่อราคากลาง</span>
+                          <span className="font-medium text-foreground">
+                            {Math.round((principal / Number(offer.items.market_price)) * 100)}%
+                          </span>
+                        </div>
+                      </>
+                    )}
                     <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                       <span className="text-foreground-subtle">ดอกเบี้ย/เดือน</span>
                       <span className="font-medium text-foreground">

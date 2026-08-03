@@ -92,7 +92,13 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = supabaseAdmin();
-    const { data: rawLoanRequest, error: loanRequestError } = await supabase
+    // items.market_price only feeds the collateral line on the investor offer
+    // card. PostgREST fails the whole query on an unknown column, and this
+    // codebase deploys on push while migrations are applied by hand, so the
+    // wide select is attempted first and the original one is used if the
+    // column is not there yet. Signing a contract must never depend on a
+    // display field.
+    const selectLoanRequest = (itemColumns: string) => supabase
       .from('loan_requests')
       .select(`
         request_id,
@@ -102,11 +108,18 @@ export async function POST(request: NextRequest) {
         requested_amount,
         requested_duration_days,
         request_status,
-        items:item_id (item_id, image_urls),
+        items:item_id (${itemColumns}),
         pawners:customer_id (customer_id, line_id)
       `)
       .eq('request_id', loanRequestId)
       .single();
+
+    let { data: rawLoanRequest, error: loanRequestError } =
+      await selectLoanRequest('item_id, image_urls, market_price, brand, model');
+    if (loanRequestError && `${loanRequestError.message || ''}`.toLowerCase().includes('market_price')) {
+      console.warn('items.market_price is missing; run 2026_08_03_add_items_market_price.sql. Offer card will omit the collateral value.');
+      ({ data: rawLoanRequest, error: loanRequestError } = await selectLoanRequest('item_id, image_urls'));
+    }
     if (loanRequestError || !rawLoanRequest) {
       return NextResponse.json(
         { error: 'ไม่พบคำขอสินเชื่อ', code: 'LOAN_REQUEST_NOT_FOUND' },
@@ -288,9 +301,58 @@ export async function POST(request: NextRequest) {
 
 function createPawnOfferCard(contract: any, loanRequest: any, investorRate: number): FlexMessage {
   const monthlyInvestorRate = Number(investorRate || 0.015);
-  const investorInterestAmount = contract.loan_principal_amount
+  const principal = Number(contract.loan_principal_amount) || 0;
+  const investorInterestAmount = principal
     * monthlyInvestorRate
     * (contract.contract_duration_days / 30);
+
+  // The collateral line: what the item is worth second-hand, so the investor
+  // can see the loan is secured by something worth materially more than the
+  // money they are putting in.
+  //
+  // Suppressed entirely when unknown - items predating the market_price column,
+  // and manual estimates, which have no ราคากลาง by construction. It must never
+  // fall back to estimated_value: that field is the loan CEILING, so showing it
+  // here would imply ~100% LTV against a reality of 40-60%.
+  const marketPrice = Number(loanRequest.items?.market_price) || 0;
+  const hasCollateralValue = marketPrice > 0 && principal > 0;
+  // Computed from the contract's actual principal, never assumed to be the 60%
+  // LTV factor - the principal is negotiated and the pawner may request less.
+  const ltvPercent = hasCollateralValue ? Math.round((principal / marketPrice) * 100) : 0;
+
+  const collateralLines: any[] = hasCollateralValue
+    ? [
+      { type: 'separator', margin: 'md' },
+      {
+        type: 'text',
+        text: `ราคากลางมือสอง (ประมาณการ): ${Math.round(marketPrice).toLocaleString()} บาท`,
+        wrap: true,
+        size: 'sm',
+        margin: 'md',
+        color: '#1E3A8A',
+        weight: 'bold',
+      },
+      {
+        type: 'text',
+        text: `วงเงินคิดเป็น ${ltvPercent}% ของราคากลาง`,
+        wrap: true,
+        size: 'xs',
+        color: '#666666',
+      },
+      {
+        type: 'text',
+        // Deliberately explicit: this is derived from advertised second-hand
+        // listings, not from prices anything actually sold for, and the
+        // platform holds no realized-resale data to validate it against.
+        text: 'ประมาณการจากราคาประกาศขายมือสองในตลาด ไม่ใช่ราคาขายจริงที่รับประกันได้',
+        wrap: true,
+        size: 'xxs',
+        color: '#999999',
+        margin: 'sm',
+      },
+    ]
+    : [];
+
   return {
     type: 'flex',
     altText: 'ข้อเสนอสินเชื่อ',
@@ -324,9 +386,10 @@ function createPawnOfferCard(contract: any, loanRequest: any, investorRate: numb
           margin: 'lg',
           spacing: 'sm',
           contents: [
-            { type: 'text', text: `วงเงินสินเชื่อ: ${Number(contract.loan_principal_amount).toLocaleString()} บาท`, wrap: true, weight: 'bold', color: '#1E3A8A' },
+            { type: 'text', text: `วงเงินสินเชื่อ: ${principal.toLocaleString()} บาท`, wrap: true, weight: 'bold', color: '#1E3A8A' },
             { type: 'text', text: `ระยะเวลา: ${contract.contract_duration_days} วัน`, wrap: true, size: 'sm', color: '#666666' },
             { type: 'text', text: `ผลตอบแทนโดยประมาณ: ${investorInterestAmount.toLocaleString()} บาท`, wrap: true, size: 'sm', color: '#666666' },
+            ...collateralLines,
           ],
         }],
       },

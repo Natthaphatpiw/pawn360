@@ -110,6 +110,20 @@ export async function GET(
     const pawner = relationOne<any>(contract.pawners);
     const contractInvestor = relationOne<any>(contract.investors);
 
+    // ราคากลาง for the investor's collateral view. Fetched separately rather
+    // than added to the select above so that a missing column - code deployed
+    // ahead of the migration - degrades to "not shown" instead of failing the
+    // whole contract lookup for both pawner and investor.
+    const contractItem = relationOne<any>(contract.items);
+    if (contractItem?.item_id) {
+      const { data: itemMarket } = await supabase
+        .from('items')
+        .select('market_price')
+        .eq('item_id', contractItem.item_id)
+        .maybeSingle();
+      contractItem.market_price = itemMarket?.market_price ?? null;
+    }
+
     if (viewer === 'pawner' && pawner?.line_id !== identity.lineId) {
       throw new LiffAuthError('CONTRACT_ACCESS_DENIED', 403);
     }

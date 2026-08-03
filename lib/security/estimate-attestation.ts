@@ -35,6 +35,22 @@ export interface EstimateAttestationPayload {
   owner: string;
   input: string;
   estimatedPrice: number;
+  /**
+   * ราคากลาง - the representative second-hand market price the estimate was
+   * derived from, before the 60% LTV factor and the condition adjustment.
+   *
+   * It rides in the signed token rather than being posted by the browser
+   * because it is shown to investors as the collateral's market value. A
+   * client-supplied number there would let a pawner inflate the collateral
+   * figure that up to 500 investors use to decide whether to fund the loan.
+   *
+   * Null for manual-estimate items, which have no ราคากลาง by construction:
+   * an operator supplies a final price and a condition score, not a market
+   * survey. Also null for tokens issued before this field existed - hence
+   * optional in validation rather than a TOKEN_VERSION bump, which would have
+   * invalidated every estimate in flight for the token's whole TTL.
+   */
+  marketPrice: number | null;
   condition: number;
   aiCondition: number | null;
   confidence: number;
@@ -198,7 +214,8 @@ export function issueEstimateAttestation(input: {
   referenceId: string;
   lineId: string;
   request: EstimateInputLike;
-  result: Pick<EstimateResponse, 'estimatedPrice' | 'condition' | 'confidence'>;
+  result: Pick<EstimateResponse, 'estimatedPrice' | 'condition' | 'confidence'>
+    & { marketPrice?: number | null };
   aiCondition?: unknown;
   source?: 'AI' | 'MANUAL';
 }): string {
@@ -210,6 +227,9 @@ export function issueEstimateAttestation(input: {
     owner: ownerFingerprint(input.lineId, signingSecret),
     input: estimateInputFingerprint(input.request),
     estimatedPrice: Math.round(finite(input.result.estimatedPrice)),
+    marketPrice: Number.isFinite(Number(input.result.marketPrice)) && Number(input.result.marketPrice) > 0
+      ? Math.round(Number(input.result.marketPrice))
+      : null,
     condition: Math.min(1, Math.max(0, finite(input.result.condition))),
     aiCondition: input.aiCondition === null || input.aiCondition === undefined
       ? null
@@ -235,6 +255,11 @@ function payloadIsValid(value: unknown): value is EstimateAttestationPayload {
     && /^[a-f0-9]{64}$/.test(payload.input)
     && Number.isFinite(payload.estimatedPrice)
     && Number(payload.estimatedPrice) > 0
+    // Optional on purpose: tokens issued before this field existed must keep
+    // verifying, so absent and null are both accepted.
+    && (payload.marketPrice === null
+      || payload.marketPrice === undefined
+      || (Number.isFinite(payload.marketPrice) && Number(payload.marketPrice) > 0))
     && Number.isFinite(payload.condition)
     && Number(payload.condition) >= 0
     && Number(payload.condition) <= 1
@@ -288,7 +313,10 @@ export function verifyEstimateAttestation(
   if (estimateRequiresManualReview(parsed.confidence)) {
     throw new EstimateAttestationError('ESTIMATE_REQUIRES_MANUAL_REVIEW', 422);
   }
-  return parsed;
+  // Tokens predating marketPrice verify with the field absent. Normalise it to
+  // null here so every caller sees one shape and cannot accidentally write
+  // `undefined` into a numeric column.
+  return { ...parsed, marketPrice: parsed.marketPrice ?? null };
 }
 
 export function estimateAttestationErrorResponse(error: EstimateAttestationError) {

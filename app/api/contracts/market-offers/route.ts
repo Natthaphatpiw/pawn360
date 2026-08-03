@@ -64,6 +64,30 @@ export async function GET(request: NextRequest) {
       throw contractsError;
     }
 
+    // ราคากลาง for each offer's item, so the list can show what secures the
+    // loan. Fetched in one extra query rather than joined into the select
+    // above: a missing column (code deployed ahead of the migration) then just
+    // means the collateral line is hidden, instead of the whole offers list
+    // failing to load.
+    const marketPriceByItemId = new Map<string, number>();
+    const itemIds = (contracts || [])
+      .map((contract: any) => (Array.isArray(contract.items) ? contract.items[0] : contract.items)?.item_id)
+      .filter((id: unknown): id is string => typeof id === 'string');
+    if (itemIds.length > 0) {
+      const { data: itemMarkets, error: itemMarketsError } = await supabase
+        .from('items')
+        .select('item_id, market_price')
+        .in('item_id', itemIds);
+      if (itemMarketsError) {
+        console.warn('items.market_price unavailable for market offers; run 2026_08_03_add_items_market_price.sql');
+      } else {
+        for (const row of itemMarkets || []) {
+          const value = Number((row as any).market_price);
+          if (Number.isFinite(value) && value > 0) marketPriceByItemId.set(String((row as any).item_id), value);
+        }
+      }
+    }
+
     const now = Date.now();
 
     // Calculate additional info for each contract and hide expired offers
@@ -83,8 +107,14 @@ export async function GET(request: NextRequest) {
 
       const hoursAgo = Math.floor(ageMs / (1000 * 60 * 60));
 
+      const offerItem = Array.isArray(contract.items) ? contract.items[0] : contract.items;
+      const offerItemId = offerItem?.item_id;
+
       return {
         ...contract,
+        items: offerItem
+          ? { ...offerItem, market_price: marketPriceByItemId.get(String(offerItemId)) ?? null }
+          : offerItem,
         posted_at: postedAt.toISOString(),
         hours_ago: hoursAgo,
         expires_at: new Date(postedAtMs + MAX_OFFER_AGE_MS).toISOString(),

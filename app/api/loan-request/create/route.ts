@@ -271,6 +271,11 @@ export async function POST(request: NextRequest) {
 
     const itemCondition = Math.round(attestation.condition * 100);
     const estimatedValue = attestation.estimatedPrice;
+    // ราคากลาง, taken from the signed token rather than the request body: this
+    // becomes the collateral value shown to investors deciding whether to fund
+    // the loan, so the pawner must not be able to set it. Null for manual
+    // estimates, which have no market survey behind them.
+    const marketPrice = attestation.marketPrice ?? null;
     const aiConditionScore = attestation.aiCondition ?? attestation.condition;
     const aiConfidence = attestation.confidence;
     const conditionChecklist = itemData?.conditionChecklist || null;
@@ -295,6 +300,7 @@ export async function POST(request: NextRequest) {
       ai_condition_score: aiConditionScore,
       ai_condition_reason: itemData.aiConditionReason || null,
       estimated_value: estimatedValue,
+      market_price: marketPrice,
       ai_confidence: aiConfidence,
       condition_checklist: conditionChecklist,
       accessories: itemData.appleAccessories ? itemData.appleAccessories.join(', ') : null,
@@ -315,6 +321,18 @@ export async function POST(request: NextRequest) {
     );
 
     let { data: item, error: itemError } = await insertItemRecord(itemRecord);
+
+    // market_price is a display-only field for the investor offer card. If the
+    // column is not there yet - code deployed ahead of the migration - drop it
+    // and carry on rather than failing the whole pawn request. Losing a number
+    // on a notification card is a far smaller harm than blocking every pawner
+    // from submitting an item.
+    if (itemError && `${itemError.message || ''}`.toLowerCase().includes('market_price')) {
+      const fallbackRecord = { ...itemRecord };
+      delete (fallbackRecord as Record<string, unknown>).market_price;
+      console.warn('items.market_price is missing; run 2026_08_03_add_items_market_price.sql. Continuing without it.');
+      ({ data: item, error: itemError } = await insertItemRecord(fallbackRecord));
+    }
 
     if (itemError && `${itemError.message || ''}`.toLowerCase().includes('condition_checklist')) {
       const fallbackRecord = { ...itemRecord };

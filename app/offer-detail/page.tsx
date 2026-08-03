@@ -398,7 +398,22 @@ function OfferDetailContent() {
           <InfoRow label="ความจุ" value={contract.items?.capacity || 'ไม่ระบุ'} />
           <InfoRow label="สภาพ" value={`${contract.items?.item_condition}%`} />
           <InfoRow label="ตำหนิ" value={contract.items?.defects || 'ไม่มี'} />
-          <InfoRow label="มูลค่า" value={`${contract.loan_principal_amount?.toLocaleString()}.00`} />
+          {/* Was labelled "มูลค่า" while showing the loan principal, which an
+              investor reads as the item's worth. The two are now separate rows
+              and the collateral value only appears when we actually have it. */}
+          {Number(contract.items?.market_price) > 0 && (
+            <InfoRow
+              label="ราคากลางมือสอง"
+              value={`${Number(contract.items.market_price).toLocaleString()}`}
+            />
+          )}
+          <InfoRow label="วงเงินสินเชื่อ" value={`${contract.loan_principal_amount?.toLocaleString()}.00`} />
+          {Number(contract.items?.market_price) > 0 && Number(contract.loan_principal_amount) > 0 && (
+            <InfoRow
+              label="สัดส่วนวงเงินต่อราคากลาง"
+              value={`${Math.round((Number(contract.loan_principal_amount) / Number(contract.items.market_price)) * 100)}%`}
+            />
+          )}
           <InfoRow
             label="ดอกเบี้ย"
             value={(
