@@ -52,6 +52,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // investors.national_id is VARCHAR(13) and a Thai ID is exactly 13 digits,
+    // but the check above accepts up to 32 characters - so an ID typed the way
+    // people actually write it, "1-2345-67890-12-3", passed validation and then
+    // failed the insert with "value too long", surfacing as a 500. Strip the
+    // formatting and require the real shape.
+    const normalizedNationalId = String(nationalId || '').replace(/\D/g, '');
+    if (normalizedNationalId.length !== 13) {
+      return NextResponse.json(
+        { error: 'เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก', code: 'INVALID_NATIONAL_ID' },
+        { status: 400 },
+      );
+    }
+
     let lineId: string;
     try {
       lineId = await requireLiffOwner(request, 'INVESTOR', claimedLineId);
@@ -86,14 +99,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert new investor
-    const { data: investor, error } = await supabase
-      .from('investors')
-      .insert([{
+    const investorRecord: Record<string, unknown> = {
         line_id: lineId,
         firstname,
         lastname,
         phone_number: phoneNumber,
-        national_id: nationalId,
+        national_id: normalizedNationalId,
         addr_house_no: address?.houseNo || null,
         addr_village: address?.village || null,
         addr_street: address?.street || null,
@@ -115,10 +126,40 @@ export async function POST(request: NextRequest) {
         min_investment_amount: 1000, // Default minimum
         auto_invest_enabled: false,
         investor_tier: 'SILVER',
-        total_active_principal: 0
-      }])
-      .select('investor_id, kyc_status, referral_code, max_investment_amount, investment_preferences, investor_tier, total_active_principal, auto_invest_enabled, auto_liquidation_enabled')
-      .single();
+        total_active_principal: 0,
+    };
+
+    const RETURNING = 'investor_id, kyc_status, max_investment_amount, investment_preferences, investor_tier, total_active_principal, auto_invest_enabled, auto_liquidation_enabled';
+    const insertInvestor = async (record: Record<string, unknown>, withReferral: boolean) => (
+      supabase
+        .from('investors')
+        .insert([record])
+        .select(withReferral ? `${RETURNING}, referral_code` : RETURNING)
+        .single()
+    );
+
+    let { data: investor, error } = await insertInvestor(investorRecord, true);
+
+    // referral_code was written here long before any schema declared it, so
+    // every registration failed with "column referral_code does not exist".
+    // The migration adds it; until that is applied, drop the field and keep
+    // the signup working rather than blocking every investor on a field that
+    // only matters for referral reporting.
+    if (error && `${error.message || ''}`.toLowerCase().includes('referral_code')) {
+      console.warn('investors.referral_code is missing; run 2026_08_04_add_investors_referral_code.sql. Registering without it.');
+      const withoutReferral = { ...investorRecord };
+      delete withoutReferral.referral_code;
+      ({ data: investor, error } = await insertInvestor(withoutReferral, false));
+    }
+
+    // A different person reusing a national_id is a real conflict, not a
+    // server fault - say so instead of returning an opaque 500.
+    if (error && (error as { code?: string }).code === '23505') {
+      return NextResponse.json(
+        { error: 'ข้อมูลนี้ถูกใช้ลงทะเบียนไปแล้ว กรุณาตรวจสอบเลขบัตรประชาชนและเบอร์โทร', code: 'DUPLICATE_INVESTOR' },
+        { status: 409 },
+      );
+    }
 
     if (error) {
       throw error;
