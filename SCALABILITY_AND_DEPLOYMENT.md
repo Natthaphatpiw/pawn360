@@ -198,6 +198,42 @@ Two properties matter more than the absolute numbers:
 1. **Cost per estimate falls as volume grows**, because a higher cache hit rate is the natural consequence of more users pricing the same popular models. This is the opposite of the usual "AI cost scales linearly" concern and is a direct result of keying the market cache on canonical product identity rather than on the user's own photos.
 2. **The ceiling is enforced, not projected.** `AI_MONTHLY_BUDGET_USD`, `AI_MAX_OWNER_DAILY_COST_USD` and `AI_MAX_JOB_COST_USD` abort before a provider call, so an unexpected traffic pattern or an abusive account degrades to a queued/manual state instead of producing an unbounded invoice. Under the previous `xhigh`/`max` configuration the Stage 2 line would have been roughly ฿4.1M/month rather than ฿312k.
 
+### 6.2 Measured throughput and latency (August 2026)
+
+Measured end to end over 72 products with the cache forced off, so these are
+cache-miss figures - the worst case, not the average a live user sees.
+
+| | Value |
+|---|---:|
+| Estimate latency p50 / p75 / p90 | 17.3s / 25.8s / 29.9s |
+| Slowest observed | 49.6s |
+| AI + search cost per cache-missed estimate | $0.0353 (≈฿1.13) |
+
+Worker throughput at the configured job concurrency (generic 6, notebook 2,
+condition 8):
+
+| Workload | Per minute | Per hour |
+|---|---:|---:|
+| Generic estimate | ~21 | ~1,260 |
+| Notebook estimate | ~7 | ~420 |
+| Condition analysis | ~27 | ~1,620 |
+
+**The budget cap binds roughly 64x before concurrency does.** At the configured
+`AI_MONTHLY_BUDGET_USD=500` the platform is allowed ~472 cache-missed estimates
+per day, while the workers could serve ~30,000. Raising job concurrency
+therefore buys nothing until the budget moves; the default of 6 generic workers
+already absorbs a peak of ~21/minute, which is around 6,000 estimates/day if
+peak hour is a fifth of daily traffic. Concurrency is not the scaling lever at
+any volume this business plausibly reaches in the near term - the budget is,
+and it is a single number.
+
+Note the per-estimate figure above is ~4x the $0.009 implied by the Stage 0
+line in 6.1. The difference is real and postdates that table: the market-extract
+retry rung added in the search-escalation work fires on most items and accounts
+for ~29% of LLM spend on its own, and the anchor and deep-search rungs add more.
+6.1 remains the right shape for how cost per estimate falls with cache hit rate;
+its absolute per-pipeline figure should be re-derived from the number here.
+
 A bottoms-up cost-per-transaction sheet keyed to these drivers, plus the eKYC per-verification vendor fee, should accompany this document in the data room.
 
 ---
