@@ -839,8 +839,27 @@ Return ONLY a JSON object with this exact structure:
     }
 
     const amountResult = buildAmountResult(detectedAmount, expectedAmount, tolerance, rawResponse);
-    const production = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
-    const allowAiAutoApproval = !production && process.env.ALLOW_AI_SLIP_AUTO_APPROVAL === 'true';
+
+    // Reading the amount is not the same as confirming the transfer happened.
+    // A vision model can only report what the image shows, so on its own it
+    // cannot tell a real slip from a convincing picture of one - which is why
+    // a MATCHED amount is still held for review unless this is explicitly
+    // opted out of.
+    //
+    // The opt-out used to also require a non-production runtime, which made it
+    // inert on the deployed site and left pre-launch testing with no way to
+    // complete a payment at all. It is now honoured wherever it is set, and the
+    // guard rail moved to where it belongs: production preflight fails while
+    // ALLOW_AI_SLIP_AUTO_APPROVAL is 'true', so this cannot survive into a
+    // real launch, and every use says so in the logs.
+    const allowAiAutoApproval = process.env.ALLOW_AI_SLIP_AUTO_APPROVAL === 'true';
+    if (allowAiAutoApproval && amountResult.result === 'MATCHED') {
+      console.warn(
+        'ALLOW_AI_SLIP_AUTO_APPROVAL is on: accepting a payment slip on the vision model\'s amount reading alone. '
+        + 'Authenticity was NOT verified - a forged or reused slip would pass. Configure SlipOK and turn this off before handling real money.',
+        { expectedAmount, detectedAmount },
+      );
+    }
     if (amountResult.result === 'MATCHED' && !allowAiAutoApproval) {
       return {
         ...amountResult,
