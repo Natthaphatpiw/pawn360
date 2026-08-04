@@ -182,6 +182,22 @@ requireExact('NEXT_PUBLIC_DROPPOINT_MOCK', 'false');
   'SHOP_SYSTEM_URL',
 ].forEach(requireHttps);
 
+// Payment-slip verification silently downgrades to a vision model when SlipOK
+// is unset, and a vision model cannot tell a real transfer from a picture of
+// one. Production must not verify money on that path without knowing.
+(() => {
+  const branchRaw = value('SLIPOK_BRANCH_ID') || value('SLIPOK_API_URL');
+  const branchId = /apikey\/(\d+)/i.exec(branchRaw)?.[1]
+    || (/^\d+$/.test(branchRaw.trim()) ? branchRaw.trim() : '');
+  const apiKey = value('SLIPOK_API_KEY') || value('SLIPOK_PASSWORD');
+  if (!branchId || !apiKey) {
+    errors.push(
+      'SlipOK is not configured (need a numeric SLIPOK_BRANCH_ID and SLIPOK_API_KEY). '
+      + 'Payment slips would be verified by the vision fallback, which cannot detect a forged or reused slip.',
+    );
+  }
+})();
+
 requireHostAllowlisted('UPPASS_API_URL', 'UPPASS_ALLOWED_HOSTS');
 requireHostAllowlisted('UPPASS_API_URL_INVEST', 'UPPASS_ALLOWED_HOSTS');
 

@@ -97,7 +97,16 @@ function extractBranchId(rawValue?: string | null) {
   }
 
   const match = trimmed.match(/apikey\/(\d+)/i);
-  return match?.[1] || trimmed;
+  if (match?.[1]) return match[1];
+
+  // A branch id is numeric. Anything else - notably the bare
+  // "https://api.slipok.com" that .env.example suggests for SLIPOK_API_URL -
+  // used to be accepted verbatim, which marked SlipOK "configured" and then
+  // built the request URL as .../apikey/https://api.slipok.com. Rejecting it
+  // here means a half-configured deployment falls back cleanly and says so,
+  // rather than calling a URL that cannot work.
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  return '';
 }
 
 function getSlipOkConfig() {
@@ -893,6 +902,16 @@ export async function verifyPaymentSlip(
     return verifyWithSlipOk(slipUrl, normalizedExpectedAmount, options);
   }
 
+  // SlipOK reads the slip's QR against the bank's own records, so it can tell
+  // a real transfer from a convincing picture of one. A vision model only
+  // reads what the image shows and cannot detect a forged or reused slip, so
+  // running money checks on it is a materially weaker control. That decision
+  // was previously invisible: a missing env var silently downgraded every
+  // verification with nothing in the logs to say so.
+  console.warn('SlipOK is not configured - verifying this payment slip with the vision fallback, which cannot detect a forged or reused slip. Set SLIPOK_BRANCH_ID (numeric) and SLIPOK_API_KEY.', {
+    hasBranchId: Boolean(config.branchId),
+    hasApiKey: Boolean(config.apiKey),
+  });
   return verifyWithAIVision(slipUrl, normalizedExpectedAmount, options.tolerance);
 }
 
