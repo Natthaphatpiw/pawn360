@@ -162,7 +162,11 @@ export async function POST(request: NextRequest) {
       await logContractAction(
         actionRequest.contract_id,
         'SLIP_VERIFIED',
-        'INVESTOR_TRANSFERRED',
+        // action_status only accepts the six workflow states. INVESTOR_TRANSFERRED
+        // is a request_status value and was being passed into this slot, so the
+        // CHECK rejected the row and logContractAction swallowed the error -
+        // losing the audit record for a money movement, silently.
+        'COMPLETED',
         'INVESTOR',
         authenticatedLineId,
         {

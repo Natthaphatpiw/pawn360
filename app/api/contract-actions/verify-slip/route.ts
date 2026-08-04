@@ -347,7 +347,12 @@ export async function POST(request: NextRequest) {
             actionRequestId: requestId,
             slipUrl,
             slipAmountDetected: verificationResult.detectedAmount,
-            slipVerificationResult: 'SLIP_REJECTED_FINAL',
+            // The column records what the slip check FOUND, and its CHECK
+            // permits only the five SlipVerificationResult values.
+            // SLIP_REJECTED_FINAL describes the workflow outcome, not the
+            // reading, so it failed the constraint and the audit row was
+            // dropped. The final-rejection fact is already in the description.
+            slipVerificationResult: verificationResult.result,
             description: `Request voided after 2 failed attempts. Detected: ${verificationResult.detectedAmount}, Expected: ${expectedAmount}`,
           }
         );

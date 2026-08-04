@@ -356,11 +356,17 @@ export async function POST(request: NextRequest) {
 
     // If camera with lenses, create lens records
     if (itemData.lenses && itemData.lenses.length > 0) {
-      const lensRecords = itemData.lenses.map((lens: { brand: string; model: string }) => ({
-        item_id: item.item_id,
-        lens_brand: lens.brand,
-        lens_model: lens.model,
-      }));
+      // item_lenses has lens_model / lens_serial_number / lens_condition and
+      // no lens_brand, so every camera submitted with lenses failed this insert
+      // - and the error is only logged, so the lenses were silently dropped
+      // while the pawn request appeared to succeed. Fold the brand into the
+      // model, which is how the draft route already stores it.
+      const lensRecords = itemData.lenses
+        .map((lens: { brand?: string; model?: string }) => ({
+          item_id: item.item_id,
+          lens_model: [lens?.brand, lens?.model].filter(Boolean).join(' ').trim(),
+        }))
+        .filter((lens: { lens_model: string }) => Boolean(lens.lens_model));
 
       const { error: lensError } = await supabase
         .from('item_lenses')
