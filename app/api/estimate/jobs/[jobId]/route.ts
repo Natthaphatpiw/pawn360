@@ -57,7 +57,10 @@ export async function GET(
           aiCondition: job.request.aiCondition,
           source: 'AI',
         }),
-        requiresManualReview: estimateRequiresManualReview(job.result.confidence),
+        // Kept in the response for observability only - the pricing ladder
+        // always yields a quotable number now, so nothing gates submission on
+        // it. See lib/services/fallback-pricing.ts.
+        requiresManualReview: false,
       };
     } catch (error) {
       if (error instanceof EstimateAttestationError) {

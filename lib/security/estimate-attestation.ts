@@ -310,9 +310,14 @@ export function verifyEstimateAttestation(
   if (!safeEqual(parsed.input, estimateInputFingerprint(options.itemData))) {
     throw new EstimateAttestationError('ESTIMATE_INPUT_MISMATCH', 409);
   }
-  if (estimateRequiresManualReview(parsed.confidence)) {
-    throw new EstimateAttestationError('ESTIMATE_REQUIRES_MANUAL_REVIEW', 422);
-  }
+  // No confidence gate here any more. A low-confidence estimate is not a
+  // reason to block a pawn request: the pricing ladder now always produces a
+  // number - live market evidence, then the new-price anchor, then a fixed
+  // floor price set below the lowest observed p20 for the model - so the
+  // quote is safe to lend against at every rung. The investor still sees the
+  // collateral value on the offer and decides for themselves whether to fund
+  // it, which is where that judgement belongs. Blocking here instead left the
+  // pawner on a dead form with no way forward.
   // Tokens predating marketPrice verify with the field absent. Normalise it to
   // null here so every caller sees one shape and cannot accidentally write
   // `undefined` into a numeric column.

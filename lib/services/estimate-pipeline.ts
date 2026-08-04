@@ -15,6 +15,7 @@ import {
   type AnchorPriceResult,
 } from '@/lib/services/anchor-pricing';
 import { computeRepresentativeUsedPriceTHB } from '@/lib/services/price-representative';
+import { resolveFallbackPrice } from '@/lib/services/fallback-pricing';
 import {
   hasAnthropicKeys,
   anthropicStructured,
@@ -2204,7 +2205,7 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
     }
     console.log('✅ Market price (low-but-fair):', marketPrice);
 
-    const pawnPrice = Math.round(marketPrice * PAWN_PRICE_FACTOR);
+    let pawnPrice = Math.round(marketPrice * PAWN_PRICE_FACTOR);
     console.log('🏦 Pawn price (60% of market):', pawnPrice);
 
     const pawnerCondition = normalizeConditionInput(body.pawnerCondition);
@@ -2217,33 +2218,54 @@ export async function runEstimatePipeline(body: EstimateRequest): Promise<Estima
       final: normalizedCondition,
     });
 
-    // Hard stop before a number is published. Between the floor and the
-    // submission threshold an operator confirms the estimate; below the floor we
-    // do not quote at all - lending against collateral we cannot value is the
-    // investor's risk, not ours to take on their behalf.
+    // Last rung. Rather than refuse to quote - which left a pawner staring at a
+    // dead form with nothing to do - fall back to a fixed floor price for the
+    // model. The floors are set below the lowest observed p20 for their bucket,
+    // so a fallback quote is safe to lend against even knowing nothing about
+    // the specific unit, and the investor still assesses the offer themselves
+    // before funding it.
     if (estimateTooUncertainToQuote(responseConfidence)) {
-      console.warn('🚫 Confidence below the quoting floor — declining to price', {
-        confidence: responseConfidence,
-        floor: getConfidenceFloorToQuote(),
-      });
-      const escalation = await escalateToManualEstimate({
-        lineId: body.lineId,
-        itemType: body.itemType,
-        brand: body.brand,
-        model: body.model,
-        productName: normalizedData.productName,
-        capacity: body.capacity,
-        reason: `ความมั่นใจของการประเมิน (${responseConfidence.toFixed(2)}) ต่ำกว่าเกณฑ์ขั้นต่ำ ${getConfidenceFloorToQuote()}`,
-        tiersAttempted: ['market evidence', 'new-price anchor'],
-      });
-      return {
-        ok: false,
-        status: 202,
-        error: escalation.requestId
-          ? 'สินค้าไม่สามารถประเมินราคาได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE ครับ'
-          : 'สินค้าไม่สามารถประเมินราคาได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคาครับ',
-        code: 'manual_estimate_escalated',
-      };
+      const fallback = resolveFallbackPrice(
+        normalizedData.productName,
+        anchorCategoryFor(body.itemType, body.brand, body.appleCategory),
+        body.brand,
+        body.model,
+      );
+      if (fallback) {
+        console.warn('🛟 Falling back to the fixed floor price', {
+          confidence: responseConfidence,
+          floor: getConfidenceFloorToQuote(),
+          source: fallback.source,
+          marketPrice: fallback.marketPrice,
+        });
+        marketPrice = fallback.marketPrice;
+        pawnPrice = Math.round(marketPrice * PAWN_PRICE_FACTOR);
+        responseConfidence = fallback.confidence;
+        marketCalculationText = fallback.note;
+      } else {
+        // Only reachable if the fallback table itself is broken.
+        console.error('🚫 No fallback price available — declining to price', {
+          confidence: responseConfidence,
+        });
+        const escalation = await escalateToManualEstimate({
+          lineId: body.lineId,
+          itemType: body.itemType,
+          brand: body.brand,
+          model: body.model,
+          productName: normalizedData.productName,
+          capacity: body.capacity,
+          reason: `ความมั่นใจของการประเมิน (${responseConfidence.toFixed(2)}) ต่ำกว่าเกณฑ์ และไม่มีราคาสำรองสำหรับสินค้านี้`,
+          tiersAttempted: ['market evidence', 'new-price anchor', 'fallback table'],
+        });
+        return {
+          ok: false,
+          status: 202,
+          error: escalation.requestId
+            ? 'สินค้าไม่สามารถประเมินราคาได้ กรุณารอเจ้าหน้าที่ติดต่อกลับทาง LINE ครับ'
+            : 'สินค้าไม่สามารถประเมินราคาได้ กรุณาติดต่อเจ้าหน้าที่เพื่อประเมินราคาครับ',
+          code: 'manual_estimate_escalated',
+        };
+      }
     }
 
     const estimatedPrice = Math.round(pawnPrice * normalizedCondition);

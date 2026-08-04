@@ -202,9 +202,6 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
   // can never disagree about what is required.
   const missingRequirements: string[] = [];
   if (!isRegistered) missingRequirements.push('ลงทะเบียนและยืนยันตัวตนให้เรียบร้อยก่อน');
-  if (itemData.requiresManualReview) {
-    missingRequirements.push('ราคาประเมินนี้ต้องให้เจ้าหน้าที่ตรวจสอบก่อน จึงยังส่งคำขอเองไม่ได้');
-  }
   if (loanAmountNum < MIN_LOAN_AMOUNT) {
     missingRequirements.push(`ระบุวงเงินที่ต้องการอย่างน้อย ${MIN_LOAN_AMOUNT.toLocaleString()} บาท`);
   }
@@ -459,11 +456,6 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
     if (loanAmountNum < MIN_LOAN_AMOUNT) {
       alert(`วงเงินขั้นต่ำ ${MIN_LOAN_AMOUNT.toLocaleString('en-US')} บาท`);
-      return;
-    }
-
-    if (itemData.requiresManualReview) {
-      alert('ข้อมูลราคาตลาดยังมีความเชื่อมั่นไม่เพียงพอ กรุณารอเจ้าหน้าที่ตรวจสอบราคาก่อนส่งคำขอ');
       return;
     }
 
@@ -750,15 +742,6 @@ export default function PawnSummary({ itemData, lineId, draftItemId, onBack, onS
 
           <div className="text-primary text-sm opacity-80 relative z-10">บาท</div>
         </div>
-
-        {itemData.requiresManualReview && (
-          <div className="mb-6 rounded-xl border border-warning/40 bg-warning-soft p-4 text-sm text-foreground-muted">
-            <p className="font-semibold text-warning">ต้องตรวจสอบราคาโดยเจ้าหน้าที่</p>
-            <p className="mt-1 text-xs text-foreground-subtle">
-              หลักฐานราคาตลาดยังไม่เพียงพอ ระบบจึงยังไม่เปิดให้ส่งคำขอด้วยราคานี้
-            </p>
-          </div>
-        )}
 
         {/* 4. Loan Amount Input */}
         <div className="mb-6">

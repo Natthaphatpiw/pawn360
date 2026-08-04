@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "currency": "THB",
+  "meaning": "marketPrice (ราคากลาง) - the second-hand market REFERENCE price, not the loan. The loan is derived from it the same way as any other estimate: marketPrice x 0.6 LTV x condition.",
+  "whenUsed": "Last resort only, after live market search AND the new-price anchor rung both fail - typically an AI/provider outage or a model nothing can be found for. Never used when real evidence exists.",
+  "calibration": "Every value sits BELOW the lowest p20 (20th percentile) of real Thai listings measured for that model in the 72-product benchmark, with extra margin on top. A fallback fires precisely when we have no evidence, so it has to be safe across every variant in its bucket - storage, colour and condition all unknown. Under-valuing here costs a pawner some headroom; over-valuing hands an investor collateral worth less than the loan.",
+  "unmeasured": "Models with no benchmark observation (iPhone 16/17, newer Androids) are extrapolated and deliberately cut harder. Treat those as guesses until real resale data exists.",
+  "rules": [
+    { "id": "iphone-17-pro", "patterns": ["iphone 17 pro"], "price": 24000, "measured": false },
+    { "id": "iphone-17", "patterns": ["iphone 17", "iphone air"], "price": 19000, "measured": false },
+    { "id": "iphone-16-pro", "patterns": ["iphone 16 pro"], "price": 21000, "measured": false },
+    { "id": "iphone-16", "patterns": ["iphone 16"], "price": 17000, "measured": false },
+    { "id": "iphone-15-pro-max", "patterns": ["iphone 15 pro max"], "price": 18000, "measured": true },
+    { "id": "iphone-15-pro", "patterns": ["iphone 15 pro"], "price": 16000, "measured": true },
+    { "id": "iphone-15", "patterns": ["iphone 15"], "price": 13000, "measured": false },
+    { "id": "iphone-14-pro", "patterns": ["iphone 14 pro"], "price": 14000, "measured": true },
+    { "id": "iphone-14", "patterns": ["iphone 14"], "price": 10000, "measured": true },
+    { "id": "iphone-13-pro", "patterns": ["iphone 13 pro"], "price": 9000, "measured": false },
+    { "id": "iphone-13", "patterns": ["iphone 13"], "price": 7500, "measured": true },
+    { "id": "iphone-12-pro", "patterns": ["iphone 12 pro"], "price": 8000, "measured": false },
+    { "id": "iphone-12", "patterns": ["iphone 12"], "price": 7000, "measured": true },
+    { "id": "iphone-legacy", "patterns": ["iphone 11", "iphone xs", "iphone xr", "iphone x", "iphone se", "iphone 8", "iphone 7"], "price": 3500, "measured": true },
+
+    { "id": "ipad-pro", "patterns": ["ipad pro"], "price": 12000, "measured": true },
+    { "id": "ipad-mini", "patterns": ["ipad mini"], "price": 7000, "measured": true },
+    { "id": "ipad-air", "patterns": ["ipad air"], "price": 6500, "measured": true },
+    { "id": "ipad", "patterns": ["ipad"], "price": 5000, "measured": true },
+
+    { "id": "macbook-pro", "patterns": ["macbook pro"], "price": 15000, "measured": true },
+    { "id": "macbook", "patterns": ["macbook air", "macbook"], "price": 9000, "measured": true },
+    { "id": "imac-mac", "patterns": ["imac", "mac studio", "mac mini", "mac pro"], "price": 8000, "measured": false },
+
+    { "id": "apple-watch-ultra", "patterns": ["watch ultra"], "price": 9000, "measured": true },
+    { "id": "apple-watch-se", "patterns": ["watch se"], "price": 2000, "measured": true },
+    { "id": "apple-watch", "patterns": ["apple watch"], "price": 3000, "measured": true },
+
+    { "id": "airpods-max", "patterns": ["airpods max"], "price": 7000, "measured": true },
+    { "id": "airpods-pro", "patterns": ["airpods pro"], "price": 3000, "measured": true },
+    { "id": "airpods", "patterns": ["airpods"], "price": 2000, "measured": true }
+  ],
+  "categoryDefaults": {
+    "apple_phone": 3500,
+    "phone": 3000,
+    "tablet": 3000,
+    "laptop": 5000,
+    "camera": 5000,
+    "accessory": 1500,
+    "hardware": 2500,
+    "default": 2000
+  }
+}
