@@ -92,11 +92,25 @@ export async function POST(request: NextRequest) {
         total_amount,
         items:item_id (brand, model, image_urls),
         pawners:customer_id (line_id),
-        drop_points:drop_point_id (google_maps_link)
+        drop_points:drop_point_id (google_map_url)
       `)
       .eq('contract_id', contractId)
       .single();
-    if (contractError || !rawContract) {
+    if (contractError) {
+      // A rejected query is not a missing contract. Reporting both as 404 is
+      // what let a bad column name read as "ไม่พบสัญญา" to every investor
+      // instead of surfacing as the schema error it was.
+      console.error('[contract:investor-action] contract lookup failed', {
+        code: (contractError as { code?: string })?.code || 'QUERY_FAILED',
+        column: /column ([a-z_.]+) does not exist/i.exec(contractError.message || '')?.[1],
+        details: /'([a-z_]+)' column/i.exec(contractError.message || '')?.[1],
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดข้อมูลสัญญาได้ กรุณาลองใหม่อีกครั้ง', code: 'CONTRACT_LOOKUP_FAILED' },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    if (!rawContract) {
       return NextResponse.json(
         { error: 'ไม่พบสัญญา', code: 'CONTRACT_NOT_FOUND' },
         { status: 404, headers: { 'Cache-Control': 'no-store' } },
@@ -387,7 +401,7 @@ function createAcceptedCard(contract: any, loanRequest: { delivery_method?: stri
           action: {
             type: 'uri',
             label: 'นำทางไป Drop Point',
-            uri: contract.drop_points?.google_maps_link || 'https://maps.google.com'
+            uri: contract.drop_points?.google_map_url || 'https://maps.google.com'
           },
           style: 'secondary'
         }]
