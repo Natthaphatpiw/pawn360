@@ -56,15 +56,17 @@ async function notifyPawnerRequestLive(contract: any, pawnerLineId?: string | nu
   }
 
   const principal = Number(contract.loan_principal_amount) || 0;
+  // Deliberately says nothing about investors or a marketplace. From the
+  // pawner's side this is a loan request that gets approved or not; who funds
+  // it and how they are matched is machinery they have no reason to carry.
   const text = [
-    'ส่งคำขอสินเชื่อเรียบร้อยแล้ว ✅',
+    'ส่งคำขอเรียบร้อยแล้ว ✅',
     '',
     `เลขที่สัญญา: ${contract.contract_number}`,
     `วงเงินที่ขอ: ${principal.toLocaleString()} บาท`,
     `ระยะเวลา: ${contract.contract_duration_days} วัน`,
     '',
-    'ขณะนี้คำขอของคุณแสดงให้นักลงทุนเห็นแล้ว',
-    'เมื่อมีนักลงทุนรับคำขอ ระบบจะแจ้งให้ทราบทาง LINE ทันที',
+    'เมื่อคำขอได้รับการอนุมัติ ระบบจะแจ้งให้ทราบทาง LINE ทันที',
     'จากนั้นจึงนำสินค้าไปส่งที่จุดรับฝากที่เลือกไว้',
   ].join('\n');
 
