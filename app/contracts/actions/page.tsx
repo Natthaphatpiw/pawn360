@@ -144,6 +144,8 @@ export default function ActionStatusListPage() {
   const mockMode = getMockContractsEnabled();
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<ActionItem[]>([]);
+  /** Submitted loan requests still waiting on approval - no contract action exists for these yet. */
+  const [pendingContracts, setPendingContracts] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const previewPrincipalIncreaseRequests: ActionItem[] = mockMode
@@ -175,6 +177,7 @@ export default function ActionStatusListPage() {
   const actionRequests = mockMode ? [...previewPrincipalIncreaseRequests, ...requests] : requests;
 
   const visibleRequests = actionRequests.filter(shouldShowActionRequest);
+  const hasAnything = visibleRequests.length > 0 || pendingContracts.length > 0;
 
   useEffect(() => {
     if (mockMode) {
@@ -210,6 +213,22 @@ export default function ActionStatusListPage() {
       const response = await axios.get('/api/contract-actions/by-pawner');
       if (response.data.success) {
         setRequests(response.data.requests);
+      }
+
+      // This screen used to list contract actions only - redemptions,
+      // extensions, principal changes on contracts that already exist. A pawner
+      // who had just submitted a request found it empty and reasonably read
+      // that as their request having vanished. Awaiting-approval contracts now
+      // appear here too. Fetched separately so a failure of one list does not
+      // blank the other.
+      try {
+        const contractsResponse = await axios.get('/api/contracts/by-customer');
+        const contracts = contractsResponse.data?.contracts || [];
+        setPendingContracts(
+          contracts.filter((contract: any) => String(contract.funding_status || '') === 'PENDING'),
+        );
+      } catch (pendingError) {
+        console.error('Error fetching awaiting-approval contracts:', pendingError);
       }
     } catch (err) {
       console.error('Error fetching action requests:', err);
@@ -259,7 +278,37 @@ export default function ActionStatusListPage() {
         </div>
 
       <div className="flex-1 space-y-3 pb-20 no-scrollbar">
-        {visibleRequests.length === 0 ? (
+        {pendingContracts.map((contract) => {
+          const item = contract.items || contract.item;
+          const itemName = [item?.brand, item?.model, item?.capacity].filter(Boolean).join(' ') || '-';
+          return (
+            <div
+              key={`pending-${contract.contract_id}`}
+              className="hover-card cursor-pointer rounded-lg border border-primary-border bg-primary-soft/50 p-4 shadow-soft transition-colors hover:bg-primary-soft/80"
+              onClick={() => router.push(`/contracts/${contract.contract_id}`)}
+            >
+              <div className="mb-2 flex flex-nowrap items-center justify-between gap-3">
+                <h3 className="min-w-0 flex-1 truncate whitespace-nowrap text-md font-medium text-foreground">
+                  คำขอสินเชื่อ
+                </h3>
+                <div className="shrink-0 rounded-full bg-background-white px-3 py-1 text-center text-xs font-medium text-primary">
+                  รออนุมัติ
+                </div>
+              </div>
+              <div className="space-y-1 mb-1">
+                <div className="text-sm text-foreground-subtle">{itemName}</div>
+                <div className="text-sm text-foreground-subtle">
+                  วงเงินที่ขอ {Number(contract.loan_principal_amount || 0).toLocaleString()} บาท
+                </div>
+              </div>
+              <div className="text-xs text-foreground-subtle">
+                เลขที่สัญญา {contract.contract_number || '-'}
+              </div>
+            </div>
+          );
+        })}
+
+        {!hasAnything ? (
           <div className="rounded-lg border border-primary-border bg-background p-8 text-center shadow-soft">
             <p className="text-primary/50">ไม่มีคำขอที่รอดำเนินการ</p>
           </div>

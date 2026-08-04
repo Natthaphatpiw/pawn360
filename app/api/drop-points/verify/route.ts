@@ -194,7 +194,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: contract, error: contractError } = await supabase
+    // Same optional column as the detail screen: items.condition_checklist may
+    // not exist yet (2026_06_24_add_condition_checklists.sql). Without this the
+    // whole select is rejected with 42703 and the operator cannot verify an
+    // item at all - the checklist is only used to compare against what the
+    // pawner declared, so losing it must not block intake.
+    const selectContract = (withChecklist: boolean) => supabase
       .from('contracts')
       .select(`
         contract_id,
@@ -215,7 +220,7 @@ export async function POST(request: NextRequest) {
           model,
           capacity,
           item_condition,
-          condition_checklist,
+          ${withChecklist ? 'condition_checklist,' : ''}
           serial_number,
           notes,
           image_urls,
@@ -239,7 +244,25 @@ export async function POST(request: NextRequest) {
       .eq('contract_id', contractId)
       .single();
 
-    if (contractError || !contract) {
+    let { data: contract, error: contractError } = await selectContract(true);
+    if (contractError && `${contractError.message || ''}`.toLowerCase().includes('condition_checklist')) {
+      console.warn('items.condition_checklist is missing; run 2026_06_24_add_condition_checklists.sql. Verifying without it.');
+      ({ data: contract, error: contractError } = await selectContract(false));
+    }
+
+    if (contractError) {
+      // A rejected query is not a missing contract - say which, so a schema
+      // problem cannot masquerade as bad data again.
+      console.error('[drop-points:verify] contract query failed', {
+        code: (contractError as { code?: string })?.code || 'QUERY_FAILED',
+        column: /column ([a-z_."]+) does not exist/i.exec(contractError.message || '')?.[1],
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดข้อมูลสัญญาได้ กรุณาลองใหม่อีกครั้ง', code: 'CONTRACT_LOOKUP_FAILED' },
+        { status: 503 }
+      );
+    }
+    if (!contract) {
       return NextResponse.json(
         { error: 'Contract not found' },
         { status: 404 }
@@ -272,7 +295,9 @@ export async function POST(request: NextRequest) {
     const expectedConditionScore = item?.item_condition === null || item?.item_condition === undefined
       ? null
       : Number(item.item_condition);
-    const pawnerConditionChecklist = item?.condition_checklist;
+    // Absent when the column has not been migrated yet, in which case there is
+    // nothing to compare the operator's checklist against.
+    const pawnerConditionChecklist = (item as { condition_checklist?: unknown } | null)?.condition_checklist;
     const dropPointConditionChecklist = conditionChecklist as Record<ConditionCheckKey, boolean>;
     const hasChecklistMismatch = !isConditionChecklistMatch(pawnerConditionChecklist, dropPointConditionChecklist);
     const isConditionGapTooHigh = expectedConditionScore !== null && Number.isFinite(expectedConditionScore)

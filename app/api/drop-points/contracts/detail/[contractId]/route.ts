@@ -47,7 +47,12 @@ export async function GET(
       );
     }
 
-    const { data: contract, error: contractError } = await supabase
+    // items.condition_checklist is added by a migration that may not have been
+    // applied yet (2026_06_24_add_condition_checklists.sql). PostgREST rejects
+    // the whole select on an unknown column with 42703, which took down the
+    // drop-point's item-check screen entirely. The item-intake routes have
+    // carried a fallback for this column for a while; this read did not.
+    const selectContract = (withChecklist: boolean) => supabase
       .from('contracts')
       .select(`
         contract_id,
@@ -68,7 +73,7 @@ export async function GET(
           color,
           image_urls,
           item_condition,
-          condition_checklist,
+          ${withChecklist ? 'condition_checklist,' : ''}
           notes,
           defects
         ),
@@ -87,9 +92,16 @@ export async function GET(
       .eq('drop_point_id', dropPoint.drop_point_id)
       .maybeSingle();
 
+    let { data: contract, error: contractError } = await selectContract(true);
+    if (contractError && `${contractError.message || ''}`.toLowerCase().includes('condition_checklist')) {
+      console.warn('items.condition_checklist is missing; run 2026_06_24_add_condition_checklists.sql. Loading without it.');
+      ({ data: contract, error: contractError } = await selectContract(false));
+    }
+
     if (contractError) {
       console.error('[drop-points:contract-detail] contract query failed', {
         code: contractError.code || 'unknown',
+        column: /column ([a-z_."]+) does not exist/i.exec(contractError.message || '')?.[1],
       });
       return NextResponse.json(
         { error: 'ไม่สามารถโหลดรายละเอียดสัญญาได้', code: 'CONTRACT_DETAIL_FAILED' },
