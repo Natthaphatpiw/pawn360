@@ -297,7 +297,16 @@ export async function POST(request: NextRequest) {
     const requestError = transactionRequestErrorResponse(error);
     if (requestError) return requestError;
     if ((error as { name?: string })?.name === 'LiffAuthError') return liffAuthErrorResponse(error);
-    console.error('Error saving draft item');
+    // Supabase rejections are plain objects, not Errors, so the previous
+    // bare message left a 500 with nothing to diagnose it by. Log the
+    // Postgres code and constraint - both are fixed identifiers, never user
+    // data - so a constraint violation names itself.
+    const supabaseError = error as { code?: string; details?: string; hint?: string; message?: string };
+    console.error('Error saving draft item', {
+      code: supabaseError?.code || (error as { name?: string })?.name || 'UNKNOWN',
+      constraint: /constraint "([^"]+)"/.exec(supabaseError?.message || '')?.[1],
+      column: /column "([^"]+)"/.exec(supabaseError?.message || '')?.[1],
+    });
     return sanitizedServerError();
   }
 }

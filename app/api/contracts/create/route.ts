@@ -39,6 +39,49 @@ const contractNumberForRequest = (loanRequestId: string) => (
   `CTR-L-${loanRequestId.replace(/-/g, '').slice(0, 20).toUpperCase()}`
 );
 
+/**
+ * Confirms to the pawner that their request is live on the investor market.
+ *
+ * Best-effort and deliberately isolated: a push failure must never affect a
+ * contract that is already signed and recorded.
+ */
+async function notifyPawnerRequestLive(contract: any, pawnerLineId?: string | null) {
+  const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  if (!token || !pawnerLineId) {
+    console.warn('Pawner request-live notification skipped', {
+      hasToken: Boolean(token),
+      hasLineId: Boolean(pawnerLineId),
+    });
+    return;
+  }
+
+  const principal = Number(contract.loan_principal_amount) || 0;
+  const text = [
+    'ส่งคำขอสินเชื่อเรียบร้อยแล้ว ✅',
+    '',
+    `เลขที่สัญญา: ${contract.contract_number}`,
+    `วงเงินที่ขอ: ${principal.toLocaleString()} บาท`,
+    `ระยะเวลา: ${contract.contract_duration_days} วัน`,
+    '',
+    'ขณะนี้คำขอของคุณแสดงให้นักลงทุนเห็นแล้ว',
+    'เมื่อมีนักลงทุนรับคำขอ ระบบจะแจ้งให้ทราบทาง LINE ทันที',
+    'จากนั้นจึงนำสินค้าไปส่งที่จุดรับฝากที่เลือกไว้',
+  ].join('\n');
+
+  try {
+    await pushLineMessage({
+      channelAccessToken: token,
+      to: pawnerLineId,
+      messages: [{ type: 'text', text }],
+      retryKey: lineRetryKeyFromMaterial(`pawn-request-live:${contract.contract_id}`),
+    });
+  } catch (error) {
+    console.error('Pawner request-live notification failed', {
+      code: (error as { code?: string })?.code || 'PUSH_FAILED',
+    });
+  }
+}
+
 async function notifyEligibleInvestors(contract: any, loanRequest: any) {
   const supabase = supabaseAdmin();
   const { data: investors, error } = await supabase
@@ -279,6 +322,11 @@ export async function POST(request: NextRequest) {
       items: relationOne<any>(loanRequest.items),
     };
     after(() => notifyEligibleInvestors(contract, notificationLoanRequest));
+    // The pawner heard nothing at all once they signed: the only push went to
+    // investors, and the request-status screen lists contract actions rather
+    // than new requests, so a submitted request looked to them like it had
+    // vanished. Tell them it is live and what happens next.
+    after(() => notifyPawnerRequestLive(contract, pawner?.line_id));
 
     return NextResponse.json({
       success: true,

@@ -130,8 +130,15 @@ export async function POST(request: NextRequest) {
     }, { headers: { 'Cache-Control': 'no-store, private' } });
 
   } catch (error) {
+    // "type: unknown" was all this ever reported, because Supabase rejects
+    // with a plain object rather than an Error. Surface the Postgres code and
+    // the offending constraint/column instead - fixed identifiers, not user
+    // data - so the next failure says what actually broke.
+    const supabaseError = error as { code?: string; message?: string };
     console.error('[investors:register] failed', {
-      type: error instanceof Error ? error.name : 'unknown',
+      code: supabaseError?.code || (error instanceof Error ? error.name : 'UNKNOWN'),
+      constraint: /constraint "([^"]+)"/.exec(supabaseError?.message || '')?.[1],
+      column: /column "([^"]+)"/.exec(supabaseError?.message || '')?.[1],
     });
     return NextResponse.json(
       { error: 'ไม่สามารถลงทะเบียนได้ชั่วคราว', code: 'REGISTRATION_FAILED' },
