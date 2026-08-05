@@ -425,7 +425,7 @@ export default function ContractForm({ item, customer, storeId, onComplete, onCl
                     ระหว่าง <input type="text" class="name" value="${contractData.sellerName}" readonly>
                     เลขบัตรประชาชน <input type="text" class="id-num" value="${contractData.sellerId}" readonly>
                     อยู่ที่อยู่ <input type="text" class="address" value="${contractData.sellerAddress}" readonly>
-                    ซึ่งต่อไปในสัญญานี้เรียกว่า "ผู้ขาย" กับ Pawnly Technologies Co., Ltd.
+                    ซึ่งต่อไปในสัญญานี้เรียกว่า "ผู้ขาย" กับ Astly Co., Ltd.
                     สำนักงานตั้งอยู่ที่ <input type="text" class="office-address" value="${contractData.buyerAddress}" readonly>
                     ซึ่งต่อไปในสัญญานี้เรียกว่า "ผู้ซื้อ"
                 </p>

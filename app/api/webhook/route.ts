@@ -1111,7 +1111,13 @@ async function handlePostbackEvent(event: WebhookEvent) {
             updated_at: new Date().toISOString(),
           })
           .eq('redemption_id', redemptionId)
-          .not('request_status', 'in', '(PAWNER_CONFIRMED,COMPLETED)')
+          // COMPLETED is exactly the status the drop-point return confirm sets
+          // (drop-points/returns/confirm/route.ts:428), so excluding it meant
+          // this guarded UPDATE could never match and the pawner's
+          // "ได้รับของคืนแล้ว" button always failed with
+          // REDEMPTION_CONFIRMATION_CONFLICT. pawner_confirmed_at IS NULL is
+          // the real idempotency guard and is enough on its own.
+          .in('request_status', ['COMPLETED', 'PREPARING_ITEM', 'IN_TRANSIT', 'AMOUNT_VERIFIED'])
           .is('pawner_confirmed_at', null)
           .select('redemption_id')
           .maybeSingle();

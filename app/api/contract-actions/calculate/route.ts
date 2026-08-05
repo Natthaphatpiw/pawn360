@@ -162,6 +162,17 @@ export async function POST(request: NextRequest) {
         // ลดเงินต้น: จ่ายจำนวนที่ขอลด + ดอกเบี้ยสะสมถึงวันนี้
         const reductionAmountValue = Number(reductionAmount ?? amount ?? 0);
 
+        // Mirrors the guard in /create: a full payoff is ไถ่ถอน, and quoting
+        // it here would let the pawner reach a request that can never complete.
+        if (reductionAmountValue >= currentPrincipal) {
+          return NextResponse.json(
+            {
+              error: 'การชำระเงินต้นทั้งหมดคือการไถ่ถอน กรุณาใช้เมนูไถ่ถอนแทน',
+              code: 'REDUCTION_EQUALS_FULL_PRINCIPAL',
+            },
+            { status: 400 }
+          );
+        }
         if (reductionAmountValue <= 0 || reductionAmountValue > currentPrincipal) {
           return NextResponse.json(
             { error: 'จำนวนเงินที่ต้องการลดไม่ถูกต้อง', code: 'INVALID_REDUCTION_AMOUNT' },

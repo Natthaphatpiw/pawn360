@@ -392,7 +392,10 @@ export default function PrincipalReductionPage() {
     : 0;
   const totalInterestAfterAction = round2(interestFirstPart + interestRemaining);
   const penaltyAmount = calculation?.penaltyRequired ? Number(calculation.penaltyAmount || calculation.penalty?.penaltyAmount || 0) : 0;
-  const maxReduction = Number(contract.remainingPrincipal || calculation?.currentPrincipal || 0);
+  // Reducing by the whole principal is a payoff, which is ไถ่ถอน and has its
+  // own flow - the server rejects it, so the input must not offer it either.
+  const currentPrincipalValue = Number(contract.remainingPrincipal || calculation?.currentPrincipal || 0);
+  const maxReduction = Math.max(0, currentPrincipalValue - 1);
 
   return (
     <div className="min-h-screen bg-background-white font-sans flex flex-col">
@@ -458,7 +461,7 @@ export default function PrincipalReductionPage() {
           </div>
           <DetailRow label="หมายเลขสัญญา" value={contract.contract_number} />
           <DetailRow label="สินค้า" value={`${contract.item?.brand} ${contract.item?.model}`} />
-          <DetailRow label="เงินต้นปัจจุบัน" value={`${maxReduction.toLocaleString()} บาท`} />
+          <DetailRow label="เงินต้นปัจจุบัน" value={`${currentPrincipalValue.toLocaleString()} บาท`} />
         </div>
 
         <div className="bg-background rounded-xl p-4 mb-4">

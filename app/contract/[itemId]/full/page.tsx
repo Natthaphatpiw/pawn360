@@ -525,7 +525,7 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
                 defaultValue={contractData.sellerAddress}
                 readOnly
               />
-              {' '}ซึ่งต่อไปในสัญญานี้เรียกว่า &quot;ผู้ขาย&quot; กับ Pawnly Technologies Co., Ltd.
+              {' '}ซึ่งต่อไปในสัญญานี้เรียกว่า &quot;ผู้ขาย&quot; กับ Astly Co., Ltd.
               สำนักงานตั้งอยู่ที่{' '}
               <input
                 type="text"

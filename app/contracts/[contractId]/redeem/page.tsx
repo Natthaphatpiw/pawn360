@@ -104,6 +104,9 @@ export default function RedemptionPaymentPage() {
   const { profile } = useLiff();
 
   const [contract, setContract] = useState<ContractDetail | null>(null);
+  /** Set when the contract, the penalty status, or the redemption create fails.
+   *  Shown instead of inventing numbers on a screen the pawner pays from. */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -159,45 +162,17 @@ export default function RedemptionPaymentPage() {
         });
       }
     } catch (error) {
+      // Previously this substituted a FABRICATED 10,000 THB contract - complete
+      // with a made-up drop point and customer address - on any fetch failure.
+      // This is the screen a pawner reads to decide what to pay to redeem their
+      // item, so inventing its numbers is the worst possible failure mode. Show
+      // the real error and let the existing !contract branch render the empty
+      // state instead.
       console.error('Error fetching contract:', error);
-      setContract({
-        contract_id: contractId,
-        contract_number: `CT-${contractId}-MOCK`,
-        contract_start_date: new Date().toISOString(),
-        loan_principal_amount: 10000,
-        original_principal_amount: 10000,
-        interest_rate: 0.03,
-        interest_amount: 300,
-        total_amount: 10300,
-        amount_paid: 0,
-        contract_duration_days: 30,
-        remainingAmount: 10300,
-        remainingPrincipal: 10000,
-        remainingInterest: 300,
-        item: {
-          brand: 'Apple',
-          model: 'iPhone 13',
-          capacity: '128GB',
-        },
-        customer: {
-          phone_number: '0812345678',
-          addr_house_no: '99/9',
-          addr_village: '',
-          addr_street: 'Sukhumvit',
-          addr_sub_district: 'Khlong Toei Nuea',
-          addr_district: 'Watthana',
-          addr_province: 'Bangkok',
-          addr_postcode: '10110',
-        },
-        investor: null,
-        drop_point: {
-          drop_point_id: 'dp-mock',
-          drop_point_name: 'Pawn360 Drop Point (Mock)',
-          phone_number: '020000000',
-          map_embed: null,
-        },
-      });
-      setPenaltyInfo({ penaltyRequired: false, penalty: null });
+      setLoadError(
+        (axios.isAxiosError(error) && error.response?.data?.error)
+        || 'ไม่สามารถโหลดข้อมูลสัญญาได้ กรุณาลองใหม่อีกครั้ง',
+      );
     } finally {
       setLoading(false);
     }
@@ -340,9 +315,15 @@ export default function RedemptionPaymentPage() {
         router.push(`/contracts/${contractId}/redeem/upload?redemptionId=${redemptionId}`);
       }
     } catch (error: any) {
+      // Falling through to preview mode sent the pawner to an upload screen
+      // that fakes a successful payment after 400ms and contacts no server -
+      // so a failed redemption looked completed. Keep them here and say what
+      // went wrong.
       console.error('Error creating redemption:', error);
-      const previewRedemptionId = `preview-redeem-${contractId}`;
-      router.push(`${withPreview(`/contracts/${contractId}/redeem/upload`, 'redemptionId', previewRedemptionId)}&deliveryMethod=${encodeURIComponent(deliveryMethod)}`);
+      setLoadError(
+        error?.response?.data?.error
+        || 'ไม่สามารถสร้างรายการไถ่ถอนได้ กรุณาลองใหม่อีกครั้ง',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -372,11 +353,18 @@ export default function RedemptionPaymentPage() {
     );
   }
 
-  if (!contract) {
+  if (!contract || loadError) {
     return (
       <div className="min-h-screen bg-background-white flex items-center justify-center p-4">
-        <div className="text-center">
-          <p className="text-red-600">ไม่พบข้อมูลสัญญา</p>
+        <div className="max-w-sm text-center">
+          <p className="mb-4 text-red-600">{loadError || 'ไม่พบข้อมูลสัญญา'}</p>
+          <button
+            type="button"
+            onClick={() => { setLoadError(null); void fetchContractDetail(); }}
+            className="w-full rounded-full bg-primary px-4 py-3 font-bold text-white"
+          >
+            ลองใหม่อีกครั้ง
+          </button>
         </div>
       </div>
     );

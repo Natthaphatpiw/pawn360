@@ -313,6 +313,19 @@ export async function POST(request: NextRequest) {
       case 'PRINCIPAL_REDUCTION': {
         const reductionAmt = Number(reductionAmount ?? amount ?? 0);
 
+        // A reduction equal to the whole principal leaves zero, and
+        // /complete rejects a zero principal - so the request could be paid
+        // for and then never completed, stranding the money. Paying the
+        // principal off in full is ไถ่ถอน, which has its own flow.
+        if (reductionAmt >= currentPrincipal) {
+          return NextResponse.json(
+            {
+              error: 'การชำระเงินต้นทั้งหมดคือการไถ่ถอน กรุณาใช้เมนูไถ่ถอนแทน',
+              code: 'REDUCTION_EQUALS_FULL_PRINCIPAL',
+            },
+            { status: 400, headers: { 'Cache-Control': 'no-store' } },
+          );
+        }
         if (reductionAmt <= 0 || reductionAmt > currentPrincipal) {
           return NextResponse.json(
             { error: 'จำนวนเงินที่ต้องการลดไม่ถูกต้อง' },

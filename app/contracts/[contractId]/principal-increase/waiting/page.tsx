@@ -280,7 +280,8 @@ export default function PrincipalIncreaseWaitingPage() {
 
           <div className="bg-amber-50 rounded-lg p-3 mb-6 border border-amber-200 text-left">
             <p className="text-xs text-amber-700">
-              หมายเหตุ: หากผู้ขอสินเชื่อไม่ยืนยันภายใน 24 ชั่วโมง ระบบจะถือว่าได้รับเงินแล้ว
+              หมายเหตุ: ผู้ขอสินเชื่อต้องกดยืนยันว่าได้รับเงินแล้วด้วยตนเอง
+              รายการจะยังไม่เสร็จสมบูรณ์จนกว่าจะมีการยืนยัน หากรอนานผิดปกติ กรุณาติดต่อเจ้าหน้าที่
             </p>
           </div>
 

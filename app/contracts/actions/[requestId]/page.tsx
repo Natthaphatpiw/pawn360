@@ -196,7 +196,10 @@ export default function ActionStatusDetailPage() {
       : signPath;
   const canConfirmReceiving =
     request.request_type === 'PRINCIPAL_INCREASE' &&
-    request.request_status === 'INVESTOR_SLIP_UPLOADED' &&
+    // INVESTOR_SLIP_UPLOADED is in the status vocabulary but no route ever
+    // writes it - investor-verify-slip sets INVESTOR_TRANSFERRED - so this
+    // button never appeared and the pawner had no way to confirm receipt.
+    ['INVESTOR_TRANSFERRED', 'INVESTOR_SLIP_UPLOADED'].includes(request.request_status) &&
     Boolean(nextWaitingPath);
 
   return (
