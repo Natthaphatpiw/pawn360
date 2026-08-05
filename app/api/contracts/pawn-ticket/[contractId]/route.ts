@@ -647,7 +647,15 @@ export async function GET(
     const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
     const feeRate = Number(contract.platform_fee_rate ?? 0.015);
     const interestRatePawner = totalMonthlyRate;
-    const durationMonths = (contract.contract_duration_days || 0) / 30;
+    // A null duration used to print "ดอกเบี้ยรวม 0.00" on the loan document and
+    // a total equal to the bare principal. Fall back to the dated term the way
+    // /api/contracts/detail does, and never let the term reach zero.
+    const ticketDurationDays = Math.max(1, Number(contract.contract_duration_days || 0)
+      || Math.ceil(
+        (new Date(contract.contract_end_date).getTime()
+          - new Date(contract.contract_start_date).getTime()) / (1000 * 60 * 60 * 24),
+      ) || 30);
+    const durationMonths = ticketDurationDays / 30;
     const principalBase = contract.original_principal_amount || contract.loan_principal_amount || 0;
     const interestOnly = Math.round(principalBase * interestRatePawner * durationMonths * 100) / 100;
     const feeAmount = Math.round(principalBase * feeRate * durationMonths * 100) / 100;

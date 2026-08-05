@@ -72,6 +72,12 @@ const getFrozenPenaltyRequirement = (
     penaltyAmount: breakdown.penaltyAmount,
     overdueInterestAmount: breakdown.overdueInterestAmount,
     totalLateChargeAmount: breakdown.totalLateChargeAmount,
+    // Already frozen at create time, where the paid/unpaid split was applied.
+    // Re-deriving it here would let a penalty paid after the quote silently
+    // change the amount the pawner's slip is checked against.
+    penaltyDue: breakdown.penaltyAmount,
+    overdueInterestDue: breakdown.overdueInterestAmount,
+    totalLateChargeDue: breakdown.totalLateChargeAmount,
     today: breakdown.requestDate,
     contractStartDate,
     contractEndDate,

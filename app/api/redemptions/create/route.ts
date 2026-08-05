@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
     }
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
-    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+    const penaltyAmount = Number(penaltyRequirement.penaltyDue || 0);
+    const overdueInterestAmount = Number(penaltyRequirement.overdueInterestDue || 0);
     if (
       !Number.isFinite(penaltyAmount)
       || penaltyAmount < 0
@@ -254,10 +254,12 @@ export async function POST(request: NextRequest) {
         base_amount: roundCurrency(basePrincipal + interestDue + deliveryFeeAmount),
         penalty_amount: penaltyAmount,
         overdue_interest_amount: overdueInterestAmount,
-        penalty_days_overdue: penaltyRequirement.required ? penaltyRequirement.daysOverdue : 0,
-        penalty_months: penaltyRequirement.required
-          ? calculatePenaltyMonths(penaltyRequirement.daysOverdue)
-          : 0,
+        // How overdue the contract actually is, recorded whether or not the flat
+        // penalty was already settled. Writing 0 here once a penalty slip was
+        // paid made the row claim the contract was on time while it was still
+        // being charged overdue interest.
+        penalty_days_overdue: penaltyRequirement.daysOverdue,
+        penalty_months: calculatePenaltyMonths(penaltyRequirement.daysOverdue),
         delivery_method: safeDeliveryMethod,
         delivery_address_full: deliveryAddressFull,
         delivery_addr_house_no: safeDeliveryAddress ? boundedText(safeDeliveryAddress.houseNo, 100) : null,

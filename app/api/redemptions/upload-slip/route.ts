@@ -156,8 +156,8 @@ export async function POST(request: NextRequest) {
     const baseAmount = Number(redemption.principal_amount || 0)
       + Number(redemption.interest_amount || 0)
       + Number(redemption.delivery_fee || 0);
-    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+    const penaltyAmount = Number(penaltyRequirement.penaltyDue || 0);
+    const overdueInterestAmount = Number(penaltyRequirement.overdueInterestDue || 0);
     const expectedAmount = roundCurrency(baseAmount + penaltyAmount + overdueInterestAmount);
     if (
       !Number.isFinite(baseAmount)

@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
     const penalty = serializePenaltyRequirement(contract, penaltyRequirement);
-    const penaltyAmount = penaltyRequirement.required ? penaltyRequirement.penaltyAmount : 0;
-    const overdueInterestAmount = penaltyRequirement.required ? penaltyRequirement.overdueInterestAmount : 0;
-    const lateChargeAmount = penaltyRequirement.required ? penaltyRequirement.totalLateChargeAmount : 0;
+    const penaltyAmount = penaltyRequirement.penaltyDue;
+    const overdueInterestAmount = penaltyRequirement.overdueInterestDue;
+    const lateChargeAmount = penaltyRequirement.totalLateChargeDue;
     const contractItem = Array.isArray(contract.items) ? contract.items[0] || null : contract.items;
 
     const round2 = (value: number) => Math.round(value * 100) / 100;

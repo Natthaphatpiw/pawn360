@@ -4,6 +4,33 @@
 
 import { MS_PER_DAY } from '@/lib/utils/time';
 
+const atMidnight = (value: Date) => {
+  const date = new Date(value.getTime());
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+/**
+ * Whole days elapsed, counting the first day.
+ *
+ * Interest runs from day one: a pawn taken and redeemed on the same calendar
+ * day still costs one day. Both ends are normalised to midnight first, so the
+ * subtraction is an exact multiple of a day and the count changes when the
+ * calendar date does - not 24 hours later. The raw wall-clock subtraction this
+ * replaces returned 0 for a full 24 hours after the cutoff, which billed
+ * nothing at all for an action taken the evening a pawn was created.
+ *
+ * The Supabase-side handlers already do exactly this
+ * (`Math.min(daysInContract, Math.max(1, Math.floor(...) + 1))`); these
+ * MongoDB-era helpers were the one family that did not.
+ */
+export function elapsedDaysInclusive(from: Date, to: Date = new Date()): number {
+  const days = Math.floor(
+    (atMidnight(to).getTime() - atMidnight(from).getTime()) / MS_PER_DAY,
+  ) + 1;
+  return Math.max(1, days);
+}
+
 /**
  * Calculate interest amount based on principal, interest rate, and days
  */
@@ -28,13 +55,11 @@ export function calculateAccruedInterest(
   lastCutoffDate: Date,
   currentDate: Date = new Date()
 ): number {
-  const daysDiff = Math.floor(
-    (currentDate.getTime() - lastCutoffDate.getTime()) / MS_PER_DAY
+  return calculateInterest(
+    principal,
+    interestRate,
+    elapsedDaysInclusive(lastCutoffDate, currentDate),
   );
-
-  if (daysDiff <= 0) return 0;
-
-  return calculateInterest(principal, interestRate, daysDiff);
 }
 
 /**
@@ -87,9 +112,9 @@ export function calculateRedemptionAmount(item: any): {
     new Date(lastCutoffDate)
   );
 
-  const daysSinceLastCutoff = Math.floor(
-    (new Date().getTime() - new Date(lastCutoffDate).getTime()) / MS_PER_DAY
-  );
+  // Must agree with the day count the interest above was billed on, or the
+  // screen shows "0 วัน" beside a non-zero charge.
+  const daysSinceLastCutoff = elapsedDaysInclusive(new Date(lastCutoffDate));
 
   return {
     principal,

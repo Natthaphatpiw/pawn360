@@ -7,11 +7,32 @@ export const PENALTY_PER_MONTH = 50;
 export const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 export interface PenaltyRequirement {
+  /**
+   * The flat penalty ladder is unpaid for today. This says NOTHING about the
+   * overdue interest, which the penalty slip never collects - read
+   * `overdueInterestDue` for that.
+   */
   required: boolean;
   daysOverdue: number;
   penaltyAmount: number;
   overdueInterestAmount: number;
   totalLateChargeAmount: number;
+  /**
+   * What to actually bill, with each component suppressed only if it was
+   * genuinely paid.
+   *
+   * Callers used to write `required ? penaltyAmount : 0` AND
+   * `required ? overdueInterestAmount : 0`, which let a pawner escape all the
+   * overdue interest by paying the small flat penalty: the standalone penalty
+   * slip only ever charges `penalty_amount` (the 50 THB/month ladder), but
+   * verifying it sets paid_through_date = today, which flipped `required` to
+   * false and zeroed the 3%/month overdue interest along with it. On a contract
+   * 61 days overdue at 5,000 principal that is 150 THB paid to avoid 297.58 THB
+   * owed - repeatable, because `required` re-arms the next day.
+   */
+  penaltyDue: number;
+  overdueInterestDue: number;
+  totalLateChargeDue: number;
   today: Date;
   contractStartDate: Date;
   contractEndDate: Date;
@@ -183,6 +204,9 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
       penaltyAmount,
       overdueInterestAmount,
       totalLateChargeAmount,
+      penaltyDue: 0,
+      overdueInterestDue: 0,
+      totalLateChargeDue: 0,
       today,
       contractStartDate,
       contractEndDate,
@@ -211,12 +235,22 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
     ? paidThroughDate.getTime() >= today.getTime()
     : false;
 
+  // A verified penalty payment covers the flat ladder and only the flat ladder:
+  // penalties/verify-slip bills `payment.penalty_amount`, and
+  // ensurePenaltyPaymentRecord writes only `requirement.penaltyAmount` to the
+  // ledger. The overdue interest is never part of that slip, so it stays due.
+  const penaltyDue = isPaid ? 0 : penaltyAmount;
+  const overdueInterestDue = overdueInterestAmount;
+
   return {
     required: !isPaid,
     daysOverdue,
     penaltyAmount,
     overdueInterestAmount,
     totalLateChargeAmount,
+    penaltyDue,
+    overdueInterestDue,
+    totalLateChargeDue: roundCurrency(penaltyDue + overdueInterestDue),
     today,
     contractStartDate,
     contractEndDate,

@@ -195,8 +195,8 @@ export async function POST(request: NextRequest) {
     }
 
     const penaltyRequirement = await getPenaltyRequirement(supabase, contract);
-    const penaltyAmount = penaltyRequirement.required ? Number(penaltyRequirement.penaltyAmount || 0) : 0;
-    const overdueInterestAmount = penaltyRequirement.required ? Number(penaltyRequirement.overdueInterestAmount || 0) : 0;
+    const penaltyAmount = Number(penaltyRequirement.penaltyDue || 0);
+    const overdueInterestAmount = Number(penaltyRequirement.overdueInterestDue || 0);
     if (penaltyRequirement.required) {
       await ensurePenaltyPaymentRecord(supabase, contract, penaltyRequirement);
     }
