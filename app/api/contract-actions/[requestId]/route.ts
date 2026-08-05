@@ -18,9 +18,12 @@ export async function GET(
 
     const supabase = supabaseAdmin();
 
-    const { data: rawActionRequest, error } = await supabase
-      .from('contract_action_requests')
-      .select(`
+    // new_principal_amount arrives via 2026_01_04_add_new_principal_amount.sql.
+    // PostgREST rejects the whole select on an unknown column, and the handler
+    // below reported that as "ไม่พบคำขอ" - so an unapplied migration looked
+    // exactly like a missing request and took the interest-payment screen down
+    // after the request had already been created.
+    const buildSelect = (withNewPrincipal: boolean) => `
         request_id,
         contract_id,
         request_type,
@@ -34,7 +37,7 @@ export async function GET(
         principal_before,
         principal_after_reduction,
         principal_after_increase,
-        new_principal_amount,
+        ${withNewPrincipal ? 'new_principal_amount,' : ''}
         new_end_date,
         terms_accepted,
         pawner_signature_url,
@@ -65,11 +68,32 @@ export async function GET(
           ),
           investors:investor_id (investor_id, line_id)
         )
-      `)
+      `;
+    const selectActionRequest = (withNewPrincipal: boolean) => supabase
+      .from('contract_action_requests')
+      .select(buildSelect(withNewPrincipal))
       .eq('request_id', requestId)
-      .single();
+      .maybeSingle();
 
-    if (error || !rawActionRequest) {
+    let { data: rawActionRequest, error } = await selectActionRequest(true);
+    if (error && `${error.message || ''}`.toLowerCase().includes('new_principal_amount')) {
+      console.warn('contract_action_requests.new_principal_amount is missing; run 2026_01_04_add_new_principal_amount.sql. Loading without it.');
+      ({ data: rawActionRequest, error } = await selectActionRequest(false));
+    }
+
+    if (error) {
+      // A rejected query is not a missing request. Keeping them separate is
+      // what turns "ไม่พบคำขอ" back into something diagnosable.
+      console.error('[contract-actions:detail] query failed', {
+        code: (error as { code?: string })?.code || 'QUERY_FAILED',
+        column: /column ([a-z_."]+) does not exist/i.exec(error.message || '')?.[1],
+      });
+      return NextResponse.json(
+        { error: 'ไม่สามารถโหลดข้อมูลคำขอได้ กรุณาลองใหม่อีกครั้ง', code: 'REQUEST_LOOKUP_FAILED' },
+        { status: 503 },
+      );
+    }
+    if (!rawActionRequest) {
       return NextResponse.json(
         { error: 'ไม่พบคำขอ', code: 'REQUEST_NOT_FOUND' },
         { status: 404 }
