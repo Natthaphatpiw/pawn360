@@ -68,6 +68,11 @@ const buildRenewedContractRecord = (params: {
   contractEndDate: Date;
   durationDays: number;
   signedContractUrl?: string | null;
+  /** Interest the pawner paid to reach this renewal. */
+  interestPaidNow: number;
+  /** Principal the pawner paid down to reach this renewal. */
+  principalReducedNow: number;
+  isExtension: boolean;
 }) => {
   const platformFeeRate = Number(params.contract.platform_fee_rate ?? 0.01);
   const platformFeeAmount = round2(
@@ -92,6 +97,9 @@ const buildRenewedContractRecord = (params: {
     platform_fee_rate: platformFeeRate,
     platform_fee_amount: platformFeeAmount,
     investor_rate: params.contract.investor_rate,
+    // Per-TERM counters. A renewal is a fresh term, so nothing has been paid
+    // against it yet - these correctly start at zero. The cumulative history
+    // lives in the total_* fields below.
     amount_paid: 0,
     interest_paid: 0,
     principal_paid: 0,
@@ -107,12 +115,29 @@ const buildRenewedContractRecord = (params: {
     payment_slip_url: params.contract.payment_slip_url,
     payment_confirmed_at: params.contract.payment_confirmed_at,
     payment_status: params.contract.payment_status,
-    original_principal_amount: params.principalAmount,
+    // The principal this borrowing STARTED at, carried across every renewal.
+    // It was being reset to the current principal, which both erased the
+    // reference and silently moved the platform-fee base - the fee is stated to
+    // the pawner as fixed on the initial amount ("คงที่ตามวงเงินเริ่มต้น"), so
+    // resetting it made the fee drift down with every reduction.
+    original_principal_amount: Number(
+      params.contract.original_principal_amount
+      ?? params.contract.loan_principal_amount
+      ?? params.principalAmount,
+    ),
     current_principal_amount: params.principalAmount,
-    total_interest_paid: 0,
-    total_principal_reduced: 0,
-    total_principal_increased: 0,
-    extension_count: 0,
+    // LIFETIME counters. These were reset to zero on every renewal, so a
+    // pawner's entire payment history vanished each time they extended or paid
+    // down - by design the whole record lived only on rows that were then
+    // marked COMPLETED and never read again.
+    total_interest_paid: round2(
+      Number(params.contract.total_interest_paid || 0) + params.interestPaidNow,
+    ),
+    total_principal_reduced: round2(
+      Number(params.contract.total_principal_reduced || 0) + params.principalReducedNow,
+    ),
+    total_principal_increased: Number(params.contract.total_principal_increased || 0),
+    extension_count: Number(params.contract.extension_count || 0) + (params.isExtension ? 1 : 0),
     redemption_status: 'NONE',
     funded_at: params.contract.funded_at,
     disbursed_at: params.contract.disbursed_at,
@@ -274,6 +299,11 @@ export async function POST(request: NextRequest) {
       contractEndDate: renewedWindow.contractEndDate,
       durationDays,
       signedContractUrl: persistedSignature,
+      interestPaidNow: Number(actionRequest.interest_to_pay || 0),
+      principalReducedNow: actionRequest.request_type === 'PRINCIPAL_REDUCTION'
+        ? Number(actionRequest.reduction_amount || 0)
+        : 0,
+      isExtension: actionRequest.request_type === 'INTEREST_PAYMENT',
     });
     let { data: newContract, error: newContractError } = await supabase
       .from('contracts')
@@ -301,6 +331,22 @@ export async function POST(request: NextRequest) {
         completed_at: now.toISOString(),
         last_action_date: now.toISOString(),
         last_action_type: actionRequest.request_type,
+        // What the pawner actually paid to close this term. Without it the
+        // retiring row said COMPLETED with every payment counter still at zero,
+        // so nothing anywhere recorded that money had changed hands - the
+        // successor started fresh and the predecessor looked unpaid.
+        interest_paid: round2(
+          Number(contract.interest_paid || 0) + Number(actionRequest.interest_to_pay || 0),
+        ),
+        principal_paid: round2(
+          Number(contract.principal_paid || 0)
+          + (actionRequest.request_type === 'PRINCIPAL_REDUCTION'
+            ? Number(actionRequest.reduction_amount || 0)
+            : 0),
+        ),
+        amount_paid: round2(
+          Number(contract.amount_paid || 0) + Number(actionRequest.total_amount || 0),
+        ),
         updated_at: now.toISOString(),
       })
       .eq('contract_id', actionRequest.contract_id)

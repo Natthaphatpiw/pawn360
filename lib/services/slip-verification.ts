@@ -634,8 +634,9 @@ async function verifyWithSlipOk(
 async function verifyWithAIVision(
   slipUrl: string,
   expectedAmount: number,
-  tolerance: number,
+  options: Required<VerifyPaymentSlipOptions>,
 ): Promise<SlipVerificationResult> {
+  const tolerance = options.tolerance;
   try {
     if (!hasOpenAIKeys() && !hasAnthropicKeys()) {
       return {
@@ -668,9 +669,14 @@ Return ONLY a JSON object with this exact structure:
   "confidence": <0.0 to 1.0>,
   "is_valid_slip": <true or false>,
   "bank_name": "<detected bank name or null>",
+  "receiver_name": "<the RECIPIENT's name exactly as printed, or null>",
+  "receiver_account": "<the RECIPIENT's account or PromptPay number exactly as printed, keeping any masking such as xxx-x-x1234-x, or null>",
   "transaction_date": "<detected date or null>",
   "notes": "<any relevant notes>"
-}`;
+}
+
+Read the RECIPIENT ("ไปยัง" / "To" / "ผู้รับเงิน"), never the sender ("จาก" / "From").
+Copy the account exactly as shown - do not unmask, guess or complete it.`;
 
     const userText = `Please analyze this bank transfer slip and extract the transfer amount. Expected amount is ${expectedAmount.toLocaleString()} THB.`;
     const schema = {
@@ -686,6 +692,18 @@ Return ONLY a JSON object with this exact structure:
           confidence: { type: 'number' },
           is_valid_slip: { type: 'boolean' },
           bank_name: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'null' },
+            ],
+          },
+          receiver_name: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'null' },
+            ],
+          },
+          receiver_account: {
             anyOf: [
               { type: 'string' },
               { type: 'null' },
@@ -709,6 +727,8 @@ Return ONLY a JSON object with this exact structure:
           'confidence',
           'is_valid_slip',
           'bank_name',
+          'receiver_name',
+          'receiver_account',
           'transaction_date',
           'notes',
         ],
@@ -838,6 +858,54 @@ Return ONLY a JSON object with this exact structure:
       };
     }
 
+    // "I could not read who this went to" is not the same accusation as "this
+    // went to the wrong account". Ask for a clearer slip instead of calling it
+    // invalid, which reads as a fraud verdict to the pawner.
+    const receiverReadable = Boolean(parsed?.receiver_account || parsed?.receiver_name);
+    const receiverExpected = Boolean(
+      options.receiverAccountNo || options.receiverPromptpay || options.receiverName,
+    );
+    if (receiverExpected && !receiverReadable) {
+      return {
+        success: false,
+        result: 'UNREADABLE',
+        detectedAmount,
+        expectedAmount,
+        difference: null,
+        confidenceScore,
+        message: 'ระบบอ่านชื่อ/เลขบัญชีผู้รับเงินจากสลิปไม่ได้ กรุณาอัปโหลดสลิปที่เห็นข้อมูลผู้รับชัดเจน',
+        rawResponse: buildAiRawResponse(provider, parsed, true),
+      };
+    }
+
+    // The receiver check only ever ran on the SlipOK path, so with SlipOK
+    // unconfigured NOTHING verified that the money went to the right account -
+    // a pawner who transferred the right amount to the wrong recipient passed.
+    // That is the failure this check exists for, so it has to apply here too.
+    const receiverValidation = validateReceiver(
+      {
+        receiver: {
+          displayName: parsed?.receiver_name ?? null,
+          account: { value: parsed?.receiver_account ?? null },
+          proxy: { value: parsed?.receiver_account ?? null },
+        },
+      },
+      options,
+    );
+    if (!receiverValidation.valid) {
+      return {
+        success: false,
+        result: 'INVALID',
+        detectedAmount,
+        expectedAmount,
+        difference: null,
+        confidenceScore,
+        message: receiverValidation.reason
+          || 'บัญชีผู้รับเงินในสลิปไม่ตรงกับบัญชีที่ระบบคาดไว้',
+        rawResponse: buildAiRawResponse(provider, parsed, true),
+      };
+    }
+
     const amountResult = buildAmountResult(detectedAmount, expectedAmount, tolerance, rawResponse);
 
     // Reading the amount is not the same as confirming the transfer happened.
@@ -931,7 +999,7 @@ export async function verifyPaymentSlip(
     hasBranchId: Boolean(config.branchId),
     hasApiKey: Boolean(config.apiKey),
   });
-  return verifyWithAIVision(slipUrl, normalizedExpectedAmount, options.tolerance);
+  return verifyWithAIVision(slipUrl, normalizedExpectedAmount, options);
 }
 
 // Save slip verification to database

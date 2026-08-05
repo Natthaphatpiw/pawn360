@@ -61,9 +61,30 @@ async function handleInvestorPostback(
   }
 
   if (action === 'investor_report_problem') {
+    // This used to reply with a phone number and record nothing, so an investor
+    // reporting that their money never arrived left no trace anywhere - the one
+    // signal that the payout failed was thrown away. Mark the redemption
+    // disputed so it stops being auto-confirmed and shows up as an open problem.
+    const nowIso = new Date().toISOString();
+    const { error: disputeError } = await supabase
+      .from('redemption_requests')
+      .update({
+        investor_disputed_at: nowIso,
+        investor_dispute_reason: 'นักลงทุนแจ้งว่ายังไม่ได้รับเงิน (ผ่านปุ่มใน LINE)',
+        investor_confirmation_source: 'DISPUTED',
+        updated_at: nowIso,
+      })
+      .eq('redemption_id', redemptionId)
+      .is('investor_confirmed_at', null);
+    if (disputeError) {
+      // The column set arrives with 2026_08_05_add_redemption_investor_confirmation.sql.
+      console.error('[investor:webhook] could not record payout dispute', {
+        code: (disputeError as { code?: string })?.code || 'DISPUTE_WRITE_FAILED',
+      });
+    }
     await lineClient.replyMessage(event.replyToken, {
       type: 'text',
-      text: 'หากพบปัญหาเกี่ยวกับการรับเงิน\n\nกรุณาติดต่อฝ่าย Support: 062-6092941\nเวลาทำการ 09:00 - 18:00 น. วันจันทร์ - เสาร์',
+      text: 'รับเรื่องแล้ว ระบบได้บันทึกว่าคุณยังไม่ได้รับเงินสำหรับรายการนี้\n\nเจ้าหน้าที่จะตรวจสอบและติดต่อกลับ\nหากต้องการติดต่อด่วน: 062-6092941 (จ.-ส. 09:00-18:00 น.)',
     });
     return;
   }
@@ -89,6 +110,9 @@ async function handleInvestorPostback(
     .update({
       request_status: 'COMPLETED',
       investor_confirmed_at: new Date().toISOString(),
+      // Distinguishes this from the cron's quiet-period close. "The investor
+      // said so" and "nobody objected" are not the same evidence.
+      investor_confirmation_source: 'HUMAN',
       updated_at: new Date().toISOString(),
     })
     .eq('redemption_id', redemptionId)
