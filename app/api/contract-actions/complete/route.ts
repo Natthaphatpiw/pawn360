@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRenewedContractWindow } from '@/lib/utils/renewal-window';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { pushLineTextMessage, lineRetryKeyFromMaterial } from '@/lib/line/push-text';
 import { requirePinToken } from '@/lib/security/pin';
@@ -34,20 +35,6 @@ const addUtcDays = (value: Date, days: number) => {
   const result = new Date(value);
   result.setUTCDate(result.getUTCDate() + days);
   return result;
-};
-
-const getRenewedContractWindow = (durationDays: number) => {
-  const normalizedDuration = Math.max(1, Math.min(Math.round(durationDays), 3_650));
-  const now = new Date();
-  const contractStartDate = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() + 1,
-  ));
-  return {
-    contractStartDate,
-    contractEndDate: addUtcDays(contractStartDate, normalizedDuration - 1),
-  };
 };
 
 const formatThaiDate = (value: Date) => (
@@ -255,7 +242,7 @@ export async function POST(request: NextRequest) {
     const rawDurationDays = Number(contract.contract_duration_days || 0)
       || Math.ceil((contractEndDate.getTime() - contractStartDate.getTime()) / msPerDay);
     const durationDays = Math.max(1, Math.min(Math.round(rawDurationDays), 3_650));
-    const renewedWindow = getRenewedContractWindow(durationDays);
+    const renewedWindow = getRenewedContractWindow(durationDays, contractEndDate);
 
     let principalAmount = 0;
     let notificationMessage = '';

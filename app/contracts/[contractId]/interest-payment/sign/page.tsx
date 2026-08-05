@@ -16,6 +16,8 @@ export default function InterestPaymentSignPage() {
   const contractId = params.contractId as string;
   const requestId = searchParams.get('requestId');
   const previewMode = isPreviewMode(searchParams);
+  /** Set when /create returned an existing request that was already paid for. */
+  const isResumed = searchParams.get('resumed') === '1';
   const slipStatus = searchParams.get('slipStatus');
   const expectedAmount = Number(searchParams.get('expectedAmount') || 0);
   const remainingAttempts = Number(searchParams.get('remainingAttempts') || 0);
@@ -265,9 +267,16 @@ export default function InterestPaymentSignPage() {
             </div>
 
             <h1 className="text-xl font-bold text-foreground mb-2">กำลังยืนยันการต่อดอกเบี้ย</h1>
-            <p className="text-foreground-subtle text-sm mb-6">
+            <p className="text-foreground-subtle text-sm mb-2">
               ระบบกำลังดำเนินการต่อดอกเบี้ยให้คุณอัตโนมัติ
             </p>
+            {isResumed && (
+              <p className="mb-6 rounded-lg bg-primary-soft px-4 py-3 text-xs text-foreground-subtle">
+                รายการนี้ต่อจากการชำระเงินที่คุณทำไว้ก่อนหน้าและตรวจสอบแล้ว
+                จึงไม่ต้องโอนเงินซ้ำอีกครั้ง
+              </p>
+            )}
+            {!isResumed && <div className="mb-6" />}
           </>
         )}
 

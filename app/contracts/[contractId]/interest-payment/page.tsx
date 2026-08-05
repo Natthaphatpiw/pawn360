@@ -306,7 +306,13 @@ export default function InterestPaymentPage() {
         }
 
         if (response.data.resumeStep === 'SIGN') {
-          router.push(`/contracts/${contractId}/interest-payment/sign?requestId=${nextRequestId}`);
+          // Reached when a previous attempt was already paid for and verified.
+          // Jumping straight to completion with no explanation looks like the
+          // renewal was free, so the sign screen is told to say why.
+          router.push(
+            `/contracts/${contractId}/interest-payment/sign?requestId=${nextRequestId}`
+            + (response.data.resumed ? '&resumed=1' : ''),
+          );
           return;
         }
 

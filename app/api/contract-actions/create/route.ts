@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRenewedContractWindow } from '@/lib/utils/renewal-window';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
 import { ensurePenaltyPaymentRecord, getPenaltyRequirement } from '@/lib/services/penalty';
@@ -232,19 +233,6 @@ export async function POST(request: NextRequest) {
 
     const round2 = (value: number) => Math.round(value * 100) / 100;
     const msPerDay = 1000 * 60 * 60 * 24;
-    const getRenewedContractWindow = (durationDays: number) => {
-      const normalizedDuration = Math.max(1, durationDays);
-      const now = new Date();
-      const contractStartDate = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() + 1,
-      ));
-      const contractEndDate = new Date(contractStartDate);
-      contractEndDate.setUTCDate(contractEndDate.getUTCDate() + normalizedDuration - 1);
-      return { contractStartDate, contractEndDate };
-    };
-
     // Calculate details (count start date as day 1)
     const startDate = new Date(contract.contract_start_date);
     startDate.setHours(0, 0, 0, 0);
@@ -297,7 +285,7 @@ export async function POST(request: NextRequest) {
         }
 
         const interestToPay = interestAccruedWithFee;
-        const renewedWindow = getRenewedContractWindow(daysInContract);
+        const renewedWindow = getRenewedContractWindow(daysInContract, contract.contract_end_date);
 
         requestData = {
           ...requestData,
