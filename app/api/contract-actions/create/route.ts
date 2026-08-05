@@ -36,6 +36,12 @@ const ACTIVE_REQUEST_STATUSES = [
   'PENDING',
   'AWAITING_PAYMENT',
   'SLIP_UPLOADED',
+  // The pawner has ALREADY PAID at this point and the request is waiting to be
+  // completed. Leaving it out made a paid request invisible to the
+  // duplicate check below, so tapping the action again minted a second request
+  // at a fresh quote and asked for the money a second time, while the paid one
+  // was left behind.
+  'SLIP_VERIFIED',
   'SLIP_REJECTED',
   'AWAITING_SIGNATURE',
   'PENDING_INVESTOR_APPROVAL',

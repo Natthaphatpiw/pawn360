@@ -580,7 +580,7 @@ export default function RedemptionPaymentPage() {
             />
             <span aria-hidden="true" className="mt-0.5" />
             <div className="text-sm text-foreground-muted">
-              ข้าพเจ้ารับทราบและยอมรับว่าหากโอนเงินเกินหรือขาดไม่ตรงตามจำนวน ทาง Pawnly จะไม่รับผิดชอบใดๆ ทั้งสิ้น และการไถ่ถอนอาจถูกปฏิเสธ
+              ข้าพเจ้ารับทราบและยอมรับว่าหากโอนเงินเกินหรือขาดไม่ตรงตามจำนวน ทาง Astly จะไม่รับผิดชอบใดๆ ทั้งสิ้น และการไถ่ถอนอาจถูกปฏิเสธ
             </div>
           </label>
         </div>

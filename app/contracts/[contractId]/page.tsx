@@ -55,6 +55,15 @@ interface DropPoint {
 }
 
 interface ContractDetail {
+  /** Interest breakdown computed by /api/contracts/detail - the single owner
+   *  of this calculation. Optional so older cached responses still type. */
+  interestRateMonthly?: number;
+  feeRateMonthly?: number;
+  daysElapsed?: number;
+  daysInContract?: number;
+  interestAccrued?: number;
+  feeAmount?: number;
+  interestDue?: number;
   contract_id: string;
   contract_number: string;
   contract_start_date: string;
@@ -282,14 +291,21 @@ export default function PawnContractDetail() {
     || contract.displayStatus === 'ไถ่ถอน'
     || contract.displayStatus === 'รอรับของคืน';
 
+  // Served by /api/contracts/detail, which owns this calculation. Recomputing
+  // it here treated contract.interest_rate as the combined 3% and subtracted a
+  // hardcoded 1.5% fee, so the pawner's interest rendered as exactly 0 on every
+  // contract. interest_rate is the interest alone; the fee is platform_fee_rate.
   const rawRate = Number(contract.interest_rate || 0);
-  const totalMonthlyRate = rawRate > 1 ? rawRate / 100 : rawRate;
-  const feeRate = 0.015;
-  const interestRatePawner = Math.max(0, totalMonthlyRate - feeRate);
-  const durationMonths = (contract.contract_duration_days || 0) / 30;
-  const feeBase = contract.original_principal_amount || contract.loan_principal_amount;
-  const interestAmount = Math.round(feeBase * interestRatePawner * durationMonths * 100) / 100;
-  const feeAmount = Math.round(feeBase * feeRate * durationMonths * 100) / 100;
+  const interestRatePawner = Number(
+    contract.interestRateMonthly ?? (rawRate > 1 ? rawRate / 100 : rawRate),
+  );
+  const feeRate = Number(contract.feeRateMonthly ?? 0.015);
+  // Interest ACCRUED so far, not the whole term - a pawner two days into a
+  // 30-day contract owes two days of interest, and showing the full-term figure
+  // (or zero) tells them nothing about what they owe today.
+  const interestAmount = Number(contract.interestAccrued ?? 0);
+  const feeAmount = Number(contract.feeAmount ?? 0);
+  const daysElapsed = Number(contract.daysElapsed ?? 0);
 
   return (
     <div className="min-h-screen bg-background-white relative px-4 py-6">
@@ -544,7 +560,12 @@ export default function PawnContractDetail() {
               label="ดอกเบี้ย"
               value={(
                 <div className="text-right">
-                  <div>{interestAmount.toLocaleString()} บาท ({(interestRatePawner * 100).toFixed(2)}%)</div>
+                  <div>{interestAmount.toLocaleString()} บาท ({(interestRatePawner * 100).toFixed(2)}% ต่อเดือน)</div>
+                  {daysElapsed > 0 && (
+                    <div className="text-xs text-foreground-subtle">
+                      ดอกเบี้ยสะสม {daysElapsed} วัน
+                    </div>
+                  )}
                   <div className="text-xs text-foreground-subtle">
                     ค่าธรรมเนียม {feeAmount.toLocaleString()} บาท ({(feeRate * 100).toFixed(2)}%)
                   </div>

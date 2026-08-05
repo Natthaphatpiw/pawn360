@@ -483,7 +483,7 @@ export default function ContractForm({ item, customer, storeId, onComplete, onCl
                 </div>
                 <div class="signature-block">
                     <p>ลงชื่อ <input type="text" style="width: 70%;" value="${signatures.buyer.signature ? '[ลายเซ็น]' : ''}" readonly> ผู้ซื้อ</p>
-                    <p>( pawnly technologies co.,ltd )</p>
+                    <p>( astly technologies co.,ltd )</p>
                     <p>วันที่ : <input type="text" class="date" value="${signatures.buyer.date}" readonly></p>
                 </div>
             </div>

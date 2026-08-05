@@ -124,7 +124,7 @@ export async function GET(
         duration: `${contractData.contract_duration_days} วัน`,
         startDate: new Date(contractData.contract_start_date).toLocaleDateString('th-TH'),
         endDate: new Date(contractData.contract_end_date).toLocaleDateString('th-TH'),
-        partnerName: 'Pawnly'
+        partnerName: 'Astly'
       },
       remark: 'ไม่มี',
       remainingDays: remainingDays

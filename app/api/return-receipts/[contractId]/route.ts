@@ -17,7 +17,7 @@ import {
 const RETURN_METHOD_LABELS: Record<string, string> = {
   SELF_PICKUP: 'รับของด้วยตัวเอง',
   SELF_ARRANGE: 'เรียกขนส่งเอง',
-  PLATFORM_ARRANGE: 'Pawnly จัดส่งให้',
+  PLATFORM_ARRANGE: 'Astly จัดส่งให้',
   DROPPOINT_SELF_PICKUP: 'รับเองที่ Drop Point',
   DROPPOINT_SELF_RIDER: 'เรียกไรเดอร์เอง',
   CENTRAL_SCHEDULE_7D: 'นัดรับที่ Drop Point ภายใน 7 วัน',
@@ -73,7 +73,7 @@ export async function GET(
     const configuredDomain = String(process.env.NEXT_PUBLIC_DOMAIN || '').trim();
     const domain = configuredDomain && /^https:\/\//.test(configuredDomain)
       ? configuredDomain.replace(/\/$/, '')
-      : 'https://pawnly.io';
+      : 'https://astly.io';
     const returnUrl = `${domain}/contracts/${contractId}/return-receipt`;
 
     const { data: contract, error: contractError } = await supabase

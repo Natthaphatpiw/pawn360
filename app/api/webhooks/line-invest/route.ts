@@ -100,7 +100,7 @@ async function handleInvestorPostback(
 
   await lineClient.replyMessage(event.replyToken, {
     type: 'text',
-    text: `ยืนยันรับเงินเรียบร้อยแล้ว\n\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`,
+    text: `ยืนยันรับเงินเรียบร้อยแล้ว\n\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Astly`,
   });
 }
 
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
           // User added the bot as friend
           // Send welcome message
           try {
-            const welcomeMessage = `ยินดีต้อนรับสู่ Pawnly Investor\n\nเพื่อเริ่มลงทุน คุณต้องทำการยืนยันตัวตนก่อน\n\nกดที่นี่เพื่อลงทะเบียน:`;
+            const welcomeMessage = `ยินดีต้อนรับสู่ Astly Investor\n\nเพื่อเริ่มลงทุน คุณต้องทำการยืนยันตัวตนก่อน\n\nกดที่นี่เพื่อลงทะเบียน:`;
 
             if (!sourceUserId) break;
             await lineClient.pushMessage(sourceUserId, {

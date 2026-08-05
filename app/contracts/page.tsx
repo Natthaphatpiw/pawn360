@@ -275,7 +275,7 @@ export default function PawnerContractList() {
         <div className="mb-5 rounded-xl border border-primary-border bg-primary-soft/55 p-4 shadow-soft">
           <div className="rounded-lg border border-background-white bg-background-white p-4 shadow-soft">
             <div className="inline-flex rounded-full border border-primary-border bg-background-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/40">
-              Pawnly Contracts
+              Astly Contracts
             </div>
             <div className="flex items-end justify-between gap-4">
               <div>

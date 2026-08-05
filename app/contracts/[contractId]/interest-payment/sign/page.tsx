@@ -243,23 +243,33 @@ export default function InterestPaymentSignPage() {
   return (
     <div className="min-h-screen bg-background-white font-sans flex flex-col items-center justify-center p-6">
       <div className="bg-background-white rounded-xl p-4 text-center max-w-sm w-full">
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-            <div className="flex gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
+        {/* An error and a green "in progress" tick used to render together, so
+            a request that failed to load still looked like it was completing.
+            The two states are now exclusive, and the failure says what to do. */}
+        {error ? (
+          <>
+            <div className="mx-auto mb-5 flex h-32 w-32 items-center justify-center rounded-full bg-red-50">
+              <AlertTriangle className="w-20 h-20 text-red-500" />
             </div>
-          </div>
+            <h1 className="text-xl font-bold text-foreground mb-2">ยังทำรายการต่อดอกเบี้ยไม่สำเร็จ</h1>
+            <p className="text-foreground-subtle text-sm mb-4">{error}</p>
+            <p className="text-foreground-subtle text-xs mb-6">
+              หากคุณโอนเงินไปแล้ว เงินของคุณไม่ได้หายไป กรุณากลับไปที่หน้าสัญญาแล้วกดต่อดอกเบี้ยอีกครั้ง
+              ระบบจะพากลับมาที่รายการเดิม หรือติดต่อเจ้าหน้าที่ทาง LINE
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mb-5 flex h-32 w-32 items-center justify-center rounded-full bg-success/10 text-3xl text-success">
+              <CheckCircle className="w-24 h-24 text-success" />
+            </div>
+
+            <h1 className="text-xl font-bold text-foreground mb-2">กำลังยืนยันการต่อดอกเบี้ย</h1>
+            <p className="text-foreground-subtle text-sm mb-6">
+              ระบบกำลังดำเนินการต่อดอกเบี้ยให้คุณอัตโนมัติ
+            </p>
+          </>
         )}
-
-        <div className="mx-auto mb-5 flex h-32 w-32 items-center justify-center rounded-full bg-success/10 text-3xl text-success">
-          <CheckCircle className="w-24 h-24 text-success" />
-        </div>
-
-        <h1 className="text-xl font-bold text-foreground mb-2">กำลังยืนยันการต่อดอกเบี้ย</h1>
-        <p className="text-foreground-subtle text-sm mb-6">
-          ระบบกำลังดำเนินการต่อดอกเบี้ยให้คุณอัตโนมัติ
-        </p>
 
         {requestDetails?.contract && (
           <div className="bg-primary-soft rounded-lg p-4 mb-6 text-left">

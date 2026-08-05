@@ -20,8 +20,8 @@ const DEFAULT_CONSENT: ConsentState = {
   timestamp: '',
 };
 
-const GA_SCRIPT_ID = 'pawnly-ga';
-const MARKETING_SCRIPT_ID = 'pawnly-marketing';
+const GA_SCRIPT_ID = 'astly-ga';
+const MARKETING_SCRIPT_ID = 'astly-marketing';
 
 const safeParse = (value: string | null): ConsentState | null => {
   if (!value) return null;
@@ -53,21 +53,21 @@ const loadScripts = (consent: ConsentState) => {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
   if (gaId) {
     (window as any)[`ga-disable-${gaId}`] = !consent.analytics;
-    if (consent.analytics && !(window as any).__pawnlyGaLoaded) {
+    if (consent.analytics && !(window as any).__astlyGaLoaded) {
       loadScript(GA_SCRIPT_ID, `https://www.googletagmanager.com/gtag/js?id=${gaId}`);
       (window as any).dataLayer = (window as any).dataLayer || [];
       const gtag = (...args: any[]) => (window as any).dataLayer.push(args);
       (window as any).gtag = gtag;
       gtag('js', new Date());
       gtag('config', gaId, { anonymize_ip: true });
-      (window as any).__pawnlyGaLoaded = true;
+      (window as any).__astlyGaLoaded = true;
     }
   }
 
   const marketingSrc = process.env.NEXT_PUBLIC_MARKETING_SCRIPT_SRC;
-  if (marketingSrc && consent.marketing && !(window as any).__pawnlyMarketingLoaded) {
+  if (marketingSrc && consent.marketing && !(window as any).__astlyMarketingLoaded) {
     loadScript(MARKETING_SCRIPT_ID, marketingSrc);
-    (window as any).__pawnlyMarketingLoaded = true;
+    (window as any).__astlyMarketingLoaded = true;
   }
 };
 

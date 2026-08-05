@@ -260,7 +260,7 @@ const mockContractDetails: Record<string, MockContractDetail> = {
     item: mockContractList[0].items,
     drop_point: {
       drop_point_id: 'mock-drop-001',
-      drop_point_name: 'Pawnly Siam Square',
+      drop_point_name: 'Astly Siam Square',
       drop_point_code: 'SQ01',
       phone_number: '02-123-4567',
       addr_house_no: '432',
@@ -303,7 +303,7 @@ const mockContractDetails: Record<string, MockContractDetail> = {
     item: mockContractList[1].items,
     drop_point: {
       drop_point_id: 'mock-drop-002',
-      drop_point_name: 'Pawnly Ari',
+      drop_point_name: 'Astly Ari',
       drop_point_code: 'AR02',
       phone_number: '02-555-0199',
       addr_house_no: '89',
@@ -346,7 +346,7 @@ const mockContractDetails: Record<string, MockContractDetail> = {
     item: mockContractList[2].items,
     drop_point: {
       drop_point_id: 'mock-drop-001',
-      drop_point_name: 'Pawnly Siam Square',
+      drop_point_name: 'Astly Siam Square',
       drop_point_code: 'SQ01',
       phone_number: '02-123-4567',
       addr_house_no: '432',

@@ -604,7 +604,7 @@ export async function sendContractCompletionNotification(
               action: {
                 type: 'uri',
                 label: 'รายละเอียดสัญญา',
-                uri: `https://pawnly.io/contract-info/${itemId}`
+                uri: `https://astly.io/contract-info/${itemId}`
               },
               color: '#c2410c',
               flex: 1

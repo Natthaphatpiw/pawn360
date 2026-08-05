@@ -216,7 +216,20 @@ export async function GET(
         displayStatus,
         remainingAmount,
         remainingPrincipal,
-        remainingInterest
+        remainingInterest,
+        // The interest breakdown is computed here and was not being returned,
+        // so the contract screen recomputed it from interest_rate and got it
+        // wrong - it treated the stored rate as the combined 3% and subtracted
+        // a hardcoded 1.5% fee, leaving the pawner's interest at exactly 0.
+        // interest_rate is the interest alone; platform_fee_rate is separate.
+        // Serving the numbers from here keeps one implementation.
+        interestRateMonthly: monthlyInterestRate,
+        feeRateMonthly: feeRate,
+        daysElapsed,
+        daysInContract,
+        interestAccrued,
+        feeAmount,
+        interestDue,
       }
     }, { headers: { 'Cache-Control': 'private, no-store' } });
 

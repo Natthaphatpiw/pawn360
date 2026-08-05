@@ -13,7 +13,7 @@ export default function DropPointHistoryLayout({
   children: React.ReactNode;
 }) {
   // Drop Point history LIFF
-  // Endpoint: https://pawnly.io/drop-point-history
+  // Endpoint: https://astly.io/drop-point-history
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_HISTORY || '2008651088-97dWJEQB';
   return (
     <LiffProvider liffId={liffId}>

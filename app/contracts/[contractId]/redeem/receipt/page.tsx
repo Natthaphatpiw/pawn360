@@ -113,7 +113,7 @@ export default function RedemptionReceiptPage() {
 
           <h1 className="text-xl font-bold text-foreground mb-2">การไถ่ถอนเสร็จสิ้น!</h1>
           <p className="text-foreground-subtle text-sm mb-6">
-            ขอบคุณที่ใช้บริการ Pawnly<br />
+            ขอบคุณที่ใช้บริการ Astly<br />
             หากมีปัญหาใดๆ สามารถติดต่อได้ที่ 062-6092941
           </p>
 

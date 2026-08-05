@@ -253,7 +253,7 @@ const buildTicketPdfHtml = (ticketData: any) => {
       <div class="header">
         <div class="header-row">
           <div>
-            <div class="brand">${escapeHtml(ticketData?.shopName || 'Pawnly')}</div>
+            <div class="brand">${escapeHtml(ticketData?.shopName || 'Astly')}</div>
             <div class="muted">${escapeHtml(ticketData?.branch || '-')}</div>
           </div>
           <div style="text-align: right;">
@@ -656,7 +656,7 @@ export async function GET(
     const notesPayload = splitItemNotesAndPasscode(item?.notes);
 
     const ticketData = {
-      shopName: 'Pawnly',
+      shopName: 'Astly',
       branch: dropPoint?.drop_point_name || 'สำนักงานใหญ่',
       ticketNo: contract.contract_number || contract.contract_id.substring(0, 6).toUpperCase(),
       bookNo: contract.contract_id.substring(0, 2).toUpperCase(),

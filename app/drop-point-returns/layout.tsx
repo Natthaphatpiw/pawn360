@@ -13,7 +13,7 @@ export default function DropPointReturnsLayout({
   children: React.ReactNode;
 }) {
   // Drop Point returns LIFF
-  // Endpoint: https://pawnly.io/drop-point-returns
+  // Endpoint: https://astly.io/drop-point-returns
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_DROPPOINT_RETURN || '2008651088-fsjSpdo9';
   return (
     <LiffProvider liffId={liffId}>

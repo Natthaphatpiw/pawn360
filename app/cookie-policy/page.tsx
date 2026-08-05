@@ -20,8 +20,8 @@ export default function CookiePolicyPage() {
           <div className="flex items-center gap-4">
             <Link href="/">
               <Image
-                src="/landing/pawnly_logo.png"
-                alt="Pawnly"
+                src="/landing/astly_logo.png"
+                alt="Astly"
                 width={302}
                 height={80}
                 priority
@@ -119,14 +119,14 @@ export default function CookiePolicyPage() {
                       <td className="px-4 py-3">ci_session, G_ENABLES_IDPS, __utmz, __utma</td>
                       <td className="px-4 py-3">ช่วยให้การใช้งานเว็บไซต์มีเสถียรภาพ เช่น การกรอกข้อมูลในแบบฟอร์ม</td>
                       <td className="px-4 py-3">ลบเมื่อปิดเบราว์เซอร์</td>
-                      <td className="px-4 py-3">Pawnly</td>
+                      <td className="px-4 py-3">Astly</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3">การทำงานของเว็บไซต์</td>
                       <td className="px-4 py-3">home_popup, compare_1, compare_2, token, phone, email</td>
                       <td className="px-4 py-3">จดจำตัวเลือก เช่น ภาษา ภูมิภาค หรือสถานะการเข้าสู่ระบบ</td>
                       <td className="px-4 py-3">ลบเมื่อปิดเบราว์เซอร์</td>
-                      <td className="px-4 py-3">Pawnly</td>
+                      <td className="px-4 py-3">Astly</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3">การวิเคราะห์/ประสิทธิภาพ</td>
@@ -179,10 +179,10 @@ export default function CookiePolicyPage() {
             <section>
               <h2 className="text-base font-semibold text-[#686360]">ช่องทางการติดต่อ</h2>
               <p className="mt-3">
-                หากท่านมีข้อสงสัยเกี่ยวกับนโยบายคุกกี้ โปรดติดต่อเราผ่านเว็บไซต์หลักของ Pawnly
+                หากท่านมีข้อสงสัยเกี่ยวกับนโยบายคุกกี้ โปรดติดต่อเราผ่านเว็บไซต์หลักของ Astly
               </p>
               <Link href="/" className="mt-3 inline-block text-[var(--accent)] underline">
-                ไปที่เว็บไซต์ Pawnly
+                ไปที่เว็บไซต์ Astly
               </Link>
             </section>
           </div>
@@ -192,8 +192,8 @@ export default function CookiePolicyPage() {
           <div className="mx-auto flex w-full max-w-[1216px] flex-wrap justify-between gap-8 px-4 py-12 sm:gap-10 sm:px-6 sm:py-16 lg:px-14">
             <div className="min-w-[180px] sm:min-w-[220px]">
               <Image
-                src="/landing/pawnly_foot.png"
-                alt="Pawnly"
+                src="/landing/astly_foot.png"
+                alt="Astly"
                 width={600}
                 height={96}
                 className="h-6 w-auto sm:h-7"
@@ -255,7 +255,7 @@ export default function CookiePolicyPage() {
             </div>
           </div>
           <div className="border-t border-[#c55125] py-4 text-center text-xs text-[#4a4644] sm:py-6">
-            Pawnly Platform
+            Astly Platform
           </div>
         </footer>
       </div>

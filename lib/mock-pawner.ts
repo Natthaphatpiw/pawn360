@@ -44,7 +44,7 @@ const svgDataUrl = (title: string, subtitle: string, accent: string) =>
 const DEFAULT_BRANCHES = [
   {
     branch_id: 'mock-branch-bkk-01',
-    branch_name: 'Pawnly Siam Square',
+    branch_name: 'Astly Siam Square',
     address: '432 Rama I Rd',
     district: 'Pathum Wan',
     province: 'Bangkok',
@@ -58,7 +58,7 @@ const DEFAULT_BRANCHES = [
   },
   {
     branch_id: 'mock-branch-bkk-02',
-    branch_name: 'Pawnly Ari',
+    branch_name: 'Astly Ari',
     address: '89 Phahon Yothin Rd',
     district: 'Phaya Thai',
     province: 'Bangkok',
@@ -75,7 +75,7 @@ const DEFAULT_BRANCHES = [
 const DEFAULT_STORES = [
   {
     _id: 'mock-store-01',
-    storeName: 'Pawnly Rama 9',
+    storeName: 'Astly Rama 9',
     phone: '02-888-1100',
     address: {
       houseNumber: '9/9',
@@ -96,7 +96,7 @@ const DEFAULT_STORES = [
   },
   {
     _id: 'mock-store-02',
-    storeName: 'Pawnly On Nut',
+    storeName: 'Astly On Nut',
     phone: '02-888-2200',
     address: {
       houseNumber: '188',

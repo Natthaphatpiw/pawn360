@@ -717,7 +717,7 @@ export default function FullContractPage({ params }: { params: Promise<{ itemId:
                 )}
                 {' '}ผู้ซื้อ
               </p>
-              <p className="mb-2">( pawnly technologies co.,ltd )</p>
+              <p className="mb-2">( astly technologies co.,ltd )</p>
               <p>วันที่ : {' '}
                 <input
                   type="text"

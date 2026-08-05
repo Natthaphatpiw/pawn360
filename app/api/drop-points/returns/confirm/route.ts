@@ -465,7 +465,7 @@ export async function POST(request: NextRequest) {
       try {
         await investorLineClient.pushMessage(investor.line_id, {
           type: 'text',
-          text: `ส่งคืนเรียบร้อย\n\nสัญญา: ${contract.contract_number}\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Pawnly`
+          text: `ส่งคืนเรียบร้อย\n\nสัญญา: ${contract.contract_number}\nกำไรสุทธิ: +${netProfit.toLocaleString()} บาท\n\nขอบคุณที่เป็นส่วนหนึ่งของ Astly`
         });
       } catch {
         console.error('[drop-point:return] asset funding notification failed');

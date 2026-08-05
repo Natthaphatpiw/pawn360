@@ -1070,7 +1070,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
             const client = new Client({ channelAccessToken });
             await client.pushMessage(userId, {
               type: 'text',
-              text: `คุณได้ยืนยันรับสินค้าไปแล้ว\n\nขอบคุณที่ใช้บริการ Pawnly`
+              text: `คุณได้ยืนยันรับสินค้าไปแล้ว\n\nขอบคุณที่ใช้บริการ Astly`
             });
           }
           return;
@@ -1153,7 +1153,7 @@ async function handlePostbackEvent(event: WebhookEvent) {
           const itemName = [item?.brand, item?.model].filter(Boolean).join(' ').trim() || 'สินค้า';
           await client.pushMessage(userId, {
             type: 'text',
-            text: `ยืนยันรับสินค้าเรียบร้อยแล้ว\n\n${itemName}\n\nขอบคุณที่ใช้บริการ Pawnly`
+            text: `ยืนยันรับสินค้าเรียบร้อยแล้ว\n\n${itemName}\n\nขอบคุณที่ใช้บริการ Astly`
           });
         }
 
@@ -1505,7 +1505,7 @@ async function handleMessageEvent(event: WebhookEvent) {
     }
 
     // Call upload-payment-proof API
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://pawnly.io';
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://astly.io';
     const internalSecret = String(process.env.INTERNAL_API_SECRET || '').trim();
     if (!internalSecret) throw new Error('INTERNAL_API_SECRET_NOT_CONFIGURED');
     const response = await fetch(`${baseUrl}/api/customer/upload-payment-proof`, {

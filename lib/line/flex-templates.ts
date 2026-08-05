@@ -320,7 +320,7 @@ export function createPaymentSuccessFlexMessage(
           action: {
             type: 'uri',
             label: 'ดูรายละเอียดสัญญา',
-            uri: `https://pawnly.io/contracts`
+            uri: `https://astly.io/contracts`
           },
           style: 'link',
           height: 'sm'

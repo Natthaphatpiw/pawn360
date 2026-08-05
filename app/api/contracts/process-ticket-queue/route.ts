@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     const results = [];
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawnly.io';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://astly.io';
 
     for (const item of queueItems) {
       const attempts = Number.isInteger(Number(item.attempts))

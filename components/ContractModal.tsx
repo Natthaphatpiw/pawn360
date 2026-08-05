@@ -240,7 +240,7 @@ export default function ContractModal({ pawnRequest, customerData, onComplete, o
                   ทำขึ้น ณ วันที่ <span className="font-semibold">{contractData.contractDate}</span> ระหว่าง{' '}
                   <span className="font-semibold">{contractData.sellerName}</span> เลขบัตรประชาชน{' '}
                   <span className="font-semibold">{contractData.sellerId}</span> อยู่ที่{' '}
-                  <span className="font-semibold">{contractData.sellerAddress}</span> ซึ่งต่อไปในสัญญานี้เรียกว่า &ldquo;ผู้ขาย&rdquo; กับ Pawnly technologies co.,ltd. สำนักงานตั้งอยู่ที่{' '}
+                  <span className="font-semibold">{contractData.sellerAddress}</span> ซึ่งต่อไปในสัญญานี้เรียกว่า &ldquo;ผู้ขาย&rdquo; กับ Astly technologies co.,ltd. สำนักงานตั้งอยู่ที่{' '}
                   <span className="font-semibold">{contractData.buyerAddress}</span> ซึ่งต่อไปในสัญญานี้เรียกว่า &ldquo;ผู้ซื้อ&rdquo;
                 </p>
 

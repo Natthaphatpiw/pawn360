@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate loan contract URL for frontend to access
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pawnly.io';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://astly.io';
     const ticketUrl = `${baseUrl}/pawn-ticket/${contractId}`;
 
     // Return instruction for manual generation (since we can't use Puppeteer on Vercel)

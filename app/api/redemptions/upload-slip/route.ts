@@ -415,7 +415,7 @@ function createDropPointRedemptionCard(redemption: any, returnUrl: string): Flex
   const deliveryMethodText = {
     'SELF_PICKUP': 'ลูกค้ามารับเอง',
     'SELF_ARRANGE': 'ลูกค้าเรียกขนส่งเอง',
-    'PLATFORM_ARRANGE': 'ให้ Pawnly เรียกขนส่ง',
+    'PLATFORM_ARRANGE': 'ให้ Astly เรียกขนส่ง',
     'DROPPOINT_SELF_PICKUP': 'ลูกค้ารับเองที่ Drop Point',
     'DROPPOINT_SELF_RIDER': 'ลูกค้าเรียกไรเดอร์เอง',
     'CENTRAL_SCHEDULE_7D': 'นัดรับที่ Drop Point ภายใน 7 วัน',

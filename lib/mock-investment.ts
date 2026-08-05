@@ -384,7 +384,7 @@ export function getMockPawnTicket(contractId?: string | null) {
   const interest = Number(contract.interest_amount || 0);
 
   return {
-    shopName: 'Pawnly',
+    shopName: 'Astly',
     branch: 'Siam Square Branch',
     bookNo: 'B-2605',
     ticketNo: contract.contract_number,
@@ -438,8 +438,8 @@ export function getMockItemActionData() {
       interestRate: 10,
     },
     stores: [
-      { _id: 'mock-store-01', storeName: 'Pawnly Rama 9', interestRate: 10 },
-      { _id: 'mock-store-02', storeName: 'Pawnly On Nut', interestRate: 9.5 },
+      { _id: 'mock-store-01', storeName: 'Astly Rama 9', interestRate: 10 },
+      { _id: 'mock-store-02', storeName: 'Astly On Nut', interestRate: 9.5 },
     ],
     customer: {
       _id: 'mock-customer-0001',

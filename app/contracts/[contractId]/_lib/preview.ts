@@ -95,7 +95,7 @@ export function getMockPrincipalIncreaseRequest(requestId: string, contractId: s
 const RETURN_METHOD_LABELS: Record<string, string> = {
   SELF_PICKUP: 'รับของด้วยตัวเอง',
   SELF_ARRANGE: 'เรียกไรเดอร์เอง',
-  PLATFORM_ARRANGE: 'Pawnly จัดส่งให้',
+  PLATFORM_ARRANGE: 'Astly จัดส่งให้',
   DROPPOINT_SELF_PICKUP: 'รับเองที่ Drop Point',
   DROPPOINT_SELF_RIDER: 'เรียกไรเดอร์เอง',
   CENTRAL_SCHEDULE_7D: 'นัดรับที่ Drop Point ภายใน 7 วัน',
@@ -216,7 +216,7 @@ export function getMockNearDueCentralRedemptionContract(contractId: string) {
     },
     drop_point: {
       drop_point_id: 'mock-drop-001',
-      drop_point_name: 'Pawnly Siam Square',
+      drop_point_name: 'Astly Siam Square',
       phone_number: '02-123-4567',
       map_embed: null,
     },
@@ -260,7 +260,7 @@ export function getMockRedeemedReturnReceipt(contractId: string, qrCodeDataUrl: 
         estimated_value: 28500,
       },
       drop_point: {
-        drop_point_name: 'Pawnly Siam Square',
+        drop_point_name: 'Astly Siam Square',
         phone_number: '02-123-4567',
         addr_house_no: '432',
         addr_street: 'Rama I Rd',
@@ -324,7 +324,7 @@ export function getMockNearDueReturnReceipt(contractId: string, qrCodeDataUrl: s
         estimated_value: 28900,
       },
       drop_point: {
-        drop_point_name: 'Pawnly Siam Square',
+        drop_point_name: 'Astly Siam Square',
         phone_number: '02-123-4567',
         addr_house_no: '432',
         addr_street: 'Rama I Rd',
@@ -388,7 +388,7 @@ export function getMockWithin15ReturnReceipt(contractId: string, qrCodeDataUrl: 
         estimated_value: contractId === 'mock-contract-002' ? 23200 : 18000,
       },
       drop_point: {
-        drop_point_name: contractId === 'mock-contract-002' ? 'Pawnly Ari' : 'Pawn360 Drop Point (Mock)',
+        drop_point_name: contractId === 'mock-contract-002' ? 'Astly Ari' : 'Pawn360 Drop Point (Mock)',
         phone_number: contractId === 'mock-contract-002' ? '02-555-0199' : '020000000',
         addr_house_no: contractId === 'mock-contract-002' ? '89' : '99/9',
         addr_street: contractId === 'mock-contract-002' ? 'Phahon Yothin Rd' : 'Sukhumvit',

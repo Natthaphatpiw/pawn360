@@ -44,14 +44,14 @@ export default function ToastProvider() {
       }, TOAST_DURATION_MS);
     };
 
-    window.addEventListener('pawnly-toast', handleToast as EventListener);
+    window.addEventListener('astly-toast', handleToast as EventListener);
     window.alert = (message?: string) => {
       showToast(String(message ?? ''), 'info');
     };
 
     return () => {
       cancelled = true;
-      window.removeEventListener('pawnly-toast', handleToast as EventListener);
+      window.removeEventListener('astly-toast', handleToast as EventListener);
       window.alert = originalAlert;
     };
   }, []);

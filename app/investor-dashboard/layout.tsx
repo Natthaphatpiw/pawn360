@@ -14,7 +14,7 @@ export default function InvestorDashboardLayout({
 }) {
   // Investor Dashboard LIFF ID
   // LIFF ID = 2008641671-wYKNjPkL
-  // Endpoint: https://pawnly.io/investor-dashboard
+  // Endpoint: https://astly.io/investor-dashboard
   const liffId = process.env.NEXT_PUBLIC_LIFF_ID_INVEST_DASHBOARD || '2008641671-wYKNjPkL';
   return <LiffProvider liffId={liffId}>{children}</LiffProvider>;
 }

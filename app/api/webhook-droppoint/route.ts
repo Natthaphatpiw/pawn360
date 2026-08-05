@@ -629,7 +629,7 @@ async function handleRedemptionAmountIncorrect(redemptionId: string, dropPointLi
 
     // Send message to pawner about cancellation
     if (pawner?.line_id) {
-      const pawnerMessage = `ยอดเงินที่โอนไม่ถูกต้อง\n\nสัญญา: ${redemption.contract?.contract_number}\n\nการไถ่ถอนถูกยกเลิกตามข้อกำหนดและข้อสัญญาของ Pawnly\n\nหากต้องการดำเนินการต่อหรือมีข้อสงสัย สามารถติดต่อฝ่ายสนับสนุนได้ที่ 062-6092941`;
+      const pawnerMessage = `ยอดเงินที่โอนไม่ถูกต้อง\n\nสัญญา: ${redemption.contract?.contract_number}\n\nการไถ่ถอนถูกยกเลิกตามข้อกำหนดและข้อสัญญาของ Astly\n\nหากต้องการดำเนินการต่อหรือมีข้อสงสัย สามารถติดต่อฝ่ายสนับสนุนได้ที่ 062-6092941`;
 
       try {
         await pawnerLineClient.pushMessage(pawner.line_id, {
@@ -670,7 +670,7 @@ function createPawnerItemReadyCard(redemption: any): FlexMessage {
   const deliveryMethodText = {
     'SELF_PICKUP': 'รับของด้วยตัวเอง',
     'SELF_ARRANGE': 'เรียกขนส่งเอง',
-    'PLATFORM_ARRANGE': 'Pawnly จัดส่งให้',
+    'PLATFORM_ARRANGE': 'Astly จัดส่งให้',
     'DROPPOINT_SELF_PICKUP': 'รับเองที่ Drop Point',
     'DROPPOINT_SELF_RIDER': 'เรียกไรเดอร์เอง',
     'CENTRAL_SCHEDULE_7D': 'นัดรับที่ Drop Point ภายใน 7 วัน',
