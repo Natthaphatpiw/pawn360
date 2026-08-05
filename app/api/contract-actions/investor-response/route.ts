@@ -107,6 +107,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // A verified payment sitting against a rejected request is an unresolved
+      // obligation, not a closed matter. Record it on the request and in the
+      // action log so it is discoverable, rather than leaving the money with no
+      // trace of why it is here.
+      const paidInterestAmount = ['SLIP_VERIFIED', 'PENDING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_APPROVAL']
+        .includes(actionRequest.request_status)
+        ? Number(actionRequest.interest_to_pay || 0)
+        : 0;
+
       // Update request status
       const { data: updatedRequest, error: updateError } = await supabase
         .from('contract_action_requests')
@@ -141,6 +150,11 @@ export async function POST(request: NextRequest) {
         {
           actionRequestId: requestId,
           rejectionReason: normalizedReason,
+          // Surfaces the unresolved obligation in the audit trail so a rejected
+          // request that already took money is findable by finance.
+          ...(paidInterestAmount > 0
+            ? { description: `ผู้จำนำชำระแล้ว ${paidInterestAmount} บาท ก่อนถูกปฏิเสธ - รอดำเนินการคืนเงินหรือปรับปรุงสัญญา` }
+            : {}),
           description: `Investor rejected principal increase request. Reason: ${normalizedReason}`,
           metadata: {
             actionType: 'PRINCIPAL_INCREASE',
@@ -158,7 +172,25 @@ export async function POST(request: NextRequest) {
 
           await pawnerLineClient.pushMessage(pawner.line_id, {
             type: 'text',
-            text: `คำขอเพิ่มเงินต้นถูกปฏิเสธ\n\nจำนวนที่ขอ: ${actionRequest.increase_amount?.toLocaleString()} บาท\n\nเหตุผล: ${normalizedReason}\n\nหากมีข้อสงสัย กรุณาติดต่อฝ่ายสนับสนุน`
+            // The pawner has usually ALREADY paid the accrued interest by this
+            // point - that is what moves the request to PENDING_INVESTOR_APPROVAL.
+            // Saying only "rejected" left them with money gone and no idea what
+            // became of it, so the message names the payment explicitly.
+            text: [
+              'คำขอเพิ่มเงินต้นถูกปฏิเสธ',
+              '',
+              `จำนวนที่ขอ: ${actionRequest.increase_amount?.toLocaleString()} บาท`,
+              `เหตุผล: ${normalizedReason}`,
+              ...(paidInterestAmount > 0
+                ? [
+                  '',
+                  `เงินที่คุณชำระไว้แล้ว ${paidInterestAmount.toLocaleString()} บาท ยังอยู่ในระบบและไม่ได้สูญหาย`,
+                  'เจ้าหน้าที่จะติดต่อกลับเพื่อดำเนินการต่อ',
+                ]
+                : []),
+              '',
+              'หากมีข้อสงสัย กรุณาติดต่อฝ่ายสนับสนุน',
+            ].join('\n')
           });
         } catch {
           console.error('[contract-action:investor-response] seller notification delayed');

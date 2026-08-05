@@ -175,30 +175,67 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (expectedAmount !== Number(redemption.total_amount || 0)) {
-      const { data: amountUpdated, error: amountUpdateError } = await supabase
-        .from('redemption_requests')
-        .update({
-          total_amount: expectedAmount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('redemption_id', safeRedemptionId)
-        .in('request_status', ['PENDING', 'AMOUNT_MISMATCH'])
-        .select('redemption_id')
-        .maybeSingle();
-      if (amountUpdateError) {
-        return sanitizedServerError('ไม่สามารถปรับยอดไถ่ถอนให้เป็นปัจจุบันได้ กรุณาลองใหม่');
-      }
-      if (!amountUpdated) {
+    // The overdue penalty accrues daily, so recomputing the payoff here can
+    // exceed what the pawner was quoted. The previous code silently re-priced
+    // the request upward and then verified the slip against the NEW number with
+    // zero tolerance - so a pawner who transferred exactly the amount they were
+    // shown was told their payment did not match, with no explanation.
+    //
+    // The quote the pawner acted on is honoured while it is still fresh. Once
+    // it has gone stale the request is re-priced, but the pawner is told the
+    // new total explicitly instead of failing an amount comparison they cannot
+    // see.
+    const quotedAmount = roundCurrency(Number(redemption.total_amount || 0));
+    const quoteAgeMs = Date.now() - new Date(redemption.created_at || Date.now()).getTime();
+    const parsedQuoteValidMs = Number(process.env.REDEMPTION_QUOTE_VALID_MS);
+    const quoteValidMs = Number.isFinite(parsedQuoteValidMs) && parsedQuoteValidMs > 0
+      ? parsedQuoteValidMs
+      : 24 * 60 * 60 * 1000;
+    const quoteIsFresh = quoteAgeMs <= quoteValidMs;
+
+    let amountToVerify = expectedAmount;
+    if (quotedAmount > 0 && expectedAmount !== quotedAmount) {
+      if (quoteIsFresh && quotedAmount >= expectedAmount) {
+        // Quote at or above the current payoff - accept what they were told.
+        amountToVerify = quotedAmount;
+      } else if (quoteIsFresh) {
+        // Still fresh but the payoff has grown. Honour the quote rather than
+        // penalising the pawner for our timing.
+        amountToVerify = quotedAmount;
+      } else {
+        const { data: amountUpdated, error: amountUpdateError } = await supabase
+          .from('redemption_requests')
+          .update({
+            total_amount: expectedAmount,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('redemption_id', safeRedemptionId)
+          .in('request_status', ['PENDING', 'AMOUNT_MISMATCH'])
+          .select('redemption_id')
+          .maybeSingle();
+        if (amountUpdateError) {
+          return sanitizedServerError('ไม่สามารถปรับยอดไถ่ถอนให้เป็นปัจจุบันได้ กรุณาลองใหม่');
+        }
+        if (!amountUpdated) {
+          return NextResponse.json(
+            { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+            { status: 409 },
+          );
+        }
         return NextResponse.json(
-          { error: 'สถานะรายการเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' },
+          {
+            error: `ยอดไถ่ถอนมีการเปลี่ยนแปลงเป็น ${expectedAmount.toLocaleString()} บาท (เดิม ${quotedAmount.toLocaleString()} บาท) เนื่องจากค่าปรับรายวัน กรุณาตรวจสอบยอดใหม่ก่อนโอน`,
+            code: 'REDEMPTION_QUOTE_EXPIRED',
+            previousAmount: quotedAmount,
+            currentAmount: expectedAmount,
+          },
           { status: 409 },
         );
       }
     }
 
     const companyBank = await getCompanyBankAccount();
-    const verificationResult = await verifyPaymentSlip(safeSlipUrl, expectedAmount, {
+    const verificationResult = await verifyPaymentSlip(safeSlipUrl, amountToVerify, {
       receiverAccountNo: companyBank.account_number || companyBank.bank_account_no || null,
       receiverPromptpay: companyBank.promptpay_number || null,
       receiverName: companyBank.account_name || companyBank.bank_account_name || null,
@@ -217,12 +254,18 @@ export async function POST(request: NextRequest) {
       null,
       safeRedemptionId,
       safeSlipUrl,
-      expectedAmount,
+      amountToVerify,
       {
         ...verificationResult,
         rawResponse: {
           provider: verificationResult.rawResponse?.provider || null,
-          fingerprint: slipFingerprint,
+          // The fingerprint is what marks a slip as spent, and it used to be
+          // written on EVERY attempt - so a slip rejected for any reason could
+          // never be submitted again, even though it evidenced a real transfer
+          // the pawner had actually made. Only an accepted slip has paid for
+          // anything, so only an accepted slip is burned. The row is still
+          // written either way, so the audit trail keeps every attempt.
+          ...(verificationResult.result === 'MATCHED' ? { fingerprint: slipFingerprint } : {}),
         },
       },
       (previousAttempts || 0) + 1,
@@ -270,7 +313,7 @@ export async function POST(request: NextRequest) {
           error: verificationResult.message,
           result: verificationResult.result,
           detectedAmount: verificationResult.detectedAmount,
-          expectedAmount,
+          expectedAmount: amountToVerify,
         },
         { status: 400 }
       );
