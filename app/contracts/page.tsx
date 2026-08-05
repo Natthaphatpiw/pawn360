@@ -90,6 +90,12 @@ export default function PawnerContractList() {
   }, [liffLoading, liffError, profile?.userId, mockMode]);
 
   const fetchContracts = async () => {
+    // Owns its own loading state so every caller is covered. Opening the PIN
+    // modal sets loading false, so the fetch that runs after the PIN is
+    // verified used to render the list while it was still empty - the page
+    // showed "ไม่มีสัญญาสินเชื่อที่กำลังดำเนินการ" for a moment and then
+    // popped the contracts in.
+    setLoading(true);
     try {
       if (mockMode) {
         const mockContracts = await getMockContracts();
@@ -100,18 +106,25 @@ export default function PawnerContractList() {
 
       if (!profile?.userId) return;
 
-      // Fetch customer info first
-      const customerResponse = await axios.get(`/api/pawners/check?lineId=${profile.userId}`);
-      if (customerResponse.data.exists && customerResponse.data.pawner) {
-        const pawner = customerResponse.data.pawner;
-        setUserName(`${pawner.firstname} ${pawner.lastname}`);
+      // The two calls are independent - one supplies the greeting name, the
+      // other the contracts - so awaiting them in series doubled the wait for
+      // no reason. allSettled so a failed name lookup cannot cost the user
+      // their contract list.
+      const [customerResult, contractsResult] = await Promise.allSettled([
+        axios.get(`/api/pawners/check?lineId=${profile.userId}`),
+        axios.get('/api/contracts/by-customer'),
+      ]);
+
+      if (customerResult.status === 'fulfilled') {
+        const customerData = customerResult.value.data;
+        if (customerData.exists && customerData.pawner) {
+          setUserName(`${customerData.pawner.firstname} ${customerData.pawner.lastname}`);
+        }
       }
 
-      // Fetch contracts
-      const response = await axios.get('/api/contracts/by-customer');
-
-      if (response.data.success) {
-        setContracts(response.data.contracts);
+      if (contractsResult.status === 'rejected') throw contractsResult.reason;
+      if (contractsResult.value.data.success) {
+        setContracts(contractsResult.value.data.contracts);
       }
     } catch (error: any) {
       console.error('Error fetching contracts:', error);
@@ -195,8 +208,11 @@ export default function PawnerContractList() {
 
   if (liffLoading || loading) {
     return (
-      <div className="min-h-screen bg-background-white flex items-center justify-center">
+      <div className="min-h-screen bg-background-white flex flex-col items-center justify-center gap-6">
         <div className="dot-bricks" />
+        {/* The animation alone reads as "something is happening"; saying what
+            is happening is what stops a slow load feeling like a broken page. */}
+        <p className="text-sm text-foreground-subtle">กำลังโหลดรายการสัญญา...</p>
       </div>
     );
   }
