@@ -88,6 +88,17 @@ export function getMockPrincipalIncreaseRequest(requestId: string, contractId: s
     new_principal_amount: 13000,
     pawner_bank_name: 'พร้อมเพย์',
     pawner_bank_account_no: '0812345678',
+    // An investor can only reject a request the pawner has already paid for, so
+    // the rejection preview must show the refund that follows it. `?status=`
+    // picks the state; `?refund=PAID` walks the settled variant.
+    investor_rejection_reason: 'มูลค่าหลักประกันไม่เพียงพอต่อวงเงินที่ขอเพิ่ม',
+    refund_status: 'PENDING',
+    refund_amount: 400,
+    refund_reference: 'RFD-PREVIEW0000000001',
+    refund_bank_name: 'พร้อมเพย์',
+    refund_bank_account_no: '0812345678',
+    refund_bank_account_name: 'สมชาย ใจดี',
+    refund_paid_at: null as string | null,
     contract: getMockContractBase(contractId),
   };
 }

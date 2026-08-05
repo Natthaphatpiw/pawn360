@@ -23,7 +23,9 @@ export async function GET(
     // below reported that as "ไม่พบคำขอ" - so an unapplied migration looked
     // exactly like a missing request and took the interest-payment screen down
     // after the request had already been created.
-    const buildSelect = (withNewPrincipal: boolean) => `
+    // The refund columns arrive via 2026_08_05_add_action_request_refund.sql and
+    // are optional for the same reason.
+    const buildSelect = (withNewPrincipal: boolean, withRefund: boolean) => `
         request_id,
         contract_id,
         request_type,
@@ -46,6 +48,17 @@ export async function GET(
         pawner_bank_account_no,
         pawner_bank_account_name,
         investor_rejection_reason,
+        ${withRefund ? `
+        refund_status,
+        refund_amount,
+        refund_reason,
+        refund_reference,
+        refund_due_at,
+        refund_bank_name,
+        refund_bank_account_no,
+        refund_bank_account_name,
+        refund_slip_url,
+        refund_paid_at,` : ''}
         created_at,
         updated_at,
         contract:contract_id (
@@ -69,16 +82,29 @@ export async function GET(
           investors:investor_id (investor_id, line_id)
         )
       `;
-    const selectActionRequest = (withNewPrincipal: boolean) => supabase
+    const selectActionRequest = (withNewPrincipal: boolean, withRefund: boolean) => supabase
       .from('contract_action_requests')
-      .select(buildSelect(withNewPrincipal))
+      .select(buildSelect(withNewPrincipal, withRefund))
       .eq('request_id', requestId)
       .maybeSingle();
 
-    let { data: rawActionRequest, error } = await selectActionRequest(true);
-    if (error && `${error.message || ''}`.toLowerCase().includes('new_principal_amount')) {
-      console.warn('contract_action_requests.new_principal_amount is missing; run 2026_01_04_add_new_principal_amount.sql. Loading without it.');
-      ({ data: rawActionRequest, error } = await selectActionRequest(false));
+    let withNewPrincipal = true;
+    let withRefund = true;
+    let { data: rawActionRequest, error } = await selectActionRequest(withNewPrincipal, withRefund);
+    // Drop whichever optional group the database does not have yet, one at a
+    // time, rather than failing the whole screen over an unapplied migration.
+    for (let attempt = 0; attempt < 2 && error; attempt += 1) {
+      const message = `${error.message || ''}`.toLowerCase();
+      if (withRefund && message.includes('refund_')) {
+        console.warn('contract_action_requests refund columns are missing; run 2026_08_05_add_action_request_refund.sql. Loading without them.');
+        withRefund = false;
+      } else if (withNewPrincipal && message.includes('new_principal_amount')) {
+        console.warn('contract_action_requests.new_principal_amount is missing; run 2026_01_04_add_new_principal_amount.sql. Loading without it.');
+        withNewPrincipal = false;
+      } else {
+        break;
+      }
+      ({ data: rawActionRequest, error } = await selectActionRequest(withNewPrincipal, withRefund));
     }
 
     if (error) {
@@ -124,6 +150,12 @@ export async function GET(
         actionRequest.pawner_signature_url = null;
       }
       if (actionRequest.signature_url) actionRequest.signature_url = null;
+      // Where the company sends the pawner's money back is between the company
+      // and the pawner - the investor who rejected the request has no part in it.
+      actionRequest.refund_bank_name = null;
+      actionRequest.refund_bank_account_no = null;
+      actionRequest.refund_bank_account_name = null;
+      actionRequest.refund_slip_url = null;
     } else {
       safeContract.pawners = pawner ? {
         customer_id: pawner.customer_id,

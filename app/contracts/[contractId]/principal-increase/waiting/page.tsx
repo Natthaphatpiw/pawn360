@@ -7,6 +7,11 @@ import axios from 'axios';
 import { useLiff } from '@/lib/liff/liff-provider';
 import TransactionHeader from '../../_components/TransactionHeader';
 import { getMockPrincipalIncreaseRequest, isPreviewMode, withPreview } from '../../_lib/preview';
+import {
+  REFUND_SLA_BUSINESS_DAYS,
+  SUPPORT_PHONE,
+  formatRefundDestination,
+} from '@/lib/services/action-refund';
 
 export default function PrincipalIncreaseWaitingPage() {
   const router = useRouter();
@@ -44,9 +49,15 @@ export default function PrincipalIncreaseWaitingPage() {
       const resolvedStatus = selectedStatus && allowedPreviewStatuses.has(selectedStatus)
         ? selectedStatus
         : 'PENDING_INVESTOR_APPROVAL';
+      const refundOverride = searchParams.get('refund');
       setRequestDetails({
         ...mockRequest,
         request_status: resolvedStatus,
+        ...(refundOverride === 'PAID'
+          ? { refund_status: 'PAID', refund_paid_at: new Date().toISOString() }
+          : refundOverride === 'NONE'
+            ? { refund_status: 'NOT_REQUIRED' }
+            : {}),
       });
       setStatus(resolvedStatus);
       setLoading(false);
@@ -128,6 +139,10 @@ export default function PrincipalIncreaseWaitingPage() {
 
   const contract = requestDetails?.contract;
   const item = contract?.items;
+  const refundDestination = formatRefundDestination({
+    bankName: requestDetails?.refund_bank_name,
+    accountNo: requestDetails?.refund_bank_account_no,
+  });
 
   // Show different states based on status
   if (status === 'INVESTOR_REJECTED') {
@@ -170,10 +185,72 @@ export default function PrincipalIncreaseWaitingPage() {
             </div>
           )}
 
-          {requestDetails?.rejection_reason && (
+          {/* The API field is investor_rejection_reason; this read the
+              non-existent rejection_reason, so the reason never appeared. */}
+          {(requestDetails?.investor_rejection_reason || requestDetails?.rejection_reason) && (
             <div className="bg-red-50 rounded-xl p-4 mb-6 text-left">
               <p className="text-sm text-red-700">
-                <span className="font-bold">เหตุผล:</span> {requestDetails.rejection_reason}
+                <span className="font-bold">เหตุผล:</span>{' '}
+                {requestDetails.investor_rejection_reason || requestDetails.rejection_reason}
+              </p>
+            </div>
+          )}
+
+          {/* The pawner has already paid by the time an investor can reject, so
+              the money is owed back. Staff send it - never claim the system did. */}
+          {requestDetails?.refund_status === 'PENDING' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+              <p className="font-bold text-amber-900 mb-2">อยู่ระหว่างคืนเงิน</p>
+              <div className="space-y-1 text-sm text-amber-900">
+                <div className="flex justify-between">
+                  <span>จำนวนที่จะคืน:</span>
+                  <span className="font-bold">
+                    {Number(requestDetails.refund_amount || 0).toLocaleString()} บาท
+                  </span>
+                </div>
+                {refundDestination && (
+                  <div className="flex justify-between">
+                    <span>โอนเข้าบัญชี:</span>
+                    <span className="font-bold">{refundDestination}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-amber-800 mt-3">
+                เจ้าหน้าที่จะดำเนินการโอนคืนภายใน {REFUND_SLA_BUSINESS_DAYS} วันทำการ
+                หากมีข้อสงสัย กรุณาติดต่อ {SUPPORT_PHONE}
+              </p>
+            </div>
+          )}
+
+          {requestDetails?.refund_status === 'PAID' && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 text-left">
+              <p className="font-bold text-green-900 mb-2">คืนเงินแล้ว</p>
+              <div className="space-y-1 text-sm text-green-900">
+                <div className="flex justify-between">
+                  <span>จำนวน:</span>
+                  <span className="font-bold">
+                    {Number(requestDetails.refund_amount || 0).toLocaleString()} บาท
+                  </span>
+                </div>
+                {refundDestination && (
+                  <div className="flex justify-between">
+                    <span>โอนเข้าบัญชี:</span>
+                    <span className="font-bold">{refundDestination}</span>
+                  </div>
+                )}
+                {requestDetails.refund_paid_at && (
+                  <div className="flex justify-between">
+                    <span>วันที่โอน:</span>
+                    <span className="font-bold">
+                      {new Date(requestDetails.refund_paid_at).toLocaleDateString('th-TH', {
+                        day: 'numeric', month: 'long', year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-green-800 mt-3">
+                หากยังไม่เห็นยอดเข้าบัญชี กรุณาติดต่อ {SUPPORT_PHONE}
               </p>
             </div>
           )}

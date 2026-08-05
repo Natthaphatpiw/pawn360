@@ -41,9 +41,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: requests, error: requestsError } = await supabase
-      .from('contract_action_requests')
-      .select(`
+    // refund_status/refund_amount arrive via
+    // 2026_08_05_add_action_request_refund.sql. PostgREST rejects the entire
+    // select on an unknown column, so an unapplied migration would empty the
+    // pawner's whole request list rather than just omit a badge.
+    const buildSelect = (withRefund: boolean) => `
         request_id,
         request_type,
         request_status,
@@ -52,6 +54,7 @@ export async function GET(request: NextRequest) {
         interest_to_pay,
         interest_for_period,
         total_amount,
+        ${withRefund ? 'refund_status,\n        refund_amount,' : ''}
         created_at,
         updated_at,
         contract:contract_id (
@@ -66,7 +69,11 @@ export async function GET(request: NextRequest) {
             image_urls
           )
         )
-      `)
+      `;
+
+    const selectRequests = (withRefund: boolean) => supabase
+      .from('contract_action_requests')
+      .select(buildSelect(withRefund))
       .in('contract_id', contractIds)
       .in('request_status', [
         'PENDING',
@@ -88,6 +95,12 @@ export async function GET(request: NextRequest) {
       ])
       .order('created_at', { ascending: false })
       .limit(500);
+
+    let { data: requests, error: requestsError } = await selectRequests(true);
+    if (requestsError && `${requestsError.message || ''}`.toLowerCase().includes('refund_')) {
+      console.warn('contract_action_requests refund columns are missing; run 2026_08_05_add_action_request_refund.sql. Loading without them.');
+      ({ data: requests, error: requestsError } = await selectRequests(false));
+    }
 
     if (requestsError) {
       throw requestsError;

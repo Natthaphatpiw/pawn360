@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
 import { logContractAction } from '@/lib/services/slip-verification';
-import { Client } from '@line/bot-sdk';
 import { requireContractParty } from '@/lib/security/contract-access';
+import { lineRetryKeyFromMaterial, pushLineTextMessage } from '@/lib/line/push-text';
+import { sendAdminMessage } from '@/lib/line/admin-client';
+import {
+  REFUND_REJECTED_INCREASE_REASON,
+  REFUND_SLA_BUSINESS_DAYS,
+  SUPPORT_PHONE,
+  buildRefundReference,
+  collectedAmountFor,
+  formatRefundDestination,
+  wasPaidByPawner,
+} from '@/lib/services/action-refund';
 import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
 import { LiffAuthError } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
@@ -14,19 +24,22 @@ import {
   transactionRequestErrorResponse,
 } from '@/lib/security/transaction-request';
 
-const getPawnerLineClient = () => {
-  const channelAccessToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-  if (!channelAccessToken) return null;
-
-  return new Client({
-    channelAccessToken,
-    channelSecret: process.env.LINE_CHANNEL_SECRET || ''
-  });
-};
-
 const normalizeRelation = <T,>(value: T | T[] | null | undefined): T | null => (
   Array.isArray(value) ? value[0] || null : value || null
 );
+
+/**
+ * The refund destination, frozen onto the request at rejection time so a later
+ * edit to the pawners row cannot redirect money that is already owed. The
+ * request already carries the account the investor would have paid the increase
+ * into; the pawner profile is the fallback for older rows.
+ */
+const resolveRefundDestination = (actionRequest: any, pawner: any) => ({
+  refund_bank_name: actionRequest.pawner_bank_name || pawner?.bank_name || null,
+  refund_bank_account_no: actionRequest.pawner_bank_account_no || pawner?.bank_account_no || null,
+  refund_bank_account_name:
+    actionRequest.pawner_bank_account_name || pawner?.bank_account_name || null,
+});
 
 export async function POST(request: NextRequest) {
   let releaseLock: (() => Promise<void>) | null = null;
@@ -79,9 +92,11 @@ export async function POST(request: NextRequest) {
     const authenticatedLineId = await requireContractParty(request, contract, 'INVESTOR');
     releaseLock = await acquireFinancialLock(`contract-action-contract:${actionRequest.contract_id}`);
 
+    // Re-read the payment evidence under the lock too: a slip verifying
+    // concurrently must not be missed when deciding whether money is owed back.
     const { data: lockedActionState, error: lockedActionError } = await supabase
       .from('contract_action_requests')
-      .select('request_status')
+      .select('request_status, slip_verification_result, slip_url, total_amount, interest_for_period, refund_status')
       .eq('request_id', requestId)
       .single();
     if (lockedActionError || !lockedActionState) {
@@ -91,9 +106,44 @@ export async function POST(request: NextRequest) {
       );
     }
     actionRequest.request_status = lockedActionState.request_status;
+    Object.assign(actionRequest, {
+      slip_verification_result: lockedActionState.slip_verification_result,
+      slip_url: lockedActionState.slip_url,
+      total_amount: lockedActionState.total_amount,
+      interest_for_period: lockedActionState.interest_for_period,
+    });
+
+    // PENDING_INVESTOR_APPROVAL is reachable only from verify-slip on a MATCHED
+    // slip, so a rejection is nearly always a rejection of money already taken.
+    const collectedAmount = collectedAmountFor(actionRequest);
+    const refundOwed = wasPaidByPawner(actionRequest);
+    const refundReference = buildRefundReference(requestId);
+    const refundDestination = resolveRefundDestination(actionRequest, pawner);
+    const refundDestinationLabel = formatRefundDestination({
+      bankName: refundDestination.refund_bank_name,
+      accountNo: refundDestination.refund_bank_account_no,
+    });
 
     if (action === 'REJECT') {
       if (actionRequest.request_status === 'INVESTOR_REJECTED') {
+        // A row rejected before refunds existed still owes the money. Record
+        // the obligation now; the null guard makes the retry a no-op.
+        if (refundOwed && lockedActionState.refund_status == null) {
+          await supabase
+            .from('contract_action_requests')
+            .update({
+              refund_status: 'PENDING',
+              refund_amount: collectedAmount,
+              refund_reason: REFUND_REJECTED_INCREASE_REASON,
+              refund_reference: refundReference,
+              refund_due_at: new Date().toISOString(),
+              ...refundDestination,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('request_id', requestId)
+            .eq('request_status', 'INVESTOR_REJECTED')
+            .is('refund_status', null);
+        }
         return NextResponse.json({
           success: true,
           alreadyProcessed: true,
@@ -107,22 +157,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // A verified payment sitting against a rejected request is an unresolved
-      // obligation, not a closed matter. Record it on the request and in the
-      // action log so it is discoverable, rather than leaving the money with no
-      // trace of why it is here.
-      const paidInterestAmount = ['SLIP_VERIFIED', 'PENDING_INVESTOR_APPROVAL', 'AWAITING_INVESTOR_APPROVAL']
-        .includes(actionRequest.request_status)
-        ? Number(actionRequest.interest_to_pay || 0)
-        : 0;
-
-      // Update request status
+      // The obligation is written in the SAME guarded update as the rejection,
+      // so a rejection can never land without the refund that must follow it.
+      // refund_status is deliberately not a request_status value: the request
+      // really is finished and rejected, and putting a refund-pending request
+      // into ACTIVE_REQUEST_STATUSES would lock the pawner out of every other
+      // contract action until a human finished a bank transfer.
       const { data: updatedRequest, error: updateError } = await supabase
         .from('contract_action_requests')
         .update({
           request_status: 'INVESTOR_REJECTED',
           investor_rejection_reason: normalizedReason,
           investor_rejected_at: new Date().toISOString(),
+          refund_status: refundOwed ? 'PENDING' : 'NOT_REQUIRED',
+          refund_amount: refundOwed ? collectedAmount : null,
+          refund_reason: refundOwed ? REFUND_REJECTED_INCREASE_REASON : null,
+          refund_reference: refundOwed ? refundReference : null,
+          refund_due_at: refundOwed ? new Date().toISOString() : null,
+          ...(refundOwed ? refundDestination : {}),
           updated_at: new Date().toISOString(),
         })
         .eq('request_id', requestId)
@@ -140,7 +192,27 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Log rejection
+      // The penalty portion of this payment marked a penalty_payments row
+      // VERIFIED with paid_through_date = today. Refunding it means the pawner
+      // did not pay it after all, so the ledger must not keep saying they did.
+      // A failure here is a one-day leak; a missing refund record is a lost
+      // liability, so this never aborts the rejection.
+      if (refundOwed && actionRequest.slip_url) {
+        const { error: penaltyReversalError } = await supabase
+          .from('penalty_payments')
+          .update({
+            status: 'CANCELLED',
+            paid_through_date: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('contract_id', actionRequest.contract_id)
+          .eq('slip_url', actionRequest.slip_url)
+          .eq('status', 'VERIFIED');
+        if (penaltyReversalError) {
+          console.error('[contract-action:investor-response] penalty reversal failed');
+        }
+      }
+
       await logContractAction(
         actionRequest.contract_id,
         'INVESTOR_REJECTED',
@@ -150,56 +222,94 @@ export async function POST(request: NextRequest) {
         {
           actionRequestId: requestId,
           rejectionReason: normalizedReason,
-          // Surfaces the unresolved obligation in the audit trail so a rejected
-          // request that already took money is findable by finance.
-          ...(paidInterestAmount > 0
-            ? { description: `ผู้จำนำชำระแล้ว ${paidInterestAmount} บาท ก่อนถูกปฏิเสธ - รอดำเนินการคืนเงินหรือปรับปรุงสัญญา` }
-            : {}),
           description: `Investor rejected principal increase request. Reason: ${normalizedReason}`,
-          metadata: {
-            actionType: 'PRINCIPAL_INCREASE',
-          },
+          metadata: { actionType: 'PRINCIPAL_INCREASE' },
         }
       );
 
-      // Notify pawner
-      if (pawner?.line_id) {
-        try {
-          const pawnerLineClient = getPawnerLineClient();
-          if (!pawnerLineClient) {
-            throw new Error('Seller LINE OA is not configured');
-          }
+      // A separate log line, because the refund is a separate obligation with
+      // its own lifecycle - finance closes it, not the investor.
+      if (refundOwed) {
+        await logContractAction(
+          actionRequest.contract_id,
+          'REFUND_DUE',
+          'PENDING',
+          'SYSTEM',
+          null,
+          {
+            actionRequestId: requestId,
+            amount: collectedAmount,
+            description: `ต้องคืนเงินผู้จำนำ ${collectedAmount.toLocaleString()} บาท (${refundReference})`,
+            metadata: {
+              actionType: 'PRINCIPAL_INCREASE',
+              refundReference,
+              slipUrl: actionRequest.slip_url,
+              missingBankDetails: !refundDestination.refund_bank_account_no,
+            },
+          },
+        ).catch(() => {});
+      }
 
-          await pawnerLineClient.pushMessage(pawner.line_id, {
-            type: 'text',
-            // The pawner has usually ALREADY paid the accrued interest by this
-            // point - that is what moves the request to PENDING_INVESTOR_APPROVAL.
-            // Saying only "rejected" left them with money gone and no idea what
-            // became of it, so the message names the payment explicitly.
-            text: [
-              'คำขอเพิ่มเงินต้นถูกปฏิเสธ',
+      // The pawner has already paid by this point - that payment is what moved
+      // the request to PENDING_INVESTOR_APPROVAL. Saying only "rejected" left
+      // them with the money gone and no idea what became of it, so the amount,
+      // the destination, who is sending it and by when are all named. The
+      // wording credits a person, because a person is what moves the money.
+      await pushLineTextMessage({
+        to: pawner?.line_id,
+        text: [
+          'คำขอเพิ่มเงินต้นถูกปฏิเสธ',
+          '',
+          `จำนวนที่ขอ: ${Number(actionRequest.increase_amount || 0).toLocaleString()} บาท`,
+          `เหตุผล: ${normalizedReason}`,
+          ...(refundOwed
+            ? [
               '',
-              `จำนวนที่ขอ: ${actionRequest.increase_amount?.toLocaleString()} บาท`,
-              `เหตุผล: ${normalizedReason}`,
-              ...(paidInterestAmount > 0
-                ? [
-                  '',
-                  `เงินที่คุณชำระไว้แล้ว ${paidInterestAmount.toLocaleString()} บาท ยังอยู่ในระบบและไม่ได้สูญหาย`,
-                  'เจ้าหน้าที่จะติดต่อกลับเพื่อดำเนินการต่อ',
-                ]
-                : []),
-              '',
-              'หากมีข้อสงสัย กรุณาติดต่อฝ่ายสนับสนุน',
-            ].join('\n')
-          });
-        } catch {
-          console.error('[contract-action:investor-response] seller notification delayed');
-        }
+              `บริษัทจะคืนเงินที่คุณชำระไว้ ${collectedAmount.toLocaleString()} บาท เต็มจำนวน`,
+              ...(refundDestinationLabel ? [`โอนเข้าบัญชี: ${refundDestinationLabel}`] : []),
+              `เจ้าหน้าที่จะดำเนินการโอนคืนภายใน ${REFUND_SLA_BUSINESS_DAYS} วันทำการ`,
+              'ดูสถานะการคืนเงินได้ที่หน้าคำขอ',
+            ]
+            : []),
+          '',
+          `สอบถามเพิ่มเติม โทร ${SUPPORT_PHONE}`,
+        ].join('\n'),
+        retryKey: lineRetryKeyFromMaterial(`refund-due:${requestId}`),
+      }).catch(() => {
+        console.error('[contract-action:investor-response] seller notification delayed');
+      });
+
+      // Without this the obligation is recorded in a table and never becomes
+      // anyone's task.
+      if (refundOwed) {
+        await sendAdminMessage({
+          type: 'text',
+          text: [
+            'ต้องคืนเงินผู้จำนำ (นักลงทุนปฏิเสธคำขอเพิ่มเงินต้น)',
+            '',
+            `สัญญา: ${contract?.contract_number || actionRequest.contract_id}`,
+            `อ้างอิง: ${refundReference}`,
+            `จำนวน: ${collectedAmount.toLocaleString()} บาท`,
+            refundDestinationLabel
+              ? `โอนเข้าบัญชี: ${refundDestinationLabel}`
+              : 'ยังไม่มีบัญชีปลายทาง - ต้องติดต่อผู้จำนำ',
+            ...(refundDestination.refund_bank_account_name
+              ? [`ชื่อบัญชี: ${refundDestination.refund_bank_account_name}`]
+              : []),
+            '',
+            `กำหนด: ภายใน ${REFUND_SLA_BUSINESS_DAYS} วันทำการ`,
+          ].join('\n'),
+        }).catch(() => {
+          console.error('[contract-action:investor-response] admin refund alert delayed');
+        });
       }
 
       return NextResponse.json({
         success: true,
         message: 'ปฏิเสธคำขอเรียบร้อยแล้ว',
+        refund: refundOwed
+          ? { status: 'PENDING', amount: collectedAmount, reference: refundReference }
+          : { status: 'NOT_REQUIRED' },
       });
     }
 
