@@ -13,6 +13,7 @@ import {
   sanitizedServerError,
   transactionRequestErrorResponse,
 } from '@/lib/security/transaction-request';
+import { getRenewedContractWindow } from '@/lib/utils/renewal-window';
 
 const round2 = (value: number) => Math.round(value * 100) / 100;
 const msPerDay = 1000 * 60 * 60 * 24;
@@ -22,11 +23,6 @@ const toUtcDateOnly = (value: string | Date) => {
   return new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth(), source.getUTCDate()));
 };
 
-const addUtcDays = (value: Date, days: number) => {
-  const result = new Date(value);
-  result.setUTCDate(result.getUTCDate() + days);
-  return result;
-};
 
 const buildContractNumber = (requestId: string, createdAt?: string) => {
   const datePart = new Date(createdAt || 0).toISOString().slice(0, 10).replace(/-/g, '');
@@ -44,6 +40,10 @@ const buildRenewedContractRecord = (params: {
   requestId: string;
   requestCreatedAt?: string;
   signedContractUrl?: string | null;
+  /** Interest the pawner paid to reach this increase. */
+  interestPaidNow: number;
+  /** How much the principal went up by. */
+  principalIncreasedNow: number;
 }) => {
   const platformFeeRate = params.contract.platform_fee_rate ?? 0.015;
   const platformFeeAmount = round2(params.principalAmount * platformFeeRate * (params.durationDays / 30));
@@ -82,12 +82,31 @@ const buildRenewedContractRecord = (params: {
     payment_slip_url: params.contract.payment_slip_url,
     payment_confirmed_at: params.contract.payment_confirmed_at,
     payment_status: params.contract.payment_status,
-    original_principal_amount: params.principalAmount,
+    // The platform-fee base. It rises when the pawner genuinely borrows more,
+    // but never falls: taking 10,000, paying down to 4,000 and then topping up
+    // to 6,000 must not leave the fee charged on 6,000 when the pawner was
+    // quoted a fee fixed on the amount they started at. Assigning the new
+    // principal outright did exactly that.
+    original_principal_amount: Math.max(
+      Number(
+        params.contract.original_principal_amount
+        ?? params.contract.loan_principal_amount
+        ?? params.principalAmount,
+      ),
+      params.principalAmount,
+    ),
     current_principal_amount: params.principalAmount,
-    total_interest_paid: 0,
-    total_principal_reduced: 0,
-    total_principal_increased: 0,
-    extension_count: 0,
+    // LIFETIME counters, carried across the renewal. Hard-coding them to zero
+    // erased the pawner's entire payment history on every principal increase -
+    // the record only ever lived on the row this action then marks COMPLETED.
+    total_interest_paid: round2(
+      Number(params.contract.total_interest_paid || 0) + params.interestPaidNow,
+    ),
+    total_principal_reduced: Number(params.contract.total_principal_reduced || 0),
+    total_principal_increased: round2(
+      Number(params.contract.total_principal_increased || 0) + params.principalIncreasedNow,
+    ),
+    extension_count: Number(params.contract.extension_count || 0),
     redemption_status: 'NONE',
     funded_at: params.contract.funded_at,
     disbursed_at: params.contract.disbursed_at,
@@ -186,8 +205,14 @@ export async function POST(request: NextRequest) {
       || Math.ceil((contractEndDate.getTime() - contractStartDateOriginal.getTime()) / msPerDay);
     const durationDays = Math.max(1, rawDurationDays);
     const principalAmount = Number(actionRequest.principal_after_increase || contract.current_principal_amount || contract.loan_principal_amount || 0);
-    const contractStartDate = new Date(contractEndDate);
-    const contractEndDateNew = addUtcDays(contractStartDate, durationDays);
+    // The replacement term runs from today, not from where the old term ended.
+    // The pawner settled interest up to now as part of this request, so the
+    // days they paid for are behind them; starting the new term at the old end
+    // date handed them the unused remainder of the old term for free and dated
+    // the contract into the future. Shared with the other renewal paths so the
+    // quote, the request and the resulting contract cannot disagree.
+    const { contractStartDate, contractEndDate: contractEndDateNew } =
+      getRenewedContractWindow(durationDays, contractEndDate);
     const interestAmount = round2(principalAmount * monthlyInterestRate * (durationDays / 30));
 
     const renewedContractRecord = buildRenewedContractRecord({
@@ -200,6 +225,8 @@ export async function POST(request: NextRequest) {
       requestId,
       requestCreatedAt: actionRequest.created_at,
       signedContractUrl: actionRequest.pawner_signature_url || contract.signed_contract_url,
+      interestPaidNow: Number(actionRequest.interest_to_pay || 0),
+      principalIncreasedNow: Number(actionRequest.increase_amount || 0),
     });
     const { data: insertedContract, error: newContractError } = await supabase
       .from('contracts')
@@ -232,6 +259,15 @@ export async function POST(request: NextRequest) {
         completed_at: now.toISOString(),
         last_action_date: now.toISOString(),
         last_action_type: actionRequest.request_type,
+        // What the pawner actually paid to close this term. Without it the
+        // retiring row was marked COMPLETED with every payment counter still at
+        // zero, so nothing recorded that money had changed hands.
+        interest_paid: round2(
+          Number(contract.interest_paid || 0) + Number(actionRequest.interest_to_pay || 0),
+        ),
+        amount_paid: round2(
+          Number(contract.amount_paid || 0) + Number(actionRequest.total_amount || 0),
+        ),
         updated_at: now.toISOString(),
       })
       .eq('contract_id', actionRequest.contract_id);

@@ -1,19 +1,26 @@
 /**
  * The date window for a contract that replaces one being renewed.
  *
- * There were three copies of this - in contract-actions/calculate, /create and
- * /complete - and they all restarted the term from tomorrow regardless of when
- * the old one ended. That quietly ate time the pawner had already paid for:
- * renewing on day 2 of a 30-day contract bought a full month of interest and
- * moved the due date out by ONE day.
+ * A renewal resets the clock from the day the pawner pays. They settle the
+ * interest for the days actually used - 3 Aug to 10 Aug if they renew on the
+ * 10th - and the replacement contract then runs its own full term from that
+ * day. Unused days from the old term are not carried over, because they were
+ * never paid for.
  *
- * A renewal continues the borrowing, so the new term begins the day after the
- * old one finishes. Someone renewing late does not get a back-dated term, so
- * the start is whichever of (day after the old end) and (tomorrow) is later.
+ *   old term   3 Aug -> 2 Sep, renewed on 10 Aug
+ *   interest   3 Aug -> 10 Aug (the days used)
+ *   new term   10 Aug -> 9 Sep (a full term from the payment date)
  *
- * Three copies also meant the quote, the request and the contract could each
- * compute a different due date - the pawner could be shown one date and given
- * another. One implementation removes that class of drift.
+ * This deliberately matches how a first contract is dated in
+ * /api/contracts/create - start today at UTC midnight, end start + duration
+ * days - so an original and a renewed contract of the same length are the same
+ * length. Renewal previously started from TOMORROW and ended a day short, which
+ * made every renewed term differ from an original one by a day at each end.
+ *
+ * There were three copies of this logic (calculate, create, complete). Three
+ * copies means the quote, the request and the resulting contract can each
+ * produce a different due date, so the pawner can be shown one and given
+ * another. One implementation removes that.
  */
 
 const MAX_DURATION_DAYS = 3_650;
@@ -29,33 +36,26 @@ export interface RenewedContractWindow {
   contractEndDate: Date;
 }
 
+/**
+ * @param durationDays term length of the replacement contract
+ * @param _previousEndDate accepted for call-site symmetry and ignored: the new
+ *        term starts from the payment date, not from where the old one ended.
+ */
 export function getRenewedContractWindow(
   durationDays: number,
-  previousEndDate?: Date | string | null,
+  _previousEndDate?: Date | string | null,
 ): RenewedContractWindow {
   const normalizedDuration = Math.max(1, Math.min(Math.round(durationDays), MAX_DURATION_DAYS));
 
   const now = new Date();
-  const tomorrow = new Date(Date.UTC(
+  const contractStartDate = new Date(Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
-    now.getUTCDate() + 1,
+    now.getUTCDate(),
   ));
-
-  const previous = previousEndDate ? new Date(previousEndDate) : null;
-  const dayAfterPrevious = previous && Number.isFinite(previous.getTime())
-    ? addUtcDays(
-      new Date(Date.UTC(previous.getUTCFullYear(), previous.getUTCMonth(), previous.getUTCDate())),
-      1,
-    )
-    : null;
-
-  const contractStartDate = dayAfterPrevious && dayAfterPrevious.getTime() > tomorrow.getTime()
-    ? dayAfterPrevious
-    : tomorrow;
 
   return {
     contractStartDate,
-    contractEndDate: addUtcDays(contractStartDate, normalizedDuration - 1),
+    contractEndDate: addUtcDays(contractStartDate, normalizedDuration),
   };
 }
