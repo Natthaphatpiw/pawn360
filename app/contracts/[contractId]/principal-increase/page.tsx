@@ -598,7 +598,7 @@ export default function PrincipalIncreasePage() {
                       <span className="font-bold text-blue-800">{overdueInterestAmount.toLocaleString()} บาท</span>
                     </div>
                     <p className="text-[11px] text-primary mt-1">
-                      เกินกำหนดแล้ว {calculation?.penalty?.daysOverdue || 0} วัน คิดค่าปรับเดือนละ 50 บาท และดอกเบี้ยเลท 3%/เดือน
+                      เกินกำหนดแล้ว {calculation?.penalty?.daysOverdue || 0} วัน คิดค่าปรับวันละ 100 บาท และดอกเบี้ยเลท 3%/เดือน
                     </p>
                   </>
                 )}

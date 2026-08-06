@@ -162,7 +162,10 @@ export async function POST(request: NextRequest) {
     if (verificationResult.result === 'MATCHED') {
       updateData.status = 'VERIFIED';
       updateData.verified_at = new Date().toISOString();
-      updateData.paid_through_date = toDateString(new Date());
+      // The slip was verified against payment.penalty_amount, which was frozen
+      // on the row's penalty_date. Crediting through TODAY instead would give
+      // away every day between the quote and the verification.
+      updateData.paid_through_date = toDateString(payment.penalty_date || new Date());
 
       const updated = await persistPenaltyUpdate(supabase, penaltyId, updateData);
       if (!updated) {

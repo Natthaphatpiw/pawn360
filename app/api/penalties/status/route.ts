@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { buildPenaltyLiffUrl, getPenaltyRequirement, toDateString } from '@/lib/services/penalty';
+import {
+  PENALTY_PER_DAY,
+  buildPenaltyLiffUrl,
+  getPenaltyRequirement,
+  roundCurrency,
+  toDateString,
+} from '@/lib/services/penalty';
 import { requireLiffIdentity } from '@/lib/security/liff-auth';
 import { liffAuthErrorResponse } from '@/lib/security/request-auth';
 import {
@@ -87,9 +93,16 @@ export async function GET(request: NextRequest) {
         contractEndDate: requirement.contractEndDate.toISOString(),
         today: requirement.today.toISOString(),
         daysOverdue: requirement.daysOverdue,
+        // The screen renders the rate and the day count and lets the pawner
+        // check the multiplication, so both have to come from the engine.
+        penaltyPerDay: roundCurrency(PENALTY_PER_DAY),
+        unpaidDays: requirement.unpaidDays,
         penaltyAmount: requirement.penaltyAmount,
+        penaltyDue: requirement.penaltyDue,
         overdueInterestAmount: requirement.overdueInterestAmount,
+        overdueInterestDue: requirement.overdueInterestDue,
         totalLateChargeAmount: requirement.totalLateChargeAmount,
+        totalLateChargeDue: requirement.totalLateChargeDue,
       },
       payment: payment ? {
         paymentId: payment.penalty_id,

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/client';
-import { buildPenaltyLiffUrl, calculateOverdueDays, getPenaltyRequirement, normalizeDate } from '@/lib/services/penalty';
+import {
+  PENALTY_PER_DAY,
+  buildPenaltyLiffUrl,
+  calculateOverdueDays,
+  getPenaltyRequirement,
+  normalizeDate,
+  roundCurrency,
+} from '@/lib/services/penalty';
 import { lineRetryKeyFromMaterial, pushLineTextMessage } from '@/lib/line/push-text';
 import { acquireFinancialLock, financialLockErrorResponse } from '@/lib/security/financial-lock';
 import {
@@ -328,7 +335,7 @@ const runReminders = async (supabase: any, today: Date) => {
       const message = [
         `คุณมีสัญญาที่เริ่มต้นวันที่ ${formatThaiDate(contract.contract_start_date)} และสิ้นสุดวันที่ ${formatThaiDate(contract.contract_end_date)}`,
         `วันนี้วันที่ ${formatThaiDate(todayStart)} ซึ่งเกินกำหนดมาแล้ว ${daysOverdue} วัน`,
-        `ค่าปรับเดือนละ 50 บาท ${overdueInterestAmount > 0 ? `และดอกเบี้ยเลท ${overdueInterestAmount.toLocaleString()} บาท` : ''}`.trim(),
+        `ค่าปรับวันละ ${roundCurrency(PENALTY_PER_DAY).toLocaleString()} บาท x ${daysOverdue} วัน ${overdueInterestAmount > 0 ? `และดอกเบี้ยเลท ${overdueInterestAmount.toLocaleString()} บาท` : ''}`.trim(),
         `ยอดรวมค่าปรับและดอกเบี้ยเลท ${totalLateChargeAmount.toLocaleString()} บาท`,
         `กรุณาเข้าลิงค์นี้เพื่อทำรายการจ่ายเงินค่าปรับ ${penaltyLink}`,
       ].join('\n');

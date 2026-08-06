@@ -107,7 +107,7 @@ export default function PaymentBreakdown({
           </div>
           {b.daysOverdue > 0 && (
             <p className="mb-2 text-xs text-foreground-subtle">
-              เกินกำหนดแล้ว {b.daysOverdue} วัน คิดค่าปรับเดือนละ 50 บาท และดอกเบี้ยเลท 3%/เดือน
+              เกินกำหนดแล้ว {b.daysOverdue} วัน คิดค่าปรับวันละ 100 บาท และดอกเบี้ยเลท 3%/เดือน
             </p>
           )}
         </>

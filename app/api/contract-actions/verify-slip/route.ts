@@ -78,6 +78,7 @@ const getFrozenPenaltyRequirement = (
     penaltyDue: breakdown.penaltyAmount,
     overdueInterestDue: breakdown.overdueInterestAmount,
     totalLateChargeDue: breakdown.totalLateChargeAmount,
+    unpaidDays: breakdown.daysOverdue,
     today: breakdown.requestDate,
     contractStartDate,
     contractEndDate,

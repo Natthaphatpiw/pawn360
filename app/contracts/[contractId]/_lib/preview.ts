@@ -121,10 +121,13 @@ export function getMockRedemption(redemptionId: string, contractId: string, deli
   // The non-near-due preview carries a late charge so the payment screens can
   // be checked with the penalty and overdue-interest rows visible.
   const baseAmount = isNearDueCentralPreview ? 26705 : 10300;
-  const penaltyAmount = isNearDueCentralPreview ? 0 : 100;
+  const daysOverdue = isNearDueCentralPreview ? 0 : 34;
+  // Must stay days x PENALTY_PER_DAY, or the preview shows a breakdown that
+  // does not add up - the old 100 here was 2 months of the retired 50-a-month
+  // ladder, which no longer matches 34 days at the daily rate.
+  const penaltyAmount = daysOverdue * 100;
   const overdueInterestAmount = isNearDueCentralPreview ? 0 : 600;
   const penaltyMonths = isNearDueCentralPreview ? 0 : 2;
-  const daysOverdue = isNearDueCentralPreview ? 0 : 34;
 
   return {
     redemption_id: redemptionId,

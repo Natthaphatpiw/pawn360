@@ -3,7 +3,22 @@ import { MS_PER_DAY } from '@/lib/utils/time';
 const DAYS_PER_PENALTY_MONTH = 30;
 const OVERDUE_INTEREST_PER_MONTH = 0.03;
 
-export const PENALTY_PER_MONTH = 50;
+/**
+ * Overdue penalty, charged per calendar day late.
+ *
+ * It had become a flat charge per STARTED 30-day month
+ * (`Math.ceil(daysOverdue / 30) * 50`), so a pawner one day late owed a whole
+ * month and a pawner 31 days late owed two. Charging by the day removes that
+ * cliff and restores the rate the product has been telling pawners all along:
+ * the penalty-payment screen already printed "ค่าปรับวันละ 100 บาท" beside a
+ * total computed from the 50-a-month ladder, so the two never agreed.
+ *
+ * Changing this constant changes what pawners owe. The rate is stated in the
+ * pre-contract terms they accept (app/estimate/contract-agreement-step.tsx),
+ * on every quote screen, and in the overdue LINE reminder - all of which now
+ * render it from here rather than repeating a literal.
+ */
+export const PENALTY_PER_DAY = 100;
 export const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
 export interface PenaltyRequirement {
@@ -33,6 +48,8 @@ export interface PenaltyRequirement {
   penaltyDue: number;
   overdueInterestDue: number;
   totalLateChargeDue: number;
+  /** Overdue days not yet covered by a verified penalty payment. */
+  unpaidDays: number;
   today: Date;
   contractStartDate: Date;
   contractEndDate: Date;
@@ -67,9 +84,16 @@ export const calculateOverdueDays = (contractEndDate: Date | string, today: Date
 };
 
 export const calculatePenaltyAmount = (daysOverdue: number) => (
-  Math.max(0, Math.ceil(daysOverdue / DAYS_PER_PENALTY_MONTH)) * PENALTY_PER_MONTH
+  roundCurrency(Math.max(0, daysOverdue) * PENALTY_PER_DAY)
 );
 
+/**
+ * Months used to LABEL the overdue interest, which really is charged per
+ * started 30-day month ("ดอกเบี้ยเลท 3%/เดือน x N เดือน"). Despite the name it
+ * no longer describes the penalty, which is now per day - the name is kept
+ * because it is serialized as `penaltyMonths` and stored in
+ * redemption_requests.penalty_months.
+ */
 export const calculatePenaltyMonths = (daysOverdue: number) => (
   Math.max(0, Math.ceil(Math.max(0, daysOverdue) / DAYS_PER_PENALTY_MONTH))
 );
@@ -178,10 +202,17 @@ export const serializePenaltyRequirement = (contract: any, requirement: PenaltyR
   contractEndDate: requirement.contractEndDate.toISOString(),
   today: requirement.today.toISOString(),
   daysOverdue: requirement.daysOverdue,
-  // Both late charges are billed per started 30-day month, so the UI can state
-  // "3%/เดือน x N เดือน" instead of an unexplained lump sum.
+  // Labels the OVERDUE INTEREST, which is billed per started 30-day month, so
+  // the UI can state "3%/เดือน x N เดือน" instead of an unexplained lump sum.
+  // The penalty itself is per day - see penaltyPerDay.
   penaltyMonths: calculatePenaltyMonths(requirement.daysOverdue),
+  // Sent so screens can show "ค่าปรับวันละ X บาท" from the engine instead of a
+  // hard-coded figure. The penalty LIFF printed "100 บาท" for a rate that had
+  // not been 100 for some time, right above a total that never matched it.
+  penaltyPerDay: roundCurrency(PENALTY_PER_DAY),
   penaltyAmount: requirement.penaltyAmount,
+  penaltyDue: requirement.penaltyDue,
+  unpaidDays: requirement.unpaidDays,
   overdueInterestAmount: requirement.overdueInterestAmount,
   totalLateChargeAmount: requirement.totalLateChargeAmount,
   paidThroughDate: requirement.paidThroughDate?.toISOString() ?? null,
@@ -207,6 +238,7 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
       penaltyDue: 0,
       overdueInterestDue: 0,
       totalLateChargeDue: 0,
+      unpaidDays: 0,
       today,
       contractStartDate,
       contractEndDate,
@@ -231,19 +263,25 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
     ? normalizeDate(latest.paid_through_date)
     : null;
 
-  const isPaid = paidThroughDate
-    ? paidThroughDate.getTime() >= today.getTime()
-    : false;
+  // Now that the penalty accrues per day, a payment can settle the days it
+  // covered instead of merely muting the whole running total for one day. The
+  // old all-or-nothing rule meant a pawner who paid still saw the entire
+  // cumulative penalty re-appear the next morning - paying never reduced the
+  // debt, it only postponed it by a day.
+  const paidDays = paidThroughDate
+    ? Math.min(daysOverdue, calculateOverdueDays(contractEndDate, paidThroughDate))
+    : 0;
+  const unpaidDays = Math.max(0, daysOverdue - paidDays);
 
-  // A verified penalty payment covers the flat ladder and only the flat ladder:
-  // penalties/verify-slip bills `payment.penalty_amount`, and
-  // ensurePenaltyPaymentRecord writes only `requirement.penaltyAmount` to the
-  // ledger. The overdue interest is never part of that slip, so it stays due.
-  const penaltyDue = isPaid ? 0 : penaltyAmount;
+  // A verified penalty payment covers the penalty and only the penalty:
+  // penalties/verify-slip bills `payment.penalty_amount`, and the ledger writers
+  // record only the penalty. The overdue interest is never part of that slip,
+  // so it stays due.
+  const penaltyDue = roundCurrency(unpaidDays * PENALTY_PER_DAY);
   const overdueInterestDue = overdueInterestAmount;
 
   return {
-    required: !isPaid,
+    required: unpaidDays > 0,
     daysOverdue,
     penaltyAmount,
     overdueInterestAmount,
@@ -251,6 +289,7 @@ export const getPenaltyRequirement = async (supabase: any, contract: any): Promi
     penaltyDue,
     overdueInterestDue,
     totalLateChargeDue: roundCurrency(penaltyDue + overdueInterestDue),
+    unpaidDays,
     today,
     contractStartDate,
     contractEndDate,
@@ -293,8 +332,12 @@ export const ensurePenaltyPaymentRecord = async (
       customer_id: contract.customer_id,
       investor_id: contract.investor_id,
       penalty_date: penaltyDate,
-      days_overdue: requirement.daysOverdue,
-      penalty_amount: requirement.penaltyAmount,
+      // What is actually being collected: the days not already covered by an
+      // earlier verified payment, not the whole running total since the
+      // contract ended. Billing the cumulative figure made a pawner who had
+      // already paid once pay for those same days again.
+      days_overdue: requirement.unpaidDays,
+      penalty_amount: requirement.penaltyDue,
       status: 'PENDING',
       created_at: nowIso,
       updated_at: nowIso,
@@ -346,13 +389,20 @@ export const markPenaltyPaymentVerified = async (
   }
 
   const nowIso = new Date().toISOString();
-  const paidThroughDate = toDateString(requirement.today);
+  // The payment covers the days the QUOTE covered, which is the row's own
+  // penalty_date - not whatever day verification happened to complete on.
+  // Stamping today would hand the pawner every day between the two for free.
+  const paidThroughDate = toDateString(record.penalty_date || requirement.today);
   const { data: updated, error: updateError } = await supabase
     .from('penalty_payments')
     .update({
       status: 'VERIFIED',
-      penalty_amount: requirement.penaltyAmount,
-      days_overdue: requirement.daysOverdue,
+      // Keep whatever the PENDING row was created with - that is the figure the
+      // pawner was quoted and transferred. Overwriting it with a requirement
+      // recomputed at verification time made the ledger disagree with the slip
+      // whenever verification landed on a later day than the quote.
+      penalty_amount: record.penalty_amount ?? requirement.penaltyDue,
+      days_overdue: record.days_overdue ?? requirement.unpaidDays,
       slip_url: payload.slipUrl,
       slip_uploaded_at: nowIso,
       slip_amount_detected: payload.detectedAmount ?? null,

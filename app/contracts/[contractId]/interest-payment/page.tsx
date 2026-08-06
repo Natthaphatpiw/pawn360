@@ -434,7 +434,7 @@ export default function InterestPaymentPage() {
                 <DetailRow label="ค่าปรับเกินกำหนด" value={`${penaltyAmount.toLocaleString()} บาท`} highlight />
                 <DetailRow label={`ดอกเบี้ยเลท (3%/เดือน${Number(calculation.penalty?.penaltyMonths || 0) > 0 ? ` x ${calculation.penalty?.penaltyMonths} เดือน` : ''})`} value={`${Number(calculation.overdueInterestAmount || calculation.penalty?.overdueInterestAmount || 0).toLocaleString()} บาท`} />
                 <p className="text-xs text-primary mt-1">
-                  เกินกำหนดแล้ว {calculation.penalty?.daysOverdue || 0} วัน คิดค่าปรับเดือนละ 50 บาท และดอกเบี้ยเลท 3%/เดือน
+                  เกินกำหนดแล้ว {calculation.penalty?.daysOverdue || 0} วัน คิดค่าปรับวันละ 100 บาท และดอกเบี้ยเลท 3%/เดือน
                 </p>
               </>
             )}

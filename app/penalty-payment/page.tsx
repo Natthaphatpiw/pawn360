@@ -14,6 +14,12 @@ interface PenaltyInfo {
   today: string;
   daysOverdue: number;
   penaltyAmount: number;
+  /** From the engine. This screen used to hard-code 100 and drifted out of
+   *  sync with what was actually charged. */
+  penaltyPerDay?: number;
+  /** Days not yet covered by a verified payment - what this slip settles. */
+  unpaidDays?: number;
+  penaltyDue?: number;
 }
 
 interface CompanyBank {
@@ -319,7 +325,12 @@ function PenaltyPaymentContent() {
   const startDateText = new Date(penaltyInfo.contractStartDate).toLocaleDateString('th-TH');
   const endDateText = new Date(penaltyInfo.contractEndDate).toLocaleDateString('th-TH');
   const todayText = new Date(penaltyInfo.today).toLocaleDateString('th-TH');
-  const requiredAmount = verificationResult?.expectedAmount ?? penaltyInfo.penaltyAmount;
+  // Older servers do not send these yet; fall back to the cumulative figures so
+  // the screen degrades to its previous behaviour rather than showing zero.
+  const penaltyRate = penaltyInfo.penaltyPerDay ?? 100;
+  const penaltyPayable = penaltyInfo.penaltyDue ?? penaltyInfo.penaltyAmount;
+  const billableDays = penaltyInfo.unpaidDays ?? penaltyInfo.daysOverdue;
+  const requiredAmount = verificationResult?.expectedAmount ?? penaltyPayable;
 
   return (
     <div className="theme-liff min-h-screen bg-background font-sans flex flex-col">
@@ -361,21 +372,36 @@ function PenaltyPaymentContent() {
           <p className="text-xs text-gray-600 leading-relaxed mb-3">
             คุณมีสัญญาที่เริ่มต้นวันที่ {startDateText} และสิ้นสุดวันที่ {endDateText}
             วันนี้วันที่ {todayText} ซึ่งเกินกำหนดมาแล้ว {penaltyInfo.daysOverdue} วัน
-            ค่าปรับวันละ 100 บาท รวมเป็น {penaltyInfo.penaltyAmount.toLocaleString()} บาท
+            ค่าปรับวันละ {penaltyRate.toLocaleString()} บาท
+            {billableDays !== penaltyInfo.daysOverdue
+              ? ` ยังไม่ได้ชำระ ${billableDays} วัน`
+              : ''}
+            {' '}รวมเป็น {penaltyPayable.toLocaleString()} บาท
           </p>
           <div className="bg-primary-soft rounded-2xl p-4">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-500">วันเกินกำหนด</span>
               <span className="font-medium text-gray-800">{penaltyInfo.daysOverdue} วัน</span>
             </div>
+            {billableDays !== penaltyInfo.daysOverdue && (
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-500">ชำระค่าปรับแล้ว</span>
+                <span className="font-medium text-gray-800">
+                  {penaltyInfo.daysOverdue - billableDays} วัน
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-500">ค่าปรับ/วัน</span>
-              <span className="font-medium text-gray-800">100 บาท</span>
+              <span className="font-medium text-gray-800">{penaltyRate.toLocaleString()} บาท</span>
             </div>
             <div className="border-t border-primary-border my-2"></div>
+            {/* Rate x days must equal this total, or the pawner catches us out.
+                It previously could not: the rate was a hard-coded 100 and the
+                total came from a 50-per-month ladder. */}
             <div className="flex justify-between text-base">
-              <span className="font-semibold text-gray-700">ยอดค่าปรับรวม</span>
-              <span className="font-bold text-primary">{penaltyInfo.penaltyAmount.toLocaleString()} บาท</span>
+              <span className="font-semibold text-gray-700">ยอดค่าปรับที่ต้องชำระ</span>
+              <span className="font-bold text-primary">{penaltyPayable.toLocaleString()} บาท</span>
             </div>
           </div>
         </div>
