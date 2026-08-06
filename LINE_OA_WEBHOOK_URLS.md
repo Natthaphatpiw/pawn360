@@ -3,6 +3,10 @@
 ## Overview
 ระบบมี 3 LINE Official Accounts ที่ใช้ LIFF และ Webhooks แยกกัน
 
+> **ห้ามใส่ค่า secret จริงในไฟล์นี้** ไฟล์นี้ถูก commit ขึ้น GitHub
+> ให้เขียนเป็น *ชื่อ* environment variable แล้วเก็บค่าจริงไว้ใน Vercel env เท่านั้น
+> (Channel Secret ของ Investor เคยหลุดในไฟล์นี้ ถูกลบออกจากประวัติและ rotate แล้ว)
+
 ---
 
 ## 1. LINE OA: Pawner (ผู้จำนำ)
@@ -34,7 +38,7 @@ https://pawn360.vercel.app/api/webhook
 ### Channel Information
 - **Channel Access Token**: `<REDACTED>`
 - **LINE Login Channel ID**: `2008641671`
-- **LINE Login Channel Secret**: `REDACTED-ROTATED-SECRET`
+- **LINE Login Channel Secret**: `LINE_CHANNEL_SECRET_INVEST` (ใส่ค่าใน env)
 - **LINE Channel ID**: `2008641309`
 
 ### LIFF IDs
